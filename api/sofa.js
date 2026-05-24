@@ -1,40 +1,27 @@
-const STRATEGIES = [
-  // 1) Direct vers api.sofascore.com (échoue souvent depuis Vercel)
-  (path) => ({
-    url: `https://api.sofascore.com/api/v1/${path}`,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1',
-      'Accept': 'application/json',
-      'Accept-Language': 'fr-FR,fr;q=0.9',
-      'Referer': 'https://www.sofascore.com/',
-      'Origin': 'https://www.sofascore.com',
-    },
-  }),
-  // 2) Via le sous-domaine www (parfois moins protégé)
-  (path) => ({
-    url: `https://www.sofascore.com/api/v1/${path}`,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15',
-      'Accept': 'application/json',
-      'Referer': 'https://www.sofascore.com/',
-    },
-  }),
-  // 3) Via proxy CORS public corsproxy.io
-  (path) => ({
-    url: `https://corsproxy.io/?url=${encodeURIComponent(`https://api.sofascore.com/api/v1/${path}`)}`,
-    headers: { 'Accept': 'application/json' },
-  }),
-  // 4) Via proxy allorigins
-  (path) => ({
-    url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api.sofascore.com/api/v1/${path}`)}`,
-    headers: { 'Accept': 'application/json' },
-  }),
-  // 5) Via codetabs
-  (path) => ({
-    url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://api.sofascore.com/api/v1/${path}`)}`,
-    headers: { 'Accept': 'application/json' },
-  }),
-];
+const SOFA_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+  'Referer': 'https://www.sofascore.com/',
+  'Origin': 'https://www.sofascore.com',
+  'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+  'sec-fetch-dest': 'empty',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-site': 'same-site',
+};
+
+function isBlocked(text) {
+  if (!text) return true;
+  const t = text.trim();
+  if (t.startsWith('<')) return true;
+  try {
+    const j = JSON.parse(t);
+    if (j.error && (j.error.code === 403 || j.error.reason === 'challenge')) return true;
+  } catch {}
+  return false;
+}
 
 export default async function handler(req, res) {
   const { path } = req.query;
@@ -43,27 +30,28 @@ export default async function handler(req, res) {
   }
   const cleanPath = path.replace(/^\/+/, '');
 
+  const urls = [
+    `https://api.sofascore.com/api/v1/${cleanPath}`,
+    `https://www.sofascore.com/api/v1/${cleanPath}`,
+  ];
+
   const errors = [];
-  for (let i = 0; i < STRATEGIES.length; i++) {
+  for (let i = 0; i < urls.length; i++) {
     try {
-      const { url, headers } = STRATEGIES[i](cleanPath);
-      const upstream = await fetch(url, { headers });
-      if (!upstream.ok) {
-        errors.push(`#${i + 1}: HTTP ${upstream.status}`);
-        continue;
-      }
+      const upstream = await fetch(urls[i], { headers: SOFA_HEADERS });
       const text = await upstream.text();
-      if (!text || text.trim().startsWith('<')) {
-        errors.push(`#${i + 1}: réponse HTML`);
-        continue;
-      }
+      if (!upstream.ok) { errors.push(`#${i+1}: HTTP ${upstream.status}`); continue; }
+      if (isBlocked(text)) { errors.push(`#${i+1}: challenge détecté`); continue; }
       res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate');
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('X-Strategy-Used', String(i + 1));
       return res.status(200).send(text);
     } catch (e) {
-      errors.push(`#${i + 1}: ${e.message}`);
+      errors.push(`#${i+1}: ${e.message}`);
     }
   }
-  return res.status(502).json({ error: 'Toutes les stratégies ont échoué', details: errors });
+  return res.status(502).json({
+    error: 'Sofascore bloque depuis Vercel. Passer au plan B (GitHub Actions).',
+    details: errors,
+  });
 }
