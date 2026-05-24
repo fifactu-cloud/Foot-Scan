@@ -1,0 +1,51 @@
+name: Scrape Sofascore
+
+on:
+  workflow_dispatch:
+    inputs:
+      jobId:
+        required: true
+        type: string
+      matchId:
+        required: true
+        type: string
+      skipHome:
+        required: false
+        default: '0'
+        type: string
+      skipAway:
+        required: false
+        default: '0'
+        type: string
+      maxNeeded:
+        required: false
+        default: '6'
+        type: string
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'curl_cffi>=0.7,<1.0'
+      - name: Run scraper
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          JOB_ID: ${{ inputs.jobId }}
+          MATCH_ID: ${{ inputs.matchId }}
+          SKIP_HOME: ${{ inputs.skipHome }}
+          SKIP_AWAY: ${{ inputs.skipAway }}
+          MAX_NEEDED: ${{ inputs.maxNeeded }}
+        run: python scripts/scrape.py
+      - name: Mark job as failed if workflow errored
+        if: failure()
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          JOB_ID: ${{ inputs.jobId }}
+        run: python scripts/mark_failed.py
