@@ -63,7 +63,7 @@
       const d = await fetchJSON(`event/${id}`);
       const ev = d.event || d;
       if (!ev?.homeTeam || !ev?.awayTeam) {
-        throw new Error('Match introuvable ou format inattendu');
+throw new Error(`Format inattendu. Clés: [${Object.keys(d||{}).slice(0,8).join(', ')}] — Sample: ${JSON.stringify(d).slice(0,200)}`);
       }
       return ev;
     };
