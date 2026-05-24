@@ -32,7 +32,6 @@
     import React, { useState } from 'react';
     import { createRoot } from 'react-dom/client';
 
-    // === BARÈME ===
     const VALUES = {
       goal: 1, goalWithAssist: 1.5, assist: 0.5,
       yellow: -0.5, secondYellow: -1.5, red: -1,
@@ -42,15 +41,40 @@
       yellow: 'Jaune', secondYellow: '2ᵉ jaune', red: 'Rouge direct',
     };
 
-    // === API via notre propre proxy serverless ===
     async function fetchJSON(path) {
       const res = await fetch(`/api/sofa?path=${encodeURIComponent(path)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
+      const text = await res.text();
+      if (!res.ok) {
+        try {
+          const errJson = JSON.parse(text);
+          throw new Error(errJson.error + (errJson.details ? ` — ${errJson.details.join(', ')}` : ''));
+        } catch {
+          throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+        }
+      }
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`JSON invalide reçu (début: ${text.slice(0, 60)})`);
+      }
     }
-    const fetchMatch = async (id) => (await fetchJSON(`event/${id}`)).event;
-    const fetchIncidents = async (id) => (await fetchJSON(`event/${id}/incidents`)).incidents || [];
-    const fetchTeamLast = async (teamId, page = 0) => (await fetchJSON(`team/${teamId}/events/last/${page}`)).events || [];
+
+    const fetchMatch = async (id) => {
+      const d = await fetchJSON(`event/${id}`);
+      const ev = d.event || d;
+      if (!ev?.homeTeam || !ev?.awayTeam) {
+        throw new Error('Match introuvable ou format inattendu');
+      }
+      return ev;
+    };
+    const fetchIncidents = async (id) => {
+      const d = await fetchJSON(`event/${id}/incidents`);
+      return d.incidents || (Array.isArray(d) ? d : []);
+    };
+    const fetchTeamLast = async (teamId, page = 0) => {
+      const d = await fetchJSON(`team/${teamId}/events/last/${page}`);
+      return d.events || (Array.isArray(d) ? d : []);
+    };
 
     function extractMatchId(input) {
       if (!input) return '';
@@ -60,7 +84,6 @@
       return m ? m[1] : s;
     }
 
-    // === PARSING ===
     function parseIncidents(incidents, matchLabel, matchId) {
       const events = [];
       for (const inc of incidents) {
@@ -146,7 +169,6 @@
       return { events: allEvents, matchesUsed };
     }
 
-    // === UI ===
     const e = React.createElement;
 
     function SkipPicker({ label, value, setValue }) {
@@ -351,7 +373,7 @@
             disabled: loading,
             className: 'display w-full bg-red-600 hover:bg-red-500 disabled:bg-stone-800 text-white py-4 rounded text-2xl tracking-wider transition',
           }, loading ? 'Scan en cours…' : 'Scanner →'),
-          error && e('div', { className: 'bg-red-950/40 border border-red-900 text-red-300 px-4 py-3 rounded text-sm' }, error),
+          error && e('div', { className: 'bg-red-950/40 border border-red-900 text-red-300 px-4 py-3 rounded text-sm break-words' }, error),
           result && e('div', { className: 'space-y-5 pt-2' },
             e(TeamColumn, { team: result.home, rank1: result.rank1, rank2: result.rank2, side: 'domicile' }),
             e('div', { className: 'flex items-center gap-3' },
