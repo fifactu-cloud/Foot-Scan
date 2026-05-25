@@ -385,6 +385,152 @@
       box-shadow: 0 12px 24px rgba(239, 68, 68, 0.18);
     }
 
+    .autoBox {
+      border-radius: 16px;
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      background:
+        linear-gradient(135deg, rgba(56, 189, 248, 0.10), rgba(34, 197, 94, 0.045)),
+        #101010;
+      overflow: hidden;
+    }
+
+    .autoHead {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .autoTitle {
+      font-size: 16px;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+    }
+
+    .autoSub {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .autoBadge {
+      padding: 7px 9px;
+      border-radius: 10px;
+      background: rgba(56, 189, 248, 0.10);
+      border: 1px solid rgba(56, 189, 248, 0.20);
+      color: #bae6fd;
+      font-size: 11px;
+      font-weight: 1000;
+      white-space: nowrap;
+    }
+
+    .autoBody {
+      padding: 14px;
+      display: grid;
+      gap: 13px;
+    }
+
+    .autoGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 560px) {
+      .autoGrid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .autoControl {
+      display: grid;
+      gap: 8px;
+    }
+
+    .autoControlTop {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .autoControlTitle {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 1000;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .autoNumber {
+      width: 88px;
+      padding: 10px 10px;
+      border-radius: 10px;
+      text-align: center;
+      font-weight: 1000;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      accent-color: var(--red);
+    }
+
+    .autoResult {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .autoResultCard {
+      padding: 13px;
+      border-radius: 13px;
+      background: #171717;
+      border: 1px solid var(--line);
+    }
+
+    .autoResultLabel {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 1000;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .autoResultValue {
+      font-size: 30px;
+      font-weight: 1000;
+      letter-spacing: -0.06em;
+      line-height: 1;
+      color: var(--green);
+    }
+
+    .autoFormula {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.20);
+      border: 1px solid var(--line);
+    }
+
+    .autoApplyBtn {
+      min-height: 50px;
+      border: 0;
+      border-radius: 13px;
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+      color: white;
+      font-size: 15px;
+      font-weight: 1000;
+      box-shadow: 0 14px 30px rgba(56, 189, 248, 0.18);
+    }
+
     .scanBtn {
       width: 100%;
       min-height: 62px;
@@ -1020,12 +1166,62 @@
         <div class="two">
           <div>
             <label for="rank1">Rang 1</label>
-            <input id="rank1" placeholder="Ex: 52.25" inputmode="decimal" />
+            <input id="rank1" placeholder="Ex: 23.5" inputmode="decimal" />
           </div>
 
           <div>
             <label for="rank2">Rang 2 optionnel</label>
-            <input id="rank2" placeholder="Ex: 79.75 ou vide" inputmode="decimal" />
+            <input id="rank2" placeholder="Ex: 38.5 ou vide" inputmode="decimal" />
+          </div>
+        </div>
+
+        <div class="autoBox">
+          <div class="autoHead">
+            <div>
+              <div class="autoTitle">Calcul automatique des rangs</div>
+              <div class="autoSub">Entre la valeur 0–12 et le nombre de rouges. Le site calcule les deux rangs.</div>
+            </div>
+            <div class="autoBadge">Base 66</div>
+          </div>
+
+          <div class="autoBody">
+            <div class="autoGrid">
+              <div class="autoControl">
+                <div class="autoControlTop">
+                  <div class="autoControlTitle">Valeur</div>
+                  <input id="autoValueNumber" class="autoNumber" type="number" min="0" max="12" step="0.125" value="10" />
+                </div>
+                <input id="autoValueRange" type="range" min="0" max="12" step="0.125" value="10" />
+              </div>
+
+              <div class="autoControl">
+                <div class="autoControlTop">
+                  <div class="autoControlTitle">Cartons rouges</div>
+                  <input id="autoRedNumber" class="autoNumber" type="number" min="0" max="8" step="1" value="0" />
+                </div>
+                <input id="autoRedRange" type="range" min="0" max="8" step="1" value="0" />
+              </div>
+            </div>
+
+            <div class="autoResult">
+              <div class="autoResultCard">
+                <div class="autoResultLabel">Rang bas</div>
+                <div class="autoResultValue" id="autoLow">25.5</div>
+              </div>
+
+              <div class="autoResultCard">
+                <div class="autoResultLabel">Rang haut</div>
+                <div class="autoResultValue" id="autoHigh">40.5</div>
+              </div>
+            </div>
+
+            <div class="autoFormula" id="autoFormula">
+              Valeur 10 × 1.5 = 15 · rouges 0 × 2 = 0 · résultats : 25.5 / 40.5
+            </div>
+
+            <button class="autoApplyBtn" id="applyAutoRanksBtn" type="button">
+              Appliquer aux rangs
+            </button>
           </div>
         </div>
 
@@ -1107,6 +1303,7 @@
     let lastResult = null;
 
     const REPORT_KEY = "footscan_session_report_v1";
+    const AUTO_BASE = 66;
 
     const LABELS = {
       goal: "But",
@@ -1156,6 +1353,21 @@
       return `${rounded > 0 ? "+" : ""}${rounded}`;
     }
 
+    function formatRank(value) {
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
+        return "";
+      }
+
+      return String(Math.round(number * 10000) / 10000);
+    }
+
+    function clamp(number, min, max) {
+      if (!Number.isFinite(number)) return min;
+      return Math.max(min, Math.min(max, number));
+    }
+
     function logoUrl(teamId) {
       return `/api/logo?teamId=${encodeURIComponent(teamId)}`;
     }
@@ -1171,7 +1383,78 @@
         return "";
       }
 
-      return ` · poids ${Math.round(weight * 100)}%`;
+      const percent = Math.round(weight * 1000) / 10;
+      return ` · poids ${percent}%`;
+    }
+
+    function getAutoValues() {
+      const rawValue = parseFloat(String($("autoValueNumber").value).replace(",", "."));
+      const rawReds = parseInt(String($("autoRedNumber").value), 10);
+
+      const value = clamp(rawValue, 0, 12);
+      const reds = clamp(rawReds, 0, 8);
+
+      return {
+        value,
+        reds: Math.floor(reds),
+      };
+    }
+
+    function calculateAutoRanks() {
+      const { value, reds } = getAutoValues();
+
+      const margin = value * 1.5;
+      const redPenalty = reds * 2;
+
+      const lowBeforeRed = AUTO_BASE - margin;
+      const highBeforeRed = AUTO_BASE + margin;
+
+      const lowAfterRed = lowBeforeRed - redPenalty;
+      const highAfterRed = highBeforeRed - redPenalty;
+
+      const low = lowAfterRed / 2;
+      const high = highAfterRed / 2;
+
+      return {
+        value,
+        reds,
+        margin,
+        redPenalty,
+        lowBeforeRed,
+        highBeforeRed,
+        lowAfterRed,
+        highAfterRed,
+        low,
+        high,
+      };
+    }
+
+    function updateAutoCalculator() {
+      const calc = calculateAutoRanks();
+
+      $("autoValueNumber").value = formatRank(calc.value);
+      $("autoValueRange").value = calc.value;
+
+      $("autoRedNumber").value = calc.reds;
+      $("autoRedRange").value = calc.reds;
+
+      $("autoLow").textContent = formatRank(calc.low);
+      $("autoHigh").textContent = formatRank(calc.high);
+
+      $("autoFormula").textContent =
+        `Valeur ${formatRank(calc.value)} × 1.5 = ${formatRank(calc.margin)} · ` +
+        `rouges ${calc.reds} × 2 = ${formatRank(calc.redPenalty)} · ` +
+        `avant division : ${formatRank(calc.lowAfterRed)} / ${formatRank(calc.highAfterRed)} · ` +
+        `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+    }
+
+    function applyAutoRanks() {
+      const calc = calculateAutoRanks();
+
+      $("rank1").value = formatRank(calc.low);
+      $("rank2").value = formatRank(calc.high);
+
+      setStatus(`Rangs appliqués : ${formatRank(calc.low)} / ${formatRank(calc.high)}`, 0);
     }
 
     function setStatus(message, progress = 0) {
@@ -1740,7 +2023,28 @@
     $("copyReportBtn").addEventListener("click", copyReport);
     $("clearReportBtn").addEventListener("click", clearReport);
 
+    $("autoValueRange").addEventListener("input", () => {
+      $("autoValueNumber").value = $("autoValueRange").value;
+      updateAutoCalculator();
+    });
+
+    $("autoValueNumber").addEventListener("input", () => {
+      updateAutoCalculator();
+    });
+
+    $("autoRedRange").addEventListener("input", () => {
+      $("autoRedNumber").value = $("autoRedRange").value;
+      updateAutoCalculator();
+    });
+
+    $("autoRedNumber").addEventListener("input", () => {
+      updateAutoCalculator();
+    });
+
+    $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
+
     updateReportCount();
+    updateAutoCalculator();
   </script>
 </body>
 </html>
