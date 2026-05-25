@@ -15,12 +15,13 @@ SKIP_HOME = int(os.environ.get("SKIP_HOME", "0") or 0)
 SKIP_AWAY = int(os.environ.get("SKIP_AWAY", "0") or 0)
 MAX_NEEDED = int(os.environ.get("MAX_NEEDED", "6") or 6)
 
+HEADLESS = os.environ.get("HEADLESS", "1") != "0"
 
 STEALTH_JS = """
-Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-Object.defineProperty(navigator, 'languages', {get: () => ['fr-FR', 'fr', 'en']});
-window.chrome = {runtime: {}, app: {}};
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+Object.defineProperty(navigator, 'languages', { get: () => ['fr-FR', 'fr', 'en'] });
+window.chrome = { runtime: {}, app: {} };
 """
 
 
@@ -49,7 +50,7 @@ def count_useful(incidents):
     for inc in incidents:
         minute = inc.get("time")
 
-        if minute is None or minute > 90 or minute < 1:
+        if minute is None or minute < 1 or minute > 90:
             continue
 
         incident_type = inc.get("incidentType")
@@ -61,13 +62,36 @@ def count_useful(incidents):
                 n += 1
 
         elif incident_type == "card":
-            if (inc.get("player") or {}).get("id"):
-                incident_class = inc.get("incidentClass")
+            player = inc.get("player") or {}
+            incident_class = inc.get("incidentClass")
 
-                if incident_class in ("yellow", "yellowRed", "red"):
-                    n += 1
+            if player.get("id") and incident_class in ("yellow", "yellowRed", "red"):
+                n += 1
 
     return n
+
+
+def parse_json_response(status, body, path, source):
+    if not body:
+        return None, f"{source}: réponse vide sur {path}"
+
+    body = body.strip()
+
+    if status != 200:
+        return None, f"{source}: HTTP {status} sur {path}: {body[:300]}"
+
+    if body.startswith("<"):
+        return None, f"{source}: HTML reçu au lieu de JSON sur {path}: {body[:300]}"
+
+    try:
+        data = json.loads(body)
+    except Exception:
+        return None, f"{source}: JSON invalide sur {path}: {body[:300]}"
+
+    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        return None, f"{source}: erreur SofaScore sur {path}: {data['error']}"
+
+    return data, None
 
 
 def main():
@@ -78,11 +102,13 @@ def main():
 
         with sync_playwright() as p:
             browser = p.chromium.launch(
-                headless=True,
+                headless=HEADLESS,
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
+                    "--disable-web-security",
+                    "--disable-features=IsolateOrigins,site-per-process",
                 ],
             )
 
@@ -93,6 +119,7 @@ def main():
                     "Chrome/131.0.0.0 Safari/537.36"
                 ),
                 locale="fr-FR",
+                timezone_id="Europe/Paris",
                 viewport={"width": 1366, "height": 768},
                 extra_http_headers={
                     "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
@@ -107,67 +134,114 @@ def main():
             print(f"Visite de {target_url} ...")
 
             try:
-                page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
+                page.goto(target_url, wait_until="domcontentloaded", timeout=45000)
+                page.wait_for_timeout(5000)
             except Exception as e:
                 print(f"goto warning: {e}", file=sys.stderr)
 
-            time.sleep(4)
-
             def fetch(path):
-                urls = [
-                    f"https://api.sofascore.com/api/v1/{path}",
-                    f"https://www.sofascore.com/api/v1/{path}",
-                ]
-
-                headers = {
-                    "Accept": "application/json, text/plain, */*",
-                    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-                    "Referer": "https://www.sofascore.com/",
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/131.0.0.0 Safari/537.36"
-                    ),
-                }
-
+                clean_path = path.lstrip("/")
                 last_error = None
 
-                for url in urls:
+                # Méthode 1 : fetch depuis la vraie page SofaScore déjà ouverte.
+                for attempt in range(2):
                     try:
-                        response = context.request.get(
-                            url,
-                            headers=headers,
-                            timeout=30000,
+                        result = page.evaluate(
+                            """
+                            async (path) => {
+                                try {
+                                    const response = await fetch(`/api/v1/${path}`, {
+                                        method: 'GET',
+                                        credentials: 'include',
+                                        cache: 'no-store',
+                                        headers: {
+                                            'Accept': 'application/json, text/plain, */*',
+                                            'X-Requested-With': 'XMLHttpRequest'
+                                        }
+                                    });
+
+                                    const text = await response.text();
+
+                                    return {
+                                        status: response.status,
+                                        body: text
+                                    };
+                                } catch (e) {
+                                    return {
+                                        status: 0,
+                                        body: 'JS error: ' + e.message
+                                    };
+                                }
+                            }
+                            """,
+                            clean_path,
                         )
 
-                        body = response.text()
+                        data, error = parse_json_response(
+                            result.get("status", 0),
+                            result.get("body", ""),
+                            clean_path,
+                            "page.fetch",
+                        )
 
-                        if response.status != 200:
-                            last_error = (
-                                f"HTTP {response.status} sur {path}: "
-                                f"{body[:300]}"
-                            )
-                            continue
+                        if data is not None:
+                            return data
 
-                        try:
-                            data = json.loads(body)
-                        except Exception:
-                            last_error = f"Non-JSON sur {path}: {body[:300]}"
-                            continue
-
-                        if isinstance(data, dict) and isinstance(data.get("error"), dict):
-                            last_error = (
-                                f"Sofascore challenge sur {path}: "
-                                f"{data['error']}"
-                            )
-                            continue
-
-                        return data
+                        last_error = error
+                        print(f"Tentative page.fetch échouée: {error}", file=sys.stderr)
+                        page.wait_for_timeout(1500)
 
                     except Exception as e:
-                        last_error = f"{type(e).__name__}: {e}"
+                        last_error = f"page.fetch exception: {type(e).__name__}: {e}"
+                        print(last_error, file=sys.stderr)
 
-                raise RuntimeError(last_error or f"Fetch impossible sur {path}")
+                # Méthode 2 : ouvrir l’URL API dans un vrai onglet Chromium.
+                urls = [
+                    f"https://www.sofascore.com/api/v1/{clean_path}",
+                    f"https://api.sofascore.com/api/v1/{clean_path}",
+                ]
+
+                for url in urls:
+                    api_page = None
+
+                    try:
+                        api_page = context.new_page()
+                        response = api_page.goto(
+                            url,
+                            wait_until="domcontentloaded",
+                            timeout=45000,
+                        )
+
+                        api_page.wait_for_timeout(1000)
+
+                        status = response.status if response else 0
+                        body = api_page.locator("body").inner_text(timeout=8000)
+
+                        data, error = parse_json_response(
+                            status,
+                            body,
+                            clean_path,
+                            f"browser.goto {url}",
+                        )
+
+                        if data is not None:
+                            return data
+
+                        last_error = error
+                        print(f"Tentative browser.goto échouée: {error}", file=sys.stderr)
+
+                    except Exception as e:
+                        last_error = f"browser.goto exception: {type(e).__name__}: {e}"
+                        print(last_error, file=sys.stderr)
+
+                    finally:
+                        if api_page:
+                            try:
+                                api_page.close()
+                            except Exception:
+                                pass
+
+                raise RuntimeError(last_error or f"Fetch impossible sur {clean_path}")
 
             ev_data = fetch(f"event/{MATCH_ID}")
             event = ev_data.get("event", ev_data) if isinstance(ev_data, dict) else ev_data
@@ -177,7 +251,7 @@ def main():
                 or "homeTeam" not in event
                 or "awayTeam" not in event
             ):
-                raise RuntimeError(f"Format event inattendu: {str(ev_data)[:200]}")
+                raise RuntimeError(f"Format event inattendu: {str(ev_data)[:300]}")
 
             home = event["homeTeam"]
             away = event["awayTeam"]
@@ -189,7 +263,7 @@ def main():
                 page_n = 0
                 safety = 0
 
-                while total < max_needed and safety < 6:
+                while total < max_needed and safety < 8:
                     page_data = fetch(f"team/{team_id}/events/last/{page_n}")
 
                     if isinstance(page_data, dict):
@@ -216,7 +290,12 @@ def main():
                         if total >= max_needed:
                             break
 
-                        inc_data = fetch(f"event/{match['id']}/incidents")
+                        match_id = match.get("id")
+
+                        if not match_id:
+                            continue
+
+                        inc_data = fetch(f"event/{match_id}/incidents")
 
                         if isinstance(inc_data, dict):
                             incidents = inc_data.get("incidents", [])
@@ -236,7 +315,7 @@ def main():
                                     f"{home_name} {home_score}-{away_score} "
                                     f"{away_name}"
                                 ),
-                                "id": match["id"],
+                                "id": match_id,
                                 "incidents": incidents,
                             }
                         )
@@ -248,13 +327,11 @@ def main():
 
                 return matches_used
 
-            print(f"Scan home (team {home['id']})...")
+            print(f"Scan home: {home.get('name')} / team {home['id']} ...")
             home_matches = scan_team(home["id"], SKIP_HOME, MAX_NEEDED)
 
-            print(f"Scan away (team {away['id']})...")
+            print(f"Scan away: {away.get('name')} / team {away['id']} ...")
             away_matches = scan_team(away["id"], SKIP_AWAY, MAX_NEEDED)
-
-            browser.close()
 
             result = {
                 "status": "done",
@@ -284,6 +361,8 @@ def main():
                 f"OK: home={len(home_matches)} matches, "
                 f"away={len(away_matches)} matches"
             )
+
+            browser.close()
 
     except Exception as e:
         try:
