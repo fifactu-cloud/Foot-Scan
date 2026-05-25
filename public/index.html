@@ -1020,12 +1020,12 @@
         <div class="two">
           <div>
             <label for="rank1">Rang 1</label>
-            <input id="rank1" placeholder="Ex: 52.5" inputmode="decimal" />
+            <input id="rank1" placeholder="Ex: 52.25" inputmode="decimal" />
           </div>
 
           <div>
             <label for="rank2">Rang 2 optionnel</label>
-            <input id="rank2" placeholder="Ex: 79.5 ou vide" inputmode="decimal" />
+            <input id="rank2" placeholder="Ex: 79.75 ou vide" inputmode="decimal" />
           </div>
         </div>
 
@@ -1145,7 +1145,15 @@
 
     function formatValue(value) {
       if (value == null) return "—";
-      return `${value > 0 ? "+" : ""}${value}`;
+
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
+        return String(value);
+      }
+
+      const rounded = Math.round(number * 10000) / 10000;
+      return `${rounded > 0 ? "+" : ""}${rounded}`;
     }
 
     function logoUrl(teamId) {
@@ -1154,6 +1162,16 @@
 
     function eventIcon(ev) {
       return ICONS[ev.type] || ev.icon || "•";
+    }
+
+    function weightText(source) {
+      const weight = Number(source?.weight || 0);
+
+      if (!weight || weight >= 0.9999) {
+        return "";
+      }
+
+      return ` · poids ${Math.round(weight * 100)}%`;
     }
 
     function setStatus(message, progress = 0) {
@@ -1399,13 +1417,15 @@
         html += `<div class="sourceList">`;
 
         for (const source of sources) {
+          const rankIndex = source.rankIndex ? `#${source.rankIndex} · ` : "";
+
           html += `
             <div class="sourceItem">
               <div class="eventIcon">${esc(eventIcon(source))}</div>
               <div>
                 <div>${esc(source.match)}</div>
                 <div class="sourceSmall">
-                  ${esc(source.minuteLabel)} · ${esc(source.side === "team" ? "Équipe analysée" : "Adversaire")} · ${esc(LABELS[source.type])} · ${esc(formatValue(source.value))}
+                  ${esc(rankIndex)}${esc(source.minuteLabel)} · ${esc(source.side === "team" ? "Équipe analysée" : "Adversaire")} · ${esc(LABELS[source.type])} · ${esc(formatValue(source.value))}${esc(weightText(source))}
                 </div>
               </div>
             </div>
@@ -1538,8 +1558,10 @@
       lines.push("Détail événement :");
 
       for (const source of sources) {
+        const rankIndex = source.rankIndex ? `#${source.rankIndex} · ` : "";
+
         lines.push(
-          `- ${eventIcon(source)} ${source.minuteLabel} · ${source.side === "team" ? "Équipe analysée" : "Adversaire"} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}`
+          `- ${rankIndex}${eventIcon(source)} ${source.minuteLabel} · ${source.side === "team" ? "Équipe analysée" : "Adversaire"} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
         );
       }
 
