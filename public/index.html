@@ -445,6 +445,83 @@
       transition: width 240ms ease;
     }
 
+    .reportPanel {
+      margin-top: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(34, 197, 94, 0.04)),
+        rgba(17, 17, 17, 0.94);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.30);
+      overflow: hidden;
+    }
+
+    .reportHead {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .reportTitle {
+      font-size: 16px;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+    }
+
+    .reportCount {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .reportBody {
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .reportBtns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+
+    @media (max-width: 520px) {
+      .reportBtns {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .reportBtn {
+      min-height: 45px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #171717;
+      color: var(--text);
+      font-weight: 1000;
+    }
+
+    .reportBtn.primary {
+      background: linear-gradient(135deg, #22c55e, #15803d);
+      border-color: rgba(34, 197, 94, 0.65);
+      color: white;
+    }
+
+    .reportBtn.red {
+      background: rgba(239, 68, 68, 0.10);
+      border-color: rgba(239, 68, 68, 0.25);
+      color: #fecaca;
+    }
+
+    .reportHint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
     .resultShell {
       display: grid;
       gap: 14px;
@@ -971,6 +1048,28 @@
       <div id="errorBox" class="errorBox"></div>
     </section>
 
+    <section class="reportPanel" id="reportPanel">
+      <div class="reportHead">
+        <div>
+          <div class="reportTitle">Rapport de session</div>
+          <div class="reportCount" id="reportCount">0 analyse enregistrée</div>
+        </div>
+      </div>
+
+      <div class="reportBody">
+        <div class="reportBtns">
+          <button class="reportBtn primary" id="addReportBtn" type="button">Ajouter l’analyse actuelle</button>
+          <button class="reportBtn" id="downloadReportBtn" type="button">Télécharger .doc</button>
+          <button class="reportBtn" id="copyReportBtn" type="button">Copier le rapport</button>
+          <button class="reportBtn red" id="clearReportBtn" type="button">Vider le rapport</button>
+        </div>
+
+        <div class="reportHint" id="reportHint">
+          Après un scan terminé, appuie sur “Ajouter l’analyse actuelle”. Le rapport reste dans cette session navigateur.
+        </div>
+      </div>
+    </section>
+
     <div id="result" class="resultShell"></div>
 
     <details class="barBox">
@@ -1005,6 +1104,9 @@
     let skipAwayValue = 0;
     let currentJobId = null;
     let pollingTimer = null;
+    let lastResult = null;
+
+    const REPORT_KEY = "footscan_session_report_v1";
 
     const LABELS = {
       goal: "But",
@@ -1153,8 +1255,16 @@
         setStatus(job.message || job.status || "Scan en cours…", job.progress || 0);
 
         if (job.status === "done") {
+          lastResult = {
+            createdAt: new Date().toISOString(),
+            skipHome: skipHomeValue,
+            skipAway: skipAwayValue,
+            result: job.result,
+          };
+
           renderResult(job.result);
-          setStatus("Scan terminé.", 100);
+          setStatus("Scan terminé. Tu peux ajouter cette analyse au rapport.", 100);
+          $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter l’analyse actuelle” pour l’enregistrer dans le rapport.";
           finishScan();
           return;
         }
@@ -1230,8 +1340,6 @@
     }
 
     function renderSummary(result) {
-      const home = result.home;
-      const away = result.away;
       const match = result.match;
 
       return `
@@ -1242,8 +1350,8 @@
           </div>
 
           <div class="summaryGrid">
-            ${renderSummaryCell(home, result.rank1, result.rank2)}
-            ${renderSummaryCell(away, result.rank1, result.rank2)}
+            ${renderSummaryCell(result.home, result.rank1, result.rank2)}
+            ${renderSummaryCell(result.away, result.rank1, result.rank2)}
           </div>
         </section>
       `;
@@ -1315,7 +1423,7 @@
       const events = team.events || [];
       const matchesUsed = team.matchesUsed || [];
 
-      const eventRows = events.map((ev, index) => {
+      const eventRows = events.map((ev) => {
         const campClass = ev.side === "team" ? "campTeam" : "campOpponent";
         const campText = ev.side === "team" ? "Équipe" : "Adversaire";
 
@@ -1397,6 +1505,173 @@
       `;
     }
 
+    function loadReport() {
+      try {
+        return JSON.parse(localStorage.getItem(REPORT_KEY) || "[]");
+      } catch {
+        return [];
+      }
+    }
+
+    function saveReport(entries) {
+      localStorage.setItem(REPORT_KEY, JSON.stringify(entries));
+      updateReportCount();
+    }
+
+    function updateReportCount() {
+      const count = loadReport().length;
+      $("reportCount").textContent = `${count} analyse${count > 1 ? "s" : ""} enregistrée${count > 1 ? "s" : ""}`;
+    }
+
+    function rankLines(team, rankLabel, rankResult) {
+      const lines = [];
+      const value = rankResult?.value;
+      const sources = rankResult?.sources || [];
+
+      lines.push(`${rankLabel} : ${formatValue(value)}`);
+
+      if (!sources.length) {
+        lines.push("Détail : événement introuvable");
+        return lines;
+      }
+
+      lines.push("Détail événement :");
+
+      for (const source of sources) {
+        lines.push(
+          `- ${eventIcon(source)} ${source.minuteLabel} · ${source.side === "team" ? "Équipe analysée" : "Adversaire"} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}`
+        );
+      }
+
+      return lines;
+    }
+
+    function entryToText(entry, index) {
+      const result = entry.result;
+      const match = result.match;
+      const home = result.home;
+      const away = result.away;
+      const date = new Date(entry.createdAt).toLocaleString("fr-FR");
+
+      const lines = [];
+
+      lines.push(`ANALYSE ${index + 1}`);
+      lines.push(`Date : ${date}`);
+      lines.push(`Match : ${match.homeTeam.name} vs ${match.awayTeam.name}`);
+      lines.push(`Ignorer domicile : ${entry.skipHome}`);
+      lines.push(`Ignorer extérieur : ${entry.skipAway}`);
+      lines.push("");
+
+      lines.push(`DOMICILE — ${home.name}`);
+      lines.push(...rankLines(home, `Rang ${result.rank1}`, home.r1));
+
+      if (result.rank2) {
+        lines.push(...rankLines(home, `Rang ${result.rank2}`, home.r2));
+      }
+
+      lines.push("");
+
+      lines.push(`EXTÉRIEUR — ${away.name}`);
+      lines.push(...rankLines(away, `Rang ${result.rank1}`, away.r1));
+
+      if (result.rank2) {
+        lines.push(...rankLines(away, `Rang ${result.rank2}`, away.r2));
+      }
+
+      lines.push("");
+      lines.push("────────────────────────");
+      lines.push("");
+
+      return lines.join("\n");
+    }
+
+    function buildReportText() {
+      const entries = loadReport();
+
+      if (!entries.length) {
+        return "Rapport Foot/Scan\n\nAucune analyse enregistrée.";
+      }
+
+      return [
+        "RAPPORT FOOT/SCAN",
+        `Généré le : ${new Date().toLocaleString("fr-FR")}`,
+        `Nombre d’analyses : ${entries.length}`,
+        "",
+        "────────────────────────",
+        "",
+        ...entries.map((entry, index) => entryToText(entry, index)),
+      ].join("\n");
+    }
+
+    function textToDocHtml(text) {
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Rapport Foot/Scan</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.45;
+              color: #111;
+              white-space: pre-wrap;
+            }
+          </style>
+        </head>
+        <body>${esc(text)}</body>
+        </html>
+      `;
+    }
+
+    function addCurrentAnalysisToReport() {
+      if (!lastResult) {
+        $("reportHint").textContent = "Aucune analyse prête. Lance un scan puis ajoute-le au rapport.";
+        return;
+      }
+
+      const entries = loadReport();
+
+      entries.push(lastResult);
+      saveReport(entries);
+
+      $("reportHint").textContent = "Analyse ajoutée au rapport.";
+    }
+
+    async function copyReport() {
+      const text = buildReportText();
+
+      try {
+        await navigator.clipboard.writeText(text);
+        $("reportHint").textContent = "Rapport copié. Tu peux le coller dans Google Docs.";
+      } catch {
+        $("reportHint").textContent = "Copie impossible sur ce navigateur. Essaie le téléchargement .doc.";
+      }
+    }
+
+    function downloadReportDoc() {
+      const text = buildReportText();
+      const html = textToDocHtml(text);
+      const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rapport-footscan-${new Date().toISOString().slice(0, 10)}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      URL.revokeObjectURL(url);
+      $("reportHint").textContent = "Téléchargement du rapport lancé.";
+    }
+
+    function clearReport() {
+      localStorage.removeItem(REPORT_KEY);
+      updateReportCount();
+      $("reportHint").textContent = "Rapport vidé.";
+    }
+
     async function handleScan() {
       try {
         await startScanJob();
@@ -1438,6 +1713,12 @@
     renderSkipButtons("skipAway", () => skipAwayValue, (v) => skipAwayValue = v);
 
     $("scanBtn").addEventListener("click", handleScan);
+    $("addReportBtn").addEventListener("click", addCurrentAnalysisToReport);
+    $("downloadReportBtn").addEventListener("click", downloadReportDoc);
+    $("copyReportBtn").addEventListener("click", copyReport);
+    $("clearReportBtn").addEventListener("click", clearReport);
+
+    updateReportCount();
   </script>
 </body>
 </html>
