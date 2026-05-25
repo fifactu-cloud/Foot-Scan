@@ -48,7 +48,7 @@ LABELS = {
     "goalWithAssist": "But + passe",
     "assist": "Passe décisive",
     "yellow": "Jaune",
-    "secondYellow": "2ᵉ jaune",
+    "secondYellow": "Jaune + rouge",
     "red": "Rouge direct",
 }
 
@@ -452,7 +452,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 icon = "🟨"
             elif cls == "yellowRed":
                 kind = "secondYellow"
-                icon = "🟧"
+                icon = "🟨🟥"
             elif cls == "red":
                 kind = "red"
                 icon = "🟥"
@@ -493,23 +493,49 @@ def value_at_rank(events, rank):
     if not rank or rank < 1:
         return {"value": None, "sources": []}
 
-    if float(rank).is_integer():
-        idx = int(rank) - 1
+    rank = float(rank)
+    base_rank = int(rank)
+    fraction = round(rank - base_rank, 10)
 
-        if idx < 0 or idx >= len(events):
-            return {"value": None, "sources": []}
+    lower_index = base_rank - 1
+    upper_index = lower_index + 1
 
-        return {"value": events[idx]["value"], "sources": [events[idx]]}
-
-    lo = int(rank // 1) - 1
-    hi = lo + 1
-
-    if lo < 0 or hi >= len(events):
+    if lower_index < 0 or lower_index >= len(events):
         return {"value": None, "sources": []}
 
+    if abs(fraction) < 0.0000001:
+        source = dict(events[lower_index])
+        source["rankIndex"] = base_rank
+        source["weight"] = 1
+
+        return {
+            "value": round(source["value"], 4),
+            "sources": [source],
+        }
+
+    if upper_index >= len(events):
+        return {"value": None, "sources": []}
+
+    lower_weight = 1 - fraction
+    upper_weight = fraction
+
+    lower_source = dict(events[lower_index])
+    upper_source = dict(events[upper_index])
+
+    lower_source["rankIndex"] = base_rank
+    lower_source["weight"] = round(lower_weight, 4)
+
+    upper_source["rankIndex"] = base_rank + 1
+    upper_source["weight"] = round(upper_weight, 4)
+
+    value = (
+        lower_source["value"] * lower_weight +
+        upper_source["value"] * upper_weight
+    )
+
     return {
-        "value": (events[lo]["value"] + events[hi]["value"]) / 2,
-        "sources": [events[lo], events[hi]],
+        "value": round(value, 4),
+        "sources": [lower_source, upper_source],
     }
 
 
@@ -855,6 +881,7 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: scan complet côté worker activé.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
+    print("Calcul pondéré: X / X.25 / X.5 / X.75 activé.")
     print("Version rapide: préchargement incidents activé.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
