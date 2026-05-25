@@ -14,6 +14,14 @@ SKIP_AWAY = int(os.environ.get('SKIP_AWAY', '0') or 0)
 MAX_NEEDED = int(os.environ.get('MAX_NEEDED', '6') or 6)
 
 
+STEALTH_JS = """
+Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+Object.defineProperty(navigator, 'languages', {get: () => ['fr-FR', 'fr', 'en']});
+window.chrome = {runtime: {}, app: {}};
+"""
+
+
 def upstash_cmd(*cmd):
     req = urllib.request.Request(
         UPSTASH_URL,
@@ -68,31 +76,49 @@ def main():
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                 locale='fr-FR',
                 viewport={'width': 1366, 'height': 768},
+                extra_http_headers={'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8'},
             )
+            context.add_init_script(STEALTH_JS)
 
             page = context.new_page()
-            print("Visite de sofascore.com pour établir la session...")
-            page.goto('https://www.sofascore.com/', wait_until='domcontentloaded', timeout=30000)
-            time.sleep(3)
+            target_url = f'https://www.sofascore.com/event/{MATCH_ID}'
+            print(f"Visite de {target_url} ...")
+            try:
+                page.goto(target_url, wait_until='domcontentloaded', timeout=30000)
+            except Exception as e:
+                print(f"goto warning: {e}", file=sys.stderr)
+            time.sleep(4)
 
             def fetch(path):
                 url = f'https://api.sofascore.com/api/v1/{path}'
-                r = context.request.get(url, headers={
-                    'Accept': 'application/json',
-                    'Accept-Language': 'fr-FR,fr;q=0.9',
-                    'Referer': 'https://www.sofascore.com/',
-                })
-                if not r.ok:
-                    raise RuntimeError(f'HTTP {r.status} sur {path}: {r.text()[:200]}')
-                data = r.json()
+                result = page.evaluate("""
+                    async (url) => {
+                        try {
+                            const r = await fetch(url, {
+                                headers: {'Accept': 'application/json'},
+                                credentials: 'include',
+                            });
+                            const text = await r.text();
+                            return {status: r.status, body: text};
+                        } catch (e) {
+                            return {status: 0, body: 'JS error: ' + e.message};
+                        }
+                    }
+                """, url)
+                if result['status'] != 200:
+                    raise RuntimeError(f"HTTP {result['status']} sur {path}: {result['body'][:300]}")
+                try:
+                    data = json.loads(result['body'])
+                except Exception:
+                    raise RuntimeError(f"Non-JSON sur {path}: {result['body'][:300]}")
                 if isinstance(data, dict) and isinstance(data.get('error'), dict):
-                    raise RuntimeError(f'Sofascore challenge sur {path}: {data["error"]}')
+                    raise RuntimeError(f"Sofascore challenge sur {path}: {data['error']}")
                 return data
 
             ev_data = fetch(f'event/{MATCH_ID}')
             event = ev_data.get('event', ev_data) if isinstance(ev_data, dict) else ev_data
             if not isinstance(event, dict) or 'homeTeam' not in event or 'awayTeam' not in event:
-                raise RuntimeError(f'Format event inattendu: {str(ev_data)[:200]}')
+                raise RuntimeError(f"Format event inattendu: {str(ev_data)[:200]}")
             home = event['homeTeam']
             away = event['awayTeam']
 
