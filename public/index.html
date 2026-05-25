@@ -3,233 +3,267 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#070707" />
+  <meta name="theme-color" content="#050505" />
   <title>Foot/Scan</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     :root {
-      --bg: #070707;
-      --panel: #11100f;
-      --panel2: #181615;
-      --line: #2a2523;
-      --muted: #918884;
-      --soft: #c8c0bc;
-      --text: #fff7ed;
+      --bg: #050505;
+      --panel: #111312;
+      --panel2: #171918;
+      --panel3: #202321;
+      --line: rgba(255, 255, 255, 0.08);
+      --muted: #8d928f;
+      --soft: #c5cbc7;
+      --text: #f8faf9;
       --red: #ef4444;
-      --red2: #991b1b;
+      --red2: #7f1d1d;
       --green: #34d399;
-      --amber: #fbbf24;
+      --amber: #facc15;
+      --purple: #a78bfa;
       --blue: #60a5fa;
-      --shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
-      --radius: 22px;
+      --shadow: 0 26px 70px rgba(0, 0, 0, 0.48);
     }
 
-    html {
-      background: var(--bg);
-    }
+    html { background: var(--bg); }
 
     body {
       margin: 0;
       min-height: 100vh;
       background:
-        radial-gradient(circle at top left, rgba(239, 68, 68, 0.20), transparent 34rem),
-        radial-gradient(circle at 80% 10%, rgba(251, 191, 36, 0.08), transparent 24rem),
-        linear-gradient(180deg, #090807 0%, #070707 42%, #0b0908 100%);
+        radial-gradient(circle at 8% -8%, rgba(239, 68, 68, 0.26), transparent 24rem),
+        radial-gradient(circle at 80% 2%, rgba(167, 139, 250, 0.10), transparent 25rem),
+        linear-gradient(180deg, #080908 0%, #050505 46%, #080706 100%);
       color: var(--text);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
 
-    button,
-    input {
-      font: inherit;
-    }
-
-    .app {
-      width: min(860px, 100%);
-      margin: 0 auto;
-      padding: 18px 14px 80px;
-    }
+    button, input { font: inherit; }
 
     .topbar {
       position: sticky;
       top: 0;
-      z-index: 10;
-      margin: -18px -14px 18px;
-      padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
+      z-index: 20;
+      padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+      background: linear-gradient(180deg, rgba(5, 5, 5, 0.96), rgba(5, 5, 5, 0.70));
       backdrop-filter: blur(18px);
-      background: linear-gradient(180deg, rgba(7, 7, 7, 0.92), rgba(7, 7, 7, 0.68));
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid var(--line);
     }
 
     .topbarInner {
-      width: min(860px, 100%);
+      width: min(900px, 100%);
       margin: 0 auto;
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
       gap: 12px;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      min-width: 0;
     }
 
-    .logo {
-      width: 38px;
-      height: 38px;
-      border-radius: 14px;
+    .logoMark {
+      width: 52px;
+      height: 52px;
+      flex: 0 0 auto;
+      border-radius: 18px;
       display: grid;
       place-items: center;
+      color: white;
+      font-weight: 1000;
+      font-size: 20px;
+      letter-spacing: -0.10em;
       background:
-        linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(127, 29, 29, 0.72)),
+        linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(127, 29, 29, 0.92)),
         #1c1917;
-      box-shadow: 0 12px 30px rgba(239, 68, 68, 0.20);
-      font-weight: 900;
-      letter-spacing: -0.08em;
+      box-shadow: 0 16px 34px rgba(239, 68, 68, 0.22);
     }
 
-    .brandTitle {
-      font-size: 18px;
-      font-weight: 950;
-      letter-spacing: -0.04em;
+    .brandName {
+      font-size: 21px;
+      font-weight: 1000;
+      letter-spacing: -0.06em;
       line-height: 1;
+      white-space: nowrap;
     }
 
-    .brandTitle span {
-      color: var(--red);
-    }
+    .brandName span { color: var(--red); }
 
     .brandSub {
-      margin-top: 3px;
+      margin-top: 5px;
       color: var(--muted);
       font-size: 11px;
-      letter-spacing: 0.08em;
       text-transform: uppercase;
+      letter-spacing: 0.16em;
+      white-space: nowrap;
     }
 
-    .livePill {
+    .workerPill {
       display: flex;
       align-items: center;
-      gap: 7px;
-      padding: 9px 11px;
+      gap: 8px;
       border-radius: 999px;
+      padding: 11px 13px;
       border: 1px solid rgba(239, 68, 68, 0.28);
       background: rgba(239, 68, 68, 0.08);
       color: #fecaca;
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 1000;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
       white-space: nowrap;
     }
 
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 999px;
+    .workerDot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
       background: var(--red);
-      box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.12);
+      box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.12);
+    }
+
+    .app {
+      width: min(900px, 100%);
+      margin: 0 auto;
+      padding: 16px 14px 90px;
     }
 
     .hero {
-      margin-top: 18px;
-      padding: 22px 18px;
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      border-radius: 28px;
-      background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-        rgba(17, 16, 15, 0.72);
-      box-shadow: var(--shadow);
-      overflow: hidden;
       position: relative;
+      overflow: hidden;
+      border-radius: 32px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      background:
+        radial-gradient(circle at top right, rgba(239, 68, 68, 0.22), transparent 18rem),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+        rgba(17, 19, 18, 0.84);
+      box-shadow: var(--shadow);
     }
 
-    .hero:before {
-      content: "";
-      position: absolute;
-      inset: -60px -60px auto auto;
-      width: 180px;
-      height: 180px;
+    .heroGrid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .heroTeam {
+      display: grid;
+      place-items: center;
+      gap: 8px;
+      text-align: center;
+      min-width: 0;
+    }
+
+    .teamLogoBig {
+      width: 64px;
+      height: 64px;
+      border-radius: 24px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+
+    .teamLogoBig img {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+    }
+
+    .heroTeamName {
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1.15;
+      max-width: 130px;
+    }
+
+    .heroVs {
+      width: 46px;
+      height: 46px;
       border-radius: 50%;
-      background: rgba(239, 68, 68, 0.16);
-      filter: blur(8px);
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-weight: 1000;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--line);
     }
 
-    .kicker {
+    .heroTitle {
       color: #fecaca;
       font-size: 12px;
-      font-weight: 900;
-      text-transform: uppercase;
+      font-weight: 1000;
       letter-spacing: 0.16em;
+      text-transform: uppercase;
     }
 
     h1 {
-      margin: 8px 0 8px;
-      font-size: clamp(36px, 10vw, 68px);
-      letter-spacing: -0.08em;
-      line-height: 0.92;
+      margin: 8px 0 0;
+      font-size: clamp(38px, 11vw, 72px);
+      line-height: 0.88;
+      letter-spacing: -0.09em;
     }
 
-    h1 span {
-      color: var(--red);
-    }
+    h1 span { color: var(--red); }
 
     .heroText {
-      max-width: 620px;
+      margin: 12px 0 0;
       color: var(--soft);
       line-height: 1.45;
-      margin: 0;
-      font-size: 15px;
+      font-size: 14px;
     }
 
     .panel {
       margin-top: 14px;
-      border-radius: var(--radius);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      background: rgba(17, 16, 15, 0.82);
-      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.32);
+      border-radius: 28px;
+      border: 1px solid var(--line);
+      background: rgba(17, 19, 18, 0.86);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
       overflow: hidden;
     }
 
-    .panelPad {
-      padding: 16px;
-    }
+    .panelPad { padding: 16px; }
 
-    .workerBox {
+    .notice {
       display: flex;
       gap: 12px;
       align-items: flex-start;
       background:
-        linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(239, 68, 68, 0.05)),
-        rgba(24, 22, 21, 0.76);
+        linear-gradient(135deg, rgba(250, 204, 21, 0.13), rgba(239, 68, 68, 0.05)),
+        rgba(17, 19, 18, 0.86);
     }
 
-    .workerIcon {
-      width: 36px;
-      height: 36px;
-      border-radius: 13px;
+    .noticeIcon {
+      width: 42px;
+      height: 42px;
+      flex: 0 0 auto;
+      border-radius: 15px;
       display: grid;
       place-items: center;
-      background: rgba(251, 191, 36, 0.13);
+      background: rgba(250, 204, 21, 0.12);
       color: var(--amber);
-      border: 1px solid rgba(251, 191, 36, 0.20);
-      flex: 0 0 auto;
+      border: 1px solid rgba(250, 204, 21, 0.22);
+      font-size: 20px;
     }
 
-    .workerTitle {
-      font-weight: 900;
-      letter-spacing: -0.02em;
+    .noticeTitle {
+      font-weight: 1000;
+      letter-spacing: -0.03em;
       margin-bottom: 4px;
     }
 
-    .workerText {
+    .noticeText {
       margin: 0;
       color: var(--soft);
       font-size: 13px;
@@ -253,10 +287,10 @@
       gap: 12px;
     }
 
-    @media (max-width: 520px) {
-      .two {
-        grid-template-columns: 1fr;
-      }
+    @media (max-width: 560px) {
+      .two { grid-template-columns: 1fr; }
+      .workerPill { padding: 10px 11px; letter-spacing: 0.10em; }
+      .brandSub { display: none; }
     }
 
     label {
@@ -264,26 +298,25 @@
       color: var(--muted);
       margin-bottom: 7px;
       font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 0.13em;
+      font-weight: 1000;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
     }
 
     input {
       width: 100%;
-      padding: 15px 14px;
-      border-radius: 16px;
+      padding: 16px 15px;
+      border-radius: 18px;
       border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(7, 7, 7, 0.52);
+      background: rgba(5, 5, 5, 0.55);
       color: var(--text);
       outline: none;
-      font-size: 15px;
-      transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+      font-size: 16px;
     }
 
     input:focus {
-      border-color: rgba(239, 68, 68, 0.75);
-      background: rgba(7, 7, 7, 0.78);
+      border-color: rgba(239, 68, 68, 0.72);
+      background: rgba(5, 5, 5, 0.78);
     }
 
     .skipGrid {
@@ -293,47 +326,46 @@
     }
 
     .skipGrid button {
-      height: 42px;
-      border-radius: 13px;
+      height: 44px;
+      border-radius: 15px;
       border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(7, 7, 7, 0.48);
+      background: rgba(5, 5, 5, 0.52);
       color: var(--muted);
-      font-weight: 900;
+      font-weight: 1000;
     }
 
     .skipGrid button.active {
       color: white;
-      border-color: rgba(239, 68, 68, 0.85);
       background: linear-gradient(135deg, #ef4444, #991b1b);
-      box-shadow: 0 12px 24px rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.90);
+      box-shadow: 0 14px 28px rgba(239, 68, 68, 0.18);
     }
 
     .scanBtn {
       width: 100%;
-      min-height: 58px;
+      min-height: 62px;
       border: 0;
-      border-radius: 18px;
+      border-radius: 20px;
       color: white;
-      background:
-        linear-gradient(135deg, #ef4444, #b91c1c 55%, #7f1d1d);
-      font-size: 19px;
-      font-weight: 950;
-      letter-spacing: -0.02em;
-      box-shadow: 0 18px 42px rgba(239, 68, 68, 0.24);
+      background: linear-gradient(135deg, #ef4444, #b91c1c 58%, #7f1d1d);
+      font-size: 20px;
+      font-weight: 1000;
+      letter-spacing: -0.03em;
+      box-shadow: 0 18px 44px rgba(239, 68, 68, 0.25);
     }
 
     .scanBtn:disabled {
-      background: linear-gradient(135deg, #44403c, #292524);
+      background: linear-gradient(135deg, #3f3f3f, #242424);
+      color: #a1a1aa;
       box-shadow: none;
-      color: #a8a29e;
     }
 
     .statusBox,
     .errorBox {
       display: none;
       margin-top: 14px;
-      border-radius: 18px;
-      padding: 14px;
+      border-radius: 20px;
+      padding: 15px;
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 13px;
@@ -343,89 +375,112 @@
 
     .statusBox {
       color: #fef3c7;
-      background: rgba(120, 53, 15, 0.26);
-      border-color: rgba(251, 191, 36, 0.20);
+      background: rgba(120, 53, 15, 0.25);
+      border-color: rgba(250, 204, 21, 0.22);
     }
 
     .errorBox {
       color: #fecaca;
       background: rgba(127, 29, 29, 0.26);
-      border-color: rgba(239, 68, 68, 0.24);
+      border-color: rgba(239, 68, 68, 0.25);
     }
 
-    .pulseLine {
-      height: 4px;
+    .progressTrack {
       margin-top: 12px;
+      height: 8px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.09);
       overflow: hidden;
     }
 
-    .pulseLine div {
-      width: 42%;
+    .progressFill {
       height: 100%;
+      width: 0%;
       border-radius: inherit;
-      background: linear-gradient(90deg, transparent, var(--amber), transparent);
-      animation: slide 1.4s linear infinite;
-    }
-
-    @keyframes slide {
-      from { transform: translateX(-100%); }
-      to { transform: translateX(260%); }
+      background: linear-gradient(90deg, var(--red), var(--amber));
+      transition: width 220ms ease;
     }
 
     .resultShell {
-      margin-top: 16px;
       display: grid;
-      gap: 14px;
+      gap: 15px;
+      margin-top: 15px;
     }
 
     .summary {
-      border-radius: 26px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 32px;
+      border: 1px solid var(--line);
       background:
-        linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(255, 255, 255, 0.03)),
-        rgba(17, 16, 15, 0.86);
+        radial-gradient(circle at top left, rgba(239, 68, 68, 0.17), transparent 20rem),
+        rgba(17, 19, 18, 0.88);
       overflow: hidden;
       box-shadow: var(--shadow);
     }
 
     .summaryHead {
-      padding: 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
     }
 
     .summaryLabel {
       color: var(--muted);
       font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 0.14em;
+      font-weight: 1000;
+      letter-spacing: 0.15em;
       text-transform: uppercase;
-      margin-bottom: 5px;
+      margin-bottom: 7px;
     }
 
     .summaryTitle {
-      font-size: 21px;
-      font-weight: 950;
-      letter-spacing: -0.04em;
+      font-size: 24px;
+      font-weight: 1000;
+      letter-spacing: -0.06em;
+      line-height: 1.05;
     }
 
     .summaryGrid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1px;
-      background: rgba(255, 255, 255, 0.07);
+      background: var(--line);
     }
 
     .summaryCell {
-      background: rgba(17, 16, 15, 0.96);
+      background: rgba(17, 19, 18, 0.98);
       padding: 16px;
+      display: grid;
+      gap: 10px;
     }
 
-    .summaryTeam {
-      color: var(--soft);
-      font-weight: 900;
-      margin-bottom: 11px;
+    .summaryTeamRow {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+    }
+
+    .teamLogoSmall {
+      width: 34px;
+      height: 34px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--line);
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+
+    .teamLogoSmall img {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+    }
+
+    .summaryTeamName {
+      font-weight: 1000;
+      line-height: 1.1;
+      min-width: 0;
     }
 
     .miniValues {
@@ -437,125 +492,148 @@
     .miniBadge {
       padding: 8px 10px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.07);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
       font-size: 12px;
-      font-weight: 900;
+      font-weight: 1000;
+      white-space: nowrap;
     }
 
     .teamCard {
-      border-radius: 26px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(17, 16, 15, 0.88);
+      border-radius: 32px;
+      border: 1px solid var(--line);
+      background: rgba(17, 19, 18, 0.90);
       box-shadow: var(--shadow);
       overflow: hidden;
     }
 
     .teamHero {
-      padding: 16px;
+      padding: 18px;
       background:
         radial-gradient(circle at top right, rgba(239, 68, 68, 0.20), transparent 18rem),
         linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      border-bottom: 1px solid var(--line);
     }
 
     .sidePill {
       display: inline-flex;
       align-items: center;
-      gap: 7px;
-      padding: 7px 10px;
+      gap: 8px;
+      padding: 8px 11px;
       border-radius: 999px;
       background: rgba(239, 68, 68, 0.10);
-      border: 1px solid rgba(239, 68, 68, 0.18);
+      border: 1px solid rgba(239, 68, 68, 0.20);
       color: #fecaca;
       font-size: 11px;
-      font-weight: 950;
-      letter-spacing: 0.11em;
+      font-weight: 1000;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
     }
 
+    .teamHeaderLine {
+      margin-top: 13px;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+    }
+
+    .teamLogoMid {
+      width: 60px;
+      height: 60px;
+      border-radius: 22px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--line);
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+
+    .teamLogoMid img {
+      width: 50px;
+      height: 50px;
+      object-fit: contain;
+    }
+
     .teamName {
-      margin-top: 10px;
-      font-size: clamp(26px, 7vw, 40px);
-      font-weight: 950;
-      letter-spacing: -0.07em;
+      font-size: clamp(26px, 7vw, 42px);
+      font-weight: 1000;
+      letter-spacing: -0.08em;
       line-height: 0.98;
     }
 
     .teamMeta {
       color: var(--muted);
       font-size: 13px;
-      margin-top: 8px;
+      margin-top: 6px;
     }
 
     .rankGrid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1px;
-      background: rgba(255, 255, 255, 0.07);
+      background: var(--line);
     }
 
-    .rankGrid.one {
-      grid-template-columns: 1fr;
-    }
+    .rankGrid.one { grid-template-columns: 1fr; }
 
     .rankCard {
-      background: rgba(17, 16, 15, 0.98);
-      padding: 16px;
+      background: rgba(17, 19, 18, 0.98);
+      padding: 17px;
     }
 
     .rankLabel {
       color: #fca5a5;
       font-size: 11px;
-      font-weight: 950;
-      letter-spacing: 0.13em;
+      font-weight: 1000;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      margin-bottom: 8px;
+      margin-bottom: 9px;
     }
 
     .rankValue {
-      font-size: 46px;
-      font-weight: 950;
-      letter-spacing: -0.07em;
+      font-size: 50px;
+      font-weight: 1000;
+      letter-spacing: -0.08em;
       line-height: 1;
     }
 
-    .rankValue.positive { color: var(--green); }
-    .rankValue.negative { color: #fb7185; }
-    .rankValue.neutral { color: var(--text); }
+    .positive { color: var(--green); }
+    .negative { color: #fb7185; }
+    .neutral { color: var(--text); }
 
     .sourceList {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      margin-top: 13px;
+      padding-top: 13px;
+      border-top: 1px solid var(--line);
       display: grid;
-      gap: 9px;
+      gap: 10px;
     }
 
     .sourceItem {
       color: var(--soft);
       font-size: 12px;
-      line-height: 1.35;
+      line-height: 1.38;
     }
 
     .sourceSmall {
-      margin-top: 3px;
+      margin-top: 4px;
       color: var(--muted);
       font-size: 11px;
     }
 
     .section {
-      padding: 14px 16px 16px;
-      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      padding: 16px 18px 18px;
+      border-top: 1px solid var(--line);
     }
 
     .sectionTitle {
       color: var(--muted);
       font-size: 11px;
-      font-weight: 950;
-      letter-spacing: 0.13em;
+      font-weight: 1000;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -563,149 +641,165 @@
     }
 
     .countPill {
-      padding: 5px 8px;
+      padding: 6px 9px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.07);
       color: var(--soft);
       font-size: 11px;
       letter-spacing: 0;
       text-transform: none;
     }
 
-    .matchList,
-    .eventList {
+    .matchList, .eventList {
       display: grid;
-      gap: 8px;
+      gap: 10px;
     }
 
-    .matchRow,
-    .eventRow {
+    .matchRow, .eventRow {
       display: grid;
       grid-template-columns: auto 1fr auto;
-      gap: 10px;
-      align-items: center;
-      min-height: 44px;
-      padding: 10px;
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      gap: 11px;
+      align-items: start;
+      padding: 12px;
+      border-radius: 19px;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(255, 255, 255, 0.055);
     }
 
     .rowNumber {
-      min-width: 28px;
-      height: 28px;
-      border-radius: 10px;
+      min-width: 34px;
+      height: 34px;
+      border-radius: 13px;
       display: grid;
       place-items: center;
       background: rgba(255, 255, 255, 0.06);
       color: var(--muted);
-      font-size: 11px;
-      font-weight: 950;
+      font-size: 12px;
+      font-weight: 1000;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
-    .rowMain {
-      min-width: 0;
-    }
+    .rowMain { min-width: 0; }
 
     .rowTitle {
       color: var(--text);
-      font-size: 13px;
-      font-weight: 850;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
     }
 
     .rowSub {
-      margin-top: 3px;
+      margin-top: 5px;
       color: var(--muted);
-      font-size: 11px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
     }
 
     .rowScore {
-      font-weight: 950;
-      font-size: 12px;
+      font-weight: 1000;
+      font-size: 13px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: nowrap;
+      padding-top: 7px;
     }
-
-    .rowScore.positive { color: var(--green); }
-    .rowScore.negative { color: #fb7185; }
-    .rowScore.neutral { color: var(--soft); }
 
     .campBadge {
       display: inline-flex;
-      padding: 4px 7px;
+      padding: 4px 8px;
       border-radius: 999px;
       font-size: 10px;
-      font-weight: 950;
-      letter-spacing: 0.06em;
+      font-weight: 1000;
+      letter-spacing: 0.07em;
       text-transform: uppercase;
       margin-right: 6px;
+      vertical-align: 1px;
     }
 
     .campTeam {
       background: rgba(52, 211, 153, 0.10);
-      border: 1px solid rgba(52, 211, 153, 0.18);
+      border: 1px solid rgba(52, 211, 153, 0.20);
       color: #a7f3d0;
     }
 
     .campOpponent {
       background: rgba(239, 68, 68, 0.10);
-      border: 1px solid rgba(239, 68, 68, 0.18);
+      border: 1px solid rgba(239, 68, 68, 0.20);
       color: #fecaca;
     }
 
     details.clean {
-      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      border-top: 1px solid var(--line);
     }
 
     details.clean summary {
       list-style: none;
       cursor: pointer;
-      padding: 14px 16px;
+      padding: 16px 18px;
       color: var(--soft);
-      font-weight: 900;
+      font-weight: 1000;
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 10px;
     }
 
-    details.clean summary::-webkit-details-marker {
-      display: none;
-    }
+    details.clean summary::-webkit-details-marker { display: none; }
 
     .barBox {
-      margin-top: 14px;
-      border-radius: 22px;
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      background: rgba(17, 16, 15, 0.78);
+      margin-top: 15px;
+      border-radius: 30px;
+      border: 1px solid var(--line);
+      background: rgba(17, 19, 18, 0.86);
+      box-shadow: var(--shadow);
       overflow: hidden;
     }
 
     .barBox summary {
-      padding: 15px 16px;
+      padding: 18px;
       cursor: pointer;
-      color: var(--soft);
-      font-weight: 950;
+      color: var(--text);
+      font-weight: 1000;
+      font-size: 18px;
+      letter-spacing: -0.04em;
     }
 
-    .barContent {
-      padding: 0 16px 16px;
+    .barGrid {
+      padding: 0 18px 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .barCard {
+      border-radius: 18px;
+      padding: 13px;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(255, 255, 255, 0.055);
+    }
+
+    .barCardTitle {
+      font-size: 12px;
+      color: var(--soft);
+      font-weight: 1000;
+      margin-bottom: 8px;
+    }
+
+    .barLine {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
       color: var(--muted);
-      font-size: 13px;
-      line-height: 1.65;
+      font-size: 12px;
+      line-height: 1.6;
     }
 
     .vs {
       text-align: center;
       color: var(--muted);
       font-size: 12px;
-      font-weight: 950;
+      font-weight: 1000;
       letter-spacing: 0.18em;
       text-transform: uppercase;
       margin: 4px 0;
@@ -717,37 +811,36 @@
   <div class="topbar">
     <div class="topbarInner">
       <div class="brand">
-        <div class="logo">F/</div>
+        <div class="logoMark">F/</div>
         <div>
-          <div class="brandTitle">Foot<span>/</span>Scan</div>
+          <div class="brandName">Foot<span>/</span>Scan</div>
           <div class="brandSub">Performance scanner</div>
         </div>
       </div>
 
-      <div class="livePill">
-        <span class="dot"></span>
+      <div class="workerPill">
+        <span class="workerDot"></span>
         Worker local
       </div>
     </div>
   </div>
 
   <main class="app">
-    <section class="hero">
-      <div class="kicker">Analyse chronologique</div>
+    <section class="hero" id="hero">
+      <div class="heroTitle">Scan complet côté worker</div>
       <h1>Foot<span>/</span>Scan</h1>
       <p class="heroText">
-        Compare deux équipes avec les événements récents SofaScore, toutes compétitions confondues,
-        en appliquant le barème du point de vue de chaque équipe analysée.
+        Un job unique est envoyé à Termux. Le worker récupère les matchs, calcule les rangs,
+        puis renvoie le résultat final.
       </p>
     </section>
 
-    <section class="panel workerBox panelPad">
-      <div class="workerIcon">⚡</div>
+    <section class="panel notice panelPad">
+      <div class="noticeIcon">⚡</div>
       <div>
-        <div class="workerTitle">Worker Termux requis</div>
-        <p class="workerText">
-          Garde Termux ouvert avec <code>python scripts/local_worker.py</code> pendant le scan.
-          Les données déjà récupérées restent en cache.
+        <div class="noticeTitle">Termux doit rester ouvert</div>
+        <p class="noticeText">
+          Lance <code>python scripts/local_worker.py</code>. Cette version fait le calcul complet dans le worker.
         </p>
       </div>
     </section>
@@ -783,7 +876,7 @@
           </div>
         </div>
 
-        <button class="scanBtn" id="scanBtn">Scanner →</button>
+        <button class="scanBtn" id="scanBtn">Lancer le scan →</button>
       </div>
 
       <div id="statusBox" class="statusBox"></div>
@@ -793,43 +886,36 @@
     <div id="result" class="resultShell"></div>
 
     <details class="barBox">
-      <summary>Barème du point de vue de l’équipe analysée</summary>
-      <div class="barContent">
-        But de l’équipe analysée : +1<br />
-        But adverse : −1<br />
-        But + passe de l’équipe analysée : +1.5<br />
-        But + passe adverse : −1.5<br />
-        Passe décisive de l’équipe analysée : +0.5<br />
-        Passe décisive adverse : −0.5<br />
-        Jaune de l’équipe analysée : −0.5<br />
-        Jaune adverse : +0.5<br />
-        Rouge direct de l’équipe analysée : −1<br />
-        Rouge direct adverse : +1<br />
-        2ᵉ jaune de l’équipe analysée : −1.5<br />
-        2ᵉ jaune adverse : +1.5
+      <summary>Barème</summary>
+      <div class="barGrid">
+        <div class="barCard">
+          <div class="barCardTitle">Équipe analysée</div>
+          <div class="barLine"><span>But</span><strong class="positive">+1</strong></div>
+          <div class="barLine"><span>But + passe</span><strong class="positive">+1.5</strong></div>
+          <div class="barLine"><span>Passe décisive</span><strong class="positive">+0.5</strong></div>
+          <div class="barLine"><span>Jaune</span><strong class="negative">−0.5</strong></div>
+          <div class="barLine"><span>Rouge</span><strong class="negative">−1</strong></div>
+          <div class="barLine"><span>2ᵉ jaune</span><strong class="negative">−1.5</strong></div>
+        </div>
+
+        <div class="barCard">
+          <div class="barCardTitle">Adversaire</div>
+          <div class="barLine"><span>But</span><strong class="negative">−1</strong></div>
+          <div class="barLine"><span>But + passe</span><strong class="negative">−1.5</strong></div>
+          <div class="barLine"><span>Passe décisive</span><strong class="negative">−0.5</strong></div>
+          <div class="barLine"><span>Jaune</span><strong class="positive">+0.5</strong></div>
+          <div class="barLine"><span>Rouge</span><strong class="positive">+1</strong></div>
+          <div class="barLine"><span>2ᵉ jaune</span><strong class="positive">+1.5</strong></div>
+        </div>
       </div>
     </details>
   </main>
 
   <script>
-    const CONFIG = {
-      pagesToLoad: 3,
-      maxMatchesPerTeam: 17,
-      incidentBatchSize: 3,
-      maxFetchAttempts: 240,
-    };
-
-    const POSITIVE_VALUES = {
-      goal: 1,
-      goalWithAssist: 1.5,
-      assist: 0.5,
-    };
-
-    const CARD_VALUES_FOR_TEAM = {
-      yellow: -0.5,
-      secondYellow: -1.5,
-      red: -1,
-    };
+    let skipHomeValue = 0;
+    let skipAwayValue = 0;
+    let currentJobId = null;
+    let pollingTimer = null;
 
     const LABELS = {
       goal: "But",
@@ -839,9 +925,6 @@
       secondYellow: "2ᵉ jaune",
       red: "Rouge direct",
     };
-
-    let skipHomeValue = 0;
-    let skipAwayValue = 0;
 
     const $ = (id) => document.getElementById(id);
 
@@ -854,24 +937,6 @@
         .replaceAll("'", "&#039;");
     }
 
-    function sleep(ms) {
-      return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-
-    function setStatus(message) {
-      const box = $("statusBox");
-      box.style.display = message ? "block" : "none";
-      box.innerHTML = message
-        ? `${esc(message)}<div class="pulseLine"><div></div></div>`
-        : "";
-    }
-
-    function setError(message) {
-      const box = $("errorBox");
-      box.style.display = message ? "block" : "none";
-      box.textContent = message || "";
-    }
-
     function valueClass(value) {
       if (value > 0) return "positive";
       if (value < 0) return "negative";
@@ -881,6 +946,35 @@
     function formatValue(value) {
       if (value == null) return "—";
       return `${value > 0 ? "+" : ""}${value}`;
+    }
+
+    function teamLogoUrl(teamId) {
+      return `https://img.sofascore.com/api/v1/team/${teamId}/image`;
+    }
+
+    function setStatus(message, progress = 0) {
+      const box = $("statusBox");
+      box.style.display = message ? "block" : "none";
+
+      if (!message) {
+        box.innerHTML = "";
+        return;
+      }
+
+      const safeProgress = Math.max(0, Math.min(100, Number(progress || 0)));
+
+      box.innerHTML = `
+        ${esc(message)}
+        <div class="progressTrack">
+          <div class="progressFill" style="width:${safeProgress}%"></div>
+        </div>
+      `;
+    }
+
+    function setError(message) {
+      const box = $("errorBox");
+      box.style.display = message ? "block" : "none";
+      box.textContent = message || "";
     }
 
     function extractMatchId(input) {
@@ -896,350 +990,163 @@
       return found ? found[1] : s;
     }
 
-    function formatDateFromTimestamp(timestamp) {
-      if (!timestamp) return "";
+    async function startScanJob() {
+      const matchId = extractMatchId($("matchInput").value);
+      const rank1 = parseFloat(String($("rank1").value).replace(",", "."));
+      const rank2Raw = String($("rank2").value || "").trim();
+      const rank2 = rank2Raw ? parseFloat(rank2Raw.replace(",", ".")) : null;
 
-      const d = new Date(timestamp * 1000);
-      const dd = String(d.getDate()).padStart(2, "0");
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const yy = String(d.getFullYear()).slice(-2);
-
-      return `${dd}.${mm}.${yy}`;
-    }
-
-    function getCompetitionName(match) {
-      return (
-        match?.tournament?.uniqueTournament?.name ||
-        match?.uniqueTournament?.name ||
-        match?.tournament?.name ||
-        match?.season?.name ||
-        ""
-      );
-    }
-
-    function makeMatchLabel(match) {
-      const date = formatDateFromTimestamp(match.startTimestamp);
-      const competition = getCompetitionName(match);
-      const prefix = [date, competition].filter(Boolean).join(" · ");
-      const score = `${match.homeScore?.current ?? "-"}-${match.awayScore?.current ?? "-"}`;
-      const teams = `${match.homeTeam?.name || "?"} ${score} ${match.awayTeam?.name || "?"}`;
-
-      return prefix ? `${prefix} · ${teams}` : teams;
-    }
-
-    async function fetchJSON(path) {
-      for (let attempt = 1; attempt <= CONFIG.maxFetchAttempts; attempt++) {
-        setStatus(`Chargement SofaScore : ${path}\nTentative ${attempt}/${CONFIG.maxFetchAttempts}`);
-
-        let res;
-        let text;
-
-        try {
-          res = await fetch(`/api/sofa?path=${encodeURIComponent(path)}&_=${Date.now()}`, {
-            cache: "no-store",
-          });
-
-          text = await res.text();
-        } catch {
-          setStatus(`Connexion instable sur : ${path}\nNouvelle tentative dans 2 secondes…`);
-          await sleep(2000);
-          continue;
-        }
-
-        let data;
-
-        try {
-          data = JSON.parse(text);
-        } catch {
-          setStatus(`Réponse invalide sur : ${path}\nNouvelle tentative dans 2 secondes…`);
-          await sleep(2000);
-          continue;
-        }
-
-        if (res.status === 202) {
-          await sleep(data.retryAfter || 1000);
-          continue;
-        }
-
-        if (!res.ok) {
-          const msg = data.error || `HTTP ${res.status} sur ${path}`;
-          setStatus(`${msg}\nNouvelle tentative dans 2 secondes…`);
-          await sleep(2000);
-          continue;
-        }
-
-        return data;
+      if (!matchId || !rank1 || rank1 < 1) {
+        setError("Mets un Match ID ou une URL SofaScore, puis un rang 1 supérieur ou égal à 1.");
+        return;
       }
 
-      throw new Error("Données pas encore prêtes. Vérifie que Termux est ouvert et que le worker tourne.");
-    }
-
-    async function fetchMatch(id) {
-      const data = await fetchJSON(`event/${id}`);
-      const event = data.event || data;
-
-      if (!event || !event.homeTeam || !event.awayTeam) {
-        throw new Error("Format du match inattendu.");
+      if (rank2 !== null && (!rank2 || rank2 < 1)) {
+        setError("Le rang 2 doit être vide ou supérieur ou égal à 1.");
+        return;
       }
 
-      return event;
-    }
+      setError("");
+      setStatus("Création du job de scan…", 1);
+      $("result").innerHTML = "";
+      $("scanBtn").disabled = true;
+      $("scanBtn").textContent = "Scan en cours…";
 
-    async function fetchIncidents(id) {
-      const data = await fetchJSON(`event/${id}/incidents`);
-      return data.incidents || (Array.isArray(data) ? data : []);
-    }
-
-    async function fetchTeamLast(teamId, page = 0) {
-      const data = await fetchJSON(`team/${teamId}/events/last/${page}`);
-      return data.events || (Array.isArray(data) ? data : []);
-    }
-
-    function incidentBelongsToAnalyzedTeam(incident, match, analyzedTeamId) {
-      const teamIsHome = match.homeTeam?.id === analyzedTeamId;
-
-      if (typeof incident.isHome === "boolean") {
-        return incident.isHome === teamIsHome;
-      }
-
-      const directTeamId =
-        incident.team?.id ||
-        incident.playerTeam?.id ||
-        incident.player?.team?.id;
-
-      if (directTeamId) {
-        return directTeamId === analyzedTeamId;
-      }
-
-      return true;
-    }
-
-    function signedAttackValue(type, isForAnalyzedTeam) {
-      const base = POSITIVE_VALUES[type] || 0;
-      return isForAnalyzedTeam ? base : -base;
-    }
-
-    function signedCardValue(type, isForAnalyzedTeam) {
-      const base = CARD_VALUES_FOR_TEAM[type] || 0;
-      return isForAnalyzedTeam ? base : -base;
-    }
-
-    function parseIncidents(incidents, match, analyzedTeamId) {
-      const events = [];
-      const matchLabel = makeMatchLabel(match);
-      const matchId = match.id;
-
-      for (const inc of incidents) {
-        const minute = inc.time;
-        const added = inc.addedTime || 0;
-
-        if (minute == null || minute < 1 || minute > 90) continue;
-
-        const minuteLabel = added ? `${minute}+${added}'` : `${minute}'`;
-        const isForTeam = incidentBelongsToAnalyzedTeam(inc, match, analyzedTeamId);
-        const campLabel = isForTeam ? "Équipe analysée" : "Adversaire";
-
-        if (inc.incidentType === "goal") {
-          const scorer = inc.player?.name || "—";
-          const assister = inc.assist1?.name || null;
-
-          if (assister) {
-            events.push({
-              type: "goalWithAssist",
-              value: signedAttackValue("goalWithAssist", isForTeam),
-              minute,
-              added,
-              minuteLabel,
-              match: matchLabel,
-              matchId,
-              side: isForTeam ? "team" : "opponent",
-              detail: `${campLabel} · ${scorer} — passe : ${assister}`,
-            });
-
-            events.push({
-              type: "assist",
-              value: signedAttackValue("assist", isForTeam),
-              minute,
-              added,
-              minuteLabel,
-              match: matchLabel,
-              matchId,
-              side: isForTeam ? "team" : "opponent",
-              detail: `${campLabel} · ${assister} → ${scorer}`,
-            });
-          } else {
-            events.push({
-              type: "goal",
-              value: signedAttackValue("goal", isForTeam),
-              minute,
-              added,
-              minuteLabel,
-              match: matchLabel,
-              matchId,
-              side: isForTeam ? "team" : "opponent",
-              detail: `${campLabel} · ${scorer}`,
-            });
-          }
-        }
-
-        if (inc.incidentType === "card") {
-          if (!inc.player?.id) continue;
-
-          let type = null;
-
-          if (inc.incidentClass === "yellow") type = "yellow";
-          if (inc.incidentClass === "yellowRed") type = "secondYellow";
-          if (inc.incidentClass === "red") type = "red";
-
-          if (!type) continue;
-
-          events.push({
-            type,
-            value: signedCardValue(type, isForTeam),
-            minute,
-            added,
-            minuteLabel,
-            match: matchLabel,
-            matchId,
-            side: isForTeam ? "team" : "opponent",
-            detail: `${campLabel} · ${inc.player.name || "—"}`,
-          });
-        }
-      }
-
-      events.sort((a, b) => {
-        const aa = a.minute + (a.added || 0) / 100;
-        const bb = b.minute + (b.added || 0) / 100;
-
-        if (bb !== aa) return bb - aa;
-
-        const order = {
-          goalWithAssist: 0,
-          goal: 0,
-          assist: 1,
-          yellow: 2,
-          secondYellow: 2,
-          red: 2,
-        };
-
-        return (order[a.type] ?? 9) - (order[b.type] ?? 9);
+      const response = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matchId,
+          rank1,
+          rank2,
+          skipHome: skipHomeValue,
+          skipAway: skipAwayValue,
+        }),
       });
 
-      return events;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      currentJobId = data.id;
+      pollJob();
     }
 
-    function valueAtRank(events, rank) {
-      if (!rank || rank < 1) return { value: null, sources: [] };
+    async function pollJob() {
+      if (!currentJobId) return;
 
-      if (Number.isInteger(rank)) {
-        const event = events[rank - 1];
+      try {
+        const response = await fetch(`/api/scan?jobId=${encodeURIComponent(currentJobId)}&_=${Date.now()}`, {
+          cache: "no-store",
+        });
 
-        if (!event) return { value: null, sources: [] };
+        const job = await response.json();
 
-        return {
-          value: event.value,
-          sources: [event],
-        };
+        if (!response.ok) {
+          throw new Error(job.error || `HTTP ${response.status}`);
+        }
+
+        setStatus(job.message || job.status || "Scan en cours…", job.progress || 0);
+
+        if (job.status === "done") {
+          renderResult(job.result);
+          setStatus("Scan terminé.", 100);
+          finishScan();
+          return;
+        }
+
+        if (job.status === "error") {
+          setError(job.error || "Erreur pendant le scan.");
+          setStatus("");
+          finishScan();
+          return;
+        }
+
+        pollingTimer = setTimeout(pollJob, 900);
+      } catch (error) {
+        setError(error.message || String(error));
+        setStatus("");
+        finishScan();
       }
-
-      const lo = Math.floor(rank) - 1;
-      const hi = lo + 1;
-
-      if (!events[lo] || !events[hi]) {
-        return { value: null, sources: [] };
-      }
-
-      return {
-        value: (events[lo].value + events[hi].value) / 2,
-        sources: [events[lo], events[hi]],
-      };
     }
 
-    async function scanTeam(analyzedTeamId, skip, maxNeeded, teamName) {
-      setStatus(`${teamName}\nRécupération des ${CONFIG.pagesToLoad} pages SofaScore…`);
-
-      const pageNumbers = Array.from({ length: CONFIG.pagesToLoad }, (_, i) => i);
-
-      const pages = await Promise.all(
-        pageNumbers.map(async (page) => {
-          setStatus(`${teamName}\nRécupération page SofaScore ${page + 1}/${CONFIG.pagesToLoad}`);
-          return await fetchTeamLast(analyzedTeamId, page);
-        })
-      );
-
-      const byId = new Map();
-
-      for (const matches of pages) {
-        for (const match of matches) {
-          if (!match?.id) continue;
-
-          const isFinished = match.status?.type === "finished";
-          const isTeamMatch =
-            match.homeTeam?.id === analyzedTeamId || match.awayTeam?.id === analyzedTeamId;
-
-          if (!isFinished || !isTeamMatch) continue;
-
-          byId.set(match.id, match);
-        }
+    function finishScan() {
+      if (pollingTimer) {
+        clearTimeout(pollingTimer);
+        pollingTimer = null;
       }
 
-      const sortedMatches = [...byId.values()].sort((a, b) => {
-        const ta = a.startTimestamp || 0;
-        const tb = b.startTimestamp || 0;
-        return tb - ta;
-      });
+      $("scanBtn").disabled = false;
+      $("scanBtn").textContent = "Lancer le scan →";
+    }
 
-      const selectedMatches = sortedMatches
-        .slice(skip)
-        .slice(0, CONFIG.maxMatchesPerTeam);
+    function updateHero(match) {
+      if (!match?.homeTeam || !match?.awayTeam) return;
 
-      const allEvents = [];
-      const matchesUsed = [];
+      $("hero").innerHTML = `
+        <div class="heroTitle">Match analysé</div>
+        <div class="heroGrid">
+          <div class="heroTeam">
+            <div class="teamLogoBig"><img src="${teamLogoUrl(match.homeTeam.id)}" alt="" loading="lazy"></div>
+            <div class="heroTeamName">${esc(match.homeTeam.name)}</div>
+          </div>
+          <div class="heroVs">VS</div>
+          <div class="heroTeam">
+            <div class="teamLogoBig"><img src="${teamLogoUrl(match.awayTeam.id)}" alt="" loading="lazy"></div>
+            <div class="heroTeamName">${esc(match.awayTeam.name)}</div>
+          </div>
+        </div>
+        <p class="heroText">Résultat calculé dans Termux avec les derniers matchs toutes compétitions confondues.</p>
+      `;
+    }
 
-      for (let start = 0; start < selectedMatches.length; start += CONFIG.incidentBatchSize) {
-        const batch = selectedMatches.slice(start, start + CONFIG.incidentBatchSize);
+    function renderResult(result) {
+      if (!result) return;
 
-        setStatus(
-          `${teamName}\nIncidents matchs ${start + 1}-${Math.min(start + batch.length, selectedMatches.length)}/${selectedMatches.length}\nÉvénements trouvés : ${allEvents.length}/${maxNeeded}`
-        );
+      updateHero(result.match);
 
-        const scannedBatch = await Promise.all(
-          batch.map(async (match) => {
-            const label = makeMatchLabel(match);
-            const incidents = await fetchIncidents(match.id);
-            const events = parseIncidents(incidents, match, analyzedTeamId);
+      $("result").innerHTML = `
+        ${renderSummary(result)}
+        ${renderTeam(result.home, "Domicile", result.rank1, result.rank2)}
+        <div class="vs">VS</div>
+        ${renderTeam(result.away, "Extérieur", result.rank1, result.rank2)}
+      `;
+    }
 
-            return {
-              events,
-              matchUsed: {
-                id: match.id,
-                label,
-                count: events.length,
-                startTimestamp: match.startTimestamp || 0,
-                competition: getCompetitionName(match),
-              },
-            };
-          })
-        );
+    function renderSummary(result) {
+      const home = result.home;
+      const away = result.away;
+      const match = result.match;
 
-        for (const item of scannedBatch) {
-          allEvents.push(...item.events);
-          matchesUsed.push(item.matchUsed);
+      return `
+        <section class="summary">
+          <div class="summaryHead">
+            <div class="summaryLabel">Résumé</div>
+            <div class="summaryTitle">${esc(match.homeTeam.name)} vs ${esc(match.awayTeam.name)}</div>
+          </div>
+          <div class="summaryGrid">
+            ${renderSummaryCell(home, result.rank1, result.rank2)}
+            ${renderSummaryCell(away, result.rank1, result.rank2)}
+          </div>
+        </section>
+      `;
+    }
 
-          if (allEvents.length >= maxNeeded) {
-            break;
-          }
-        }
-
-        if (allEvents.length >= maxNeeded) {
-          break;
-        }
-      }
-
-      return {
-        events: allEvents,
-        matchesUsed,
-      };
+    function renderSummaryCell(team, rank1, rank2) {
+      return `
+        <div class="summaryCell">
+          <div class="summaryTeamRow">
+            <div class="teamLogoSmall"><img src="${teamLogoUrl(team.id)}" alt="" loading="lazy"></div>
+            <div class="summaryTeamName">${esc(team.name)}</div>
+          </div>
+          <div class="miniValues">
+            <span class="miniBadge">Rang ${esc(rank1)} : ${esc(formatValue(team.r1.value))}</span>
+            ${rank2 ? `<span class="miniBadge">Rang ${esc(rank2)} : ${esc(formatValue(team.r2.value))}</span>` : ""}
+          </div>
+        </div>
+      `;
     }
 
     function renderValue(label, result) {
@@ -1271,40 +1178,11 @@
       }
 
       html += `</div>`;
-
       return html;
     }
 
-    function renderSummary(match, home, away, rank1, rank2) {
-      return `
-        <section class="summary">
-          <div class="summaryHead">
-            <div class="summaryLabel">Match analysé</div>
-            <div class="summaryTitle">${esc(match.homeTeam.name)} vs ${esc(match.awayTeam.name)}</div>
-          </div>
-
-          <div class="summaryGrid">
-            ${renderSummaryCell(home, rank1, rank2)}
-            ${renderSummaryCell(away, rank1, rank2)}
-          </div>
-        </section>
-      `;
-    }
-
-    function renderSummaryCell(team, rank1, rank2) {
-      return `
-        <div class="summaryCell">
-          <div class="summaryTeam">${esc(team.name)}</div>
-          <div class="miniValues">
-            <span class="miniBadge">Rang ${esc(rank1)} : ${esc(formatValue(team.r1.value))}</span>
-            ${rank2 ? `<span class="miniBadge">Rang ${esc(rank2)} : ${esc(formatValue(team.r2.value))}</span>` : ""}
-          </div>
-        </div>
-      `;
-    }
-
     function renderTeam(team, side, rank1, rank2) {
-      const eventRows = team.events.map((ev, index) => {
+      const eventRows = (team.events || []).map((ev, index) => {
         const campClass = ev.side === "team" ? "campTeam" : "campOpponent";
         const campText = ev.side === "team" ? "Équipe" : "Adversaire";
 
@@ -1323,7 +1201,7 @@
         `;
       }).join("");
 
-      const matchRows = team.matchesUsed.map((m, index) => `
+      const matchRows = (team.matchesUsed || []).map((m, index) => `
         <div class="matchRow">
           <div class="rowNumber">${index + 1}</div>
           <div class="rowMain">
@@ -1338,8 +1216,13 @@
         <section class="teamCard">
           <div class="teamHero">
             <div class="sidePill">${esc(side)}</div>
-            <div class="teamName">${esc(team.name)}</div>
-            <div class="teamMeta">${team.events.length} événements · ${team.matchesUsed.length} matchs utilisés</div>
+            <div class="teamHeaderLine">
+              <div class="teamLogoMid"><img src="${teamLogoUrl(team.id)}" alt="" loading="lazy"></div>
+              <div>
+                <div class="teamName">${esc(team.name)}</div>
+                <div class="teamMeta">${team.events.length} événements · ${team.matchesUsed.length} matchs utilisés</div>
+              </div>
+            </div>
           </div>
 
           <div class="rankGrid ${rank2 ? "" : "one"}">
@@ -1369,72 +1252,12 @@
     }
 
     async function handleScan() {
-      setError("");
-      setStatus("");
-      $("result").innerHTML = "";
-
-      const matchId = extractMatchId($("matchInput").value);
-      const rank1 = parseFloat(String($("rank1").value).replace(",", "."));
-      const rank2Raw = String($("rank2").value || "").trim();
-      const rank2 = rank2Raw ? parseFloat(rank2Raw.replace(",", ".")) : null;
-
-      if (!matchId || !rank1 || rank1 < 1) {
-        setError("Mets un Match ID ou une URL SofaScore, puis un rang 1 supérieur ou égal à 1.");
-        return;
-      }
-
-      if (rank2 !== null && (!rank2 || rank2 < 1)) {
-        setError("Le rang 2 doit être vide ou supérieur ou égal à 1.");
-        return;
-      }
-
-      const ranks = [rank1, rank2].filter((x) => x !== null).sort((a, b) => a - b);
-      const maxRank = ranks[ranks.length - 1];
-      const maxNeeded = Math.ceil(maxRank);
-
-      $("scanBtn").disabled = true;
-      $("scanBtn").textContent = "Scan en cours…";
-
       try {
-        setStatus("Récupération du match principal…");
-
-        const match = await fetchMatch(matchId);
-
-        setStatus(`Match trouvé : ${match.homeTeam.name} vs ${match.awayTeam.name}`);
-
-        const [homeScan, awayScan] = await Promise.all([
-          scanTeam(match.homeTeam.id, skipHomeValue, maxNeeded, match.homeTeam.name),
-          scanTeam(match.awayTeam.id, skipAwayValue, maxNeeded, match.awayTeam.name),
-        ]);
-
-        const home = {
-          ...match.homeTeam,
-          ...homeScan,
-          r1: valueAtRank(homeScan.events, rank1),
-          r2: rank2 ? valueAtRank(homeScan.events, rank2) : null,
-        };
-
-        const away = {
-          ...match.awayTeam,
-          ...awayScan,
-          r1: valueAtRank(awayScan.events, rank1),
-          r2: rank2 ? valueAtRank(awayScan.events, rank2) : null,
-        };
-
-        $("result").innerHTML = `
-          ${renderSummary(match, home, away, rank1, rank2)}
-          ${renderTeam(home, "Domicile", rank1, rank2)}
-          <div class="vs">VS</div>
-          ${renderTeam(away, "Extérieur", rank1, rank2)}
-        `;
-
-        setStatus("Scan terminé.");
+        await startScanJob();
       } catch (error) {
         setError(error.message || String(error));
         setStatus("");
-      } finally {
-        $("scanBtn").disabled = false;
-        $("scanBtn").textContent = "Scanner →";
+        finishScan();
       }
     }
 
