@@ -687,6 +687,41 @@
       line-height: 1.05;
     }
 
+    .dominanceBox {
+      margin: 12px 14px;
+      padding: 13px;
+      border-radius: 14px;
+      border: 1px solid rgba(34, 197, 94, 0.22);
+      background:
+        linear-gradient(135deg, rgba(34, 197, 94, 0.11), rgba(56, 189, 248, 0.05)),
+        #141414;
+      display: grid;
+      gap: 7px;
+    }
+
+    .dominanceLabel {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .dominanceTeam {
+      color: var(--green);
+      font-size: 24px;
+      font-weight: 1000;
+      letter-spacing: -0.06em;
+      line-height: 1.05;
+      overflow-wrap: anywhere;
+    }
+
+    .dominanceMeta {
+      color: var(--soft);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
     .summaryGrid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1330,6 +1365,11 @@
       return "neutral";
     }
 
+    function numberOrNull(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    }
+
     function formatValue(value) {
       if (value == null) return "—";
 
@@ -1475,6 +1515,119 @@
       setStatus(`Rangs appliqués : ${formatRank(calc.low)} / ${formatRank(calc.high)}`, 0);
     }
 
+    function averagePerformance(team) {
+      const values = [];
+
+      const r1 = numberOrNull(team?.r1?.value);
+      const r2 = numberOrNull(team?.r2?.value);
+
+      if (r1 !== null) values.push(r1);
+      if (r2 !== null) values.push(r2);
+
+      if (!values.length) return null;
+
+      const sum = values.reduce((acc, value) => acc + value, 0);
+      return sum / values.length;
+    }
+
+    function getDominance(result) {
+      const homeAvg = averagePerformance(result?.home);
+      const awayAvg = averagePerformance(result?.away);
+
+      if (homeAvg === null && awayAvg === null) {
+        return {
+          type: "none",
+          label: "Domination indisponible",
+          average: null,
+          diff: null,
+        };
+      }
+
+      if (homeAvg !== null && awayAvg === null) {
+        return {
+          type: "winner",
+          team: result.home,
+          label: result.home.name,
+          average: homeAvg,
+          diff: null,
+        };
+      }
+
+      if (awayAvg !== null && homeAvg === null) {
+        return {
+          type: "winner",
+          team: result.away,
+          label: result.away.name,
+          average: awayAvg,
+          diff: null,
+        };
+      }
+
+      const diff = homeAvg - awayAvg;
+
+      if (Math.abs(diff) < 0.0000001) {
+        return {
+          type: "tie",
+          label: "Égalité",
+          average: homeAvg,
+          diff: 0,
+        };
+      }
+
+      if (diff > 0) {
+        return {
+          type: "winner",
+          team: result.home,
+          label: result.home.name,
+          average: homeAvg,
+          diff: Math.abs(diff),
+        };
+      }
+
+      return {
+        type: "winner",
+        team: result.away,
+        label: result.away.name,
+        average: awayAvg,
+        diff: Math.abs(diff),
+      };
+    }
+
+    function renderDominance(result) {
+      const dom = getDominance(result);
+
+      if (dom.type === "none") {
+        return `
+          <div class="dominanceBox">
+            <div class="dominanceLabel">Domination moyenne</div>
+            <div class="dominanceTeam">Indisponible</div>
+            <div class="dominanceMeta">Aucune moyenne disponible sur les rangs.</div>
+          </div>
+        `;
+      }
+
+      if (dom.type === "tie") {
+        return `
+          <div class="dominanceBox">
+            <div class="dominanceLabel">Domination moyenne</div>
+            <div class="dominanceTeam">Égalité</div>
+            <div class="dominanceMeta">Moyenne des deux rangs : ${esc(formatValue(dom.average))}</div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="dominanceBox">
+          <div class="dominanceLabel">Domination moyenne</div>
+          <div class="dominanceTeam">${esc(dom.label)}</div>
+          <div class="dominanceMeta">
+            Moyenne dominante : ${esc(formatValue(dom.average))}
+            ${dom.diff !== null ? ` · écart : ${esc(formatRank(dom.diff))}` : ""}
+          </div>
+        </div>
+      `;
+    }
+
     function setStatus(message, progress = 0) {
       const box = $("statusBox");
       box.style.display = message ? "block" : "none";
@@ -1578,6 +1731,7 @@
             createdAt: new Date().toISOString(),
             skipHome: skipHomeValue,
             skipAway: skipAwayValue,
+            autoSearch: calculateAutoRanks(),
             result: job.result,
           };
 
@@ -1667,6 +1821,8 @@
             <div class="summaryLabel">Résumé rapide</div>
             <div class="summaryTitle">${esc(match.homeTeam.name)} vs ${esc(match.awayTeam.name)}</div>
           </div>
+
+          ${renderDominance(result)}
 
           <div class="summaryGrid">
             ${renderSummaryCell(result.home, result.rank1, result.rank2)}
@@ -1869,6 +2025,44 @@
       return lines;
     }
 
+    function searchValueLines(entry) {
+      const calc = entry.autoSearch;
+      const lines = [];
+
+      lines.push("VALEUR DE RECHERCHE");
+
+      if (!calc) {
+        lines.push("Calculateur : non enregistré sur cette analyse.");
+        return lines;
+      }
+
+      lines.push(`Limites offensives : ${calc.offensive}`);
+      lines.push(`Changements : ${calc.changes}`);
+      lines.push(`Carton rouge dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`);
+      lines.push(`Deuxième jaune dans la valeur : ${calc.secondYellows > 0 ? "oui" : "non"} (${calc.secondYellows})`);
+      lines.push(`Rang bas calculé : ${formatRank(calc.low)}`);
+      lines.push(`Rang haut calculé : ${formatRank(calc.high)}`);
+
+      return lines;
+    }
+
+    function dominanceLines(result) {
+      const dom = getDominance(result);
+
+      if (dom.type === "none") {
+        return ["Domination moyenne : indisponible"];
+      }
+
+      if (dom.type === "tie") {
+        return [`Domination moyenne : égalité (${formatValue(dom.average)})`];
+      }
+
+      return [
+        `Domination moyenne : ${dom.label}`,
+        `Moyenne dominante : ${formatValue(dom.average)}${dom.diff !== null ? ` · écart : ${formatRank(dom.diff)}` : ""}`,
+      ];
+    }
+
     function entryToText(entry, index) {
       const result = entry.result;
       const match = result.match;
@@ -1883,6 +2077,12 @@
       lines.push(`Match : ${match.homeTeam.name} vs ${match.awayTeam.name}`);
       lines.push(`Ignorer domicile : ${entry.skipHome}`);
       lines.push(`Ignorer extérieur : ${entry.skipAway}`);
+      lines.push("");
+
+      lines.push(...searchValueLines(entry));
+      lines.push("");
+
+      lines.push(...dominanceLines(result));
       lines.push("");
 
       lines.push(`DOMICILE — ${home.name}`);
@@ -2083,4 +2283,4 @@
     updateAutoCalculator();
   </script>
 </body>
-</html>
+  </html>
