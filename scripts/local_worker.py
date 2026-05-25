@@ -26,7 +26,9 @@ SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "0.5"))
 PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAGE", "17"))
 
 PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "3"))
-MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "17"))
+INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM", "15"))
+SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
+MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "20"))
 INCIDENT_BATCH_SIZE = int(os.environ.get("FOOTSCAN_INCIDENT_BATCH_SIZE", "4"))
 
 POSITIVE_VALUES = {
@@ -406,6 +408,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
                     "matchId": match_id,
                     "side": side,
                     "detail": f"{camp_label} · {scorer} — passe : {assister}",
+                    "icon": "⚽",
                 })
 
                 events.append({
@@ -418,6 +421,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
                     "matchId": match_id,
                     "side": side,
                     "detail": f"{camp_label} · {assister} → {scorer}",
+                    "icon": "🅰️",
                 })
             else:
                 events.append({
@@ -430,6 +434,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
                     "matchId": match_id,
                     "side": side,
                     "detail": f"{camp_label} · {scorer}",
+                    "icon": "⚽",
                 })
 
         if inc.get("incidentType") == "card":
@@ -440,13 +445,17 @@ def parse_incidents(incidents, match, analyzed_team_id):
 
             cls = inc.get("incidentClass")
             kind = None
+            icon = "🟨"
 
             if cls == "yellow":
                 kind = "yellow"
+                icon = "🟨"
             elif cls == "yellowRed":
                 kind = "secondYellow"
+                icon = "🟧"
             elif cls == "red":
                 kind = "red"
+                icon = "🟥"
 
             if not kind:
                 continue
@@ -461,6 +470,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 "matchId": match_id,
                 "side": side,
                 "detail": f"{camp_label} · {player.get('name') or '—'}",
+                "icon": icon,
             })
 
     def sort_key(ev):
@@ -518,7 +528,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             job_id,
             status="running",
             message=f"{team_name} · page {page + 1}/{PAGES_TO_LOAD}",
-            progress=base_progress + int(progress_span * 0.12 * ((page + 1) / PAGES_TO_LOAD)),
+            progress=base_progress + int(progress_span * 0.10 * ((page + 1) / PAGES_TO_LOAD)),
         )
 
         data = get_json(f"team/{analyzed_team_id}/events/last/{page}")
@@ -557,72 +567,97 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     )
 
     selected_matches = sorted_matches[skip:skip + MAX_MATCHES_PER_TEAM]
+    stages = []
+
+    for limit in [INITIAL_MATCHES_PER_TEAM, SECOND_MATCHES_PER_TEAM, MAX_MATCHES_PER_TEAM]:
+        limit = max(1, min(limit, len(selected_matches)))
+        if limit not in stages:
+            stages.append(limit)
 
     all_events = []
     matches_used = []
+    scanned_until = 0
 
-    for start in range(0, len(selected_matches), INCIDENT_BATCH_SIZE):
-        batch = selected_matches[start:start + INCIDENT_BATCH_SIZE]
-        batch_end = min(start + len(batch), len(selected_matches))
+    for stage_limit in stages:
+        if len(all_events) >= max_needed:
+            break
 
         update_scan_job(
             job_id,
             status="running",
             message=(
-                f"{team_name} · incidents matchs {start + 1}-{batch_end}/{len(selected_matches)}\n"
+                f"{team_name} · scan progressif jusqu’à {stage_limit} matchs\n"
                 f"Événements trouvés : {len(all_events)}/{max_needed}"
             ),
-            progress=base_progress + int(progress_span * (0.15 + 0.80 * (start / max(1, len(selected_matches))))),
+            progress=base_progress + int(progress_span * 0.13),
         )
 
-        scanned = []
+        for start in range(scanned_until, stage_limit, INCIDENT_BATCH_SIZE):
+            batch = selected_matches[start:min(start + INCIDENT_BATCH_SIZE, stage_limit)]
+            batch_end = min(start + len(batch), stage_limit)
 
-        with ThreadPoolExecutor(max_workers=len(batch) or 1) as executor:
-            futures = {}
+            stage_position = batch_end / max(1, MAX_MATCHES_PER_TEAM)
 
-            for idx, match in enumerate(batch):
-                future = executor.submit(get_json, f"event/{match['id']}/incidents")
-                futures[future] = (idx, match)
+            update_scan_job(
+                job_id,
+                status="running",
+                message=(
+                    f"{team_name} · incidents matchs {start + 1}-{batch_end}/{stage_limit}\n"
+                    f"Événements trouvés : {len(all_events)}/{max_needed}"
+                ),
+                progress=base_progress + int(progress_span * (0.15 + 0.80 * stage_position)),
+            )
 
-            for future in as_completed(futures):
-                idx, match = futures[future]
-                data = future.result()
-                incidents = data.get("incidents") if isinstance(data, dict) else data
+            scanned = []
 
-                if not isinstance(incidents, list):
-                    incidents = []
+            with ThreadPoolExecutor(max_workers=len(batch) or 1) as executor:
+                futures = {}
 
-                events = parse_incidents(incidents, match, analyzed_team_id)
+                for idx, match in enumerate(batch):
+                    future = executor.submit(get_json, f"event/{match['id']}/incidents")
+                    futures[future] = (idx, match)
 
-                scanned.append({
-                    "idx": idx,
-                    "match": match,
-                    "events": events,
-                    "matchUsed": {
-                        "id": match.get("id"),
-                        "label": make_match_label(match),
-                        "count": len(events),
-                        "startTimestamp": match.get("startTimestamp") or 0,
-                        "competition": get_competition_name(match),
-                    },
-                })
+                for future in as_completed(futures):
+                    idx, match = futures[future]
+                    data = future.result()
+                    incidents = data.get("incidents") if isinstance(data, dict) else data
 
-        scanned.sort(key=lambda item: item["idx"])
+                    if not isinstance(incidents, list):
+                        incidents = []
 
-        for item in scanned:
-            all_events.extend(item["events"])
-            matches_used.append(item["matchUsed"])
+                    events = parse_incidents(incidents, match, analyzed_team_id)
+
+                    scanned.append({
+                        "idx": idx,
+                        "match": match,
+                        "events": events,
+                        "matchUsed": {
+                            "id": match.get("id"),
+                            "label": make_match_label(match),
+                            "count": len(events),
+                            "startTimestamp": match.get("startTimestamp") or 0,
+                            "competition": get_competition_name(match),
+                        },
+                    })
+
+            scanned.sort(key=lambda item: item["idx"])
+
+            for item in scanned:
+                all_events.extend(item["events"])
+                matches_used.append(item["matchUsed"])
+
+                if len(all_events) >= max_needed:
+                    break
+
+            scanned_until = batch_end
 
             if len(all_events) >= max_needed:
                 break
 
-        if len(all_events) >= max_needed:
-            break
-
     update_scan_job(
         job_id,
         status="running",
-        message=f"{team_name} · terminé ({len(all_events)} événements).",
+        message=f"{team_name} · terminé ({len(all_events)} événements, {len(matches_used)} matchs).",
         progress=base_progress + progress_span,
     )
 
@@ -725,6 +760,8 @@ def process_scan_job(job_id):
             "rank2": rank2,
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
+                "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
+                "secondMatchesPerTeam": SECOND_MATCHES_PER_TEAM,
                 "maxMatchesPerTeam": MAX_MATCHES_PER_TEAM,
                 "incidentBatchSize": INCIDENT_BATCH_SIZE,
             },
@@ -817,6 +854,7 @@ def main():
 
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: scan complet côté worker activé.")
+    print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Version rapide: préchargement incidents activé.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
