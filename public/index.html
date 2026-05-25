@@ -1250,4 +1250,837 @@
           <button class="reportBtn red" id="clearReportBtn" type="button">Vider le rapport</button>
         </div>
 
-        <div class="reportHint" id="report
+        <div class="reportHint" id="reportHint">
+          Après un scan terminé, appuie sur “Ajouter l’analyse actuelle”. Le rapport reste dans cette session navigateur.
+        </div>
+      </div>
+    </section>
+
+    <div id="result" class="resultShell"></div>
+
+    <details class="barBox">
+      <summary>Barème</summary>
+
+      <div class="barGrid">
+        <div class="barCard">
+          <div class="barCardTitle">✅ Équipe analysée</div>
+          <div class="barLine"><span>⚽ But</span><strong class="positive">+1</strong></div>
+          <div class="barLine"><span>⚽ But + passe</span><strong class="positive">+1.5</strong></div>
+          <div class="barLine"><span>🅰️ Passe décisive</span><strong class="positive">+0.5</strong></div>
+          <div class="barLine"><span>🟨 Jaune</span><strong class="negative">−0.5</strong></div>
+          <div class="barLine"><span>🟥 Rouge</span><strong class="negative">−1</strong></div>
+          <div class="barLine"><span>🟨🟥 Jaune + rouge</span><strong class="negative">−1.5</strong></div>
+        </div>
+
+        <div class="barCard">
+          <div class="barCardTitle">⚔️ Adversaire</div>
+          <div class="barLine"><span>⚽ But</span><strong class="negative">−1</strong></div>
+          <div class="barLine"><span>⚽ But + passe</span><strong class="negative">−1.5</strong></div>
+          <div class="barLine"><span>🅰️ Passe décisive</span><strong class="negative">−0.5</strong></div>
+          <div class="barLine"><span>🟨 Jaune</span><strong class="positive">+0.5</strong></div>
+          <div class="barLine"><span>🟥 Rouge</span><strong class="positive">+1</strong></div>
+          <div class="barLine"><span>🟨🟥 Jaune + rouge</span><strong class="positive">+1.5</strong></div>
+        </div>
+      </div>
+    </details>
+  </main>
+
+  <script>
+    let skipHomeValue = 0;
+    let skipAwayValue = 0;
+    let currentJobId = null;
+    let pollingTimer = null;
+    let lastResult = null;
+
+    const REPORT_KEY = "footscan_session_report_v1";
+    const AUTO_BASE = 15;
+
+    const LABELS = {
+      goal: "But",
+      goalWithAssist: "But + passe",
+      assist: "Passe décisive",
+      yellow: "Jaune",
+      secondYellow: "Jaune + rouge",
+      red: "Rouge direct",
+    };
+
+    const ICONS = {
+      goal: "⚽",
+      goalWithAssist: "⚽",
+      assist: "🅰️",
+      yellow: "🟨",
+      secondYellow: "🟨🟥",
+      red: "🟥",
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function esc(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function valueClass(value) {
+      if (value > 0) return "positive";
+      if (value < 0) return "negative";
+      return "neutral";
+    }
+
+    function formatValue(value) {
+      if (value == null) return "—";
+
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
+        return String(value);
+      }
+
+      const rounded = Math.round(number * 10000) / 10000;
+      return `${rounded > 0 ? "+" : ""}${rounded}`;
+    }
+
+    function formatRank(value) {
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
+        return "";
+      }
+
+      return String(Math.round(number * 10000) / 10000);
+    }
+
+    function clamp(number, min, max) {
+      if (!Number.isFinite(number)) return min;
+      return Math.max(min, Math.min(max, number));
+    }
+
+    function logoUrl(teamId) {
+      return `/api/logo?teamId=${encodeURIComponent(teamId)}`;
+    }
+
+    function eventIcon(ev) {
+      return ICONS[ev.type] || ev.icon || "•";
+    }
+
+    function weightText(source) {
+      const weight = Number(source?.weight || 0);
+
+      if (!weight || weight >= 0.9999) {
+        return "";
+      }
+
+      const percent = Math.round(weight * 1000) / 10;
+      return ` · poids ${percent}%`;
+    }
+
+    function getAutoValues() {
+      const rawOffensive = parseInt(String($("autoOffensiveNumber").value), 10);
+      const rawChanges = parseInt(String($("autoChangeNumber").value), 10);
+      const rawReds = parseInt(String($("autoRedNumber").value), 10);
+      const rawSecondYellows = parseInt(String($("autoSecondYellowNumber").value), 10);
+
+      const offensive = Math.floor(clamp(rawOffensive, 0, 22));
+      const changes = Math.floor(clamp(rawChanges, 0, 22));
+      const reds = Math.floor(clamp(rawReds, 0, 22));
+      const secondYellows = Math.floor(clamp(rawSecondYellows, 0, 22));
+
+      return {
+        offensive,
+        changes,
+        reds,
+        secondYellows,
+      };
+    }
+
+    function calculateAutoRanks() {
+      const { offensive, changes, reds, secondYellows } = getAutoValues();
+
+      const adjustedBase = AUTO_BASE + offensive * 11;
+
+      const marginUnit = 1 + offensive * 0.5;
+      const marginFinal = marginUnit * changes;
+
+      const lowBeforeCards = adjustedBase - marginFinal;
+      const highBeforeCards = adjustedBase + marginFinal;
+
+      const redPenaltyPerCard = 1.5 + offensive * 0.5;
+      const redPenaltyTotal = reds * redPenaltyPerCard;
+
+      const secondYellowPenaltyPerCard = 2 + offensive * 0.5;
+      const secondYellowPenaltyTotal = secondYellows * secondYellowPenaltyPerCard;
+
+      const totalPenalty = redPenaltyTotal + secondYellowPenaltyTotal;
+
+      const low = lowBeforeCards - totalPenalty;
+      const high = highBeforeCards - totalPenalty;
+
+      return {
+        offensive,
+        changes,
+        reds,
+        secondYellows,
+        adjustedBase,
+        marginUnit,
+        marginFinal,
+        lowBeforeCards,
+        highBeforeCards,
+        redPenaltyPerCard,
+        redPenaltyTotal,
+        secondYellowPenaltyPerCard,
+        secondYellowPenaltyTotal,
+        totalPenalty,
+        low,
+        high,
+      };
+    }
+
+    function updateAutoCalculator() {
+      const calc = calculateAutoRanks();
+
+      $("autoOffensiveNumber").value = calc.offensive;
+      $("autoOffensiveRange").value = calc.offensive;
+
+      $("autoChangeNumber").value = calc.changes;
+      $("autoChangeRange").value = calc.changes;
+
+      $("autoRedNumber").value = calc.reds;
+      $("autoRedRange").value = calc.reds;
+
+      $("autoSecondYellowNumber").value = calc.secondYellows;
+      $("autoSecondYellowRange").value = calc.secondYellows;
+
+      $("autoLow").textContent = formatRank(calc.low);
+      $("autoHigh").textContent = formatRank(calc.high);
+
+      $("autoFormula").textContent =
+        `Base : ${AUTO_BASE} + (${calc.offensive} × 11) = ${formatRank(calc.adjustedBase)} · ` +
+        `marge : (1 + ${calc.offensive} × 0.5) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
+        `avant cartons : ${formatRank(calc.lowBeforeCards)} / ${formatRank(calc.highBeforeCards)} · ` +
+        `rouges : ${calc.reds} × ${formatRank(calc.redPenaltyPerCard)} = ${formatRank(calc.redPenaltyTotal)} · ` +
+        `2e jaunes : ${calc.secondYellows} × ${formatRank(calc.secondYellowPenaltyPerCard)} = ${formatRank(calc.secondYellowPenaltyTotal)} · ` +
+        `total cartons : ${formatRank(calc.totalPenalty)} · ` +
+        `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+    }
+
+    function applyAutoRanks() {
+      const calc = calculateAutoRanks();
+
+      $("rank1").value = formatRank(calc.low);
+      $("rank2").value = formatRank(calc.high);
+
+      setStatus(`Rangs appliqués : ${formatRank(calc.low)} / ${formatRank(calc.high)}`, 0);
+    }
+
+    function setStatus(message, progress = 0) {
+      const box = $("statusBox");
+      box.style.display = message ? "block" : "none";
+
+      if (!message) {
+        box.innerHTML = "";
+        return;
+      }
+
+      const safeProgress = Math.max(0, Math.min(100, Number(progress || 0)));
+
+      box.innerHTML = `
+        ${esc(message)}
+        <div class="progressTrack">
+          <div class="progressFill" style="width:${safeProgress}%"></div>
+        </div>
+      `;
+    }
+
+    function setError(message) {
+      const box = $("errorBox");
+      box.style.display = message ? "block" : "none";
+      box.textContent = message || "";
+    }
+
+    function extractMatchId(input) {
+      const s = String(input || "").trim();
+
+      if (/^\d+$/.test(s)) return s;
+
+      const found =
+        s.match(/#id:(\d+)/) ||
+        s.match(/\/event\/(\d+)/) ||
+        s.match(/\/(\d+)(?:[/?#]|$)/);
+
+      return found ? found[1] : s;
+    }
+
+    async function startScanJob() {
+      const matchId = extractMatchId($("matchInput").value);
+      const rank1 = parseFloat(String($("rank1").value).replace(",", "."));
+      const rank2Raw = String($("rank2").value || "").trim();
+      const rank2 = rank2Raw ? parseFloat(rank2Raw.replace(",", ".")) : null;
+
+      if (!matchId || !rank1 || rank1 < 1) {
+        setError("Mets un Match ID ou une URL SofaScore, puis un rang 1 supérieur ou égal à 1.");
+        return;
+      }
+
+      if (rank2 !== null && (!rank2 || rank2 < 1)) {
+        setError("Le rang 2 doit être vide ou supérieur ou égal à 1.");
+        return;
+      }
+
+      setError("");
+      setStatus("Création du job de scan…", 1);
+      $("result").innerHTML = "";
+      $("scanBtn").disabled = true;
+      $("scanBtn").textContent = "Scan en cours…";
+
+      const response = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matchId,
+          rank1,
+          rank2,
+          skipHome: skipHomeValue,
+          skipAway: skipAwayValue,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      currentJobId = data.id;
+      pollJob();
+    }
+
+    async function pollJob() {
+      if (!currentJobId) return;
+
+      try {
+        const response = await fetch(`/api/scan?jobId=${encodeURIComponent(currentJobId)}&_=${Date.now()}`, {
+          cache: "no-store",
+        });
+
+        const job = await response.json();
+
+        if (!response.ok) {
+          throw new Error(job.error || `HTTP ${response.status}`);
+        }
+
+        setStatus(job.message || job.status || "Scan en cours…", job.progress || 0);
+
+        if (job.status === "done") {
+          lastResult = {
+            createdAt: new Date().toISOString(),
+            skipHome: skipHomeValue,
+            skipAway: skipAwayValue,
+            result: job.result,
+          };
+
+          renderResult(job.result);
+          setStatus("Scan terminé. Tu peux ajouter cette analyse au rapport.", 100);
+          $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter l’analyse actuelle” pour l’enregistrer dans le rapport.";
+          finishScan();
+          return;
+        }
+
+        if (job.status === "error") {
+          setError(job.error || "Erreur pendant le scan.");
+          setStatus("");
+          finishScan();
+          return;
+        }
+
+        pollingTimer = setTimeout(pollJob, 850);
+      } catch (error) {
+        setError(error.message || String(error));
+        setStatus("");
+        finishScan();
+      }
+    }
+
+    function finishScan() {
+      if (pollingTimer) {
+        clearTimeout(pollingTimer);
+        pollingTimer = null;
+      }
+
+      $("scanBtn").disabled = false;
+      $("scanBtn").textContent = "Scanner →";
+    }
+
+    function updateHero(match) {
+      if (!match?.homeTeam || !match?.awayTeam) return;
+
+      $("hero").innerHTML = `
+        <div class="matchHero">
+          <div class="kicker">Match analysé</div>
+
+          <div class="matchTeams">
+            <div class="matchTeam">
+              <div class="logoXL">
+                <img src="${logoUrl(match.homeTeam.id)}" alt="">
+              </div>
+              <div class="matchTeamName">${esc(match.homeTeam.name)}</div>
+            </div>
+
+            <div class="vsBox">VS</div>
+
+            <div class="matchTeam">
+              <div class="logoXL">
+                <img src="${logoUrl(match.awayTeam.id)}" alt="">
+              </div>
+              <div class="matchTeamName">${esc(match.awayTeam.name)}</div>
+            </div>
+          </div>
+
+          <p class="heroText">
+            Résultat calculé dans Termux avec les derniers matchs toutes compétitions confondues.
+          </p>
+        </div>
+      `;
+    }
+
+    function renderResult(result) {
+      if (!result) return;
+
+      updateHero(result.match);
+
+      $("result").innerHTML = `
+        ${renderSummary(result)}
+        ${renderTeam(result.home, "Domicile", result.rank1, result.rank2)}
+        <div class="vsDivider">VS</div>
+        ${renderTeam(result.away, "Extérieur", result.rank1, result.rank2)}
+      `;
+    }
+
+    function renderSummary(result) {
+      const match = result.match;
+
+      return `
+        <section class="summary">
+          <div class="summaryHead">
+            <div class="summaryLabel">Résumé rapide</div>
+            <div class="summaryTitle">${esc(match.homeTeam.name)} vs ${esc(match.awayTeam.name)}</div>
+          </div>
+
+          <div class="summaryGrid">
+            ${renderSummaryCell(result.home, result.rank1, result.rank2)}
+            ${renderSummaryCell(result.away, result.rank1, result.rank2)}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderSummaryCell(team, rank1, rank2) {
+      return `
+        <div class="summaryCell">
+          <div class="summaryTeamRow">
+            <div class="logoS">
+              <img src="${logoUrl(team.id)}" alt="">
+            </div>
+            <div class="summaryTeamName">${esc(team.name)}</div>
+          </div>
+
+          <div class="miniValues">
+            <div class="miniBadge">
+              <span>Rang ${esc(rank1)}</span>
+              <strong class="${valueClass(team.r1?.value)}">${esc(formatValue(team.r1?.value))}</strong>
+            </div>
+
+            ${rank2 ? `
+              <div class="miniBadge">
+                <span>Rang ${esc(rank2)}</span>
+                <strong class="${valueClass(team.r2?.value)}">${esc(formatValue(team.r2?.value))}</strong>
+              </div>
+            ` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderValue(label, result) {
+      const value = result?.value;
+      const sources = result?.sources || [];
+      const cls = valueClass(value || 0);
+
+      let html = `
+        <div class="rankCard">
+          <div class="rankLabel">${esc(label)}</div>
+          <div class="rankValue ${cls}">${esc(formatValue(value))}</div>
+      `;
+
+      if (sources.length) {
+        html += `<div class="sourceList">`;
+
+        for (const source of sources) {
+          const rankIndex = source.rankIndex ? `#${source.rankIndex} · ` : "";
+
+          html += `
+            <div class="sourceItem">
+              <div class="eventIcon">${esc(eventIcon(source))}</div>
+              <div>
+                <div>${esc(source.match)}</div>
+                <div class="sourceSmall">
+                  ${esc(rankIndex)}${esc(source.minuteLabel)} · ${esc(source.side === "team" ? "Équipe analysée" : "Adversaire")} · ${esc(LABELS[source.type])} · ${esc(formatValue(source.value))}${esc(weightText(source))}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        html += `</div>`;
+      }
+
+      html += `</div>`;
+      return html;
+    }
+
+    function renderTeam(team, side, rank1, rank2) {
+      const events = team.events || [];
+      const matchesUsed = team.matchesUsed || [];
+
+      const eventRows = events.map((ev) => {
+        const campClass = ev.side === "team" ? "campTeam" : "campOpponent";
+        const campText = ev.side === "team" ? "Équipe" : "Adversaire";
+
+        return `
+          <div class="eventRow">
+            <div class="eventIcon">${esc(eventIcon(ev))}</div>
+
+            <div class="rowMain">
+              <div class="rowTitle">
+                <span class="campBadge ${campClass}">${campText}</span>
+                ${esc(LABELS[ev.type] || ev.type)}
+              </div>
+
+              <div class="rowSub">
+                ${esc(ev.minuteLabel)} · ${esc(ev.detail)} · ${esc(ev.match)}
+              </div>
+            </div>
+
+            <div class="rowScore ${valueClass(ev.value)}">${esc(formatValue(ev.value))}</div>
+          </div>
+        `;
+      }).join("");
+
+      const matchRows = matchesUsed.map((m, index) => `
+        <div class="matchRow">
+          <div class="rowNumber">${index + 1}</div>
+
+          <div class="rowMain">
+            <div class="rowTitle">${esc(m.label)}</div>
+            <div class="rowSub">${esc(m.competition || "Toutes compétitions")}</div>
+          </div>
+
+          <div class="rowScore neutral">${esc(m.count)}</div>
+        </div>
+      `).join("");
+
+      return `
+        <section class="teamCard">
+          <div class="teamHero">
+            <div class="sidePill">${esc(side)}</div>
+
+            <div class="teamHeaderLine">
+              <div class="logoM">
+                <img src="${logoUrl(team.id)}" alt="">
+              </div>
+
+              <div>
+                <div class="teamName">${esc(team.name)}</div>
+                <div class="teamMeta">${events.length} événements · ${matchesUsed.length} matchs utilisés</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rankGrid ${rank2 ? "" : "one"}">
+            ${renderValue(`Rang ${rank1}`, team.r1)}
+            ${rank2 ? renderValue(`Rang ${rank2}`, team.r2) : ""}
+          </div>
+
+          <div class="section">
+            <div class="sectionTitle">
+              Matchs utilisés
+              <span class="countPill">${matchesUsed.length}</span>
+            </div>
+
+            <div class="matchList">${matchRows || "Aucun match trouvé."}</div>
+          </div>
+
+          <details class="clean">
+            <summary>
+              Événements trouvés
+              <span class="countPill">${events.length}</span>
+            </summary>
+
+            <div class="section">
+              <div class="eventList">${eventRows || "Aucun événement trouvé."}</div>
+            </div>
+          </details>
+        </section>
+      `;
+    }
+
+    function loadReport() {
+      try {
+        return JSON.parse(localStorage.getItem(REPORT_KEY) || "[]");
+      } catch {
+        return [];
+      }
+    }
+
+    function saveReport(entries) {
+      localStorage.setItem(REPORT_KEY, JSON.stringify(entries));
+      updateReportCount();
+    }
+
+    function updateReportCount() {
+      const count = loadReport().length;
+      $("reportCount").textContent = `${count} analyse${count > 1 ? "s" : ""} enregistrée${count > 1 ? "s" : ""}`;
+    }
+
+    function rankLines(team, rankLabel, rankResult) {
+      const lines = [];
+      const value = rankResult?.value;
+      const sources = rankResult?.sources || [];
+
+      lines.push(`${rankLabel} : ${formatValue(value)}`);
+
+      if (!sources.length) {
+        lines.push("Détail : événement introuvable");
+        return lines;
+      }
+
+      lines.push("Détail événement :");
+
+      for (const source of sources) {
+        const rankIndex = source.rankIndex ? `#${source.rankIndex} · ` : "";
+
+        lines.push(
+          `- ${rankIndex}${eventIcon(source)} ${source.minuteLabel} · ${source.side === "team" ? "Équipe analysée" : "Adversaire"} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
+        );
+      }
+
+      return lines;
+    }
+
+    function entryToText(entry, index) {
+      const result = entry.result;
+      const match = result.match;
+      const home = result.home;
+      const away = result.away;
+      const date = new Date(entry.createdAt).toLocaleString("fr-FR");
+
+      const lines = [];
+
+      lines.push(`ANALYSE ${index + 1}`);
+      lines.push(`Date : ${date}`);
+      lines.push(`Match : ${match.homeTeam.name} vs ${match.awayTeam.name}`);
+      lines.push(`Ignorer domicile : ${entry.skipHome}`);
+      lines.push(`Ignorer extérieur : ${entry.skipAway}`);
+      lines.push("");
+
+      lines.push(`DOMICILE — ${home.name}`);
+      lines.push(...rankLines(home, `Rang ${result.rank1}`, home.r1));
+
+      if (result.rank2) {
+        lines.push(...rankLines(home, `Rang ${result.rank2}`, home.r2));
+      }
+
+      lines.push("");
+
+      lines.push(`EXTÉRIEUR — ${away.name}`);
+      lines.push(...rankLines(away, `Rang ${result.rank1}`, away.r1));
+
+      if (result.rank2) {
+        lines.push(...rankLines(away, `Rang ${result.rank2}`, away.r2));
+      }
+
+      lines.push("");
+      lines.push("────────────────────────");
+      lines.push("");
+
+      return lines.join("\n");
+    }
+
+    function buildReportText() {
+      const entries = loadReport();
+
+      if (!entries.length) {
+        return "Rapport Foot/Scan\n\nAucune analyse enregistrée.";
+      }
+
+      return [
+        "RAPPORT FOOT/SCAN",
+        `Généré le : ${new Date().toLocaleString("fr-FR")}`,
+        `Nombre d’analyses : ${entries.length}`,
+        "",
+        "────────────────────────",
+        "",
+        ...entries.map((entry, index) => entryToText(entry, index)),
+      ].join("\n");
+    }
+
+    function textToDocHtml(text) {
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Rapport Foot/Scan</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.45;
+              color: #111;
+              white-space: pre-wrap;
+            }
+          </style>
+        </head>
+        <body>${esc(text)}</body>
+        </html>
+      `;
+    }
+
+    function addCurrentAnalysisToReport() {
+      if (!lastResult) {
+        $("reportHint").textContent = "Aucune analyse prête. Lance un scan puis ajoute-le au rapport.";
+        return;
+      }
+
+      const entries = loadReport();
+
+      entries.push(lastResult);
+      saveReport(entries);
+
+      $("reportHint").textContent = "Analyse ajoutée au rapport.";
+    }
+
+    async function copyReport() {
+      const text = buildReportText();
+
+      try {
+        await navigator.clipboard.writeText(text);
+        $("reportHint").textContent = "Rapport copié. Tu peux le coller dans Google Docs.";
+      } catch {
+        $("reportHint").textContent = "Copie impossible sur ce navigateur. Essaie le téléchargement .doc.";
+      }
+    }
+
+    function downloadReportDoc() {
+      const text = buildReportText();
+      const html = textToDocHtml(text);
+      const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rapport-footscan-${new Date().toISOString().slice(0, 10)}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      URL.revokeObjectURL(url);
+      $("reportHint").textContent = "Téléchargement du rapport lancé.";
+    }
+
+    function clearReport() {
+      localStorage.removeItem(REPORT_KEY);
+      updateReportCount();
+      $("reportHint").textContent = "Rapport vidé.";
+    }
+
+    async function handleScan() {
+      try {
+        await startScanJob();
+      } catch (error) {
+        setError(error.message || String(error));
+        setStatus("");
+        finishScan();
+      }
+    }
+
+    function renderSkipButtons(id, getValue, setValue) {
+      const container = $(id);
+
+      function draw() {
+        container.innerHTML = "";
+
+        for (let i = 0; i <= 5; i++) {
+          const btn = document.createElement("button");
+          btn.textContent = i;
+          btn.type = "button";
+
+          if (getValue() === i) {
+            btn.className = "active";
+          }
+
+          btn.addEventListener("click", () => {
+            setValue(i);
+            draw();
+          });
+
+          container.appendChild(btn);
+        }
+      }
+
+      draw();
+    }
+
+    renderSkipButtons("skipHome", () => skipHomeValue, (v) => skipHomeValue = v);
+    renderSkipButtons("skipAway", () => skipAwayValue, (v) => skipAwayValue = v);
+
+    $("scanBtn").addEventListener("click", handleScan);
+    $("addReportBtn").addEventListener("click", addCurrentAnalysisToReport);
+    $("downloadReportBtn").addEventListener("click", downloadReportDoc);
+    $("copyReportBtn").addEventListener("click", copyReport);
+    $("clearReportBtn").addEventListener("click", clearReport);
+
+    $("autoOffensiveRange").addEventListener("input", () => {
+      $("autoOffensiveNumber").value = $("autoOffensiveRange").value;
+      updateAutoCalculator();
+    });
+
+    $("autoOffensiveNumber").addEventListener("input", () => {
+      updateAutoCalculator();
+    });
+
+    $("autoChangeRange").addEventListener("input", () => {
+      $("autoChangeNumber").value = $("autoChangeRange").value;
+      updateAutoCalculator();
+    });
+
+    $("autoChangeNumber").addEventListener("input", () => {
+      updateAutoCalculator();
+    });
+
+    $("autoRedRange").addEventListener("input", () => {
+      $("autoRedNumber").value = $("autoRedRange").value;
+      updateAutoCalculator();
+    });
+
+    $("autoRedNumber").addEventListener("input", () => {
+      updateAutoCalculator();
+    });
+
+    $("autoSecondYellowRange").addEventListener("input", () => {
+      $("autoSecondYellowNumber").value = $("autoSecondYellowRange").value;
+      updateAutoCalculator();
+    });
+
+    $("autoSecondYellowNumber").addEventListener("input", () => {
+      updateAutoCalculator();
+    });
+
+    $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
+
+    updateReportCount();
+    updateAutoCalculator();
+  </script>
+</body>
+</html>
