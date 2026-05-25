@@ -45,6 +45,11 @@
       line-height: 1.4;
     }
 
+    code {
+      color: #e7e5e4;
+      font-family: monospace;
+    }
+
     label {
       display: block;
       margin: 16px 0 7px;
@@ -128,6 +133,8 @@
       background: rgba(120, 53, 15, 0.25);
       font-size: 14px;
       line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
 
     .error {
@@ -135,6 +142,7 @@
       border-color: #7f1d1d;
       background: rgba(127, 29, 29, 0.35);
       word-break: break-word;
+      white-space: pre-wrap;
     }
 
     .team {
@@ -320,12 +328,12 @@
     <div class="grid">
       <div>
         <label for="rank1">Rang 1</label>
-        <input id="rank1" placeholder="Ex: 5 ou 5.5" inputmode="decimal" />
+        <input id="rank1" placeholder="Ex: 52.5" inputmode="decimal" />
       </div>
 
       <div>
         <label for="rank2">Rang 2 optionnel</label>
-        <input id="rank2" placeholder="Ex: 8 ou vide" inputmode="decimal" />
+        <input id="rank2" placeholder="Ex: 79.5 ou vide" inputmode="decimal" />
       </div>
     </div>
 
@@ -423,23 +431,40 @@
     }
 
     async function fetchJSON(path) {
-      const maxAttempts = 180;
+      const maxAttempts = 240;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        setStatus(`Chargement SofaScore : ${path} — tentative ${attempt}/${maxAttempts}`);
+        setStatus(`Chargement SofaScore : ${path}\nTentative ${attempt}/${maxAttempts}`);
 
-        const res = await fetch(`/api/sofa?path=${encodeURIComponent(path)}&_=${Date.now()}`, {
-          cache: "no-store",
-        });
+        let res;
+        let text;
 
-        const text = await res.text();
+        try {
+          res = await fetch(`/api/sofa?path=${encodeURIComponent(path)}&_=${Date.now()}`, {
+            cache: "no-store",
+          });
+
+          text = await res.text();
+        } catch (networkError) {
+          setStatus(
+            `Connexion instable sur : ${path}\nNouvelle tentative dans 2 secondes…`
+          );
+
+          await sleep(2000);
+          continue;
+        }
 
         let data;
 
         try {
           data = JSON.parse(text);
         } catch {
-          throw new Error(`Réponse non JSON sur ${path}: ${text.slice(0, 160)}`);
+          setStatus(
+            `Réponse invalide sur : ${path}\nNouvelle tentative dans 2 secondes…`
+          );
+
+          await sleep(2000);
+          continue;
         }
 
         if (res.status === 202) {
@@ -448,13 +473,19 @@
         }
 
         if (!res.ok) {
-          throw new Error(data.error || `HTTP ${res.status} sur ${path}`);
+          const msg = data.error || `HTTP ${res.status} sur ${path}`;
+
+          setStatus(`${msg}\nNouvelle tentative dans 2 secondes…`);
+          await sleep(2000);
+          continue;
         }
 
         return data;
       }
 
-      throw new Error("Données pas encore prêtes. Vérifie que le worker Termux est toujours lancé.");
+      throw new Error(
+        "Données pas encore prêtes. Vérifie que Termux est ouvert et que le worker tourne."
+      );
     }
 
     async function fetchMatch(id) {
@@ -545,7 +576,19 @@
       events.sort((a, b) => {
         const aa = a.minute + (a.added || 0) / 100;
         const bb = b.minute + (b.added || 0) / 100;
-        return bb - aa;
+
+        if (bb !== aa) return bb - aa;
+
+        const order = {
+          goalWithAssist: 0,
+          goal: 0,
+          assist: 1,
+          yellow: 2,
+          secondYellow: 2,
+          red: 2,
+        };
+
+        return (order[a.type] ?? 9) - (order[b.type] ?? 9);
       });
 
       return events;
@@ -578,7 +621,7 @@
       };
     }
 
-    async function scanTeam(teamId, skip, maxNeeded) {
+    async function scanTeam(teamId, skip, maxNeeded, teamName) {
       const allEvents = [];
       const matchesUsed = [];
 
@@ -586,7 +629,17 @@
       let skipped = 0;
       let safety = 0;
 
-      while (allEvents.length < maxNeeded && safety < 8) {
+      const maxMatchesPerTeam = 15;
+
+      while (
+        allEvents.length < maxNeeded &&
+        matchesUsed.length < maxMatchesPerTeam &&
+        safety < 8
+      ) {
+        setStatus(
+          `${teamName}\nPage SofaScore ${page}\nÉvénements trouvés : ${allEvents.length}/${maxNeeded}\nMatchs utilisés : ${matchesUsed.length}/${maxMatchesPerTeam}`
+        );
+
         const matches = await fetchTeamLast(teamId, page);
         const finished = matches.filter((m) => m.status?.type === "finished");
 
@@ -598,12 +651,16 @@
             continue;
           }
 
+          if (matchesUsed.length >= maxMatchesPerTeam) break;
           if (allEvents.length >= maxNeeded) break;
-
-          const incidents = await fetchIncidents(match.id);
 
           const label = `${match.homeTeam?.name || "?"} ${match.homeScore?.current ?? "-"}-${match.awayScore?.current ?? "-"} ${match.awayTeam?.name || "?"}`;
 
+          setStatus(
+            `${teamName}\nMatch ${matchesUsed.length + 1}/${maxMatchesPerTeam}\n${label}\nÉvénements trouvés : ${allEvents.length}/${maxNeeded}`
+          );
+
+          const incidents = await fetchIncidents(match.id);
           const events = parseIncidents(incidents, label, match.id);
 
           allEvents.push(...events);
@@ -717,18 +774,32 @@
         return;
       }
 
-      const maxNeeded = Math.ceil(Math.max(rank1, rank2 || 0)) + 1;
+      const maxRank = Math.max(rank1, rank2 || 0);
+      const maxNeeded = Math.ceil(maxRank) + 5;
 
       $("scanBtn").disabled = true;
       $("scanBtn").textContent = "Scan en cours…";
 
       try {
+        setStatus("Récupération du match principal…");
+
         const match = await fetchMatch(matchId);
 
         setStatus(`Match trouvé : ${match.homeTeam.name} vs ${match.awayTeam.name}`);
 
-        const homeScan = await scanTeam(match.homeTeam.id, skipHomeValue, maxNeeded);
-        const awayScan = await scanTeam(match.awayTeam.id, skipAwayValue, maxNeeded);
+        const homeScan = await scanTeam(
+          match.homeTeam.id,
+          skipHomeValue,
+          maxNeeded,
+          match.homeTeam.name
+        );
+
+        const awayScan = await scanTeam(
+          match.awayTeam.id,
+          skipAwayValue,
+          maxNeeded,
+          match.awayTeam.name
+        );
 
         const home = {
           ...match.homeTeam,
