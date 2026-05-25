@@ -6,9 +6,7 @@
   <title>Foot/Scan</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -35,9 +33,7 @@
       letter-spacing: 1px;
     }
 
-    h1 span {
-      color: #ef4444;
-    }
+    h1 span { color: #ef4444; }
 
     p {
       color: #a8a29e;
@@ -71,9 +67,7 @@
       font-size: 15px;
     }
 
-    input:focus {
-      border-color: #ef4444;
-    }
+    input:focus { border-color: #ef4444; }
 
     .grid {
       display: grid;
@@ -115,9 +109,7 @@
       letter-spacing: 1px;
     }
 
-    .scan:disabled {
-      background: #44403c;
-    }
+    .scan:disabled { background: #44403c; }
 
     .box {
       border: 1px solid #292524;
@@ -176,9 +168,7 @@
       background: #292524;
     }
 
-    .values.one {
-      grid-template-columns: 1fr;
-    }
+    .values.one { grid-template-columns: 1fr; }
 
     .valueCell {
       background: #1c1917;
@@ -235,9 +225,7 @@
       border-bottom: 1px solid rgba(41, 37, 36, 0.65);
     }
 
-    .row:last-child {
-      border-bottom: 0;
-    }
+    .row:last-child { border-bottom: 0; }
 
     .num {
       color: #78716c;
@@ -257,9 +245,7 @@
       min-width: 0;
     }
 
-    .eventTitle {
-      color: #fafaf9;
-    }
+    .eventTitle { color: #fafaf9; }
 
     .eventSub {
       color: #78716c;
@@ -281,9 +267,7 @@
       font-weight: bold;
     }
 
-    details {
-      margin-top: 14px;
-    }
+    details { margin-top: 14px; }
 
     summary {
       cursor: pointer;
@@ -356,23 +340,39 @@
     <div id="result"></div>
 
     <details class="box">
-      <summary>Barème</summary>
+      <summary>Barème du point de vue de l’équipe analysée</summary>
       <div class="bar">
-        But + passe : +1.5<br />
-        But : +1<br />
-        Passe décisive : +0.5<br />
-        Jaune : −0.5<br />
-        Rouge direct : −1<br />
-        2ᵉ jaune : −1.5
+        But de l’équipe analysée : +1<br />
+        But adverse : −1<br />
+        But + passe de l’équipe analysée : +1.5<br />
+        But + passe adverse : −1.5<br />
+        Passe décisive de l’équipe analysée : +0.5<br />
+        Passe décisive adverse : −0.5<br />
+        Jaune de l’équipe analysée : −0.5<br />
+        Jaune adverse : +0.5<br />
+        Rouge direct de l’équipe analysée : −1<br />
+        Rouge direct adverse : +1<br />
+        2ᵉ jaune de l’équipe analysée : −1.5<br />
+        2ᵉ jaune adverse : +1.5
       </div>
     </details>
   </main>
 
   <script>
-    const VALUES = {
+    const CONFIG = {
+      pagesToLoad: 3,
+      maxMatchesPerTeam: 17,
+      incidentBatchSize: 3,
+      maxFetchAttempts: 240,
+    };
+
+    const POSITIVE_VALUES = {
       goal: 1,
       goalWithAssist: 1.5,
       assist: 0.5,
+    };
+
+    const CARD_VALUES_FOR_TEAM = {
       yellow: -0.5,
       secondYellow: -1.5,
       red: -1,
@@ -441,11 +441,29 @@
       return `${dd}.${mm}.${yy}`;
     }
 
-    async function fetchJSON(path) {
-      const maxAttempts = 240;
+    function getCompetitionName(match) {
+      return (
+        match?.tournament?.uniqueTournament?.name ||
+        match?.uniqueTournament?.name ||
+        match?.tournament?.name ||
+        match?.season?.name ||
+        ""
+      );
+    }
 
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        setStatus(`Chargement SofaScore : ${path}\nTentative ${attempt}/${maxAttempts}`);
+    function makeMatchLabel(match) {
+      const date = formatDateFromTimestamp(match.startTimestamp);
+      const competition = getCompetitionName(match);
+      const prefix = [date, competition].filter(Boolean).join(" · ");
+      const score = `${match.homeScore?.current ?? "-"}-${match.awayScore?.current ?? "-"}`;
+      const teams = `${match.homeTeam?.name || "?"} ${score} ${match.awayTeam?.name || "?"}`;
+
+      return prefix ? `${prefix} · ${teams}` : teams;
+    }
+
+    async function fetchJSON(path) {
+      for (let attempt = 1; attempt <= CONFIG.maxFetchAttempts; attempt++) {
+        setStatus(`Chargement SofaScore : ${path}\nTentative ${attempt}/${CONFIG.maxFetchAttempts}`);
 
         let res;
         let text;
@@ -456,11 +474,8 @@
           });
 
           text = await res.text();
-        } catch (networkError) {
-          setStatus(
-            `Connexion instable sur : ${path}\nNouvelle tentative dans 2 secondes…`
-          );
-
+        } catch {
+          setStatus(`Connexion instable sur : ${path}\nNouvelle tentative dans 2 secondes…`);
           await sleep(2000);
           continue;
         }
@@ -470,10 +485,7 @@
         try {
           data = JSON.parse(text);
         } catch {
-          setStatus(
-            `Réponse invalide sur : ${path}\nNouvelle tentative dans 2 secondes…`
-          );
-
+          setStatus(`Réponse invalide sur : ${path}\nNouvelle tentative dans 2 secondes…`);
           await sleep(2000);
           continue;
         }
@@ -485,7 +497,6 @@
 
         if (!res.ok) {
           const msg = data.error || `HTTP ${res.status} sur ${path}`;
-
           setStatus(`${msg}\nNouvelle tentative dans 2 secondes…`);
           await sleep(2000);
           continue;
@@ -494,9 +505,7 @@
         return data;
       }
 
-      throw new Error(
-        "Données pas encore prêtes. Vérifie que Termux est ouvert et que le worker tourne."
-      );
+      throw new Error("Données pas encore prêtes. Vérifie que Termux est ouvert et que le worker tourne.");
     }
 
     async function fetchMatch(id) {
@@ -520,8 +529,39 @@
       return data.events || (Array.isArray(data) ? data : []);
     }
 
-    function parseIncidents(incidents, matchLabel, matchId) {
+    function incidentBelongsToAnalyzedTeam(incident, match, analyzedTeamId) {
+      const teamIsHome = match.homeTeam?.id === analyzedTeamId;
+
+      if (typeof incident.isHome === "boolean") {
+        return incident.isHome === teamIsHome;
+      }
+
+      const directTeamId =
+        incident.team?.id ||
+        incident.playerTeam?.id ||
+        incident.player?.team?.id;
+
+      if (directTeamId) {
+        return directTeamId === analyzedTeamId;
+      }
+
+      return true;
+    }
+
+    function signedAttackValue(type, isForAnalyzedTeam) {
+      const base = POSITIVE_VALUES[type] || 0;
+      return isForAnalyzedTeam ? base : -base;
+    }
+
+    function signedCardValue(type, isForAnalyzedTeam) {
+      const base = CARD_VALUES_FOR_TEAM[type] || 0;
+      return isForAnalyzedTeam ? base : -base;
+    }
+
+    function parseIncidents(incidents, match, analyzedTeamId) {
       const events = [];
+      const matchLabel = makeMatchLabel(match);
+      const matchId = match.id;
 
       for (const inc of incidents) {
         const minute = inc.time;
@@ -530,32 +570,48 @@
         if (minute == null || minute < 1 || minute > 90) continue;
 
         const minuteLabel = added ? `${minute}+${added}'` : `${minute}'`;
+        const isForTeam = incidentBelongsToAnalyzedTeam(inc, match, analyzedTeamId);
+        const campLabel = isForTeam ? "Équipe analysée" : "Adversaire";
 
         if (inc.incidentType === "goal") {
           const scorer = inc.player?.name || "—";
           const assister = inc.assist1?.name || null;
 
-          events.push({
-            type: assister ? "goalWithAssist" : "goal",
-            value: assister ? VALUES.goalWithAssist : VALUES.goal,
-            minute,
-            added,
-            minuteLabel,
-            match: matchLabel,
-            matchId,
-            detail: assister ? `${scorer} — passe : ${assister}` : scorer,
-          });
-
           if (assister) {
             events.push({
-              type: "assist",
-              value: VALUES.assist,
+              type: "goalWithAssist",
+              value: signedAttackValue("goalWithAssist", isForTeam),
               minute,
               added,
               minuteLabel,
               match: matchLabel,
               matchId,
-              detail: `${assister} → ${scorer}`,
+              side: isForTeam ? "team" : "opponent",
+              detail: `${campLabel} · ${scorer} — passe : ${assister}`,
+            });
+
+            events.push({
+              type: "assist",
+              value: signedAttackValue("assist", isForTeam),
+              minute,
+              added,
+              minuteLabel,
+              match: matchLabel,
+              matchId,
+              side: isForTeam ? "team" : "opponent",
+              detail: `${campLabel} · ${assister} → ${scorer}`,
+            });
+          } else {
+            events.push({
+              type: "goal",
+              value: signedAttackValue("goal", isForTeam),
+              minute,
+              added,
+              minuteLabel,
+              match: matchLabel,
+              matchId,
+              side: isForTeam ? "team" : "opponent",
+              detail: `${campLabel} · ${scorer}`,
             });
           }
         }
@@ -573,13 +629,14 @@
 
           events.push({
             type,
-            value: VALUES[type],
+            value: signedCardValue(type, isForTeam),
             minute,
             added,
             minuteLabel,
             match: matchLabel,
             matchId,
-            detail: inc.player.name || "—",
+            side: isForTeam ? "team" : "opponent",
+            detail: `${campLabel} · ${inc.player.name || "—"}`,
           });
         }
       }
@@ -632,25 +689,27 @@
       };
     }
 
-    async function scanTeam(teamId, skip, maxNeeded, teamName) {
-      const maxMatchesPerTeam = 15;
-      const pagesToLoad = 6;
+    async function scanTeam(analyzedTeamId, skip, maxNeeded, teamName) {
+      setStatus(`${teamName}\nRécupération des ${CONFIG.pagesToLoad} pages SofaScore…`);
+
+      const pageNumbers = Array.from({ length: CONFIG.pagesToLoad }, (_, i) => i);
+
+      const pages = await Promise.all(
+        pageNumbers.map(async (page) => {
+          setStatus(`${teamName}\nRécupération page SofaScore ${page + 1}/${CONFIG.pagesToLoad}`);
+          return await fetchTeamLast(analyzedTeamId, page);
+        })
+      );
 
       const byId = new Map();
 
-      for (let page = 0; page < pagesToLoad; page++) {
-        setStatus(
-          `${teamName}\nRécupération des derniers matchs\nPage SofaScore ${page + 1}/${pagesToLoad}`
-        );
-
-        const matches = await fetchTeamLast(teamId, page);
-
+      for (const matches of pages) {
         for (const match of matches) {
           if (!match?.id) continue;
 
           const isFinished = match.status?.type === "finished";
           const isTeamMatch =
-            match.homeTeam?.id === teamId || match.awayTeam?.id === teamId;
+            match.homeTeam?.id === analyzedTeamId || match.awayTeam?.id === analyzedTeamId;
 
           if (!isFinished || !isTeamMatch) continue;
 
@@ -661,38 +720,54 @@
       const sortedMatches = [...byId.values()].sort((a, b) => {
         const ta = a.startTimestamp || 0;
         const tb = b.startTimestamp || 0;
-
         return tb - ta;
       });
 
       const selectedMatches = sortedMatches
         .slice(skip)
-        .slice(0, maxMatchesPerTeam);
+        .slice(0, CONFIG.maxMatchesPerTeam);
 
       const allEvents = [];
       const matchesUsed = [];
 
-      for (let i = 0; i < selectedMatches.length; i++) {
-        const match = selectedMatches[i];
-
-        const date = formatDateFromTimestamp(match.startTimestamp);
-        const label = `${date ? date + " · " : ""}${match.homeTeam?.name || "?"} ${match.homeScore?.current ?? "-"}-${match.awayScore?.current ?? "-"} ${match.awayTeam?.name || "?"}`;
+      for (let start = 0; start < selectedMatches.length; start += CONFIG.incidentBatchSize) {
+        const batch = selectedMatches.slice(start, start + CONFIG.incidentBatchSize);
 
         setStatus(
-          `${teamName}\nMatch ${i + 1}/${selectedMatches.length}\n${label}\nÉvénements trouvés : ${allEvents.length}/${maxNeeded}`
+          `${teamName}\nIncidents matchs ${start + 1}-${Math.min(start + batch.length, selectedMatches.length)}/${selectedMatches.length}\nÉvénements trouvés : ${allEvents.length}/${maxNeeded}`
         );
 
-        const incidents = await fetchIncidents(match.id);
-        const events = parseIncidents(incidents, label, match.id);
+        const scannedBatch = await Promise.all(
+          batch.map(async (match) => {
+            const label = makeMatchLabel(match);
+            const incidents = await fetchIncidents(match.id);
+            const events = parseIncidents(incidents, match, analyzedTeamId);
 
-        allEvents.push(...events);
+            return {
+              events,
+              matchUsed: {
+                id: match.id,
+                label,
+                count: events.length,
+                startTimestamp: match.startTimestamp || 0,
+                competition: getCompetitionName(match),
+              },
+            };
+          })
+        );
 
-        matchesUsed.push({
-          id: match.id,
-          label,
-          count: events.length,
-          startTimestamp: match.startTimestamp || 0,
-        });
+        for (const item of scannedBatch) {
+          allEvents.push(...item.events);
+          matchesUsed.push(item.matchUsed);
+
+          if (allEvents.length >= maxNeeded) {
+            break;
+          }
+        }
+
+        if (allEvents.length >= maxNeeded) {
+          break;
+        }
       }
 
       return {
@@ -717,7 +792,7 @@
         for (const source of sources) {
           html += `
             <div>${esc(source.match)}</div>
-            <small>${esc(source.minuteLabel)} · ${esc(LABELS[source.type])} · ${esc((source.value > 0 ? "+" : "") + source.value)}</small>
+            <small>${esc(source.minuteLabel)} · ${esc(source.side === "team" ? "Équipe analysée" : "Adversaire")} · ${esc(LABELS[source.type])} · ${esc((source.value > 0 ? "+" : "") + source.value)}</small>
           `;
         }
 
@@ -735,7 +810,7 @@
           <div class="num">#${index + 1}</div>
           <div class="min">${esc(ev.minuteLabel)}</div>
           <div class="grow">
-            <div class="eventTitle">${esc(LABELS[ev.type])}</div>
+            <div class="eventTitle">${esc(LABELS[ev.type])} · ${esc(ev.side === "team" ? "Équipe analysée" : "Adversaire")}</div>
             <div class="eventSub">${esc(ev.detail)} · ${esc(ev.match)}</div>
           </div>
           <div class="${ev.value > 0 ? "plus" : "minus"}">${esc((ev.value > 0 ? "+" : "") + ev.value)}</div>
@@ -793,8 +868,9 @@
         return;
       }
 
-      const maxRank = Math.max(rank1, rank2 || 0);
-      const maxNeeded = Math.ceil(maxRank) + 5;
+      const ranks = [rank1, rank2].filter((x) => x !== null).sort((a, b) => a - b);
+      const maxRank = ranks[ranks.length - 1];
+      const maxNeeded = Math.ceil(maxRank);
 
       $("scanBtn").disabled = true;
       $("scanBtn").textContent = "Scan en cours…";
@@ -806,19 +882,10 @@
 
         setStatus(`Match trouvé : ${match.homeTeam.name} vs ${match.awayTeam.name}`);
 
-        const homeScan = await scanTeam(
-          match.homeTeam.id,
-          skipHomeValue,
-          maxNeeded,
-          match.homeTeam.name
-        );
-
-        const awayScan = await scanTeam(
-          match.awayTeam.id,
-          skipAwayValue,
-          maxNeeded,
-          match.awayTeam.name
-        );
+        const [homeScan, awayScan] = await Promise.all([
+          scanTeam(match.homeTeam.id, skipHomeValue, maxNeeded, match.homeTeam.name),
+          scanTeam(match.awayTeam.id, skipAwayValue, maxNeeded, match.awayTeam.name),
+        ]);
 
         const home = {
           ...match.homeTeam,
