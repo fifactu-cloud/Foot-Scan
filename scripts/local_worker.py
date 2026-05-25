@@ -2,19 +2,24 @@ import os
 import sys
 import json
 import time
+import re
 import urllib.request
 import urllib.error
 
 
 QUEUE_KEY = "sofa:queue"
+PREFETCH_QUEUE_KEY = "sofa:prefetch_queue"
+
 CACHE_PREFIX = "sofa:cache:"
 ERROR_PREFIX = "sofa:error:"
 REQUEST_PREFIX = "sofa:req:"
 LOCK_PREFIX = "sofa:lock:"
+PREFETCH_LOCK_PREFIX = "sofa:prefetch_lock:"
 
 CACHE_TTL_SECONDS = int(os.environ.get("SOFA_CACHE_TTL_SECONDS", "86400"))
 ERROR_TTL_SECONDS = int(os.environ.get("SOFA_ERROR_TTL_SECONDS", "60"))
-SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "1.5"))
+SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "0.5"))
+PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAGE", "17"))
 
 
 def env(name):
@@ -123,7 +128,117 @@ def sofa_fetch(path):
     raise RuntimeError(last_error or f"Impossible de récupérer {clean_path}")
 
 
-def process_request(request_id):
+def cache_key(path):
+    return f"{CACHE_PREFIX}{path.lstrip('/')}"
+
+
+def error_key(path):
+    return f"{ERROR_PREFIX}{path.lstrip('/')}"
+
+
+def is_cached(path):
+    return bool(redis_cmd("GET", cache_key(path)))
+
+
+def set_cache(path, body):
+    redis_cmd("SET", cache_key(path), body, "EX", str(CACHE_TTL_SECONDS))
+
+
+def set_error(path, error_message):
+    payload = {
+        "error": error_message,
+        "path": path,
+        "source": "local_worker",
+    }
+
+    redis_cmd("SET", error_key(path), json.dumps(payload), "EX", str(ERROR_TTL_SECONDS))
+
+
+def extract_events_from_body(body):
+    try:
+        data = json.loads(body)
+    except Exception:
+        return []
+
+    if isinstance(data, dict):
+        events = data.get("events", [])
+    elif isinstance(data, list):
+        events = data
+    else:
+        events = []
+
+    if not isinstance(events, list):
+        return []
+
+    return events
+
+
+def enqueue_prefetch(path):
+    clean_path = path.lstrip("/")
+    lock_key = f"{PREFETCH_LOCK_PREFIX}{clean_path}"
+
+    if is_cached(clean_path):
+        return False
+
+    lock_result = redis_cmd(
+        "SET",
+        lock_key,
+        "1",
+        "EX",
+        "600",
+        "NX",
+    )
+
+    if lock_result == "OK":
+        redis_cmd("LPUSH", PREFETCH_QUEUE_KEY, clean_path)
+        return True
+
+    return False
+
+
+def maybe_enqueue_incidents_from_team_page(path, body):
+    clean_path = path.lstrip("/")
+
+    if not re.match(r"^team/\d+/events/last/\d+$", clean_path):
+        return
+
+    events = extract_events_from_body(body)
+    finished = []
+
+    for match in events:
+        if not isinstance(match, dict):
+            continue
+
+        if (match.get("status") or {}).get("type") != "finished":
+            continue
+
+        match_id = match.get("id")
+
+        if not match_id:
+            continue
+
+        start_timestamp = match.get("startTimestamp") or 0
+
+        finished.append({
+            "id": match_id,
+            "startTimestamp": start_timestamp,
+        })
+
+    finished.sort(key=lambda x: x["startTimestamp"], reverse=True)
+
+    count = 0
+
+    for match in finished[:PREFETCH_MAX_MATCHES_PER_PAGE]:
+        incident_path = f"event/{match['id']}/incidents"
+
+        if enqueue_prefetch(incident_path):
+            count += 1
+
+    if count:
+        print(f"Préchargement incidents ajouté: {count} match(s) depuis {clean_path}")
+
+
+def process_main_request(request_id):
     request_key = f"{REQUEST_PREFIX}{request_id}"
     raw = redis_cmd("GET", request_key)
 
@@ -134,51 +249,80 @@ def process_request(request_id):
     payload = json.loads(raw)
     path = payload["path"].lstrip("/")
 
-    cache_key = f"{CACHE_PREFIX}{path}"
-    error_key = f"{ERROR_PREFIX}{path}"
     lock_key = f"{LOCK_PREFIX}{request_id}"
+
+    if is_cached(path):
+        redis_cmd("DEL", request_key)
+        redis_cmd("DEL", lock_key)
+        print(f"Déjà en cache: {path}")
+        return
 
     print(f"Traitement: {path}")
 
     try:
         body = sofa_fetch(path)
 
-        redis_cmd("SET", cache_key, body, "EX", str(CACHE_TTL_SECONDS))
-        redis_cmd("DEL", error_key)
+        set_cache(path, body)
+        redis_cmd("DEL", error_key(path))
         redis_cmd("DEL", request_key)
         redis_cmd("DEL", lock_key)
 
         print(f"OK: {path}")
 
-    except Exception as e:
-        error_payload = {
-            "error": str(e),
-            "path": path,
-            "source": "local_worker",
-        }
+        maybe_enqueue_incidents_from_team_page(path, body)
 
-        redis_cmd("SET", error_key, json.dumps(error_payload), "EX", str(ERROR_TTL_SECONDS))
+    except Exception as e:
+        set_error(path, str(e))
         redis_cmd("DEL", lock_key)
 
         print(f"ERREUR: {path}: {e}", file=sys.stderr)
+
+
+def process_prefetch_path(path):
+    clean_path = path.lstrip("/")
+
+    if is_cached(clean_path):
+        print(f"Préchargement ignoré, déjà en cache: {clean_path}")
+        return
+
+    print(f"Préchargement: {clean_path}")
+
+    try:
+        body = sofa_fetch(clean_path)
+        set_cache(clean_path, body)
+        print(f"OK préchargé: {clean_path}")
+
+        maybe_enqueue_incidents_from_team_page(clean_path, body)
+
+    except Exception as e:
+        print(f"ERREUR préchargement: {clean_path}: {e}", file=sys.stderr)
 
 
 def main():
     once = "--once" in sys.argv
 
     print("Foot/Scan worker local démarré.")
+    print("Version rapide: préchargement incidents activé.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
     while True:
         request_id = redis_cmd("RPOP", QUEUE_KEY)
 
         if request_id:
-            process_request(request_id)
-        elif once:
+            process_main_request(request_id)
+            continue
+
+        prefetch_path = redis_cmd("RPOP", PREFETCH_QUEUE_KEY)
+
+        if prefetch_path:
+            process_prefetch_path(prefetch_path)
+            continue
+
+        if once:
             print("Aucune requête en attente.")
             break
-        else:
-            time.sleep(SLEEP_SECONDS)
+
+        time.sleep(SLEEP_SECONDS)
 
 
 if __name__ == "__main__":
