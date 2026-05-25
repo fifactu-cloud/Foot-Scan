@@ -1,57 +1,137 @@
-const SOFA_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Accept': 'application/json, text/plain, */*',
-  'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
-  'Referer': 'https://www.sofascore.com/',
-  'Origin': 'https://www.sofascore.com',
-  'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-  'sec-ch-ua-mobile': '?0',
-  'sec-ch-ua-platform': '"Windows"',
-  'sec-fetch-dest': 'empty',
-  'sec-fetch-mode': 'cors',
-  'sec-fetch-site': 'same-site',
-};
+const QUEUE_KEY = "sofa:queue";
+const CACHE_PREFIX = "sofa:cache:";
+const ERROR_PREFIX = "sofa:error:";
+const REQUEST_PREFIX = "sofa:req:";
+const LOCK_PREFIX = "sofa:lock:";
 
-function isBlocked(text) {
-  if (!text) return true;
-  const t = text.trim();
-  if (t.startsWith('<')) return true;
-  try {
-    const j = JSON.parse(t);
-    if (j.error && (j.error.code === 403 || j.error.reason === 'challenge')) return true;
-  } catch {}
-  return false;
+const CACHE_TTL_SECONDS = Number(process.env.SOFA_CACHE_TTL_SECONDS || 86400);
+const REQUEST_TTL_SECONDS = 300;
+const LOCK_TTL_SECONDS = 30;
+
+function getEnv(name) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Variable d'environnement manquante: ${name}`);
+  }
+
+  return value;
+}
+
+function makeRequestId(path) {
+  return Buffer.from(path).toString("base64url");
+}
+
+async function redisCmd(...cmd) {
+  const url = getEnv("UPSTASH_REDIS_REST_URL");
+  const token = getEnv("UPSTASH_REDIS_REST_TOKEN");
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(cmd),
+  });
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`Upstash HTTP ${response.status}: ${text}`);
+  }
+
+  const data = JSON.parse(text);
+
+  if (data.error) {
+    throw new Error(`Upstash error: ${data.error}`);
+  }
+
+  return data.result;
 }
 
 export default async function handler(req, res) {
-  const { path } = req.query;
-  if (!path || typeof path !== 'string') {
-    return res.status(400).json({ error: 'paramètre "path" manquant' });
-  }
-  const cleanPath = path.replace(/^\/+/, '');
+  try {
+    const { path } = req.query;
 
-  const urls = [
-    `https://api.sofascore.com/api/v1/${cleanPath}`,
-    `https://www.sofascore.com/api/v1/${cleanPath}`,
-  ];
-
-  const errors = [];
-  for (let i = 0; i < urls.length; i++) {
-    try {
-      const upstream = await fetch(urls[i], { headers: SOFA_HEADERS });
-      const text = await upstream.text();
-      if (!upstream.ok) { errors.push(`#${i+1}: HTTP ${upstream.status}`); continue; }
-      if (isBlocked(text)) { errors.push(`#${i+1}: challenge détecté`); continue; }
-      res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate');
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('X-Strategy-Used', String(i + 1));
-      return res.status(200).send(text);
-    } catch (e) {
-      errors.push(`#${i+1}: ${e.message}`);
+    if (!path || typeof path !== "string") {
+      return res.status(400).json({
+        error: 'Paramètre "path" manquant',
+      });
     }
+
+    const cleanPath = path.replace(/^\/+/, "").trim();
+
+    if (!cleanPath || cleanPath.startsWith("http")) {
+      return res.status(400).json({
+        error: "Path SofaScore invalide",
+      });
+    }
+
+    const requestId = makeRequestId(cleanPath);
+    const cacheKey = `${CACHE_PREFIX}${cleanPath}`;
+    const errorKey = `${ERROR_PREFIX}${cleanPath}`;
+    const requestKey = `${REQUEST_PREFIX}${requestId}`;
+    const lockKey = `${LOCK_PREFIX}${requestId}`;
+
+    const cached = await redisCmd("GET", cacheKey);
+
+    if (cached) {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-Foot-Scan-Cache", "HIT");
+      return res.status(200).send(cached);
+    }
+
+    const cachedError = await redisCmd("GET", errorKey);
+
+    if (cachedError) {
+      let payload;
+
+      try {
+        payload = JSON.parse(cachedError);
+      } catch {
+        payload = { error: cachedError };
+      }
+
+      return res.status(502).json(payload);
+    }
+
+    await redisCmd(
+      "SET",
+      requestKey,
+      JSON.stringify({
+        id: requestId,
+        path: cleanPath,
+        createdAt: Date.now(),
+      }),
+      "EX",
+      String(REQUEST_TTL_SECONDS)
+    );
+
+    const lockResult = await redisCmd(
+      "SET",
+      lockKey,
+      "1",
+      "EX",
+      String(LOCK_TTL_SECONDS),
+      "NX"
+    );
+
+    if (lockResult === "OK") {
+      await redisCmd("LPUSH", QUEUE_KEY, requestId);
+    }
+
+    return res.status(202).json({
+      status: "queued",
+      id: requestId,
+      path: cleanPath,
+      retryAfter: 1000,
+      message: "Requête envoyée au worker local",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: error.message || String(error),
+    });
   }
-  return res.status(502).json({
-    error: 'Sofascore bloque depuis Vercel. Passer au plan B (GitHub Actions).',
-    details: errors,
-  });
 }
