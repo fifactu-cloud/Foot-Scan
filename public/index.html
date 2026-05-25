@@ -2,59 +2,365 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0c0a09" />
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Foot/Scan</title>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
-    rel="stylesheet"
-  />
-
-  <script src="https://cdn.tailwindcss.com"></script>
-
   <style>
-    html,
+    * {
+      box-sizing: border-box;
+    }
+
     body {
+      margin: 0;
       background: #0c0a09;
+      color: #fafaf9;
+      font-family: Arial, Helvetica, sans-serif;
     }
 
-    body {
-      font-family: 'Inter Tight', system-ui, sans-serif;
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 22px 16px 60px;
     }
 
-    .display {
-      font-family: 'Bebas Neue', sans-serif;
-      letter-spacing: 0.02em;
+    .header {
+      border-bottom: 1px solid #292524;
+      background: linear-gradient(180deg, rgba(127, 29, 29, 0.35), transparent);
+      margin-bottom: 22px;
     }
 
-    .mono {
-      font-family: 'JetBrains Mono', monospace;
+    h1 {
+      margin: 0;
+      font-size: 44px;
+      letter-spacing: 1px;
+    }
+
+    h1 span {
+      color: #ef4444;
+    }
+
+    p {
+      color: #a8a29e;
+      margin: 8px 0 0;
+      line-height: 1.4;
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 7px;
+      font-size: 11px;
+      color: #78716c;
+      text-transform: uppercase;
+      letter-spacing: 1.6px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #292524;
+      background: #1c1917;
+      color: #fafaf9;
+      outline: none;
+      font-size: 15px;
+    }
+
+    input:focus {
+      border-color: #ef4444;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .skip {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+    }
+
+    .skip button {
+      padding: 10px 0;
+      border-radius: 8px;
+      border: 1px solid #292524;
+      background: #1c1917;
+      color: #a8a29e;
+      font-weight: bold;
+    }
+
+    .skip button.active {
+      background: #dc2626;
+      color: white;
+      border-color: #dc2626;
+    }
+
+    .scan {
+      margin-top: 20px;
+      width: 100%;
+      padding: 17px;
+      border: 0;
+      border-radius: 12px;
+      background: #dc2626;
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    .scan:disabled {
+      background: #44403c;
+    }
+
+    .box {
+      border: 1px solid #292524;
+      background: rgba(28, 25, 23, 0.75);
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 16px;
+    }
+
+    .status {
+      color: #fbbf24;
+      border-color: #78350f;
+      background: rgba(120, 53, 15, 0.25);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .error {
+      color: #fca5a5;
+      border-color: #7f1d1d;
+      background: rgba(127, 29, 29, 0.35);
+      word-break: break-word;
+    }
+
+    .team {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .teamHead {
+      padding: 14px;
+      border-bottom: 1px solid #292524;
+      background: linear-gradient(90deg, #1c1917, rgba(127, 29, 29, 0.25));
+    }
+
+    .side {
+      font-size: 11px;
+      color: #78716c;
+      text-transform: uppercase;
+      letter-spacing: 1.6px;
+      margin-bottom: 4px;
+    }
+
+    .teamName {
+      font-size: 26px;
+      font-weight: bold;
+    }
+
+    .values {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: #292524;
+    }
+
+    .values.one {
+      grid-template-columns: 1fr;
+    }
+
+    .valueCell {
+      background: #1c1917;
+      padding: 14px;
+    }
+
+    .rankLabel {
+      color: #f87171;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .score {
+      font-size: 38px;
+      font-weight: bold;
+    }
+
+    .source {
+      margin-top: 9px;
+      padding-top: 9px;
+      border-top: 1px solid #292524;
+      font-size: 12px;
+      color: #a8a29e;
+      line-height: 1.35;
+    }
+
+    .source small {
+      color: #78716c;
+      display: block;
+      margin-top: 2px;
+    }
+
+    .sectionTitle {
+      font-size: 11px;
+      color: #78716c;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin: 14px 14px 8px;
+      font-weight: bold;
+    }
+
+    .list {
+      padding: 0 14px 14px;
+      font-size: 13px;
+      color: #d6d3d1;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(41, 37, 36, 0.65);
+    }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
+    .num {
+      color: #78716c;
+      min-width: 34px;
+      text-align: right;
+      font-family: monospace;
+    }
+
+    .min {
+      color: #a8a29e;
+      min-width: 46px;
+      font-family: monospace;
+    }
+
+    .grow {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .eventTitle {
+      color: #fafaf9;
+    }
+
+    .eventSub {
+      color: #78716c;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .plus {
+      color: #34d399;
+      font-family: monospace;
+      font-weight: bold;
+    }
+
+    .minus {
+      color: #f87171;
+      font-family: monospace;
+      font-weight: bold;
+    }
+
+    details {
+      margin-top: 14px;
+    }
+
+    summary {
+      cursor: pointer;
+      color: #a8a29e;
+      padding: 12px 14px;
+      border-top: 1px solid #292524;
+      font-size: 13px;
+    }
+
+    .bar {
+      color: #a8a29e;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .vs {
+      text-align: center;
+      color: #78716c;
+      font-weight: bold;
+      margin: 18px 0;
     }
   </style>
 </head>
 
 <body>
-  <div id="root"></div>
+  <div class="header">
+    <div class="wrap">
+      <h1>Foot<span>/</span>Scan</h1>
+      <p>Compare deux équipes avec les événements de leurs derniers matchs SofaScore.</p>
+    </div>
+  </div>
 
-  <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.3.1",
-        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client"
-      }
-    }
-  </script>
+  <main class="wrap">
+    <div class="box">
+      <strong>Mode worker local</strong>
+      <p>Garde Termux ouvert avec <code>python scripts/local_worker.py</code> pendant le scan.</p>
+    </div>
 
-  <script type="module">
-    import React, { useState } from 'react';
-    import { createRoot } from 'react-dom/client';
+    <label for="matchInput">URL SofaScore ou Match ID</label>
+    <input id="matchInput" placeholder="Ex: 14023959 ou lien SofaScore" />
 
-    const e = React.createElement;
+    <div class="grid">
+      <div>
+        <label for="rank1">Rang 1</label>
+        <input id="rank1" placeholder="Ex: 5 ou 5.5" inputmode="decimal" />
+      </div>
 
+      <div>
+        <label for="rank2">Rang 2 optionnel</label>
+        <input id="rank2" placeholder="Ex: 8 ou vide" inputmode="decimal" />
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <label>Ignorer domicile</label>
+        <div class="skip" id="skipHome"></div>
+      </div>
+
+      <div>
+        <label>Ignorer extérieur</label>
+        <div class="skip" id="skipAway"></div>
+      </div>
+    </div>
+
+    <button class="scan" id="scanBtn">Scanner →</button>
+
+    <div id="statusBox" class="box status" style="display:none;"></div>
+    <div id="errorBox" class="box error" style="display:none;"></div>
+    <div id="result"></div>
+
+    <details class="box">
+      <summary>Barème</summary>
+      <div class="bar">
+        But + passe : +1.5<br />
+        But : +1<br />
+        Passe décisive : +0.5<br />
+        Jaune : −0.5<br />
+        Rouge direct : −1<br />
+        2ᵉ jaune : −1.5
+      </div>
+    </details>
+  </main>
+
+  <script>
     const VALUES = {
       goal: 1,
       goalWithAssist: 1.5,
@@ -65,41 +371,75 @@
     };
 
     const LABELS = {
-      goal: 'But',
-      goalWithAssist: 'But + passe',
-      assist: 'Passe décisive',
-      yellow: 'Jaune',
-      secondYellow: '2ᵉ jaune',
-      red: 'Rouge direct',
+      goal: "But",
+      goalWithAssist: "But + passe",
+      assist: "Passe décisive",
+      yellow: "Jaune",
+      secondYellow: "2ᵉ jaune",
+      red: "Rouge direct",
     };
+
+    let skipHomeValue = 0;
+    let skipAwayValue = 0;
+
+    const $ = (id) => document.getElementById(id);
+
+    function esc(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
 
     function sleep(ms) {
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
+    function setStatus(message) {
+      const box = $("statusBox");
+      box.style.display = message ? "block" : "none";
+      box.textContent = message || "";
+    }
+
+    function setError(message) {
+      const box = $("errorBox");
+      box.style.display = message ? "block" : "none";
+      box.textContent = message || "";
+    }
+
+    function extractMatchId(input) {
+      const s = String(input || "").trim();
+
+      if (/^\d+$/.test(s)) return s;
+
+      const found =
+        s.match(/#id:(\d+)/) ||
+        s.match(/\/event\/(\d+)/) ||
+        s.match(/\/(\d+)(?:[/?#]|$)/);
+
+      return found ? found[1] : s;
+    }
+
     async function fetchJSON(path) {
       const maxAttempts = 180;
 
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const res = await fetch(
-          `/api/sofa?path=${encodeURIComponent(path)}&_=${Date.now()}`,
-          {
-            cache: 'no-store',
-          }
-        );
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        setStatus(`Chargement SofaScore : ${path} — tentative ${attempt}/${maxAttempts}`);
+
+        const res = await fetch(`/api/sofa?path=${encodeURIComponent(path)}&_=${Date.now()}`, {
+          cache: "no-store",
+        });
 
         const text = await res.text();
 
-        let data = null;
+        let data;
 
         try {
           data = JSON.parse(text);
         } catch {
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${text.slice(0, 160)}`);
-          }
-
-          throw new Error(`JSON invalide reçu: ${text.slice(0, 160)}`);
+          throw new Error(`Réponse non JSON sur ${path}: ${text.slice(0, 160)}`);
         }
 
         if (res.status === 202) {
@@ -108,55 +448,34 @@
         }
 
         if (!res.ok) {
-          throw new Error(data.error || `HTTP ${res.status}`);
+          throw new Error(data.error || `HTTP ${res.status} sur ${path}`);
         }
 
         return data;
       }
 
-      throw new Error(
-        'Données pas encore prêtes. Lance le worker local sur ton téléphone/PC puis réessaie.'
-      );
+      throw new Error("Données pas encore prêtes. Vérifie que le worker Termux est toujours lancé.");
     }
 
-    const fetchMatch = async (id) => {
-      const d = await fetchJSON(`event/${id}`);
-      const ev = d.event || d;
+    async function fetchMatch(id) {
+      const data = await fetchJSON(`event/${id}`);
+      const event = data.event || data;
 
-      if (!ev?.homeTeam || !ev?.awayTeam) {
-        throw new Error(
-          `Format inattendu. Clés: [${Object.keys(d || {})
-            .slice(0, 8)
-            .join(', ')}] — Sample: ${JSON.stringify(d).slice(0, 200)}`
-        );
+      if (!event || !event.homeTeam || !event.awayTeam) {
+        throw new Error("Format du match inattendu.");
       }
 
-      return ev;
-    };
+      return event;
+    }
 
-    const fetchIncidents = async (id) => {
-      const d = await fetchJSON(`event/${id}/incidents`);
-      return d.incidents || (Array.isArray(d) ? d : []);
-    };
+    async function fetchIncidents(id) {
+      const data = await fetchJSON(`event/${id}/incidents`);
+      return data.incidents || (Array.isArray(data) ? data : []);
+    }
 
-    const fetchTeamLast = async (teamId, page = 0) => {
-      const d = await fetchJSON(`team/${teamId}/events/last/${page}`);
-      return d.events || (Array.isArray(d) ? d : []);
-    };
-
-    function extractMatchId(input) {
-      if (!input) return '';
-
-      const s = input.trim();
-
-      if (/^\d+$/.test(s)) return s;
-
-      const m =
-        s.match(/#id:(\d+)/) ||
-        s.match(/\/event\/(\d+)/) ||
-        s.match(/\/(\d+)(?:[/?#]|$)/);
-
-      return m ? m[1] : s;
+    async function fetchTeamLast(teamId, page = 0) {
+      const data = await fetchJSON(`team/${teamId}/events/last/${page}`);
+      return data.events || (Array.isArray(data) ? data : []);
     }
 
     function parseIncidents(incidents, matchLabel, matchId) {
@@ -166,29 +485,28 @@
         const minute = inc.time;
         const added = inc.addedTime || 0;
 
-        if (minute == null || minute > 90 || minute < 1) continue;
+        if (minute == null || minute < 1 || minute > 90) continue;
 
         const minuteLabel = added ? `${minute}+${added}'` : `${minute}'`;
 
-        if (inc.incidentType === 'goal') {
-          const hasAssist = !!inc.assist1;
-          const scorer = inc.player?.name || '—';
+        if (inc.incidentType === "goal") {
+          const scorer = inc.player?.name || "—";
           const assister = inc.assist1?.name || null;
 
           events.push({
-            type: hasAssist ? 'goalWithAssist' : 'goal',
-            value: hasAssist ? VALUES.goalWithAssist : VALUES.goal,
+            type: assister ? "goalWithAssist" : "goal",
+            value: assister ? VALUES.goalWithAssist : VALUES.goal,
             minute,
             added,
             minuteLabel,
             match: matchLabel,
             matchId,
-            detail: assister ? `${scorer} (passe : ${assister})` : scorer,
+            detail: assister ? `${scorer} — passe : ${assister}` : scorer,
           });
 
-          if (hasAssist) {
+          if (assister) {
             events.push({
-              type: 'assist',
+              type: "assist",
               value: VALUES.assist,
               minute,
               added,
@@ -198,15 +516,16 @@
               detail: `${assister} → ${scorer}`,
             });
           }
-        } else if (inc.incidentType === 'card') {
+        }
+
+        if (inc.incidentType === "card") {
           if (!inc.player?.id) continue;
 
-          const cls = inc.incidentClass;
           let type = null;
 
-          if (cls === 'yellow') type = 'yellow';
-          else if (cls === 'yellowRed') type = 'secondYellow';
-          else if (cls === 'red') type = 'red';
+          if (inc.incidentClass === "yellow") type = "yellow";
+          if (inc.incidentClass === "yellowRed") type = "secondYellow";
+          if (inc.incidentClass === "red") type = "red";
 
           if (!type) continue;
 
@@ -218,47 +537,38 @@
             minuteLabel,
             match: matchLabel,
             matchId,
-            detail: inc.player.name,
+            detail: inc.player.name || "—",
           });
         }
       }
 
       events.sort((a, b) => {
-        const tA = a.minute + (a.added || 0) / 100;
-        const tB = b.minute + (b.added || 0) / 100;
-
-        if (tB !== tA) return tB - tA;
-
-        const order = {
-          goalWithAssist: 0,
-          goal: 0,
-          assist: 1,
-        };
-
-        return (order[a.type] ?? 2) - (order[b.type] ?? 2);
+        const aa = a.minute + (a.added || 0) / 100;
+        const bb = b.minute + (b.added || 0) / 100;
+        return bb - aa;
       });
 
       return events;
     }
 
     function valueAtRank(events, rank) {
-      if (rank < 1) return { value: null, sources: [] };
+      if (!rank || rank < 1) return { value: null, sources: [] };
 
       if (Number.isInteger(rank)) {
-        const idx = rank - 1;
+        const event = events[rank - 1];
 
-        if (idx >= events.length) return { value: null, sources: [] };
+        if (!event) return { value: null, sources: [] };
 
         return {
-          value: events[idx].value,
-          sources: [events[idx]],
+          value: event.value,
+          sources: [event],
         };
       }
 
       const lo = Math.floor(rank) - 1;
       const hi = lo + 1;
 
-      if (hi >= events.length || lo < 0) {
+      if (!events[lo] || !events[hi]) {
         return { value: null, sources: [] };
       }
 
@@ -276,16 +586,13 @@
       let skipped = 0;
       let safety = 0;
 
-      while (allEvents.length < maxNeeded && safety < 6) {
+      while (allEvents.length < maxNeeded && safety < 8) {
         const matches = await fetchTeamLast(teamId, page);
+        const finished = matches.filter((m) => m.status?.type === "finished");
 
-        const finished = matches.filter(
-          (m) => m.status?.type === 'finished'
-        );
+        if (!finished.length) break;
 
-        if (finished.length === 0) break;
-
-        for (const m of finished) {
+        for (const match of finished) {
           if (skipped < skip) {
             skipped += 1;
             continue;
@@ -293,20 +600,18 @@
 
           if (allEvents.length >= maxNeeded) break;
 
-          const incidents = await fetchIncidents(m.id);
+          const incidents = await fetchIncidents(match.id);
 
-          const label = `${m.homeTeam.name} ${
-            m.homeScore?.current ?? '-'
-          }-${m.awayScore?.current ?? '-'} ${m.awayTeam.name}`;
+          const label = `${match.homeTeam?.name || "?"} ${match.homeScore?.current ?? "-"}-${match.awayScore?.current ?? "-"} ${match.awayTeam?.name || "?"}`;
 
-          const evs = parseIncidents(incidents, label, m.id);
+          const events = parseIncidents(incidents, label, match.id);
 
-          allEvents.push(...evs);
+          allEvents.push(...events);
 
           matchesUsed.push({
+            id: match.id,
             label,
-            id: m.id,
-            count: evs.length,
+            count: events.length,
           });
         }
 
@@ -320,372 +625,172 @@
       };
     }
 
-    function SkipPicker({ label, value, setValue }) {
-      return e(
-        'div',
-        null,
-        e(
-          'label',
-          {
-            className:
-              'block text-xs uppercase tracking-widest text-stone-500 mb-2',
-          },
-          label
-        ),
-        e(
-          'div',
-          {
-            className: 'flex gap-1',
-          },
-          [0, 1, 2, 3, 4, 5].map((n) =>
-            e(
-              'button',
-              {
-                key: n,
-                onClick: () => setValue(n),
-                className: `mono flex-1 py-2 rounded text-sm border transition ${
-                  value === n
-                    ? 'bg-red-600 border-red-600 text-white'
-                    : 'bg-stone-900 border-stone-800 text-stone-500'
-                }`,
-              },
-              n
-            )
-          )
-        )
-      );
-    }
-
-    function ValueCell({ label, result }) {
+    function renderValue(label, result) {
       const value = result?.value;
       const sources = result?.sources || [];
-      const uniqueMatches = [...new Set(sources.map((s) => s.match))];
 
-      return e(
-        'div',
-        {
-          className: 'bg-stone-900 px-4 py-4',
-        },
-        e(
-          'div',
-          {
-            className:
-              'text-xs uppercase tracking-widest text-red-400 mb-1',
-          },
-          label
-        ),
-        e(
-          'div',
-          {
-            className: 'display text-4xl text-stone-50 mb-2',
-          },
-          value == null ? '—' : (value > 0 ? '+' : '') + value
-        ),
-        sources.length > 0 &&
-          e(
-            'div',
-            {
-              className: 'border-t border-stone-800 pt-2 space-y-1',
-            },
-            e(
-              'div',
-              {
-                className:
-                  'text-[10px] uppercase tracking-widest text-stone-500',
-              },
-              uniqueMatches.length > 1 ? 'Moyenne tirée de' : 'Tiré de'
-            ),
-            sources.map((s, i) =>
-              e(
-                'div',
-                {
-                  key: i,
-                  className: 'text-xs',
-                },
-                e(
-                  'div',
-                  {
-                    className: 'text-stone-300 truncate',
-                  },
-                  s.match
-                ),
-                e(
-                  'div',
-                  {
-                    className: 'text-stone-500 mono text-[10px]',
-                  },
-                  `${s.minuteLabel} · ${LABELS[s.type]} `,
-                  e(
-                    'span',
-                    {
-                      className:
-                        s.value > 0 ? 'text-emerald-400' : 'text-red-400',
-                    },
-                    `(${s.value > 0 ? '+' : ''}${s.value})`
-                  )
-                )
-              )
-            )
-          )
-      );
-    }
+      let html = `
+        <div class="valueCell">
+          <div class="rankLabel">${esc(label)}</div>
+          <div class="score">${value == null ? "—" : esc((value > 0 ? "+" : "") + value)}</div>
+      `;
 
-    function TeamColumn({ team, rank1, rank2, side }) {
-      return e(
-        'div',
-        {
-          className: 'border border-stone-800 rounded-lg overflow-hidden',
-        },
-        e(
-          'div',
-          {
-            className:
-              'bg-gradient-to-r from-stone-900 to-red-950/30 px-4 py-3 border-b border-stone-800',
-          },
-          e(
-            'div',
-            {
-              className: 'text-xs uppercase tracking-widest text-stone-500',
-            },
-            side
-          ),
-          e(
-            'div',
-            {
-              className: 'display text-2xl text-stone-50',
-            },
-            team.name
-          )
-        ),
-        e(
-          'div',
-          {
-            className: `grid ${
-              rank2 ? 'grid-cols-2' : 'grid-cols-1'
-            } gap-px bg-stone-800`,
-          },
-          e(ValueCell, {
-            label: `Rang ${rank1}`,
-            result: team.r1,
-          }),
-          rank2 &&
-            e(ValueCell, {
-              label: `Rang ${rank2}`,
-              result: team.r2,
-            })
-        ),
-        e(
-          'div',
-          {
-            className: 'px-4 py-3 border-t border-stone-800',
-          },
-          e(
-            'div',
-            {
-              className:
-                'text-xs uppercase tracking-widest text-stone-500 mb-2',
-            },
-            `Matchs (${team.matchesUsed.length})`
-          ),
-          e(
-            'div',
-            {
-              className: 'text-xs text-stone-400 space-y-1',
-            },
-            team.matchesUsed.map((m, i) =>
-              e(
-                'div',
-                {
-                  key: m.id,
-                  className: 'flex justify-between gap-2',
-                },
-                e(
-                  'span',
-                  {
-                    className: 'truncate',
-                  },
-                  `${i + 1}. ${m.label}`
-                ),
-                e(
-                  'span',
-                  {
-                    className: 'text-stone-600 mono shrink-0',
-                  },
-                  m.count
-                )
-              )
-            )
-          )
-        ),
-        e(
-          'div',
-          {
-            className:
-              'px-4 py-3 border-t border-stone-800 max-h-80 overflow-y-auto',
-          },
-          e(
-            'div',
-            {
-              className:
-                'text-xs uppercase tracking-widest text-stone-500 mb-2',
-            },
-            `Événements (${team.events.length})`
-          ),
-          e(
-            'div',
-            {
-              className: 'space-y-1',
-            },
-            team.events.map((ev, i) => {
-              const rank = i + 1;
+      if (sources.length) {
+        html += `<div class="source">`;
 
-              const highlight =
-                rank === Math.floor(rank1) ||
-                rank === Math.ceil(rank1) ||
-                (rank2 &&
-                  (rank === Math.floor(rank2) ||
-                    rank === Math.ceil(rank2)));
-
-              return e(
-                'div',
-                {
-                  key: i,
-                  className: `flex items-center gap-2 px-2 py-1.5 rounded text-xs ${
-                    highlight
-                      ? 'bg-red-950/40 border border-red-900'
-                      : ''
-                  }`,
-                },
-                e(
-                  'div',
-                  {
-                    className: 'mono text-stone-600 w-6 text-right',
-                  },
-                  `#${rank}`
-                ),
-                e(
-                  'div',
-                  {
-                    className: 'mono text-stone-500 w-12',
-                  },
-                  ev.minuteLabel
-                ),
-                e(
-                  'div',
-                  {
-                    className: 'flex-1 min-w-0',
-                  },
-                  e(
-                    'div',
-                    {
-                      className: 'text-stone-200 truncate',
-                    },
-                    LABELS[ev.type]
-                  ),
-                  e(
-                    'div',
-                    {
-                      className: 'text-stone-500 truncate',
-                    },
-                    ev.detail
-                  )
-                ),
-                e(
-                  'div',
-                  {
-                    className: `mono font-bold ${
-                      ev.value > 0 ? 'text-emerald-400' : 'text-red-400'
-                    }`,
-                  },
-                  `${ev.value > 0 ? '+' : ''}${ev.value}`
-                )
-              );
-            })
-          )
-        )
-      );
-    }
-
-    function App() {
-      const [matchId, setMatchId] = useState('');
-      const [rank1, setRank1] = useState('');
-      const [rank2, setRank2] = useState('');
-      const [skipHome, setSkipHome] = useState(0);
-      const [skipAway, setSkipAway] = useState(0);
-      const [loading, setLoading] = useState(false);
-      const [error, setError] = useState(null);
-      const [result, setResult] = useState(null);
-
-      async function handleScan() {
-        setError(null);
-        setResult(null);
-
-        const r1 = parseFloat(rank1);
-        const r2 = rank2 ? parseFloat(rank2) : null;
-        const cleanedId = extractMatchId(matchId);
-
-        if (!cleanedId || isNaN(r1) || r1 < 1) {
-          setError('Indique un matchId ou une URL SofaScore et un rang ≥ 1.');
-          return;
+        for (const source of sources) {
+          html += `
+            <div>${esc(source.match)}</div>
+            <small>${esc(source.minuteLabel)} · ${esc(LABELS[source.type])} · ${esc((source.value > 0 ? "+" : "") + source.value)}</small>
+          `;
         }
 
-        if (r2 != null && (isNaN(r2) || r2 < 1)) {
-          setError('Le rang 2 doit être vide ou supérieur à 1.');
-          return;
-        }
+        html += `</div>`;
+      }
 
-        const maxNeeded = Math.ceil(Math.max(r1, r2 ?? 0)) + 1;
+      html += `</div>`;
 
-        setLoading(true);
+      return html;
+    }
 
-        try {
-          const match = await fetchMatch(cleanedId);
+    function renderTeam(team, side, rank1, rank2) {
+      const eventRows = team.events.map((ev, index) => `
+        <div class="row">
+          <div class="num">#${index + 1}</div>
+          <div class="min">${esc(ev.minuteLabel)}</div>
+          <div class="grow">
+            <div class="eventTitle">${esc(LABELS[ev.type])}</div>
+            <div class="eventSub">${esc(ev.detail)} · ${esc(ev.match)}</div>
+          </div>
+          <div class="${ev.value > 0 ? "plus" : "minus"}">${esc((ev.value > 0 ? "+" : "") + ev.value)}</div>
+        </div>
+      `).join("");
 
-          const home = match.homeTeam;
-          const away = match.awayTeam;
+      const matchRows = team.matchesUsed.map((m, index) => `
+        <div class="row">
+          <div class="num">${index + 1}.</div>
+          <div class="grow">${esc(m.label)}</div>
+          <div class="num">${esc(m.count)}</div>
+        </div>
+      `).join("");
 
-          const [homeScan, awayScan] = await Promise.all([
-            scanTeam(home.id, skipHome, maxNeeded),
-            scanTeam(away.id, skipAway, maxNeeded),
-          ]);
+      return `
+        <div class="box team">
+          <div class="teamHead">
+            <div class="side">${esc(side)}</div>
+            <div class="teamName">${esc(team.name)}</div>
+          </div>
 
-          setResult({
-            home: {
-              ...home,
-              ...homeScan,
-              r1: valueAtRank(homeScan.events, r1),
-              r2: r2 ? valueAtRank(homeScan.events, r2) : null,
-            },
-            away: {
-              ...away,
-              ...awayScan,
-              r1: valueAtRank(awayScan.events, r1),
-              r2: r2 ? valueAtRank(awayScan.events, r2) : null,
-            },
-            rank1: r1,
-            rank2: r2,
+          <div class="values ${rank2 ? "" : "one"}">
+            ${renderValue(`Rang ${rank1}`, team.r1)}
+            ${rank2 ? renderValue(`Rang ${rank2}`, team.r2) : ""}
+          </div>
+
+          <div class="sectionTitle">Matchs utilisés (${team.matchesUsed.length})</div>
+          <div class="list">${matchRows || "Aucun match trouvé."}</div>
+
+          <details>
+            <summary>Événements trouvés (${team.events.length})</summary>
+            <div class="list">${eventRows || "Aucun événement trouvé."}</div>
+          </details>
+        </div>
+      `;
+    }
+
+    async function handleScan() {
+      setError("");
+      setStatus("");
+      $("result").innerHTML = "";
+
+      const matchId = extractMatchId($("matchInput").value);
+      const rank1 = parseFloat(String($("rank1").value).replace(",", "."));
+      const rank2Raw = String($("rank2").value || "").trim();
+      const rank2 = rank2Raw ? parseFloat(rank2Raw.replace(",", ".")) : null;
+
+      if (!matchId || !rank1 || rank1 < 1) {
+        setError("Mets un Match ID ou une URL SofaScore, puis un rang 1 supérieur ou égal à 1.");
+        return;
+      }
+
+      if (rank2 !== null && (!rank2 || rank2 < 1)) {
+        setError("Le rang 2 doit être vide ou supérieur ou égal à 1.");
+        return;
+      }
+
+      const maxNeeded = Math.ceil(Math.max(rank1, rank2 || 0)) + 1;
+
+      $("scanBtn").disabled = true;
+      $("scanBtn").textContent = "Scan en cours…";
+
+      try {
+        const match = await fetchMatch(matchId);
+
+        setStatus(`Match trouvé : ${match.homeTeam.name} vs ${match.awayTeam.name}`);
+
+        const homeScan = await scanTeam(match.homeTeam.id, skipHomeValue, maxNeeded);
+        const awayScan = await scanTeam(match.awayTeam.id, skipAwayValue, maxNeeded);
+
+        const home = {
+          ...match.homeTeam,
+          ...homeScan,
+          r1: valueAtRank(homeScan.events, rank1),
+          r2: rank2 ? valueAtRank(homeScan.events, rank2) : null,
+        };
+
+        const away = {
+          ...match.awayTeam,
+          ...awayScan,
+          r1: valueAtRank(awayScan.events, rank1),
+          r2: rank2 ? valueAtRank(awayScan.events, rank2) : null,
+        };
+
+        $("result").innerHTML = `
+          ${renderTeam(home, "Domicile", rank1, rank2)}
+          <div class="vs">VS</div>
+          ${renderTeam(away, "Extérieur", rank1, rank2)}
+        `;
+
+        setStatus("Scan terminé.");
+      } catch (error) {
+        setError(error.message || String(error));
+        setStatus("");
+      } finally {
+        $("scanBtn").disabled = false;
+        $("scanBtn").textContent = "Scanner →";
+      }
+    }
+
+    function renderSkipButtons(id, getValue, setValue) {
+      const container = $(id);
+
+      function draw() {
+        container.innerHTML = "";
+
+        for (let i = 0; i <= 5; i++) {
+          const btn = document.createElement("button");
+          btn.textContent = i;
+          btn.type = "button";
+
+          if (getValue() === i) {
+            btn.className = "active";
+          }
+
+          btn.addEventListener("click", () => {
+            setValue(i);
+            draw();
           });
-        } catch (err) {
-          setError(`Échec : ${err.message}`);
-        } finally {
-          setLoading(false);
+
+          container.appendChild(btn);
         }
       }
 
-      return e(
-        'div',
-        {
-          className: 'min-h-screen bg-stone-950 text-stone-100',
-        },
-        e(
-          'div',
-          {
-            className:
-              'border-b border-stone-800 bg-gradient-to-b from-red-950/40 to-transparent',
-          },
-          e(
-            'div',
-            {
-              className: 'max-w-2xl mx-auto px-5 py-
+      draw();
+    }
+
+    renderSkipButtons("skipHome", () => skipHomeValue, (v) => skipHomeValue = v);
+    renderSkipButtons("skipAway", () => skipAwayValue, (v) => skipAwayValue = v);
+
+    $("scanBtn").addEventListener("click", handleScan);
+  </script>
 </body>
 </html>
