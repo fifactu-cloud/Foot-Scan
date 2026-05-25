@@ -435,11 +435,11 @@
 
     .autoGrid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 10px;
     }
 
-    @media (max-width: 560px) {
+    @media (max-width: 720px) {
       .autoGrid {
         grid-template-columns: 1fr;
       }
@@ -466,7 +466,7 @@
     }
 
     .autoNumber {
-      width: 84px;
+      width: 78px;
       padding: 10px 10px;
       border-radius: 10px;
       text-align: center;
@@ -1141,7 +1141,7 @@
         <h1 class="homeTitle">Foot<span>/</span>Scan</h1>
         <p class="heroText">
           Termux récupère les matchs, calcule les rangs et renvoie le résultat final.
-          Nouveau calculateur : base 15, limites offensives, marge automatique et rouges.
+          Nouveau calculateur : base 15, limites offensives, changements et rouges.
         </p>
       </div>
     </section>
@@ -1168,10 +1168,10 @@
             <div>
               <div class="autoTitle">Calcul automatique des rangs</div>
               <div class="autoSub">
-                Base 15 · limites offensives × 11 · marge 1 + 0.5 par limite · rouges appliqués à la fin.
+                Base 15 · limites × 11 · marge multipliée par changements · rouges appliqués à la fin.
               </div>
             </div>
-            <div class="autoBadge">Base 15</div>
+            <div class="autoBadge">0 → 22</div>
           </div>
 
           <div class="autoBody">
@@ -1179,34 +1179,42 @@
               <div class="autoControl">
                 <div class="autoControlTop">
                   <div class="autoControlTitle">Limites offensives</div>
-                  <input id="autoOffensiveNumber" class="autoNumber" type="number" min="0" max="12" step="1" value="4" />
+                  <input id="autoOffensiveNumber" class="autoNumber" type="number" min="0" max="22" step="1" value="4" />
                 </div>
-                <input id="autoOffensiveRange" type="range" min="0" max="12" step="1" value="4" />
+                <input id="autoOffensiveRange" type="range" min="0" max="22" step="1" value="4" />
+              </div>
+
+              <div class="autoControl">
+                <div class="autoControlTop">
+                  <div class="autoControlTitle">Changements</div>
+                  <input id="autoChangeNumber" class="autoNumber" type="number" min="0" max="22" step="1" value="3" />
+                </div>
+                <input id="autoChangeRange" type="range" min="0" max="22" step="1" value="3" />
               </div>
 
               <div class="autoControl">
                 <div class="autoControlTop">
                   <div class="autoControlTitle">Cartons rouges</div>
-                  <input id="autoRedNumber" class="autoNumber" type="number" min="0" max="8" step="1" value="0" />
+                  <input id="autoRedNumber" class="autoNumber" type="number" min="0" max="22" step="1" value="0" />
                 </div>
-                <input id="autoRedRange" type="range" min="0" max="8" step="1" value="0" />
+                <input id="autoRedRange" type="range" min="0" max="22" step="1" value="0" />
               </div>
             </div>
 
             <div class="autoResult">
               <div class="autoResultCard">
                 <div class="autoResultLabel">Rang bas</div>
-                <div class="autoResultValue" id="autoLow">56</div>
+                <div class="autoResultValue" id="autoLow">50</div>
               </div>
 
               <div class="autoResultCard">
                 <div class="autoResultLabel">Rang haut</div>
-                <div class="autoResultValue" id="autoHigh">62</div>
+                <div class="autoResultValue" id="autoHigh">68</div>
               </div>
             </div>
 
             <div class="autoFormula" id="autoFormula">
-              Base corrigée : 59 · marge : 3 · rouges : 0 · résultats : 56 / 62
+              Base corrigée : 59 · marge finale : 9 · rouges : 0 · résultats : 50 / 68
             </div>
 
             <button class="autoApplyBtn" id="applyAutoRanksBtn" type="button">
@@ -1218,12 +1226,12 @@
         <div class="two">
           <div>
             <label for="rank1">Rang 1</label>
-            <input id="rank1" placeholder="Ex: 56" inputmode="decimal" />
+            <input id="rank1" placeholder="Ex: 50" inputmode="decimal" />
           </div>
 
           <div>
             <label for="rank2">Rang 2 optionnel</label>
-            <input id="rank2" placeholder="Ex: 62 ou vide" inputmode="decimal" />
+            <input id="rank2" placeholder="Ex: 68 ou vide" inputmode="decimal" />
           </div>
         </div>
 
@@ -1391,36 +1399,44 @@
 
     function getAutoValues() {
       const rawOffensive = parseInt(String($("autoOffensiveNumber").value), 10);
+      const rawChanges = parseInt(String($("autoChangeNumber").value), 10);
       const rawReds = parseInt(String($("autoRedNumber").value), 10);
 
-      const offensive = Math.floor(clamp(rawOffensive, 0, 12));
-      const reds = Math.floor(clamp(rawReds, 0, 8));
+      const offensive = Math.floor(clamp(rawOffensive, 0, 22));
+      const changes = Math.floor(clamp(rawChanges, 0, 22));
+      const reds = Math.floor(clamp(rawReds, 0, 22));
 
       return {
         offensive,
+        changes,
         reds,
       };
     }
 
     function calculateAutoRanks() {
-      const { offensive, reds } = getAutoValues();
+      const { offensive, changes, reds } = getAutoValues();
 
       const adjustedBase = AUTO_BASE + offensive * 11;
-      const margin = 1 + offensive * 0.5;
+
+      const marginUnit = 1 + offensive * 0.5;
+      const marginFinal = marginUnit * changes;
+
+      const lowBeforeRed = adjustedBase - marginFinal;
+      const highBeforeRed = adjustedBase + marginFinal;
+
       const redPenaltyPerCard = 1.5 + offensive * 0.5;
       const redPenaltyTotal = reds * redPenaltyPerCard;
-
-      const lowBeforeRed = adjustedBase - margin;
-      const highBeforeRed = adjustedBase + margin;
 
       const low = lowBeforeRed - redPenaltyTotal;
       const high = highBeforeRed - redPenaltyTotal;
 
       return {
         offensive,
+        changes,
         reds,
         adjustedBase,
-        margin,
+        marginUnit,
+        marginFinal,
         redPenaltyPerCard,
         redPenaltyTotal,
         lowBeforeRed,
@@ -1436,6 +1452,9 @@
       $("autoOffensiveNumber").value = calc.offensive;
       $("autoOffensiveRange").value = calc.offensive;
 
+      $("autoChangeNumber").value = calc.changes;
+      $("autoChangeRange").value = calc.changes;
+
       $("autoRedNumber").value = calc.reds;
       $("autoRedRange").value = calc.reds;
 
@@ -1443,8 +1462,8 @@
       $("autoHigh").textContent = formatRank(calc.high);
 
       $("autoFormula").textContent =
-        `Base corrigée : ${AUTO_BASE} + (${calc.offensive} × 11) = ${formatRank(calc.adjustedBase)} · ` +
-        `marge : 1 + (${calc.offensive} × 0.5) = ${formatRank(calc.margin)} · ` +
+        `Base : ${AUTO_BASE} + (${calc.offensive} × 11) = ${formatRank(calc.adjustedBase)} · ` +
+        `marge : (1 + ${calc.offensive} × 0.5) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
         `avant rouges : ${formatRank(calc.lowBeforeRed)} / ${formatRank(calc.highBeforeRed)} · ` +
         `rouges : ${calc.reds} × ${formatRank(calc.redPenaltyPerCard)} = ${formatRank(calc.redPenaltyTotal)} · ` +
         `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
@@ -2031,6 +2050,15 @@
     });
 
     $("autoOffensiveNumber").addEventListener("input", () => {
+      updateAutoCalculator();
+    });
+
+    $("autoChangeRange").addEventListener("input", () => {
+      $("autoChangeNumber").value = $("autoChangeRange").value;
+      updateAutoCalculator();
+    });
+
+    $("autoChangeNumber").addEventListener("input", () => {
       updateAutoCalculator();
     });
 
