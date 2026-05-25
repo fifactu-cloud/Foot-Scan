@@ -430,6 +430,17 @@
       return found ? found[1] : s;
     }
 
+    function formatDateFromTimestamp(timestamp) {
+      if (!timestamp) return "";
+
+      const d = new Date(timestamp * 1000);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yy = String(d.getFullYear()).slice(-2);
+
+      return `${dd}.${mm}.${yy}`;
+    }
+
     async function fetchJSON(path) {
       const maxAttempts = 240;
 
@@ -622,58 +633,66 @@
     }
 
     async function scanTeam(teamId, skip, maxNeeded, teamName) {
-      const allEvents = [];
-      const matchesUsed = [];
-
-      let page = 0;
-      let skipped = 0;
-      let safety = 0;
-
       const maxMatchesPerTeam = 15;
+      const pagesToLoad = 6;
 
-      while (
-        allEvents.length < maxNeeded &&
-        matchesUsed.length < maxMatchesPerTeam &&
-        safety < 8
-      ) {
+      const byId = new Map();
+
+      for (let page = 0; page < pagesToLoad; page++) {
         setStatus(
-          `${teamName}\nPage SofaScore ${page}\nÉvénements trouvés : ${allEvents.length}/${maxNeeded}\nMatchs utilisés : ${matchesUsed.length}/${maxMatchesPerTeam}`
+          `${teamName}\nRécupération des derniers matchs\nPage SofaScore ${page + 1}/${pagesToLoad}`
         );
 
         const matches = await fetchTeamLast(teamId, page);
-        const finished = matches.filter((m) => m.status?.type === "finished");
 
-        if (!finished.length) break;
+        for (const match of matches) {
+          if (!match?.id) continue;
 
-        for (const match of finished) {
-          if (skipped < skip) {
-            skipped += 1;
-            continue;
-          }
+          const isFinished = match.status?.type === "finished";
+          const isTeamMatch =
+            match.homeTeam?.id === teamId || match.awayTeam?.id === teamId;
 
-          if (matchesUsed.length >= maxMatchesPerTeam) break;
-          if (allEvents.length >= maxNeeded) break;
+          if (!isFinished || !isTeamMatch) continue;
 
-          const label = `${match.homeTeam?.name || "?"} ${match.homeScore?.current ?? "-"}-${match.awayScore?.current ?? "-"} ${match.awayTeam?.name || "?"}`;
-
-          setStatus(
-            `${teamName}\nMatch ${matchesUsed.length + 1}/${maxMatchesPerTeam}\n${label}\nÉvénements trouvés : ${allEvents.length}/${maxNeeded}`
-          );
-
-          const incidents = await fetchIncidents(match.id);
-          const events = parseIncidents(incidents, label, match.id);
-
-          allEvents.push(...events);
-
-          matchesUsed.push({
-            id: match.id,
-            label,
-            count: events.length,
-          });
+          byId.set(match.id, match);
         }
+      }
 
-        page += 1;
-        safety += 1;
+      const sortedMatches = [...byId.values()].sort((a, b) => {
+        const ta = a.startTimestamp || 0;
+        const tb = b.startTimestamp || 0;
+
+        return tb - ta;
+      });
+
+      const selectedMatches = sortedMatches
+        .slice(skip)
+        .slice(0, maxMatchesPerTeam);
+
+      const allEvents = [];
+      const matchesUsed = [];
+
+      for (let i = 0; i < selectedMatches.length; i++) {
+        const match = selectedMatches[i];
+
+        const date = formatDateFromTimestamp(match.startTimestamp);
+        const label = `${date ? date + " · " : ""}${match.homeTeam?.name || "?"} ${match.homeScore?.current ?? "-"}-${match.awayScore?.current ?? "-"} ${match.awayTeam?.name || "?"}`;
+
+        setStatus(
+          `${teamName}\nMatch ${i + 1}/${selectedMatches.length}\n${label}\nÉvénements trouvés : ${allEvents.length}/${maxNeeded}`
+        );
+
+        const incidents = await fetchIncidents(match.id);
+        const events = parseIncidents(incidents, label, match.id);
+
+        allEvents.push(...events);
+
+        matchesUsed.push({
+          id: match.id,
+          label,
+          count: events.length,
+          startTimestamp: match.startTimestamp || 0,
+        });
       }
 
       return {
