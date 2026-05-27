@@ -1401,12 +1401,12 @@
       const lowBeforeCards = adjustedBase - marginFinal;
       const highBeforeCards = adjustedBase + marginFinal;
 
-      const redPenaltyTotal = offensive * reds;
-      const secondYellowRedPenaltyTotal = offensive * secondYellowReds;
-      const totalCardPenalty = redPenaltyTotal + secondYellowRedPenaltyTotal;
+      const redBonusTotal = offensive * reds;
+      const secondYellowRedBonusTotal = offensive * secondYellowReds;
+      const totalCardBonus = redBonusTotal + secondYellowRedBonusTotal;
 
-      const low = lowBeforeCards - totalCardPenalty;
-      const high = highBeforeCards - totalCardPenalty;
+      const low = lowBeforeCards + totalCardBonus;
+      const high = highBeforeCards + totalCardBonus;
 
       return {
         base,
@@ -1420,9 +1420,9 @@
         marginFinal,
         lowBeforeCards,
         highBeforeCards,
-        redPenaltyTotal,
-        secondYellowRedPenaltyTotal,
-        totalCardPenalty,
+        redBonusTotal,
+        secondYellowRedBonusTotal,
+        totalCardBonus,
         low,
         high,
       };
@@ -1455,8 +1455,8 @@
         `base corrigée : ${formatRank(calc.adjustedBase)} · ` +
         `marge : (3 + ${calc.offensive}) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
         `avant cartons : ${formatRank(calc.lowBeforeCards)} / ${formatRank(calc.highBeforeCards)} · ` +
-        `rouges directs : ${calc.reds} × ${calc.offensive} = -${formatRank(calc.redPenaltyTotal)} · ` +
-        `rouges via 2e jaune : ${calc.secondYellowReds} × ${calc.offensive} = -${formatRank(calc.secondYellowRedPenaltyTotal)} · ` +
+        `rouges directs : ${calc.reds} × ${calc.offensive} = +${formatRank(calc.redBonusTotal)} · ` +
+        `rouges via 2e jaune : ${calc.secondYellowReds} × ${calc.offensive} = +${formatRank(calc.secondYellowRedBonusTotal)} · ` +
         `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
     }
 
