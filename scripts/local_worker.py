@@ -25,7 +25,7 @@ SCAN_JOB_TTL_SECONDS = int(os.environ.get("SCAN_JOB_TTL_SECONDS", "86400"))
 SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "0.5"))
 PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAGE", "17"))
 
-PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "3"))
+PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "2"))
 INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM", "15"))
 SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
 MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "20"))
@@ -911,9 +911,10 @@ def main():
 
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: scan complet côté worker activé.")
+    print("Pages SofaScore: 2 pages activées.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Calcul pondéré: X / X.125 / X.25 / X.375 / X.5 / X.625 / X.75 / X.875 activé.")
-    print("Nouveau barème cartons: jaune, 2e jaune, rouge direct, rouge via 2e jaune activé.")
+    print("Barème cartons: jaune, 2e jaune, rouge direct, rouge via 2e jaune activé.")
     print("Version rapide: préchargement incidents activé.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
