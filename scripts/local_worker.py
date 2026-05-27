@@ -38,9 +38,10 @@ POSITIVE_VALUES = {
 }
 
 CARD_VALUES_FOR_TEAM = {
-    "yellow": -0.5,
-    "secondYellow": -1.5,
+    "yellow": -0.25,
+    "secondYellow": -0.5,
     "red": -1,
+    "redFromSecondYellow": -1.5,
 }
 
 LABELS = {
@@ -48,8 +49,9 @@ LABELS = {
     "goalWithAssist": "But + passe",
     "assist": "Passe décisive",
     "yellow": "Jaune",
-    "secondYellow": "Jaune + rouge",
+    "secondYellow": "Deuxième jaune",
     "red": "Rouge direct",
+    "redFromSecondYellow": "Rouge via 2e jaune",
 }
 
 
@@ -444,34 +446,62 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 continue
 
             cls = inc.get("incidentClass")
-            kind = None
-            icon = "🟨"
+            player_name = player.get("name") or "—"
 
             if cls == "yellow":
-                kind = "yellow"
-                icon = "🟨"
+                events.append({
+                    "type": "yellow",
+                    "value": signed_card_value("yellow", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {player_name}",
+                    "icon": "🟨",
+                })
+
             elif cls == "yellowRed":
-                kind = "secondYellow"
-                icon = "🟨🟥"
+                events.append({
+                    "type": "secondYellow",
+                    "value": signed_card_value("secondYellow", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {player_name}",
+                    "icon": "🟧",
+                })
+
+                events.append({
+                    "type": "redFromSecondYellow",
+                    "value": signed_card_value("redFromSecondYellow", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {player_name}",
+                    "icon": "🟥",
+                })
+
             elif cls == "red":
-                kind = "red"
-                icon = "🟥"
-
-            if not kind:
-                continue
-
-            events.append({
-                "type": kind,
-                "value": signed_card_value(kind, is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
-                "detail": f"{camp_label} · {player.get('name') or '—'}",
-                "icon": icon,
-            })
+                events.append({
+                    "type": "red",
+                    "value": signed_card_value("red", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {player_name}",
+                    "icon": "🟥",
+                })
 
     def sort_key(ev):
         time_value = ev.get("minute", 0) + (ev.get("added", 0) or 0) / 100
@@ -479,9 +509,10 @@ def parse_incidents(incidents, match, analyzed_team_id):
             "goalWithAssist": 0,
             "goal": 0,
             "assist": 1,
-            "yellow": 2,
             "secondYellow": 2,
-            "red": 2,
+            "redFromSecondYellow": 3,
+            "yellow": 4,
+            "red": 4,
         }.get(ev.get("type"), 9)
         return (-time_value, order)
 
@@ -881,7 +912,8 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: scan complet côté worker activé.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Calcul pondéré: X / X.25 / X.5 / X.75 activé.")
+    print("Calcul pondéré: X / X.125 / X.25 / X.375 / X.5 / X.625 / X.75 / X.875 activé.")
+    print("Nouveau barème cartons: jaune, 2e jaune, rouge direct, rouge via 2e jaune activé.")
     print("Version rapide: préchargement incidents activé.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
