@@ -1116,7 +1116,7 @@
             <div>
               <div class="auto-title">Calcul automatique des rangs</div>
               <div class="auto-sub">
-                Base écrite libre · limites × 22 · marge (3 + limites) × changements · cartons = limites × curseur.
+                Base libre · limites × 22 · marge (3 + limites) × changements · cartons moyens appliqués seulement au rang bas.
               </div>
             </div>
             <div class="auto-badge">Base 0 → 1000</div>
@@ -1401,12 +1401,18 @@
       const lowBeforeCards = adjustedBase - marginFinal;
       const highBeforeCards = adjustedBase + marginFinal;
 
-      const redBonusTotal = offensive * reds;
-      const secondYellowRedBonusTotal = offensive * secondYellowReds;
-      const totalCardBonus = redBonusTotal + secondYellowRedBonusTotal;
+      const redFirstPart = -1 * reds;
+      const redSecondPart = -(2 + offensive) * reds;
+      const redEffect = (redFirstPart + redSecondPart) / 2;
 
-      const low = lowBeforeCards + totalCardBonus;
-      const high = highBeforeCards + totalCardBonus;
+      const secondYellowRedFirstPart = 0;
+      const secondYellowRedSecondPart = -(3 + offensive) * secondYellowReds;
+      const secondYellowRedEffect = (secondYellowRedFirstPart + secondYellowRedSecondPart) / 2;
+
+      const totalCardEffect = redEffect + secondYellowRedEffect;
+
+      const low = lowBeforeCards + totalCardEffect;
+      const high = highBeforeCards;
 
       return {
         base,
@@ -1420,9 +1426,13 @@
         marginFinal,
         lowBeforeCards,
         highBeforeCards,
-        redBonusTotal,
-        secondYellowRedBonusTotal,
-        totalCardBonus,
+        redFirstPart,
+        redSecondPart,
+        redEffect,
+        secondYellowRedFirstPart,
+        secondYellowRedSecondPart,
+        secondYellowRedEffect,
+        totalCardEffect,
         low,
         high,
       };
@@ -1455,8 +1465,9 @@
         `base corrigée : ${formatRank(calc.adjustedBase)} · ` +
         `marge : (3 + ${calc.offensive}) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
         `avant cartons : ${formatRank(calc.lowBeforeCards)} / ${formatRank(calc.highBeforeCards)} · ` +
-        `rouges directs : ${calc.reds} × ${calc.offensive} = +${formatRank(calc.redBonusTotal)} · ` +
-        `rouges via 2e jaune : ${calc.secondYellowReds} × ${calc.offensive} = +${formatRank(calc.secondYellowRedBonusTotal)} · ` +
+        `rouges directs : moyenne (${formatValue(calc.redFirstPart)} et ${formatValue(calc.redSecondPart)}) = ${formatValue(calc.redEffect)} · ` +
+        `rouges via 2e jaune : moyenne (0 et ${formatValue(calc.secondYellowRedSecondPart)}) = ${formatValue(calc.secondYellowRedEffect)} · ` +
+        `cartons appliqués seulement au rang bas · ` +
         `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
     }
 
@@ -1996,7 +2007,10 @@
       lines.push(`Limites offensives : ${calc.offensive}`);
       lines.push(`Changements : ${calc.changes}`);
       lines.push(`Carton rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`);
+      lines.push(`Impact rouge direct : moyenne de ${formatValue(calc.redFirstPart)} et ${formatValue(calc.redSecondPart)} = ${formatValue(calc.redEffect)}`);
       lines.push(`Rouge via 2e jaune dans la valeur : ${calc.secondYellowReds > 0 ? "oui" : "non"} (${calc.secondYellowReds})`);
+      lines.push(`Impact rouge via 2e jaune : moyenne de 0 et ${formatValue(calc.secondYellowRedSecondPart)} = ${formatValue(calc.secondYellowRedEffect)}`);
+      lines.push(`Cartons appliqués seulement au rang bas : ${formatValue(calc.totalCardEffect)}`);
       lines.push(`Rang bas calculé : ${formatRank(calc.low)}`);
       lines.push(`Rang haut calculé : ${formatRank(calc.high)}`);
 
