@@ -1148,7 +1148,7 @@
         <h1 class="homeTitle">Foot<span>/</span>Scan</h1>
         <p class="heroText">
           Termux récupère les matchs, calcule les rangs et renvoie le résultat final.
-          Nouveau calculateur : base 15, limites offensives, changements, rouges et deuxièmes jaunes.
+          Nouveau calculateur : base 19, limites offensives, changements, rouges directs et rouges via 2e jaune.
         </p>
       </div>
     </section>
@@ -1175,7 +1175,7 @@
             <div>
               <div class="autoTitle">Calcul automatique des rangs</div>
               <div class="autoSub">
-                Base 15 · limites × 11 · marge multipliée par changements · rouges et 2e jaunes à la fin.
+                Base 19 · limites × 11 · marge 1.5 + limites × 0.5 · rouges directs − · rouges via 2e jaune + ou −.
               </div>
             </div>
             <div class="autoBadge">0 → 22</div>
@@ -1201,7 +1201,7 @@
 
               <div class="autoControl">
                 <div class="autoControlTop">
-                  <div class="autoControlTitle">Rouges</div>
+                  <div class="autoControlTitle">Rouges directs</div>
                   <input id="autoRedNumber" class="autoNumber" type="number" min="0" max="22" step="1" value="0" />
                 </div>
                 <input id="autoRedRange" type="range" min="0" max="22" step="1" value="0" />
@@ -1209,27 +1209,27 @@
 
               <div class="autoControl">
                 <div class="autoControlTop">
-                  <div class="autoControlTitle">2e jaunes</div>
-                  <input id="autoSecondYellowNumber" class="autoNumber" type="number" min="0" max="22" step="1" value="0" />
+                  <div class="autoControlTitle">Rouges via 2e jaune</div>
+                  <input id="autoSecondYellowRedNumber" class="autoNumber" type="number" min="0" max="22" step="1" value="0" />
                 </div>
-                <input id="autoSecondYellowRange" type="range" min="0" max="22" step="1" value="0" />
+                <input id="autoSecondYellowRedRange" type="range" min="0" max="22" step="1" value="0" />
               </div>
             </div>
 
             <div class="autoResult">
               <div class="autoResultCard">
                 <div class="autoResultLabel">Rang bas</div>
-                <div class="autoResultValue" id="autoLow">50</div>
+                <div class="autoResultValue" id="autoLow">52.5</div>
               </div>
 
               <div class="autoResultCard">
                 <div class="autoResultLabel">Rang haut</div>
-                <div class="autoResultValue" id="autoHigh">68</div>
+                <div class="autoResultValue" id="autoHigh">73.5</div>
               </div>
             </div>
 
             <div class="autoFormula" id="autoFormula">
-              Base corrigée : 59 · marge finale : 9 · rouges : 0 · 2e jaunes : 0 · résultats : 50 / 68
+              Base corrigée : 63 · marge finale : 10.5 · rouges directs : 0 · rouges via 2e jaune : 0 · résultats : 52.5 / 73.5
             </div>
 
             <button class="autoApplyBtn" id="applyAutoRanksBtn" type="button">
@@ -1241,12 +1241,12 @@
         <div class="two">
           <div>
             <label for="rank1">Rang 1</label>
-            <input id="rank1" placeholder="Ex: 50" inputmode="decimal" />
+            <input id="rank1" placeholder="Ex: 52.5" inputmode="decimal" />
           </div>
 
           <div>
             <label for="rank2">Rang 2 optionnel</label>
-            <input id="rank2" placeholder="Ex: 68 ou vide" inputmode="decimal" />
+            <input id="rank2" placeholder="Ex: 73.5 ou vide" inputmode="decimal" />
           </div>
         </div>
 
@@ -1302,9 +1302,10 @@
           <div class="barLine"><span>⚽ But</span><strong class="positive">+1</strong></div>
           <div class="barLine"><span>⚽ But + passe</span><strong class="positive">+1.5</strong></div>
           <div class="barLine"><span>🅰️ Passe décisive</span><strong class="positive">+0.5</strong></div>
-          <div class="barLine"><span>🟨 Jaune</span><strong class="negative">−0.5</strong></div>
-          <div class="barLine"><span>🟥 Rouge</span><strong class="negative">−1</strong></div>
-          <div class="barLine"><span>🟨🟥 Jaune + rouge</span><strong class="negative">−1.5</strong></div>
+          <div class="barLine"><span>🟨 Jaune</span><strong class="negative">−0.25</strong></div>
+          <div class="barLine"><span>🟧 Deuxième jaune</span><strong class="negative">−0.5</strong></div>
+          <div class="barLine"><span>🟥 Rouge direct</span><strong class="negative">−1</strong></div>
+          <div class="barLine"><span>🟥 Rouge via 2e jaune</span><strong class="negative">−1.5</strong></div>
         </div>
 
         <div class="barCard">
@@ -1312,9 +1313,10 @@
           <div class="barLine"><span>⚽ But</span><strong class="negative">−1</strong></div>
           <div class="barLine"><span>⚽ But + passe</span><strong class="negative">−1.5</strong></div>
           <div class="barLine"><span>🅰️ Passe décisive</span><strong class="negative">−0.5</strong></div>
-          <div class="barLine"><span>🟨 Jaune</span><strong class="positive">+0.5</strong></div>
-          <div class="barLine"><span>🟥 Rouge</span><strong class="positive">+1</strong></div>
-          <div class="barLine"><span>🟨🟥 Jaune + rouge</span><strong class="positive">+1.5</strong></div>
+          <div class="barLine"><span>🟨 Jaune</span><strong class="positive">+0.25</strong></div>
+          <div class="barLine"><span>🟧 Deuxième jaune</span><strong class="positive">+0.5</strong></div>
+          <div class="barLine"><span>🟥 Rouge direct</span><strong class="positive">+1</strong></div>
+          <div class="barLine"><span>🟥 Rouge via 2e jaune</span><strong class="positive">+1.5</strong></div>
         </div>
       </div>
     </details>
@@ -1328,15 +1330,16 @@
     let lastResult = null;
 
     const REPORT_KEY = "footscan_session_report_v1";
-    const AUTO_BASE = 15;
+    const AUTO_BASE = 19;
 
     const LABELS = {
       goal: "But",
       goalWithAssist: "But + passe",
       assist: "Passe décisive",
       yellow: "Jaune",
-      secondYellow: "Jaune + rouge",
+      secondYellow: "Deuxième jaune",
       red: "Rouge direct",
+      redFromSecondYellow: "Rouge via 2e jaune",
     };
 
     const ICONS = {
@@ -1344,8 +1347,9 @@
       goalWithAssist: "⚽",
       assist: "🅰️",
       yellow: "🟨",
-      secondYellow: "🟨🟥",
+      secondYellow: "🟧",
       red: "🟥",
+      redFromSecondYellow: "🟥",
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1421,48 +1425,46 @@
       const rawOffensive = parseInt(String($("autoOffensiveNumber").value), 10);
       const rawChanges = parseInt(String($("autoChangeNumber").value), 10);
       const rawReds = parseInt(String($("autoRedNumber").value), 10);
-      const rawSecondYellows = parseInt(String($("autoSecondYellowNumber").value), 10);
+      const rawSecondYellowReds = parseInt(String($("autoSecondYellowRedNumber").value), 10);
 
       const offensive = Math.floor(clamp(rawOffensive, 0, 22));
       const changes = Math.floor(clamp(rawChanges, 0, 22));
       const reds = Math.floor(clamp(rawReds, 0, 22));
-      const secondYellows = Math.floor(clamp(rawSecondYellows, 0, 22));
+      const secondYellowReds = Math.floor(clamp(rawSecondYellowReds, 0, 22));
 
       return {
         offensive,
         changes,
         reds,
-        secondYellows,
+        secondYellowReds,
       };
     }
 
     function calculateAutoRanks() {
-      const { offensive, changes, reds, secondYellows } = getAutoValues();
+      const { offensive, changes, reds, secondYellowReds } = getAutoValues();
 
       const adjustedBase = AUTO_BASE + offensive * 11;
 
-      const marginUnit = 1 + offensive * 0.5;
+      const marginUnit = 1.5 + offensive * 0.5;
       const marginFinal = marginUnit * changes;
 
       const lowBeforeCards = adjustedBase - marginFinal;
       const highBeforeCards = adjustedBase + marginFinal;
 
-      const redPenaltyPerCard = 1.5 + offensive * 0.5;
+      const redPenaltyPerCard = 2 + offensive * 0.5;
       const redPenaltyTotal = reds * redPenaltyPerCard;
 
-      const secondYellowPenaltyPerCard = 2 + offensive * 0.5;
-      const secondYellowPenaltyTotal = secondYellows * secondYellowPenaltyPerCard;
+      const secondYellowRedValue = 1.5 - offensive * 0.5;
+      const secondYellowRedTotal = secondYellowReds * secondYellowRedValue;
 
-      const totalPenalty = redPenaltyTotal + secondYellowPenaltyTotal;
-
-      const low = lowBeforeCards - totalPenalty;
-      const high = highBeforeCards - totalPenalty;
+      const low = lowBeforeCards - redPenaltyTotal + secondYellowRedTotal;
+      const high = highBeforeCards - redPenaltyTotal + secondYellowRedTotal;
 
       return {
         offensive,
         changes,
         reds,
-        secondYellows,
+        secondYellowReds,
         adjustedBase,
         marginUnit,
         marginFinal,
@@ -1470,9 +1472,8 @@
         highBeforeCards,
         redPenaltyPerCard,
         redPenaltyTotal,
-        secondYellowPenaltyPerCard,
-        secondYellowPenaltyTotal,
-        totalPenalty,
+        secondYellowRedValue,
+        secondYellowRedTotal,
         low,
         high,
       };
@@ -1490,19 +1491,18 @@
       $("autoRedNumber").value = calc.reds;
       $("autoRedRange").value = calc.reds;
 
-      $("autoSecondYellowNumber").value = calc.secondYellows;
-      $("autoSecondYellowRange").value = calc.secondYellows;
+      $("autoSecondYellowRedNumber").value = calc.secondYellowReds;
+      $("autoSecondYellowRedRange").value = calc.secondYellowReds;
 
       $("autoLow").textContent = formatRank(calc.low);
       $("autoHigh").textContent = formatRank(calc.high);
 
       $("autoFormula").textContent =
         `Base : ${AUTO_BASE} + (${calc.offensive} × 11) = ${formatRank(calc.adjustedBase)} · ` +
-        `marge : (1 + ${calc.offensive} × 0.5) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
+        `marge : (1.5 + ${calc.offensive} × 0.5) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
         `avant cartons : ${formatRank(calc.lowBeforeCards)} / ${formatRank(calc.highBeforeCards)} · ` +
-        `rouges : ${calc.reds} × ${formatRank(calc.redPenaltyPerCard)} = ${formatRank(calc.redPenaltyTotal)} · ` +
-        `2e jaunes : ${calc.secondYellows} × ${formatRank(calc.secondYellowPenaltyPerCard)} = ${formatRank(calc.secondYellowPenaltyTotal)} · ` +
-        `total cartons : ${formatRank(calc.totalPenalty)} · ` +
+        `rouges directs : ${calc.reds} × ${formatRank(calc.redPenaltyPerCard)} = -${formatRank(calc.redPenaltyTotal)} · ` +
+        `rouges via 2e jaune : ${calc.secondYellowReds} × ${formatRank(calc.secondYellowRedValue)} = ${formatValue(calc.secondYellowRedTotal)} · ` +
         `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
     }
 
@@ -2038,8 +2038,8 @@
 
       lines.push(`Limites offensives : ${calc.offensive}`);
       lines.push(`Changements : ${calc.changes}`);
-      lines.push(`Carton rouge dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`);
-      lines.push(`Deuxième jaune dans la valeur : ${calc.secondYellows > 0 ? "oui" : "non"} (${calc.secondYellows})`);
+      lines.push(`Carton rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`);
+      lines.push(`Rouge via 2e jaune dans la valeur : ${calc.secondYellowReds > 0 ? "oui" : "non"} (${calc.secondYellowReds})`);
       lines.push(`Rang bas calculé : ${formatRank(calc.low)}`);
       lines.push(`Rang haut calculé : ${formatRank(calc.high)}`);
 
@@ -2268,12 +2268,12 @@
       updateAutoCalculator();
     });
 
-    $("autoSecondYellowRange").addEventListener("input", () => {
-      $("autoSecondYellowNumber").value = $("autoSecondYellowRange").value;
+    $("autoSecondYellowRedRange").addEventListener("input", () => {
+      $("autoSecondYellowRedNumber").value = $("autoSecondYellowRedRange").value;
       updateAutoCalculator();
     });
 
-    $("autoSecondYellowNumber").addEventListener("input", () => {
+    $("autoSecondYellowRedNumber").addEventListener("input", () => {
       updateAutoCalculator();
     });
 
@@ -2283,4 +2283,4 @@
     updateAutoCalculator();
   </script>
 </body>
-  </html>
+</html>
