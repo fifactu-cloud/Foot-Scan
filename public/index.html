@@ -1228,6 +1228,7 @@
         <div class="report-buttons">
           <button class="report-btn primary" id="addReportBtn" type="button">Ajouter l’analyse actuelle</button>
           <button class="report-btn" id="copySimpleReportBtn" type="button">Copier simple</button>
+          <button class="report-btn" id="copyFullReportBtn" type="button">Copier complet</button>
           <button class="report-btn" id="downloadSimpleReportBtn" type="button">TXT simple</button>
           <button class="report-btn" id="printSimpleReportBtn" type="button">PDF simple</button>
           <button class="report-btn" id="downloadFullReportBtn" type="button">TXT complet</button>
@@ -1235,7 +1236,7 @@
         </div>
 
         <div class="report-hint" id="reportHint">
-          Après un scan terminé, ajoute l’analyse. Le TXT s’ouvre dans Google Docs. Pour le PDF, choisis “Enregistrer en PDF” dans l’écran d’impression.
+          Après un scan terminé, ajoute l’analyse. Le TXT s’ouvre dans Google Docs. Le PDF utilise Google Sans en taille 6.
         </div>
       </div>
     </section>
@@ -1279,6 +1280,7 @@
     let lastResult = null;
 
     const REPORT_KEY = "footscan_session_report_v1";
+    const DOMINANCE_TIE_THRESHOLD = 0.125;
 
     const LABELS = {
       goal: "But",
@@ -1531,10 +1533,6 @@
         reasons.push("rang X.5 contre rang X.0");
       }
 
-      if (homeAvg === 0 || awayAvg === 0) {
-        reasons.push("moyenne d’une équipe à 0");
-      }
-
       return reasons;
     }
 
@@ -1612,15 +1610,29 @@
       }
 
       const diff = homeAvg - awayAvg;
+      const absDiff = Math.abs(diff);
+      const inversionReasons = getInversionReasons(result, homeAvg, awayAvg);
 
-      if (Math.abs(diff) < 0.0000001) {
+      if (absDiff < DOMINANCE_TIE_THRESHOLD) {
+        if (inversionReasons.length) {
+          return {
+            type: "unpredictable",
+            label: "Victoire sans camp",
+            average: (homeAvg + awayAvg) / 2,
+            diff: absDiff,
+            inverted: true,
+            baseLabel: "Égalité",
+            inversionReasons,
+          };
+        }
+
         return {
           type: "tie",
           label: "Égalité",
-          average: homeAvg,
-          diff: 0,
+          average: (homeAvg + awayAvg) / 2,
+          diff: absDiff,
           inverted: false,
-          inversionReasons: getInversionReasons(result, homeAvg, awayAvg),
+          inversionReasons: [],
         };
       }
 
@@ -1644,12 +1656,25 @@
         `;
       }
 
+      if (dominance.type === "unpredictable") {
+        return `
+          <div class="dominance-box">
+            <div class="dominance-label">Domination moyenne</div>
+            <div class="dominance-team">Victoire sans camp</div>
+            <div class="dominance-meta">
+              Imprévisible · base : égalité · écart inférieur à ${esc(formatRank(DOMINANCE_TIE_THRESHOLD))}
+              · inversé (${esc(dominance.inversionReasons.join(" + "))})
+            </div>
+          </div>
+        `;
+      }
+
       if (dominance.type === "tie") {
         return `
           <div class="dominance-box">
             <div class="dominance-label">Domination moyenne</div>
             <div class="dominance-team">Égalité</div>
-            <div class="dominance-meta">Moyenne des deux rangs : ${esc(formatValue(dominance.average))}</div>
+            <div class="dominance-meta">Moyenne des deux rangs : ${esc(formatValue(dominance.average))} · écart inférieur à ${esc(formatRank(DOMINANCE_TIE_THRESHOLD))}</div>
           </div>
         `;
       }
@@ -2109,11 +2134,15 @@
         return ["Domination moyenne : indisponible"];
       }
 
+      if (dominance.type === "unpredictable") {
+        return [
+          `Domination moyenne : victoire sans camp`,
+          `Imprévisible · base : égalité · écart ${formatRank(dominance.diff)} inférieur à ${formatRank(DOMINANCE_TIE_THRESHOLD)} · inversé (${dominance.inversionReasons.join(" + ")})`,
+        ];
+      }
+
       if (dominance.type === "tie") {
-        const extra = dominance.inversionReasons?.length
-          ? ` · règle détectée : ${dominance.inversionReasons.join(" + ")}`
-          : "";
-        return [`Domination moyenne : égalité (${formatValue(dominance.average)})${extra}`];
+        return [`Domination moyenne : égalité (${formatValue(dominance.average)}) · écart ${formatRank(dominance.diff)} inférieur à ${formatRank(DOMINANCE_TIE_THRESHOLD)}`];
       }
 
       const inversionText = dominance.inverted
@@ -2299,8 +2328,8 @@
   <title>${esc(title)}</title>
   <style>
     @page { margin: 16mm; }
-    body { font-family: Arial, sans-serif; color: #111; line-height: 1.35; }
-    pre { white-space: pre-wrap; word-break: break-word; font-family: Arial, sans-serif; font-size: 12px; }
+    body { font-family: "Google Sans", "Roboto", Arial, sans-serif; color: #111; line-height: 1.25; font-size: 6pt; }
+    pre { white-space: pre-wrap; word-break: break-word; font-family: "Google Sans", "Roboto", Arial, sans-serif; font-size: 6pt; line-height: 1.25; }
   </style>
 </head>
 <body>
@@ -2375,6 +2404,7 @@
     $("scanBtn").addEventListener("click", handleScan);
     $("addReportBtn").addEventListener("click", addCurrentAnalysisToReport);
     $("copySimpleReportBtn").addEventListener("click", () => copyReport(true));
+    $("copyFullReportBtn").addEventListener("click", () => copyReport(false));
     $("downloadSimpleReportBtn").addEventListener("click", () => downloadReportTxt(true));
     $("printSimpleReportBtn").addEventListener("click", () => openReportPdf(true));
     $("downloadFullReportBtn").addEventListener("click", () => downloadReportTxt(false));
