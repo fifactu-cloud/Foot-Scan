@@ -1227,13 +1227,15 @@
       <div class="report-body">
         <div class="report-buttons">
           <button class="report-btn primary" id="addReportBtn" type="button">Ajouter l’analyse actuelle</button>
-          <button class="report-btn" id="downloadReportBtn" type="button">Télécharger .doc</button>
-          <button class="report-btn" id="copyReportBtn" type="button">Copier le rapport</button>
+          <button class="report-btn" id="copySimpleReportBtn" type="button">Copier simple</button>
+          <button class="report-btn" id="downloadSimpleReportBtn" type="button">TXT simple</button>
+          <button class="report-btn" id="printSimpleReportBtn" type="button">PDF simple</button>
+          <button class="report-btn" id="downloadFullReportBtn" type="button">TXT complet</button>
           <button class="report-btn red" id="clearReportBtn" type="button">Vider le rapport</button>
         </div>
 
         <div class="report-hint" id="reportHint">
-          Après un scan terminé, appuie sur “Ajouter l’analyse actuelle”. Le rapport reste dans cette session navigateur.
+          Après un scan terminé, ajoute l’analyse. Le TXT s’ouvre dans Google Docs. Pour le PDF, choisis “Enregistrer en PDF” dans l’écran d’impression.
         </div>
       </div>
     </section>
@@ -1495,6 +1497,95 @@
       return sum / values.length;
     }
 
+    function rankFraction(value) {
+      const number = Math.abs(Number(value));
+
+      if (!Number.isFinite(number)) return null;
+
+      return Math.round((number - Math.floor(number)) * 1000000) / 1000000;
+    }
+
+    function isIntegerRank(value) {
+      const fraction = rankFraction(value);
+      return fraction !== null && Math.abs(fraction) < 0.000001;
+    }
+
+    function isHalfRank(value) {
+      const fraction = rankFraction(value);
+      return fraction !== null && Math.abs(fraction - 0.5) < 0.000001;
+    }
+
+    function hasHalfVsIntegerRank(result) {
+      if (!result || result.rank2 == null) return false;
+
+      return (
+        (isHalfRank(result.rank1) && isIntegerRank(result.rank2)) ||
+        (isIntegerRank(result.rank1) && isHalfRank(result.rank2))
+      );
+    }
+
+    function getInversionReasons(result, homeAvg, awayAvg) {
+      const reasons = [];
+
+      if (hasHalfVsIntegerRank(result)) {
+        reasons.push("rang X.5 contre rang X.0");
+      }
+
+      if (homeAvg === 0 || awayAvg === 0) {
+        reasons.push("moyenne d’une équipe à 0");
+      }
+
+      return reasons;
+    }
+
+    function makeDominanceWinner(team, average, diff, inverted = false, baseLabel = null, inversionReasons = []) {
+      return {
+        type: "winner",
+        team,
+        label: team.name,
+        average,
+        diff,
+        inverted,
+        baseLabel,
+        inversionReasons,
+      };
+    }
+
+    function invertDominanceIfNeeded(result, dominance, homeAvg, awayAvg) {
+      const inversionReasons = getInversionReasons(result, homeAvg, awayAvg);
+
+      if (!inversionReasons.length || dominance.type !== "winner") {
+        return {
+          ...dominance,
+          inverted: false,
+          inversionReasons: [],
+        };
+      }
+
+      const homeId = result?.home?.id;
+      const awayId = result?.away?.id;
+      const winnerId = dominance.team?.id;
+      const invertedTeam = winnerId === homeId ? result.away : result.home;
+      const invertedAverage = winnerId === homeId ? awayAvg : homeAvg;
+
+      if (!invertedTeam || invertedAverage === null) {
+        return {
+          ...dominance,
+          inverted: false,
+          inversionReasons: [],
+        };
+      }
+
+      return makeDominanceWinner(
+        invertedTeam,
+        invertedAverage,
+        dominance.diff,
+        true,
+        dominance.label,
+        inversionReasons
+      );
+    }
+
     function getDominance(result) {
       const homeAvg = averagePerformance(result?.home);
       const awayAvg = averagePerformance(result?.away);
@@ -1505,27 +1596,19 @@
           label: "Domination indisponible",
           average: null,
           diff: null,
+          inverted: false,
+          inversionReasons: [],
         };
       }
 
       if (homeAvg !== null && awayAvg === null) {
-        return {
-          type: "winner",
-          team: result.home,
-          label: result.home.name,
-          average: homeAvg,
-          diff: null,
-        };
+        const dominance = makeDominanceWinner(result.home, homeAvg, null);
+        return invertDominanceIfNeeded(result, dominance, homeAvg, awayAvg);
       }
 
       if (awayAvg !== null && homeAvg === null) {
-        return {
-          type: "winner",
-          team: result.away,
-          label: result.away.name,
-          average: awayAvg,
-          diff: null,
-        };
+        const dominance = makeDominanceWinner(result.away, awayAvg, null);
+        return invertDominanceIfNeeded(result, dominance, homeAvg, awayAvg);
       }
 
       const diff = homeAvg - awayAvg;
@@ -1536,26 +1619,16 @@
           label: "Égalité",
           average: homeAvg,
           diff: 0,
+          inverted: false,
+          inversionReasons: getInversionReasons(result, homeAvg, awayAvg),
         };
       }
 
-      if (diff > 0) {
-        return {
-          type: "winner",
-          team: result.home,
-          label: result.home.name,
-          average: homeAvg,
-          diff: Math.abs(diff),
-        };
-      }
+      const dominance = diff > 0
+        ? makeDominanceWinner(result.home, homeAvg, Math.abs(diff))
+        : makeDominanceWinner(result.away, awayAvg, Math.abs(diff));
 
-      return {
-        type: "winner",
-        team: result.away,
-        label: result.away.name,
-        average: awayAvg,
-        diff: Math.abs(diff),
-      };
+      return invertDominanceIfNeeded(result, dominance, homeAvg, awayAvg);
     }
 
     function renderDominance(result) {
@@ -1581,13 +1654,17 @@
         `;
       }
 
+      const inversionText = dominance.inverted
+        ? ` · inversé (${esc(dominance.inversionReasons.join(" + "))}) · base : ${esc(dominance.baseLabel)}`
+        : "";
+
       return `
         <div class="dominance-box">
           <div class="dominance-label">Domination moyenne</div>
           <div class="dominance-team">${esc(dominance.label)}</div>
           <div class="dominance-meta">
             Moyenne dominante : ${esc(formatValue(dominance.average))}
-            ${dominance.diff !== null ? ` · écart : ${esc(formatRank(dominance.diff))}` : ""}
+            ${dominance.diff !== null ? ` · écart : ${esc(formatRank(dominance.diff))}` : ""}${inversionText}
           </div>
         </div>
       `;
@@ -1992,7 +2069,7 @@
       return lines;
     }
 
-    function searchValueLines(entry) {
+    function searchValueLines(entry, compact = false) {
       const calc = entry.autoSearch;
       const lines = [];
 
@@ -2000,6 +2077,14 @@
 
       if (!calc) {
         lines.push("Calculateur : non enregistré sur cette analyse.");
+        return lines;
+      }
+
+      if (compact) {
+        lines.push(
+          `Base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouge direct ${calc.reds} · rouge 2e jaune ${calc.secondYellowReds}`
+        );
+        lines.push(`Rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`);
         return lines;
       }
 
@@ -2017,7 +2102,7 @@
       return lines;
     }
 
-    function dominanceLines(result) {
+    function dominanceLines(result, compact = false) {
       const dominance = getDominance(result);
 
       if (dominance.type === "none") {
@@ -2025,13 +2110,61 @@
       }
 
       if (dominance.type === "tie") {
-        return [`Domination moyenne : égalité (${formatValue(dominance.average)})`];
+        const extra = dominance.inversionReasons?.length
+          ? ` · règle détectée : ${dominance.inversionReasons.join(" + ")}`
+          : "";
+        return [`Domination moyenne : égalité (${formatValue(dominance.average)})${extra}`];
+      }
+
+      const inversionText = dominance.inverted
+        ? ` · inversé (${dominance.inversionReasons.join(" + ")}) · base : ${dominance.baseLabel}`
+        : "";
+
+      if (compact) {
+        return [`Domination : ${dominance.label} · moyenne ${formatValue(dominance.average)}${inversionText}`];
       }
 
       return [
         `Domination moyenne : ${dominance.label}`,
-        `Moyenne dominante : ${formatValue(dominance.average)}${dominance.diff !== null ? ` · écart : ${formatRank(dominance.diff)}` : ""}`,
+        `Moyenne dominante : ${formatValue(dominance.average)}${dominance.diff !== null ? ` · écart : ${formatRank(dominance.diff)}` : ""}${inversionText}`,
       ];
+    }
+
+    function teamCompactLine(team, rank1, rank2) {
+      const avg = averagePerformance(team);
+      const parts = [
+        `${team.name}`,
+        `R${rank1}: ${formatValue(team.r1?.value)}`,
+      ];
+
+      if (rank2) {
+        parts.push(`R${rank2}: ${formatValue(team.r2?.value)}`);
+      }
+
+      parts.push(`moyenne: ${avg === null ? "—" : formatValue(avg)}`);
+
+      return parts.join(" · ");
+    }
+
+    function entryToSimpleText(entry, index) {
+      const result = entry.result;
+      const match = result.match;
+      const home = result.home;
+      const away = result.away;
+      const date = new Date(entry.createdAt).toLocaleString("fr-FR");
+      const lines = [];
+
+      lines.push(`ANALYSE ${index + 1}`);
+      lines.push(`${date}`);
+      lines.push(`${match.homeTeam.name} vs ${match.awayTeam.name}`);
+      lines.push(...searchValueLines(entry, true));
+      lines.push(...dominanceLines(result, true));
+      lines.push(`Domicile : ${teamCompactLine(home, result.rank1, result.rank2)}`);
+      lines.push(`Extérieur : ${teamCompactLine(away, result.rank1, result.rank2)}`);
+      lines.push("────────────────────────");
+      lines.push("");
+
+      return lines.join("\n");
     }
 
     function entryToText(entry, index) {
@@ -2077,7 +2210,7 @@
       return lines.join("\n");
     }
 
-    function buildReportText() {
+    function buildReportText(simple = false) {
       const entries = loadReport();
 
       if (!entries.length) {
@@ -2085,35 +2218,32 @@
       }
 
       return [
-        "RAPPORT FOOT/SCAN",
+        simple ? "RAPPORT FOOT/SCAN — SIMPLE" : "RAPPORT FOOT/SCAN — COMPLET",
         `Généré le : ${new Date().toLocaleString("fr-FR")}`,
         `Nombre d’analyses : ${entries.length}`,
         "",
         "────────────────────────",
         "",
-        ...entries.map((entry, index) => entryToText(entry, index)),
+        ...entries.map((entry, index) => simple ? entryToSimpleText(entry, index) : entryToText(entry, index)),
       ].join("\n");
     }
 
-    function textToDocHtml(text) {
-      return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8" />
-          <title>Rapport Foot/Scan</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.45;
-              color: #111;
-              white-space: pre-wrap;
-            }
-          </style>
-        </head>
-        <body>${esc(text)}</body>
-        </html>
-      `;
+    function reportFilename(kind, extension) {
+      return `rapport-footscan-${kind}-${new Date().toISOString().slice(0, 10)}.${extension}`;
+    }
+
+    function downloadTextFile(filename, text) {
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+
+      URL.revokeObjectURL(url);
     }
 
     function addCurrentAnalysisToReport() {
@@ -2129,32 +2259,62 @@
       $("reportHint").textContent = "Analyse ajoutée au rapport.";
     }
 
-    async function copyReport() {
-      const text = buildReportText();
+    async function copyReport(simple = true) {
+      const text = buildReportText(simple);
 
       try {
         await navigator.clipboard.writeText(text);
-        $("reportHint").textContent = "Rapport copié. Tu peux le coller dans Google Docs.";
+        $("reportHint").textContent = simple
+          ? "Rapport simple copié. Tu peux le coller dans Google Docs."
+          : "Rapport complet copié. Tu peux le coller dans Google Docs.";
       } catch {
-        $("reportHint").textContent = "Copie impossible sur ce navigateur. Essaie le téléchargement .doc.";
+        $("reportHint").textContent = "Copie impossible sur ce navigateur. Essaie le téléchargement TXT.";
       }
     }
 
-    function downloadReportDoc() {
-      const text = buildReportText();
-      const html = textToDocHtml(text);
-      const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+    function downloadReportTxt(simple = true) {
+      const text = buildReportText(simple);
+      const kind = simple ? "simple" : "complet";
 
-      a.href = url;
-      a.download = `rapport-footscan-${new Date().toISOString().slice(0, 10)}.doc`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      downloadTextFile(reportFilename(kind, "txt"), text);
+      $("reportHint").textContent = `Téléchargement TXT ${kind} lancé. Ce fichier doit s’ouvrir correctement dans Google Docs.`;
+    }
 
-      URL.revokeObjectURL(url);
-      $("reportHint").textContent = "Téléchargement du rapport lancé.";
+    function openReportPdf(simple = true) {
+      const text = buildReportText(simple);
+      const title = simple ? "Rapport Foot/Scan simple" : "Rapport Foot/Scan complet";
+      const win = window.open("", "_blank");
+
+      if (!win) {
+        $("reportHint").textContent = "Ouverture PDF bloquée. Autorise les pop-ups ou utilise le TXT.";
+        return;
+      }
+
+      win.document.open();
+      win.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${esc(title)}</title>
+  <style>
+    @page { margin: 16mm; }
+    body { font-family: Arial, sans-serif; color: #111; line-height: 1.35; }
+    pre { white-space: pre-wrap; word-break: break-word; font-family: Arial, sans-serif; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <pre>${esc(text)}</pre>
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () { window.print(); }, 300);
+    });
+  <\/script>
+</body>
+</html>`);
+      win.document.close();
+
+      $("reportHint").textContent = "Fenêtre PDF ouverte. Choisis “Enregistrer en PDF” dans l’écran d’impression.";
     }
 
     function clearReport() {
@@ -2214,8 +2374,10 @@
 
     $("scanBtn").addEventListener("click", handleScan);
     $("addReportBtn").addEventListener("click", addCurrentAnalysisToReport);
-    $("downloadReportBtn").addEventListener("click", downloadReportDoc);
-    $("copyReportBtn").addEventListener("click", copyReport);
+    $("copySimpleReportBtn").addEventListener("click", () => copyReport(true));
+    $("downloadSimpleReportBtn").addEventListener("click", () => downloadReportTxt(true));
+    $("printSimpleReportBtn").addEventListener("click", () => openReportPdf(true));
+    $("downloadFullReportBtn").addEventListener("click", () => downloadReportTxt(false));
     $("clearReportBtn").addEventListener("click", clearReport);
 
     bindRangeAndNumber("autoBaseRange", "autoBaseNumber", updateAutoCalculator);
