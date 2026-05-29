@@ -49,6 +49,22 @@
       font: inherit;
     }
 
+    .app,
+    .panel,
+    .auto-box,
+    .per-team-box,
+    .per-team-card,
+    .auto-control,
+    .team-calc-grid,
+    .auto-formula,
+    .mode-toggle,
+    .report-panel,
+    .summary,
+    .team-card {
+      min-width: 0;
+      max-width: 100%;
+    }
+
     button {
       cursor: pointer;
     }
@@ -413,6 +429,8 @@
       border: 0;
       background: transparent;
       accent-color: var(--red);
+      width: 100%;
+      min-width: 0;
     }
 
     .skip-grid {
@@ -491,14 +509,15 @@
     }
 
     .auto-control-top {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(68px, 82px);
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
+      gap: 8px;
     }
 
     .auto-number {
-      width: 88px;
+      width: 82px;
+      max-width: 100%;
       padding: 10px;
       border-radius: 10px;
       text-align: center;
@@ -547,7 +566,8 @@
 
 
     .mode-toggle {
-      display: flex;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
       gap: 10px;
       padding: 12px;
@@ -558,6 +578,7 @@
       font-size: 13px;
       font-weight: 1000;
       line-height: 1.35;
+      overflow-wrap: anywhere;
     }
 
     .mode-toggle input {
@@ -566,6 +587,11 @@
       padding: 0;
       accent-color: var(--blue);
       flex: 0 0 auto;
+    }
+
+    .mode-toggle span {
+      min-width: 0;
+      display: block;
     }
 
     .per-team-box {
@@ -643,8 +669,22 @@
 
     @media (max-width: 720px) {
       .per-team-grid,
-      .per-team-results {
+      .per-team-results,
+      .team-calc-grid {
         grid-template-columns: 1fr;
+      }
+
+      .per-team-card {
+        padding: 10px;
+        overflow: hidden;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) 76px;
+      }
+
+      .auto-number {
+        width: 76px;
       }
     }
 
@@ -658,10 +698,14 @@
     }
 
     .auto-apply-btn {
+      width: 100%;
       min-height: 48px;
       background: linear-gradient(135deg, #38bdf8, #2563eb);
       font-size: 15px;
       box-shadow: 0 14px 30px rgba(56, 189, 248, 0.18);
+      white-space: normal;
+      overflow-wrap: anywhere;
+      padding: 10px 12px;
     }
 
     .scan-btn {
@@ -927,48 +971,6 @@
       grid-template-columns: 1fr;
     }
 
-    .range-stat-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 9px;
-    }
-
-    @media (max-width: 520px) {
-      .range-stat-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .range-stat-card {
-      padding: 12px;
-      border-radius: 12px;
-      background: #171717;
-      border: 1px solid var(--line);
-    }
-
-    .range-stat-label {
-      color: var(--muted);
-      font-size: 10px;
-      font-weight: 1000;
-      letter-spacing: 0.13em;
-      text-transform: uppercase;
-      margin-bottom: 6px;
-    }
-
-    .range-stat-value {
-      font-size: 20px;
-      font-weight: 1000;
-      letter-spacing: -0.04em;
-      line-height: 1.05;
-    }
-
-    .range-stat-note {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1.35;
-    }
-
     .rank-label {
       color: #fca5a5;
       margin-bottom: 9px;
@@ -1197,6 +1199,22 @@
       line-height: 1.75;
     }
 
+    @media (max-width: 520px) {
+      .auto-formula {
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .mode-toggle {
+        font-size: 12px;
+        letter-spacing: 0.03em;
+      }
+
+      .auto-result-value {
+        font-size: 26px;
+      }
+    }
+
     .vs-divider {
       text-align: center;
       color: var(--muted);
@@ -1326,7 +1344,12 @@
 
             <label class="mode-toggle" for="perTeamMode">
               <input id="perTeamMode" type="checkbox" />
-              Calcul par équipe : faire un bas/haut domicile + un bas/haut extérieur, puis appliquer la moyenne finale.
+              <span>Calcul par équipe : bas/haut domicile + bas/haut extérieur, puis moyenne finale.</span>
+            </label>
+
+            <label class="mode-toggle" for="inversionMode">
+              <input id="inversionMode" type="checkbox" checked />
+              <span>Inversion X.0 vs X.5 activée.</span>
             </label>
 
             <div class="per-team-box" id="perTeamBox">
@@ -1725,6 +1748,18 @@
       return Boolean($("perTeamMode")?.checked);
     }
 
+    function isInversionEnabled() {
+      return Boolean($("inversionMode")?.checked);
+    }
+
+    function isInversionEnabledForResult(result) {
+      if (typeof result?.inversionEnabled === "boolean") {
+        return result.inversionEnabled;
+      }
+
+      return isInversionEnabled();
+    }
+
     function calculateAutoRanks() {
       const single = calculateRanksFromValues(getAutoValues());
 
@@ -1856,7 +1891,7 @@
     function getInversionReasons(result, homeAvg, awayAvg) {
       const reasons = [];
 
-      if (hasHalfVsIntegerRank(result)) {
+      if (isInversionEnabledForResult(result) && hasHalfVsIntegerRank(result)) {
         reasons.push("rang X.5 contre rang X.0");
       }
 
@@ -2123,15 +2158,20 @@
         setStatus(job.message || job.status || "Scan en cours…", job.progress || 0);
 
         if (job.status === "done") {
+          const resultWithOptions = {
+            ...job.result,
+            inversionEnabled: isInversionEnabled(),
+          };
+
           lastResult = {
             createdAt: new Date().toISOString(),
             skipHome: skipHomeValue,
             skipAway: skipAwayValue,
             autoSearch: calculateAutoRanks(),
-            result: job.result,
+            result: resultWithOptions,
           };
 
-          renderResult(job.result);
+          renderResult(resultWithOptions);
           setStatus("Scan terminé. Tu peux ajouter cette analyse au rapport.", 100);
           $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter l’analyse actuelle” pour l’enregistrer dans le rapport.";
           finishScan();
@@ -2250,13 +2290,6 @@
                 <strong class="${valueClass(team.r2?.value)}">${esc(formatValue(team.r2?.value))}</strong>
               </div>
             ` : ""}
-
-            ${rank2 && team.rangeStats ? `
-              <div class="mini-badge">
-                <span>Moy. entre rangs</span>
-                <strong class="${valueClass(team.rangeStats.average)}">${esc(formatValue(team.rangeStats.average))}</strong>
-              </div>
-            ` : ""}
           </div>
         </div>
       `;
@@ -2299,33 +2332,37 @@
       return html;
     }
 
-    function formatModeList(stats) {
-      const modes = stats?.modes || [];
 
-      if (!modes.length) {
+    function zoneModeText(stats) {
+      const values = stats?.modeValues || [];
+
+      if (!values.length) {
         return "—";
       }
 
-      return modes
-        .map((mode) => `${formatValue(mode.value)} ×${mode.count}`)
-        .join(" / ");
+      const formatted = values.map((value) => formatValue(value)).join(" / ");
+      const count = Number(stats?.modeCount || 0);
+
+      return count > 0 ? `${formatted} ×${count}` : formatted;
     }
 
-    function renderRangeStats(team, rank1, rank2) {
-      if (!rank2) {
-        return "";
-      }
+    function renderZoneStats(team) {
+      const stats = team?.zoneStats;
 
-      const stats = team.rangeStats;
-
-      if (!stats) {
+      if (!stats || !stats.count) {
         return `
           <div class="section">
-            <div class="section-title">
-              Parcours entre les rangs
-              <span class="count-pill">—</span>
+            <div class="section-title">Zone entre les rangs</div>
+            <div class="mini-values">
+              <div class="mini-badge">
+                <span>Moyenne zone</span>
+                <strong class="neutral">—</strong>
+              </div>
+              <div class="mini-badge">
+                <span>Plus présente</span>
+                <strong class="neutral">—</strong>
+              </div>
             </div>
-            <div class="row-sub">Statistiques indisponibles entre le rang ${esc(rank1)} et le rang ${esc(rank2)}.</div>
           </div>
         `;
       }
@@ -2333,21 +2370,19 @@
       return `
         <div class="section">
           <div class="section-title">
-            Parcours entre les rangs
-            <span class="count-pill">${esc(stats.count)} événements</span>
+            Zone entre les rangs
+            <span class="count-pill">#${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements</span>
           </div>
 
-          <div class="range-stat-grid">
-            <div class="range-stat-card">
-              <div class="range-stat-label">Moyenne parcourue</div>
-              <div class="range-stat-value ${valueClass(stats.average)}">${esc(formatValue(stats.average))}</div>
-              <div class="range-stat-note">Événements #${esc(stats.startRank)} à #${esc(stats.endRank)}, rang final inclus.</div>
+          <div class="mini-values">
+            <div class="mini-badge">
+              <span>Moyenne zone</span>
+              <strong class="${valueClass(stats.average)}">${esc(formatValue(stats.average))}</strong>
             </div>
 
-            <div class="range-stat-card">
-              <div class="range-stat-label">Performance fréquente</div>
-              <div class="range-stat-value">${esc(formatModeList(stats))}</div>
-              <div class="range-stat-note">Valeur qui revient le plus souvent entre les deux rangs.</div>
+            <div class="mini-badge">
+              <span>Plus présente</span>
+              <strong class="neutral">${esc(zoneModeText(stats))}</strong>
             </div>
           </div>
         </div>
@@ -2413,11 +2448,11 @@
           </div>
 
           <div class="rank-grid ${rank2 ? "" : "one"}">
-            ${renderValue(`Rang ${rank1}`, team.r1)}
-            ${rank2 ? renderValue(`Rang ${rank2}`, team.r2) : ""}
+            ${renderValue(`Performance rang ${rank1}`, team.r1)}
+            ${rank2 ? renderValue(`Performance rang ${rank2}`, team.r2) : ""}
           </div>
 
-          ${renderRangeStats(team, rank1, rank2)}
+          ${renderZoneStats(team)}
 
           <div class="section">
             <div class="section-title">
@@ -2485,6 +2520,34 @@
       return lines;
     }
 
+
+    function zoneStatsCompactText(team) {
+      const stats = team?.zoneStats;
+
+      if (!stats || !stats.count) {
+        return "zone: —";
+      }
+
+      return `zone moyenne: ${formatValue(stats.average)} · plus présente: ${zoneModeText(stats)} · #${stats.startRankIndex}-${stats.endRankIndex}`;
+    }
+
+    function zoneStatsLines(team) {
+      const stats = team?.zoneStats;
+
+      if (!stats || !stats.count) {
+        return [
+          "Performance moyenne zone entre les rangs : —",
+          "Performance la plus présente zone entre les rangs : —",
+        ];
+      }
+
+      return [
+        `Performance moyenne zone entre les rangs : ${formatValue(stats.average)}`,
+        `Performance la plus présente zone entre les rangs : ${zoneModeText(stats)}`,
+        `Zone incluse : rang #${stats.startRankIndex} à #${stats.endRankIndex} (${stats.count} événements, rangs finaux inclus)`,
+      ];
+    }
+
     function compactCalcLine(label, calc) {
       return `${label} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouge direct ${calc.reds} · rouge 2e jaune ${calc.secondYellowReds} · rangs ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
     }
@@ -2509,6 +2572,7 @@
       const lines = [];
 
       lines.push("VALEUR DE RECHERCHE");
+      lines.push(`Inversion X.0/X.5 : ${entry.result?.inversionEnabled === false ? "désactivée" : "activée"}`);
 
       if (!calc) {
         lines.push("Calculateur : non enregistré sur cette analyse.");
@@ -2582,25 +2646,6 @@
       ];
     }
 
-    function rangeStatsLines(team, compact = false) {
-      const stats = team.rangeStats;
-
-      if (!stats) {
-        return compact ? ["parcours : —"] : ["Parcours entre les rangs : indisponible"];
-      }
-
-      if (compact) {
-        return [`parcours : moyenne ${formatValue(stats.average)} · fréquent ${formatModeList(stats)} · ${stats.count} événements`];
-      }
-
-      return [
-        "Parcours entre les rangs :",
-        `- Moyenne des événements parcourus : ${formatValue(stats.average)}`,
-        `- Performance la plus fréquente : ${formatModeList(stats)}`,
-        `- Événements inclus : #${stats.startRank} à #${stats.endRank} (${stats.count} événements, rang final inclus)`,
-      ];
-    }
-
     function teamCompactLine(team, rank1, rank2) {
       const avg = averagePerformance(team);
       const parts = [
@@ -2612,12 +2657,8 @@
         parts.push(`R${rank2}: ${formatValue(team.r2?.value)}`);
       }
 
-      parts.push(`moyenne: ${avg === null ? "—" : formatValue(avg)}`);
-
-      if (rank2 && team.rangeStats) {
-        parts.push(`parcours: ${formatValue(team.rangeStats.average)}`);
-        parts.push(`fréquent: ${formatModeList(team.rangeStats)}`);
-      }
+      parts.push(`moyenne rangs finaux: ${avg === null ? "—" : formatValue(avg)}`);
+      parts.push(zoneStatsCompactText(team));
 
       return parts.join(" · ");
     }
@@ -2665,21 +2706,25 @@
       lines.push("");
 
       lines.push(`DOMICILE — ${home.name}`);
+      lines.push("Performance des rangs finaux :");
       lines.push(...rankLines(home, `Rang ${result.rank1}`, home.r1));
 
       if (result.rank2) {
         lines.push(...rankLines(home, `Rang ${result.rank2}`, home.r2));
-        lines.push(...rangeStatsLines(home));
       }
+
+      lines.push(...zoneStatsLines(home));
 
       lines.push("");
       lines.push(`EXTÉRIEUR — ${away.name}`);
+      lines.push("Performance des rangs finaux :");
       lines.push(...rankLines(away, `Rang ${result.rank1}`, away.r1));
 
       if (result.rank2) {
         lines.push(...rankLines(away, `Rang ${result.rank2}`, away.r2));
-        lines.push(...rangeStatsLines(away));
       }
+
+      lines.push(...zoneStatsLines(away));
 
       lines.push("");
       lines.push("────────────────────────");
@@ -2878,6 +2923,15 @@
     bindRangeAndNumber("awaySecondYellowRedRange", "awaySecondYellowRedNumber", updateAutoCalculator);
 
     $("perTeamMode").addEventListener("change", updateAutoCalculator);
+    $("inversionMode").addEventListener("change", () => {
+      if (lastResult?.result) {
+        lastResult.result = {
+          ...lastResult.result,
+          inversionEnabled: isInversionEnabled(),
+        };
+        renderResult(lastResult.result);
+      }
+    });
     $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
 
     updateReportCount();
