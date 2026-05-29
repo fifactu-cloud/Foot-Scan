@@ -49,6 +49,22 @@
       font: inherit;
     }
 
+    .app,
+    .panel,
+    .auto-box,
+    .per-team-box,
+    .per-team-card,
+    .auto-control,
+    .team-calc-grid,
+    .auto-formula,
+    .mode-toggle,
+    .report-panel,
+    .summary,
+    .team-card {
+      min-width: 0;
+      max-width: 100%;
+    }
+
     button {
       cursor: pointer;
     }
@@ -413,6 +429,8 @@
       border: 0;
       background: transparent;
       accent-color: var(--red);
+      width: 100%;
+      min-width: 0;
     }
 
     .skip-grid {
@@ -491,14 +509,15 @@
     }
 
     .auto-control-top {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(68px, 82px);
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
+      gap: 8px;
     }
 
     .auto-number {
-      width: 88px;
+      width: 82px;
+      max-width: 100%;
       padding: 10px;
       border-radius: 10px;
       text-align: center;
@@ -547,7 +566,8 @@
 
 
     .mode-toggle {
-      display: flex;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
       gap: 10px;
       padding: 12px;
@@ -558,6 +578,7 @@
       font-size: 13px;
       font-weight: 1000;
       line-height: 1.35;
+      overflow-wrap: anywhere;
     }
 
     .mode-toggle input {
@@ -566,6 +587,11 @@
       padding: 0;
       accent-color: var(--blue);
       flex: 0 0 auto;
+    }
+
+    .mode-toggle span {
+      min-width: 0;
+      display: block;
     }
 
     .per-team-box {
@@ -643,8 +669,22 @@
 
     @media (max-width: 720px) {
       .per-team-grid,
-      .per-team-results {
+      .per-team-results,
+      .team-calc-grid {
         grid-template-columns: 1fr;
+      }
+
+      .per-team-card {
+        padding: 10px;
+        overflow: hidden;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) 76px;
+      }
+
+      .auto-number {
+        width: 76px;
       }
     }
 
@@ -658,10 +698,14 @@
     }
 
     .auto-apply-btn {
+      width: 100%;
       min-height: 48px;
       background: linear-gradient(135deg, #38bdf8, #2563eb);
       font-size: 15px;
       box-shadow: 0 14px 30px rgba(56, 189, 248, 0.18);
+      white-space: normal;
+      overflow-wrap: anywhere;
+      padding: 10px 12px;
     }
 
     .scan-btn {
@@ -1155,6 +1199,22 @@
       line-height: 1.75;
     }
 
+    @media (max-width: 520px) {
+      .auto-formula {
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .mode-toggle {
+        font-size: 12px;
+        letter-spacing: 0.03em;
+      }
+
+      .auto-result-value {
+        font-size: 26px;
+      }
+    }
+
     .vs-divider {
       text-align: center;
       color: var(--muted);
@@ -1284,7 +1344,12 @@
 
             <label class="mode-toggle" for="perTeamMode">
               <input id="perTeamMode" type="checkbox" />
-              Calcul par équipe : faire un bas/haut domicile + un bas/haut extérieur, puis appliquer la moyenne finale.
+              <span>Calcul par équipe : bas/haut domicile + bas/haut extérieur, puis moyenne finale.</span>
+            </label>
+
+            <label class="mode-toggle" for="inversionMode">
+              <input id="inversionMode" type="checkbox" checked />
+              <span>Inversion X.0 vs X.5 activée.</span>
             </label>
 
             <div class="per-team-box" id="perTeamBox">
@@ -1683,6 +1748,18 @@
       return Boolean($("perTeamMode")?.checked);
     }
 
+    function isInversionEnabled() {
+      return Boolean($("inversionMode")?.checked);
+    }
+
+    function isInversionEnabledForResult(result) {
+      if (typeof result?.inversionEnabled === "boolean") {
+        return result.inversionEnabled;
+      }
+
+      return isInversionEnabled();
+    }
+
     function calculateAutoRanks() {
       const single = calculateRanksFromValues(getAutoValues());
 
@@ -1814,7 +1891,7 @@
     function getInversionReasons(result, homeAvg, awayAvg) {
       const reasons = [];
 
-      if (hasHalfVsIntegerRank(result)) {
+      if (isInversionEnabledForResult(result) && hasHalfVsIntegerRank(result)) {
         reasons.push("rang X.5 contre rang X.0");
       }
 
@@ -2081,15 +2158,20 @@
         setStatus(job.message || job.status || "Scan en cours…", job.progress || 0);
 
         if (job.status === "done") {
+          const resultWithOptions = {
+            ...job.result,
+            inversionEnabled: isInversionEnabled(),
+          };
+
           lastResult = {
             createdAt: new Date().toISOString(),
             skipHome: skipHomeValue,
             skipAway: skipAwayValue,
             autoSearch: calculateAutoRanks(),
-            result: job.result,
+            result: resultWithOptions,
           };
 
-          renderResult(job.result);
+          renderResult(resultWithOptions);
           setStatus("Scan terminé. Tu peux ajouter cette analyse au rapport.", 100);
           $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter l’analyse actuelle” pour l’enregistrer dans le rapport.";
           finishScan();
@@ -2403,6 +2485,7 @@
       const lines = [];
 
       lines.push("VALEUR DE RECHERCHE");
+      lines.push(`Inversion X.0/X.5 : ${entry.result?.inversionEnabled === false ? "désactivée" : "activée"}`);
 
       if (!calc) {
         lines.push("Calculateur : non enregistré sur cette analyse.");
@@ -2746,6 +2829,15 @@
     bindRangeAndNumber("awaySecondYellowRedRange", "awaySecondYellowRedNumber", updateAutoCalculator);
 
     $("perTeamMode").addEventListener("change", updateAutoCalculator);
+    $("inversionMode").addEventListener("change", () => {
+      if (lastResult?.result) {
+        lastResult.result = {
+          ...lastResult.result,
+          inversionEnabled: isInversionEnabled(),
+        };
+        renderResult(lastResult.result);
+      }
+    });
     $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
 
     updateReportCount();
