@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import re
+import math
 import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -570,71 +571,87 @@ def value_at_rank(events, rank):
     }
 
 
-def range_stats_between_ranks(events, rank1, rank2):
-    if not events or not rank1 or not rank2:
-        return None
+
+
+def zone_stats_between_ranks(events, rank1, rank2=None):
+    if not events or not rank1:
+        return {
+            "average": None,
+            "modeValues": [],
+            "modeCount": 0,
+            "count": 0,
+            "startRankIndex": None,
+            "endRankIndex": None,
+        }
 
     try:
-        low_rank = float(min(rank1, rank2))
-        high_rank = float(max(rank1, rank2))
+        first_rank = float(rank1)
+        second_rank = float(rank2) if rank2 is not None else first_rank
     except Exception:
-        return None
+        return {
+            "average": None,
+            "modeValues": [],
+            "modeCount": 0,
+            "count": 0,
+            "startRankIndex": None,
+            "endRankIndex": None,
+        }
 
-    if low_rank < 1 or high_rank < 1:
-        return None
+    low_rank = min(first_rank, second_rank)
+    high_rank = max(first_rank, second_rank)
 
-    def floor_rank(value):
-        return int(value)
+    start_rank_index = max(1, int(math.floor(low_rank)))
+    end_rank_index = max(start_rank_index, int(math.ceil(high_rank)))
 
-    def ceil_rank(value):
-        base = int(value)
-        fraction = round(value - base, 10)
-        return base if abs(fraction) < 0.0000001 else base + 1
+    start_index = start_rank_index - 1
+    end_index = min(len(events), end_rank_index)
 
-    start_rank = floor_rank(low_rank)
-    end_rank = ceil_rank(high_rank)
-
-    start_index = max(0, start_rank - 1)
-    end_index = min(len(events) - 1, end_rank - 1)
-
-    if start_index > end_index or start_index >= len(events):
-        return None
-
-    selected = events[start_index:end_index + 1]
+    if start_index < 0 or start_index >= len(events) or start_index >= end_index:
+        return {
+            "average": None,
+            "modeValues": [],
+            "modeCount": 0,
+            "count": 0,
+            "startRankIndex": start_rank_index,
+            "endRankIndex": end_rank_index,
+        }
 
     values = []
 
-    for event in selected:
+    for event in events[start_index:end_index]:
         try:
             values.append(round(float(event.get("value", 0)), 4))
         except Exception:
-            continue
+            pass
 
     if not values:
-        return None
-
-    average = round(sum(values) / len(values), 4)
+        return {
+            "average": None,
+            "modeValues": [],
+            "modeCount": 0,
+            "count": 0,
+            "startRankIndex": start_rank_index,
+            "endRankIndex": end_rank_index,
+        }
 
     counts = {}
 
     for value in values:
-        counts[value] = counts.get(value, 0) + 1
+        key = f"{value:.4f}"
+        counts[key] = counts.get(key, 0) + 1
 
-    max_count = max(counts.values())
-    modes = [
-        {"value": value, "count": count}
-        for value, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
-        if count == max_count
-    ]
+    mode_count = max(counts.values())
+    mode_values = sorted(
+        [round(float(key), 4) for key, count in counts.items() if count == mode_count]
+    )
 
     return {
-        "startRank": start_rank,
-        "endRank": end_rank,
-        "requestedStartRank": round(low_rank, 4),
-        "requestedEndRank": round(high_rank, 4),
+        "average": round(sum(values) / len(values), 4),
+        "modeValues": mode_values,
+        "modeCount": mode_count,
         "count": len(values),
-        "average": average,
-        "modes": modes,
+        "startRankIndex": start_rank_index,
+        "endRankIndex": end_rank_index,
     }
 
 
@@ -862,7 +879,7 @@ def process_scan_job(job_id):
             **home_scan,
             "r1": value_at_rank(home_scan["events"], rank1),
             "r2": value_at_rank(home_scan["events"], rank2) if rank2 else None,
-            "rangeStats": range_stats_between_ranks(home_scan["events"], rank1, rank2) if rank2 else None,
+            "zoneStats": zone_stats_between_ranks(home_scan["events"], rank1, rank2),
         }
 
         away = {
@@ -870,7 +887,7 @@ def process_scan_job(job_id):
             **away_scan,
             "r1": value_at_rank(away_scan["events"], rank1),
             "r2": value_at_rank(away_scan["events"], rank2) if rank2 else None,
-            "rangeStats": range_stats_between_ranks(away_scan["events"], rank1, rank2) if rank2 else None,
+            "zoneStats": zone_stats_between_ranks(away_scan["events"], rank1, rank2),
         }
 
         result = {
