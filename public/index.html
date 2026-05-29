@@ -545,6 +545,109 @@
       border: 1px solid var(--line);
     }
 
+
+    .mode-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 13px;
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      background: rgba(56, 189, 248, 0.08);
+      color: var(--soft);
+      font-size: 13px;
+      font-weight: 1000;
+      line-height: 1.35;
+    }
+
+    .mode-toggle input {
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      accent-color: var(--blue);
+      flex: 0 0 auto;
+    }
+
+    .per-team-box {
+      display: none;
+      padding: 12px;
+      border-radius: 15px;
+      border: 1px solid rgba(34, 197, 94, 0.20);
+      background: rgba(34, 197, 94, 0.055);
+      gap: 12px;
+    }
+
+    .per-team-box.active {
+      display: grid;
+    }
+
+    .per-team-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .per-team-card {
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #121212;
+      display: grid;
+      gap: 11px;
+    }
+
+    .per-team-title {
+      font-size: 15px;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+    }
+
+    .team-calc-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .team-calc-grid .auto-control:last-child {
+      grid-column: 1 / -1;
+    }
+
+    .per-team-results {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .per-team-mini {
+      padding: 11px;
+      border-radius: 12px;
+      background: #171717;
+      border: 1px solid var(--line);
+    }
+
+    .per-team-mini-title {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .per-team-mini-value {
+      color: var(--green);
+      font-size: 18px;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+    }
+
+    @media (max-width: 720px) {
+      .per-team-grid,
+      .per-team-results {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .auto-apply-btn,
     .scan-btn,
     .report-btn {
@@ -1179,6 +1282,125 @@
 
             <div class="auto-formula" id="autoFormula"></div>
 
+            <label class="mode-toggle" for="perTeamMode">
+              <input id="perTeamMode" type="checkbox" />
+              Calcul par équipe : faire un bas/haut domicile + un bas/haut extérieur, puis appliquer la moyenne finale.
+            </label>
+
+            <div class="per-team-box" id="perTeamBox">
+              <div class="per-team-grid">
+                <div class="per-team-card">
+                  <div class="per-team-title">Domicile</div>
+
+                  <div class="team-calc-grid">
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Base</div>
+                        <input id="homeBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.01" value="19" />
+                      </div>
+                      <input id="homeBaseRange" type="range" min="0" max="1000" step="0.01" value="19" />
+                    </div>
+
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Limites</div>
+                        <input id="homeOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="1" value="4" />
+                      </div>
+                      <input id="homeOffensiveRange" type="range" min="0" max="22" step="1" value="4" />
+                    </div>
+
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Changements</div>
+                        <input id="homeChangeNumber" class="auto-number" type="number" min="0" max="22" step="1" value="3" />
+                      </div>
+                      <input id="homeChangeRange" type="range" min="0" max="22" step="1" value="3" />
+                    </div>
+
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Rouges</div>
+                        <input id="homeRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                      </div>
+                      <input id="homeRedRange" type="range" min="0" max="22" step="1" value="0" />
+                    </div>
+
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Rouges via 2e jaune</div>
+                        <input id="homeSecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                      </div>
+                      <input id="homeSecondYellowRedRange" type="range" min="0" max="22" step="1" value="0" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="per-team-card">
+                  <div class="per-team-title">Extérieur</div>
+
+                  <div class="team-calc-grid">
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Base</div>
+                        <input id="awayBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.01" value="19" />
+                      </div>
+                      <input id="awayBaseRange" type="range" min="0" max="1000" step="0.01" value="19" />
+                    </div>
+
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Limites</div>
+                        <input id="awayOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="1" value="4" />
+                      </div>
+                      <input id="awayOffensiveRange" type="range" min="0" max="22" step="1" value="4" />
+                    </div>
+
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Changements</div>
+                        <input id="awayChangeNumber" class="auto-number" type="number" min="0" max="22" step="1" value="3" />
+                      </div>
+                      <input id="awayChangeRange" type="range" min="0" max="22" step="1" value="3" />
+                    </div>
+
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Rouges</div>
+                        <input id="awayRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                      </div>
+                      <input id="awayRedRange" type="range" min="0" max="22" step="1" value="0" />
+                    </div>
+
+                    <div class="auto-control">
+                      <div class="auto-control-top">
+                        <div class="auto-control-title">Rouges via 2e jaune</div>
+                        <input id="awaySecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                      </div>
+                      <input id="awaySecondYellowRedRange" type="range" min="0" max="22" step="1" value="0" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="per-team-results">
+                <div class="per-team-mini">
+                  <div class="per-team-mini-title">Domicile</div>
+                  <div class="per-team-mini-value" id="homeAutoResult">—</div>
+                </div>
+
+                <div class="per-team-mini">
+                  <div class="per-team-mini-title">Extérieur</div>
+                  <div class="per-team-mini-value" id="awayAutoResult">—</div>
+                </div>
+
+                <div class="per-team-mini">
+                  <div class="per-team-mini-title">Moyenne finale</div>
+                  <div class="per-team-mini-value" id="averageAutoResult">—</div>
+                </div>
+              </div>
+            </div>
+
+
             <button class="auto-apply-btn" id="applyAutoRanksBtn" type="button">
               Appliquer aux rangs
             </button>
@@ -1371,30 +1593,41 @@
       return ` · poids ${percent}%`;
     }
 
-    function getAutoValues() {
-      const rawBase = parseFloat(String($("autoBaseNumber").value).replace(",", "."));
-      const rawOffensive = parseInt(String($("autoOffensiveNumber").value), 10);
-      const rawChanges = parseInt(String($("autoChangeNumber").value), 10);
-      const rawReds = parseInt(String($("autoRedNumber").value), 10);
-      const rawSecondYellowReds = parseInt(String($("autoSecondYellowRedNumber").value), 10);
-
-      const base = clamp(rawBase, 0, 1000);
-      const offensive = Math.floor(clamp(rawOffensive, 0, 22));
-      const changes = Math.floor(clamp(rawChanges, 0, 22));
-      const reds = Math.floor(clamp(rawReds, 0, 22));
-      const secondYellowReds = Math.floor(clamp(rawSecondYellowReds, 0, 22));
+    function readCalculatorValues(prefix) {
+      const rawBase = parseFloat(String($(`${prefix}BaseNumber`).value).replace(",", "."));
+      const rawOffensive = parseInt(String($(`${prefix}OffensiveNumber`).value), 10);
+      const rawChanges = parseInt(String($(`${prefix}ChangeNumber`).value), 10);
+      const rawReds = parseInt(String($(`${prefix}RedNumber`).value), 10);
+      const rawSecondYellowReds = parseInt(String($(`${prefix}SecondYellowRedNumber`).value), 10);
 
       return {
-        base,
-        offensive,
-        changes,
-        reds,
-        secondYellowReds,
+        base: clamp(rawBase, 0, 1000),
+        offensive: Math.floor(clamp(rawOffensive, 0, 22)),
+        changes: Math.floor(clamp(rawChanges, 0, 22)),
+        reds: Math.floor(clamp(rawReds, 0, 22)),
+        secondYellowReds: Math.floor(clamp(rawSecondYellowReds, 0, 22)),
       };
     }
 
-    function calculateAutoRanks() {
-      const { base, offensive, changes, reds, secondYellowReds } = getAutoValues();
+    function writeCalculatorValues(prefix, calc) {
+      $(`${prefix}BaseNumber`).value = formatRank(calc.base);
+      $(`${prefix}BaseRange`).value = calc.base;
+
+      $(`${prefix}OffensiveNumber`).value = calc.offensive;
+      $(`${prefix}OffensiveRange`).value = calc.offensive;
+
+      $(`${prefix}ChangeNumber`).value = calc.changes;
+      $(`${prefix}ChangeRange`).value = calc.changes;
+
+      $(`${prefix}RedNumber`).value = calc.reds;
+      $(`${prefix}RedRange`).value = calc.reds;
+
+      $(`${prefix}SecondYellowRedNumber`).value = calc.secondYellowReds;
+      $(`${prefix}SecondYellowRedRange`).value = calc.secondYellowReds;
+    }
+
+    function calculateRanksFromValues(values) {
+      const { base, offensive, changes, reds, secondYellowReds } = values;
 
       const offensiveBoost = offensive * 22;
       const adjustedBase = base + offensiveBoost;
@@ -1442,28 +1675,41 @@
       };
     }
 
-    function updateAutoCalculator() {
-      const calc = calculateAutoRanks();
+    function getAutoValues() {
+      return readCalculatorValues("auto");
+    }
 
-      $("autoBaseNumber").value = formatRank(calc.base);
-      $("autoBaseRange").value = calc.base;
+    function isPerTeamMode() {
+      return Boolean($("perTeamMode")?.checked);
+    }
 
-      $("autoOffensiveNumber").value = calc.offensive;
-      $("autoOffensiveRange").value = calc.offensive;
+    function calculateAutoRanks() {
+      const single = calculateRanksFromValues(getAutoValues());
 
-      $("autoChangeNumber").value = calc.changes;
-      $("autoChangeRange").value = calc.changes;
+      if (!isPerTeamMode()) {
+        return {
+          ...single,
+          mode: "single",
+        };
+      }
 
-      $("autoRedNumber").value = calc.reds;
-      $("autoRedRange").value = calc.reds;
+      const homeAuto = calculateRanksFromValues(readCalculatorValues("home"));
+      const awayAuto = calculateRanksFromValues(readCalculatorValues("away"));
+      const low = (homeAuto.low + awayAuto.low) / 2;
+      const high = (homeAuto.high + awayAuto.high) / 2;
 
-      $("autoSecondYellowRedNumber").value = calc.secondYellowReds;
-      $("autoSecondYellowRedRange").value = calc.secondYellowReds;
+      return {
+        ...single,
+        mode: "perTeam",
+        homeAuto,
+        awayAuto,
+        low,
+        high,
+      };
+    }
 
-      $("autoLow").textContent = formatRank(calc.low);
-      $("autoHigh").textContent = formatRank(calc.high);
-
-      $("autoFormula").textContent =
+    function formulaTextForCalc(calc) {
+      return (
         `Base : ${formatRank(calc.base)} · ` +
         `limites : ${calc.offensive} × 22 = ${formatRank(calc.offensiveBoost)} · ` +
         `base corrigée : ${formatRank(calc.adjustedBase)} · ` +
@@ -1472,7 +1718,42 @@
         `rouges directs : moyenne (${formatValue(calc.redFirstPart)} et ${formatValue(calc.redSecondPart)}) = ${formatValue(calc.redEffect)} · ` +
         `rouges via 2e jaune : moyenne (0 et ${formatValue(calc.secondYellowRedSecondPart)}) = ${formatValue(calc.secondYellowRedEffect)} · ` +
         `cartons appliqués seulement au rang bas · ` +
-        `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+        `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
+      );
+    }
+
+    function updateAutoCalculator() {
+      const single = calculateRanksFromValues(getAutoValues());
+      writeCalculatorValues("auto", single);
+
+      const homeAuto = calculateRanksFromValues(readCalculatorValues("home"));
+      const awayAuto = calculateRanksFromValues(readCalculatorValues("away"));
+      writeCalculatorValues("home", homeAuto);
+      writeCalculatorValues("away", awayAuto);
+
+      const perTeam = isPerTeamMode();
+      const calc = calculateAutoRanks();
+
+      $("perTeamBox").classList.toggle("active", perTeam);
+      $("applyAutoRanksBtn").textContent = perTeam
+        ? "Appliquer la moyenne aux rangs"
+        : "Appliquer aux rangs";
+
+      $("autoLow").textContent = formatRank(calc.low);
+      $("autoHigh").textContent = formatRank(calc.high);
+
+      $("homeAutoResult").textContent = `${formatRank(homeAuto.low)} / ${formatRank(homeAuto.high)}`;
+      $("awayAutoResult").textContent = `${formatRank(awayAuto.low)} / ${formatRank(awayAuto.high)}`;
+      $("averageAutoResult").textContent = `${formatRank((homeAuto.low + awayAuto.low) / 2)} / ${formatRank((homeAuto.high + awayAuto.high) / 2)}`;
+
+      if (perTeam) {
+        $("autoFormula").textContent =
+          `Mode par équipe · domicile : ${formatRank(homeAuto.low)} / ${formatRank(homeAuto.high)} · ` +
+          `extérieur : ${formatRank(awayAuto.low)} / ${formatRank(awayAuto.high)} · ` +
+          `moyenne finale : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      } else {
+        $("autoFormula").textContent = formulaTextForCalc(calc);
+      }
     }
 
     function applyAutoRanks() {
@@ -1481,7 +1762,11 @@
       $("rank1").value = formatRank(calc.low);
       $("rank2").value = formatRank(calc.high);
 
-      setStatus(`Rangs appliqués : ${formatRank(calc.low)} / ${formatRank(calc.high)}`, 0);
+      const message = calc.mode === "perTeam"
+        ? `Moyenne appliquée : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
+        : `Rangs appliqués : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+
+      setStatus(message, 0);
     }
 
     function averagePerformance(team) {
@@ -2094,6 +2379,25 @@
       return lines;
     }
 
+    function compactCalcLine(label, calc) {
+      return `${label} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouge direct ${calc.reds} · rouge 2e jaune ${calc.secondYellowReds} · rangs ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+    }
+
+    function detailedCalcLines(calc) {
+      return [
+        `Base écrite : ${formatRank(calc.base)}`,
+        `Limites offensives : ${calc.offensive}`,
+        `Changements : ${calc.changes}`,
+        `Carton rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`,
+        `Impact rouge direct : moyenne de ${formatValue(calc.redFirstPart)} et ${formatValue(calc.redSecondPart)} = ${formatValue(calc.redEffect)}`,
+        `Rouge via 2e jaune dans la valeur : ${calc.secondYellowReds > 0 ? "oui" : "non"} (${calc.secondYellowReds})`,
+        `Impact rouge via 2e jaune : moyenne de 0 et ${formatValue(calc.secondYellowRedSecondPart)} = ${formatValue(calc.secondYellowRedEffect)}`,
+        `Cartons appliqués seulement au rang bas : ${formatValue(calc.totalCardEffect)}`,
+        `Rang bas calculé : ${formatRank(calc.low)}`,
+        `Rang haut calculé : ${formatRank(calc.high)}`,
+      ];
+    }
+
     function searchValueLines(entry, compact = false) {
       const calc = entry.autoSearch;
       const lines = [];
@@ -2105,25 +2409,38 @@
         return lines;
       }
 
-      if (compact) {
-        lines.push(
-          `Base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouge direct ${calc.reds} · rouge 2e jaune ${calc.secondYellowReds}`
-        );
-        lines.push(`Rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`);
+      if (calc.mode === "perTeam") {
+        const homeAuto = calc.homeAuto;
+        const awayAuto = calc.awayAuto;
+
+        if (compact) {
+          lines.push("Mode : moyenne par équipe");
+          lines.push(compactCalcLine("Domicile", homeAuto));
+          lines.push(compactCalcLine("Extérieur", awayAuto));
+          lines.push(`Rangs moyens : ${formatRank(calc.low)} / ${formatRank(calc.high)}`);
+          return lines;
+        }
+
+        lines.push("Mode : moyenne par équipe");
+        lines.push("");
+        lines.push("Domicile :");
+        lines.push(...detailedCalcLines(homeAuto));
+        lines.push("");
+        lines.push("Extérieur :");
+        lines.push(...detailedCalcLines(awayAuto));
+        lines.push("");
+        lines.push(`Rang bas moyen : ${formatRank(calc.low)}`);
+        lines.push(`Rang haut moyen : ${formatRank(calc.high)}`);
         return lines;
       }
 
-      lines.push(`Base écrite : ${formatRank(calc.base)}`);
-      lines.push(`Limites offensives : ${calc.offensive}`);
-      lines.push(`Changements : ${calc.changes}`);
-      lines.push(`Carton rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`);
-      lines.push(`Impact rouge direct : moyenne de ${formatValue(calc.redFirstPart)} et ${formatValue(calc.redSecondPart)} = ${formatValue(calc.redEffect)}`);
-      lines.push(`Rouge via 2e jaune dans la valeur : ${calc.secondYellowReds > 0 ? "oui" : "non"} (${calc.secondYellowReds})`);
-      lines.push(`Impact rouge via 2e jaune : moyenne de 0 et ${formatValue(calc.secondYellowRedSecondPart)} = ${formatValue(calc.secondYellowRedEffect)}`);
-      lines.push(`Cartons appliqués seulement au rang bas : ${formatValue(calc.totalCardEffect)}`);
-      lines.push(`Rang bas calculé : ${formatRank(calc.low)}`);
-      lines.push(`Rang haut calculé : ${formatRank(calc.high)}`);
+      if (compact) {
+        lines.push(compactCalcLine("Mode unique", calc));
+        return lines;
+      }
 
+      lines.push("Mode : calcul unique");
+      lines.push(...detailedCalcLines(calc));
       return lines;
     }
 
@@ -2416,6 +2733,19 @@
     bindRangeAndNumber("autoRedRange", "autoRedNumber", updateAutoCalculator);
     bindRangeAndNumber("autoSecondYellowRedRange", "autoSecondYellowRedNumber", updateAutoCalculator);
 
+    bindRangeAndNumber("homeBaseRange", "homeBaseNumber", updateAutoCalculator);
+    bindRangeAndNumber("homeOffensiveRange", "homeOffensiveNumber", updateAutoCalculator);
+    bindRangeAndNumber("homeChangeRange", "homeChangeNumber", updateAutoCalculator);
+    bindRangeAndNumber("homeRedRange", "homeRedNumber", updateAutoCalculator);
+    bindRangeAndNumber("homeSecondYellowRedRange", "homeSecondYellowRedNumber", updateAutoCalculator);
+
+    bindRangeAndNumber("awayBaseRange", "awayBaseNumber", updateAutoCalculator);
+    bindRangeAndNumber("awayOffensiveRange", "awayOffensiveNumber", updateAutoCalculator);
+    bindRangeAndNumber("awayChangeRange", "awayChangeNumber", updateAutoCalculator);
+    bindRangeAndNumber("awayRedRange", "awayRedNumber", updateAutoCalculator);
+    bindRangeAndNumber("awaySecondYellowRedRange", "awaySecondYellowRedNumber", updateAutoCalculator);
+
+    $("perTeamMode").addEventListener("change", updateAutoCalculator);
     $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
 
     updateReportCount();
