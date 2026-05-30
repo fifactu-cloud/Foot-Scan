@@ -1279,7 +1279,7 @@
             <div>
               <div class="auto-title">Calcul automatique des rangs</div>
               <div class="auto-sub">
-                Base libre · limites × 22 · marge (3 + limites) × changements · cartons moyens appliqués seulement au rang bas.
+                Base libre · valeurs en X.5 acceptées · limites × 22 · marge (2 + limites) × changements · rouges = −0.5 × limite × curseur, seulement au rang bas.
               </div>
             </div>
             <div class="auto-badge">Base 0 → 1000</div>
@@ -1298,45 +1298,45 @@
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Limites offensives</div>
-                  <input id="autoOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="1" value="4" />
+                  <input id="autoOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="4" />
                 </div>
-                <input id="autoOffensiveRange" type="range" min="0" max="22" step="1" value="4" />
+                <input id="autoOffensiveRange" type="range" min="0" max="22" step="0.5" value="4" />
               </div>
 
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Changements</div>
-                  <input id="autoChangeNumber" class="auto-number" type="number" min="0" max="22" step="1" value="3" />
+                  <input id="autoChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="3" />
                 </div>
-                <input id="autoChangeRange" type="range" min="0" max="22" step="1" value="3" />
+                <input id="autoChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
               </div>
 
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Rouges directs</div>
-                  <input id="autoRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                  <input id="autoRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
                 </div>
-                <input id="autoRedRange" type="range" min="0" max="22" step="1" value="0" />
+                <input id="autoRedRange" type="range" min="0" max="22" step="0.5" value="0" />
               </div>
 
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Rouges via 2e jaune</div>
-                  <input id="autoSecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                  <input id="autoSecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
                 </div>
-                <input id="autoSecondYellowRedRange" type="range" min="0" max="22" step="1" value="0" />
+                <input id="autoSecondYellowRedRange" type="range" min="0" max="22" step="0.5" value="0" />
               </div>
             </div>
 
             <div class="auto-result">
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang bas</div>
-                <div class="auto-result-value" id="autoLow">51</div>
+                <div class="auto-result-value" id="autoLow">89</div>
               </div>
 
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang haut</div>
-                <div class="auto-result-value" id="autoHigh">75</div>
+                <div class="auto-result-value" id="autoHigh">125</div>
               </div>
             </div>
 
@@ -1369,33 +1369,33 @@
                     <div class="auto-control">
                       <div class="auto-control-top">
                         <div class="auto-control-title">Limites</div>
-                        <input id="homeOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="1" value="4" />
+                        <input id="homeOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="4" />
                       </div>
-                      <input id="homeOffensiveRange" type="range" min="0" max="22" step="1" value="4" />
+                      <input id="homeOffensiveRange" type="range" min="0" max="22" step="0.5" value="4" />
                     </div>
 
                     <div class="auto-control">
                       <div class="auto-control-top">
                         <div class="auto-control-title">Changements</div>
-                        <input id="homeChangeNumber" class="auto-number" type="number" min="0" max="22" step="1" value="3" />
+                        <input id="homeChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="3" />
                       </div>
-                      <input id="homeChangeRange" type="range" min="0" max="22" step="1" value="3" />
+                      <input id="homeChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
                     </div>
 
                     <div class="auto-control">
                       <div class="auto-control-top">
                         <div class="auto-control-title">Rouges</div>
-                        <input id="homeRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                        <input id="homeRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
                       </div>
-                      <input id="homeRedRange" type="range" min="0" max="22" step="1" value="0" />
+                      <input id="homeRedRange" type="range" min="0" max="22" step="0.5" value="0" />
                     </div>
 
                     <div class="auto-control">
                       <div class="auto-control-top">
                         <div class="auto-control-title">Rouges via 2e jaune</div>
-                        <input id="homeSecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                        <input id="homeSecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
                       </div>
-                      <input id="homeSecondYellowRedRange" type="range" min="0" max="22" step="1" value="0" />
+                      <input id="homeSecondYellowRedRange" type="range" min="0" max="22" step="0.5" value="0" />
                     </div>
                   </div>
                 </div>
@@ -1415,33 +1415,33 @@
                     <div class="auto-control">
                       <div class="auto-control-top">
                         <div class="auto-control-title">Limites</div>
-                        <input id="awayOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="1" value="4" />
+                        <input id="awayOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="4" />
                       </div>
-                      <input id="awayOffensiveRange" type="range" min="0" max="22" step="1" value="4" />
+                      <input id="awayOffensiveRange" type="range" min="0" max="22" step="0.5" value="4" />
                     </div>
 
                     <div class="auto-control">
                       <div class="auto-control-top">
                         <div class="auto-control-title">Changements</div>
-                        <input id="awayChangeNumber" class="auto-number" type="number" min="0" max="22" step="1" value="3" />
+                        <input id="awayChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="3" />
                       </div>
-                      <input id="awayChangeRange" type="range" min="0" max="22" step="1" value="3" />
+                      <input id="awayChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
                     </div>
 
                     <div class="auto-control">
                       <div class="auto-control-top">
                         <div class="auto-control-title">Rouges</div>
-                        <input id="awayRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                        <input id="awayRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
                       </div>
-                      <input id="awayRedRange" type="range" min="0" max="22" step="1" value="0" />
+                      <input id="awayRedRange" type="range" min="0" max="22" step="0.5" value="0" />
                     </div>
 
                     <div class="auto-control">
                       <div class="auto-control-top">
                         <div class="auto-control-title">Rouges via 2e jaune</div>
-                        <input id="awaySecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="1" value="0" />
+                        <input id="awaySecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
                       </div>
-                      <input id="awaySecondYellowRedRange" type="range" min="0" max="22" step="1" value="0" />
+                      <input id="awaySecondYellowRedRange" type="range" min="0" max="22" step="0.5" value="0" />
                     </div>
                   </div>
                 </div>
@@ -1660,17 +1660,17 @@
 
     function readCalculatorValues(prefix) {
       const rawBase = parseFloat(String($(`${prefix}BaseNumber`).value).replace(",", "."));
-      const rawOffensive = parseInt(String($(`${prefix}OffensiveNumber`).value), 10);
-      const rawChanges = parseInt(String($(`${prefix}ChangeNumber`).value), 10);
-      const rawReds = parseInt(String($(`${prefix}RedNumber`).value), 10);
-      const rawSecondYellowReds = parseInt(String($(`${prefix}SecondYellowRedNumber`).value), 10);
+      const rawOffensive = parseFloat(String($(`${prefix}OffensiveNumber`).value).replace(",", "."));
+      const rawChanges = parseFloat(String($(`${prefix}ChangeNumber`).value).replace(",", "."));
+      const rawReds = parseFloat(String($(`${prefix}RedNumber`).value).replace(",", "."));
+      const rawSecondYellowReds = parseFloat(String($(`${prefix}SecondYellowRedNumber`).value).replace(",", "."));
 
       return {
         base: clamp(rawBase, 0, 1000),
-        offensive: Math.floor(clamp(rawOffensive, 0, 22)),
-        changes: Math.floor(clamp(rawChanges, 0, 22)),
-        reds: Math.floor(clamp(rawReds, 0, 22)),
-        secondYellowReds: Math.floor(clamp(rawSecondYellowReds, 0, 22)),
+        offensive: clamp(rawOffensive, 0, 22),
+        changes: clamp(rawChanges, 0, 22),
+        reds: clamp(rawReds, 0, 22),
+        secondYellowReds: clamp(rawSecondYellowReds, 0, 22),
       };
     }
 
@@ -1697,20 +1697,14 @@
       const offensiveBoost = offensive * 22;
       const adjustedBase = base + offensiveBoost;
 
-      const marginUnit = 3 + offensive;
+      const marginUnit = 2 + offensive;
       const marginFinal = marginUnit * changes;
 
       const lowBeforeCards = adjustedBase - marginFinal;
       const highBeforeCards = adjustedBase + marginFinal;
 
-      const redFirstPart = -1 * reds;
-      const redSecondPart = -(2 + offensive) * reds;
-      const redEffect = (redFirstPart + redSecondPart) / 2;
-
-      const secondYellowRedFirstPart = 0;
-      const secondYellowRedSecondPart = -(3 + offensive) * secondYellowReds;
-      const secondYellowRedEffect = (secondYellowRedFirstPart + secondYellowRedSecondPart) / 2;
-
+      const redEffect = -0.5 * offensive * reds;
+      const secondYellowRedEffect = -0.5 * offensive * secondYellowReds;
       const totalCardEffect = redEffect + secondYellowRedEffect;
 
       const low = lowBeforeCards + totalCardEffect;
@@ -1728,11 +1722,7 @@
         marginFinal,
         lowBeforeCards,
         highBeforeCards,
-        redFirstPart,
-        redSecondPart,
         redEffect,
-        secondYellowRedFirstPart,
-        secondYellowRedSecondPart,
         secondYellowRedEffect,
         totalCardEffect,
         low,
@@ -1790,10 +1780,10 @@
         `Base : ${formatRank(calc.base)} · ` +
         `limites : ${calc.offensive} × 22 = ${formatRank(calc.offensiveBoost)} · ` +
         `base corrigée : ${formatRank(calc.adjustedBase)} · ` +
-        `marge : (3 + ${calc.offensive}) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
+        `marge : (2 + ${calc.offensive}) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
         `avant cartons : ${formatRank(calc.lowBeforeCards)} / ${formatRank(calc.highBeforeCards)} · ` +
-        `rouges directs : moyenne (${formatValue(calc.redFirstPart)} et ${formatValue(calc.redSecondPart)}) = ${formatValue(calc.redEffect)} · ` +
-        `rouges via 2e jaune : moyenne (0 et ${formatValue(calc.secondYellowRedSecondPart)}) = ${formatValue(calc.secondYellowRedEffect)} · ` +
+        `rouges directs : -0.5 × ${calc.offensive} × ${calc.reds} = ${formatValue(calc.redEffect)} · ` +
+        `rouges via 2e jaune : -0.5 × ${calc.offensive} × ${calc.secondYellowReds} = ${formatValue(calc.secondYellowRedEffect)} · ` +
         `cartons appliqués seulement au rang bas · ` +
         `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
       );
@@ -2558,9 +2548,9 @@
         `Limites offensives : ${calc.offensive}`,
         `Changements : ${calc.changes}`,
         `Carton rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`,
-        `Impact rouge direct : moyenne de ${formatValue(calc.redFirstPart)} et ${formatValue(calc.redSecondPart)} = ${formatValue(calc.redEffect)}`,
+        `Impact rouge direct : -0.5 × ${calc.offensive} × ${calc.reds} = ${formatValue(calc.redEffect)}`,
         `Rouge via 2e jaune dans la valeur : ${calc.secondYellowReds > 0 ? "oui" : "non"} (${calc.secondYellowReds})`,
-        `Impact rouge via 2e jaune : moyenne de 0 et ${formatValue(calc.secondYellowRedSecondPart)} = ${formatValue(calc.secondYellowRedEffect)}`,
+        `Impact rouge via 2e jaune : -0.5 × ${calc.offensive} × ${calc.secondYellowReds} = ${formatValue(calc.secondYellowRedEffect)}`,
         `Cartons appliqués seulement au rang bas : ${formatValue(calc.totalCardEffect)}`,
         `Rang bas calculé : ${formatRank(calc.low)}`,
         `Rang haut calculé : ${formatRank(calc.high)}`,
