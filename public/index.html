@@ -1279,7 +1279,7 @@
             <div>
               <div class="auto-title">Calcul automatique des rangs</div>
               <div class="auto-sub">
-                Base libre · valeurs en X.5 acceptées · limites × 22 · marge (2 + limites) × changements · rouges = −0.5 × limite × curseur, seulement au rang bas.
+                Base libre · valeurs en X.5 acceptées · limites × 22 · marge (20/9) × changements · rouge direct = −1 × curseur, appliqué aux deux rangs.
               </div>
             </div>
             <div class="auto-badge">Base 0 → 1000</div>
@@ -1318,25 +1318,17 @@
                 </div>
                 <input id="autoRedRange" type="range" min="0" max="22" step="0.5" value="0" />
               </div>
-
-              <div class="auto-control">
-                <div class="auto-control-top">
-                  <div class="auto-control-title">Rouges via 2e jaune</div>
-                  <input id="autoSecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
-                </div>
-                <input id="autoSecondYellowRedRange" type="range" min="0" max="22" step="0.5" value="0" />
-              </div>
             </div>
 
             <div class="auto-result">
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang bas</div>
-                <div class="auto-result-value" id="autoLow">89</div>
+                <div class="auto-result-value" id="autoLow">100.3333</div>
               </div>
 
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang haut</div>
-                <div class="auto-result-value" id="autoHigh">125</div>
+                <div class="auto-result-value" id="autoHigh">113.6667</div>
               </div>
             </div>
 
@@ -1389,14 +1381,6 @@
                       </div>
                       <input id="homeRedRange" type="range" min="0" max="22" step="0.5" value="0" />
                     </div>
-
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Rouges via 2e jaune</div>
-                        <input id="homeSecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
-                      </div>
-                      <input id="homeSecondYellowRedRange" type="range" min="0" max="22" step="0.5" value="0" />
-                    </div>
                   </div>
                 </div>
 
@@ -1434,14 +1418,6 @@
                         <input id="awayRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
                       </div>
                       <input id="awayRedRange" type="range" min="0" max="22" step="0.5" value="0" />
-                    </div>
-
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Rouges via 2e jaune</div>
-                        <input id="awaySecondYellowRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
-                      </div>
-                      <input id="awaySecondYellowRedRange" type="range" min="0" max="22" step="0.5" value="0" />
                     </div>
                   </div>
                 </div>
@@ -1663,14 +1639,12 @@
       const rawOffensive = parseFloat(String($(`${prefix}OffensiveNumber`).value).replace(",", "."));
       const rawChanges = parseFloat(String($(`${prefix}ChangeNumber`).value).replace(",", "."));
       const rawReds = parseFloat(String($(`${prefix}RedNumber`).value).replace(",", "."));
-      const rawSecondYellowReds = parseFloat(String($(`${prefix}SecondYellowRedNumber`).value).replace(",", "."));
 
       return {
         base: clamp(rawBase, 0, 1000),
         offensive: clamp(rawOffensive, 0, 22),
         changes: clamp(rawChanges, 0, 22),
         reds: clamp(rawReds, 0, 22),
-        secondYellowReds: clamp(rawSecondYellowReds, 0, 22),
       };
     }
 
@@ -1686,36 +1660,31 @@
 
       $(`${prefix}RedNumber`).value = calc.reds;
       $(`${prefix}RedRange`).value = calc.reds;
-
-      $(`${prefix}SecondYellowRedNumber`).value = calc.secondYellowReds;
-      $(`${prefix}SecondYellowRedRange`).value = calc.secondYellowReds;
     }
 
     function calculateRanksFromValues(values) {
-      const { base, offensive, changes, reds, secondYellowReds } = values;
+      const { base, offensive, changes, reds } = values;
 
       const offensiveBoost = offensive * 22;
       const adjustedBase = base + offensiveBoost;
 
-      const marginUnit = 2 + offensive;
+      const marginUnit = 20 / 9;
       const marginFinal = marginUnit * changes;
 
       const lowBeforeCards = adjustedBase - marginFinal;
       const highBeforeCards = adjustedBase + marginFinal;
 
-      const redEffect = -0.5 * offensive * reds;
-      const secondYellowRedEffect = -0.5 * offensive * secondYellowReds;
-      const totalCardEffect = redEffect + secondYellowRedEffect;
+      const redEffect = -1 * reds;
+      const totalCardEffect = redEffect;
 
       const low = lowBeforeCards + totalCardEffect;
-      const high = highBeforeCards;
+      const high = highBeforeCards + totalCardEffect;
 
       return {
         base,
         offensive,
         changes,
         reds,
-        secondYellowReds,
         offensiveBoost,
         adjustedBase,
         marginUnit,
@@ -1723,7 +1692,6 @@
         lowBeforeCards,
         highBeforeCards,
         redEffect,
-        secondYellowRedEffect,
         totalCardEffect,
         low,
         high,
@@ -1780,11 +1748,10 @@
         `Base : ${formatRank(calc.base)} · ` +
         `limites : ${calc.offensive} × 22 = ${formatRank(calc.offensiveBoost)} · ` +
         `base corrigée : ${formatRank(calc.adjustedBase)} · ` +
-        `marge : (2 + ${calc.offensive}) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
-        `avant cartons : ${formatRank(calc.lowBeforeCards)} / ${formatRank(calc.highBeforeCards)} · ` +
-        `rouges directs : -0.5 × ${calc.offensive} × ${calc.reds} = ${formatValue(calc.redEffect)} · ` +
-        `rouges via 2e jaune : -0.5 × ${calc.offensive} × ${calc.secondYellowReds} = ${formatValue(calc.secondYellowRedEffect)} · ` +
-        `cartons appliqués seulement au rang bas · ` +
+        `marge : (20/9) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
+        `avant rouge : ${formatRank(calc.lowBeforeCards)} / ${formatRank(calc.highBeforeCards)} · ` +
+        `rouges directs : -1 × ${calc.reds} = ${formatValue(calc.redEffect)} · ` +
+        `rouges appliqués aux deux rangs · ` +
         `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
       );
     }
@@ -2539,7 +2506,7 @@
     }
 
     function compactCalcLine(label, calc) {
-      return `${label} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouge direct ${calc.reds} · rouge 2e jaune ${calc.secondYellowReds} · rangs ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      return `${label} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouges ${calc.reds} · rangs ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
     }
 
     function detailedCalcLines(calc) {
@@ -2547,11 +2514,9 @@
         `Base écrite : ${formatRank(calc.base)}`,
         `Limites offensives : ${calc.offensive}`,
         `Changements : ${calc.changes}`,
-        `Carton rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`,
-        `Impact rouge direct : -0.5 × ${calc.offensive} × ${calc.reds} = ${formatValue(calc.redEffect)}`,
-        `Rouge via 2e jaune dans la valeur : ${calc.secondYellowReds > 0 ? "oui" : "non"} (${calc.secondYellowReds})`,
-        `Impact rouge via 2e jaune : -0.5 × ${calc.offensive} × ${calc.secondYellowReds} = ${formatValue(calc.secondYellowRedEffect)}`,
-        `Cartons appliqués seulement au rang bas : ${formatValue(calc.totalCardEffect)}`,
+        `Rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`,
+        `Impact rouge direct : -1 × ${calc.reds} = ${formatValue(calc.redEffect)}`,
+        `Rouge appliqué aux deux rangs : ${formatValue(calc.totalCardEffect)}`,
         `Rang bas calculé : ${formatRank(calc.low)}`,
         `Rang haut calculé : ${formatRank(calc.high)}`,
       ];
@@ -2898,19 +2863,16 @@
     bindRangeAndNumber("autoOffensiveRange", "autoOffensiveNumber", updateAutoCalculator);
     bindRangeAndNumber("autoChangeRange", "autoChangeNumber", updateAutoCalculator);
     bindRangeAndNumber("autoRedRange", "autoRedNumber", updateAutoCalculator);
-    bindRangeAndNumber("autoSecondYellowRedRange", "autoSecondYellowRedNumber", updateAutoCalculator);
 
     bindRangeAndNumber("homeBaseRange", "homeBaseNumber", updateAutoCalculator);
     bindRangeAndNumber("homeOffensiveRange", "homeOffensiveNumber", updateAutoCalculator);
     bindRangeAndNumber("homeChangeRange", "homeChangeNumber", updateAutoCalculator);
     bindRangeAndNumber("homeRedRange", "homeRedNumber", updateAutoCalculator);
-    bindRangeAndNumber("homeSecondYellowRedRange", "homeSecondYellowRedNumber", updateAutoCalculator);
 
     bindRangeAndNumber("awayBaseRange", "awayBaseNumber", updateAutoCalculator);
     bindRangeAndNumber("awayOffensiveRange", "awayOffensiveNumber", updateAutoCalculator);
     bindRangeAndNumber("awayChangeRange", "awayChangeNumber", updateAutoCalculator);
     bindRangeAndNumber("awayRedRange", "awayRedNumber", updateAutoCalculator);
-    bindRangeAndNumber("awaySecondYellowRedRange", "awaySecondYellowRedNumber", updateAutoCalculator);
 
     $("perTeamMode").addEventListener("change", updateAutoCalculator);
     $("inversionMode").addEventListener("change", () => {
