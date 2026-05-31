@@ -589,22 +589,29 @@ def parse_incidents(incidents, match, analyzed_team_id):
 
 
 
+RANK_EVENT_STEP = 7.25 / 8
+
+
 def event_rank_quantity(event):
     """Quantité qui fait avancer le rang.
 
-    Ancienne logique: 1 événement = 1 rang.
-    Nouvelle logique: c'est la valeur absolue de la performance qui avance.
-    Exemple: jaune -0.25 => +0.25 vers le rang ; but+passe +1.5 => +1.5.
+    Nouvelle logique: chaque événement fait avancer le rang de 7.25 / 8,
+    en classique comme en simultané.
+    Le barème de performance reste inchangé ; il sert à la valeur récupérée,
+    pas à la distance parcourue vers le rang.
     """
+    if not isinstance(event, dict):
+        return 0.0
+
     try:
-        quantity = abs(float((event or {}).get("value", 0)))
+        value = float(event.get("value", 0))
     except Exception:
         return 0.0
 
-    if not math.isfinite(quantity):
+    if not math.isfinite(value):
         return 0.0
 
-    return max(0.0, quantity)
+    return RANK_EVENT_STEP
 
 
 def total_rank_quantity(events):
@@ -647,7 +654,7 @@ def value_at_rank(events, rank):
         cumulative_end = cumulative + quantity
 
         # L'événement couvre l'intervalle (cumulative_start, cumulative_end].
-        # Exemple: un jaune -0.25 couvre 0.25 rang, un but+passe +1.5 couvre 1.5 rang.
+        # Chaque événement couvre 7.25 / 8 rang, quelle que soit sa valeur de barème.
         if target_rank <= cumulative_end + 1e-9 and target_rank > cumulative_start + 1e-9:
             source = annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank)
 
@@ -718,8 +725,7 @@ def events_between_rank_quantities(events, rank1, rank2=None):
 def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
     """Calcule les stats entre deux rangs, rangs finaux inclus.
 
-    Nouvelle logique: la progression du rang se fait par quantité de performance.
-    Exemple: un jaune -0.25 avance de 0.25 ; un but + passe +1.5 avance de 1.5.
+    Nouvelle logique: chaque événement fait avancer le rang de 7.25 / 8, peu importe sa valeur de barème.
 
     group_mode="target" : groupe par événement + équipe attribuée + valeur.
       -> utile pour une zone d'équipe.
@@ -891,8 +897,7 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
 def zone_events_between_ranks(events, rank1, rank2=None):
     """Retourne les événements situés entre deux rangs, rangs finaux inclus.
 
-    Nouvelle logique: la zone est basée sur la quantité cumulée des performances,
-    pas sur le nombre brut d'événements.
+    Nouvelle logique: la zone est basée sur le cumul fixe de 7.25 / 8 par événement, pas sur un rang 1 événement = 1.
     """
     selected_events, start_rank_value, end_rank_value, _selected_quantity = events_between_rank_quantities(events, rank1, rank2)
     return selected_events, start_rank_value, end_rank_value
@@ -903,21 +908,22 @@ def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
 
     En simultané, le décompte global parcourt l'ensemble des événements
     réattribués : équipe A + équipe B + adversaire passé de A + adversaire
-    passé de B. Comme cette liste globale contient les deux flux ensemble,
-    on utilise les rangs divisés par 2 pour obtenir la fenêtre globale.
+    passé de B. Les rangs utilisés restent exactement ceux indiqués par
+    l'utilisateur : il n'y a plus de division par 2 pour la zone globale.
 
-    La fenêtre globale utilise aussi la nouvelle logique de rang par quantité.
+    Chaque événement fait avancer le rang de 7.25 / 8.
     """
     try:
-        used_rank1 = float(rank1) / 2
-        used_rank2 = float(rank2) / 2 if rank2 is not None else used_rank1
+        used_rank1 = float(rank1)
+        used_rank2 = float(rank2) if rank2 is not None else used_rank1
     except Exception:
         used_rank1 = rank1
         used_rank2 = rank2
 
     result = zone_stats_between_ranks(combined_events or [], used_rank1, used_rank2, group_mode="global")
-    result["globalMethod"] = "combined_all_events_half_ranks_quantity"
-    result["rankDivisor"] = 2
+    result["globalMethod"] = "combined_all_events_full_ranks_fixed_event_step"
+    result["rankDivisor"] = 1
+    result["eventStep"] = RANK_EVENT_STEP
     result["originalRank1"] = rank1
     result["originalRank2"] = rank2
     result["usedRank1"] = used_rank1
@@ -999,7 +1005,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             status="running",
             message=(
                 f"{team_name} · scan progressif jusqu’à {stage_limit} matchs\n"
-                f"Quantité trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
+                f"Avancement trouvé : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
             ),
             progress=base_progress + int(progress_span * 0.13),
         )
@@ -1015,7 +1021,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 status="running",
                 message=(
                     f"{team_name} · incidents matchs {start + 1}-{batch_end}/{stage_limit}\n"
-                    f"Quantité trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
+                    f"Avancement trouvé : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
                 ),
                 progress=base_progress + int(progress_span * (0.15 + 0.80 * stage_position)),
             )
@@ -1069,7 +1075,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     update_scan_job(
         job_id,
         status="running",
-        message=f"{team_name} · terminé ({len(all_events)} événements, quantité {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs).",
+        message=f"{team_name} · terminé ({len(all_events)} événements, avancement {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs).",
         progress=base_progress + progress_span,
     )
 
@@ -1250,7 +1256,7 @@ def process_scan_job(job_id):
     print(
         f"Scan complet: job={job_id} match={match_id} "
         f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
-        f"objectif quantité brute={scan_fetch_needed} simultaneous={simultaneous_mode}"
+        f"objectif avancement brut={scan_fetch_needed} simultaneous={simultaneous_mode}"
     )
 
     try:
