@@ -574,28 +574,24 @@ def value_at_rank(events, rank):
 
 
 def zone_stats_between_ranks(events, rank1, rank2=None):
+    empty = {
+        "average": None,
+        "modeValues": [],
+        "modeItems": [],
+        "modeCount": 0,
+        "count": 0,
+        "startRankIndex": None,
+        "endRankIndex": None,
+    }
+
     if not events or not rank1:
-        return {
-            "average": None,
-            "modeValues": [],
-            "modeCount": 0,
-            "count": 0,
-            "startRankIndex": None,
-            "endRankIndex": None,
-        }
+        return dict(empty)
 
     try:
         first_rank = float(rank1)
         second_rank = float(rank2) if rank2 is not None else first_rank
     except Exception:
-        return {
-            "average": None,
-            "modeValues": [],
-            "modeCount": 0,
-            "count": 0,
-            "startRankIndex": None,
-            "endRankIndex": None,
-        }
+        return dict(empty)
 
     low_rank = min(first_rank, second_rank)
     high_rank = max(first_rank, second_rank)
@@ -607,53 +603,79 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
     end_index = min(len(events), end_rank_index)
 
     if start_index < 0 or start_index >= len(events) or start_index >= end_index:
-        return {
-            "average": None,
-            "modeValues": [],
-            "modeCount": 0,
-            "count": 0,
-            "startRankIndex": start_rank_index,
-            "endRankIndex": end_rank_index,
-        }
+        result = dict(empty)
+        result["startRankIndex"] = start_rank_index
+        result["endRankIndex"] = end_rank_index
+        return result
 
     values = []
+    counts = {}
+    examples = {}
+
+    def display_side(event):
+        if event.get("displaySide"):
+            return event.get("displaySide")
+        return "Équipe analysée" if event.get("side") == "team" else "Adversaire"
 
     for event in events[start_index:end_index]:
         try:
-            values.append(round(float(event.get("value", 0)), 4))
+            value = round(float(event.get("value", 0)), 4)
         except Exception:
-            pass
+            continue
 
-    if not values:
-        return {
-            "average": None,
-            "modeValues": [],
-            "modeCount": 0,
-            "count": 0,
-            "startRankIndex": start_rank_index,
-            "endRankIndex": end_rank_index,
-        }
+        values.append(value)
 
-    counts = {}
+        event_type = event.get("type") or "unknown"
+        side = event.get("side") or "unknown"
+        side_label = display_side(event)
+        key = f"{event_type}|{side}|{side_label}|{value:.4f}"
 
-    for value in values:
-        key = f"{value:.4f}"
         counts[key] = counts.get(key, 0) + 1
 
+        if key not in examples:
+            examples[key] = {
+                "type": event_type,
+                "label": LABELS.get(event_type, event_type),
+                "side": side,
+                "sideLabel": side_label,
+                "value": value,
+                "icon": event.get("icon") or "•",
+            }
+
+    if not values:
+        result = dict(empty)
+        result["startRankIndex"] = start_rank_index
+        result["endRankIndex"] = end_rank_index
+        return result
+
     mode_count = max(counts.values())
-    mode_values = sorted(
-        [round(float(key), 4) for key, count in counts.items() if count == mode_count]
-    )
+    mode_items = []
+
+    for key, count in counts.items():
+        if count != mode_count:
+            continue
+        item = dict(examples[key])
+        item["count"] = count
+        mode_items.append(item)
+
+    mode_items.sort(key=lambda item: (
+        -item.get("count", 0),
+        str(item.get("label", "")),
+        str(item.get("sideLabel", "")),
+        float(item.get("value", 0)),
+    ))
+
+    mode_values = sorted({round(float(item["value"]), 4) for item in mode_items})
 
     return {
         "average": round(sum(values) / len(values), 4),
         "modeValues": mode_values,
+        "modeItems": mode_items,
         "modeCount": mode_count,
         "count": len(values),
         "startRankIndex": start_rank_index,
         "endRankIndex": end_rank_index,
     }
-
 
 def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span):
     update_scan_job(
@@ -810,15 +832,23 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 
 
 
-def apply_simultaneous_match_minute_order(home_scan, away_scan):
-    """Reclasse les événements en mode parallèle.
+def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domicile", away_name="Extérieur"):
+    """Construit le mode simultané match par match puis minute par minute.
 
-    Le scan garde une liste par équipe, mais le parcours est construit par
-    paire de matchs: match #1 domicile avec match #1 extérieur, puis minute
-    décroissante à l'intérieur de cette paire. Cela rend explicite le mode
-    "match par match → minute par minute" sans mélanger les valeurs d'une
-    équipe avec celles de l'autre.
+    Règle importante demandée:
+    - les événements de l'équipe analysée restent dans son flux.
+    - les événements de l'adversaire dans le passé de A sont transférés au flux de B,
+      avec la valeur inversée.
+    - les événements de l'adversaire dans le passé de B sont transférés au flux de A,
+      avec la valeur inversée.
     """
+
+    def strip_camp_prefix(detail):
+        text = str(detail or "")
+        for prefix in ["Équipe analysée · ", "Adversaire · "]:
+            if text.startswith(prefix):
+                return text[len(prefix):]
+        return text
 
     def group_by_match(scan):
         order = []
@@ -838,6 +868,25 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan):
                 order.append(match_id)
 
         return order, grouped
+
+    def copy_for_target(event, target_key, source_name, target_name, linked_from_opponent):
+        copied = dict(event)
+
+        if linked_from_opponent:
+            try:
+                copied["value"] = round(-float(copied.get("value", 0)), 4)
+            except Exception:
+                copied["value"] = copied.get("value")
+
+            copied["side"] = "team"
+            copied["displaySide"] = f"Adversaire passé de {source_name} → performance {target_name}"
+            copied["linkedFromOpponentPast"] = True
+            copied["detail"] = f"{copied['displaySide']} · {strip_camp_prefix(copied.get('detail'))}"
+        else:
+            copied["displaySide"] = "Équipe analysée"
+
+        copied["simultaneousTarget"] = target_key
+        return copied
 
     home_order, home_grouped = group_by_match(home_scan)
     away_order, away_grouped = group_by_match(away_scan)
@@ -859,30 +908,45 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan):
                 items.append(("away", original_index, event))
 
         def sort_key(item):
-            team_key, original_index, event = item
+            source_key, original_index, event = item
             minute = event.get("minute") or 0
             added = event.get("added") or 0
-            # Minute décroissante, puis domicile/extérieur stable, puis ordre original.
-            return (-(minute + added / 100), 0 if team_key == "home" else 1, original_index)
+            return (-(minute + added / 100), 0 if source_key == "home" else 1, original_index)
 
-        for team_key, original_index, event in sorted(items, key=sort_key):
+        for source_key, original_index, event in sorted(items, key=sort_key):
             shared_index += 1
-            copied = dict(event)
-            copied["simultaneousIndex"] = shared_index
-            copied["simultaneousMatchPair"] = match_index + 1
 
-            if team_key == "home":
-                home_events.append(copied)
+            if source_key == "home":
+                if event.get("side") == "opponent":
+                    copied = copy_for_target(event, "away", home_name, away_name, True)
+                    copied["simultaneousIndex"] = shared_index
+                    copied["simultaneousMatchPair"] = match_index + 1
+                    away_events.append(copied)
+                else:
+                    copied = copy_for_target(event, "home", home_name, home_name, False)
+                    copied["simultaneousIndex"] = shared_index
+                    copied["simultaneousMatchPair"] = match_index + 1
+                    home_events.append(copied)
             else:
-                away_events.append(copied)
+                if event.get("side") == "opponent":
+                    copied = copy_for_target(event, "home", away_name, home_name, True)
+                    copied["simultaneousIndex"] = shared_index
+                    copied["simultaneousMatchPair"] = match_index + 1
+                    home_events.append(copied)
+                else:
+                    copied = copy_for_target(event, "away", away_name, away_name, False)
+                    copied["simultaneousIndex"] = shared_index
+                    copied["simultaneousMatchPair"] = match_index + 1
+                    away_events.append(copied)
 
     home_result = dict(home_scan)
     away_result = dict(away_scan)
     home_result["events"] = home_events
     away_result["events"] = away_events
+    home_result["simultaneousLinkedMode"] = True
+    away_result["simultaneousLinkedMode"] = True
 
     return home_result, away_result
-
 
 def process_scan_job(job_id):
     raw = redis_cmd("GET", f"{SCAN_JOB_PREFIX}{job_id}")
@@ -902,14 +966,20 @@ def process_scan_job(job_id):
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = bool(params.get("simultaneousMode"))
 
-    ranks = [rank1]
+    effective_rank1 = rank1 * 2 if simultaneous_mode else rank1
+    effective_rank2 = rank2 * 2 if (simultaneous_mode and rank2 is not None) else rank2
 
-    if rank2 is not None:
-        ranks.append(rank2)
+    ranks = [effective_rank1]
+
+    if effective_rank2 is not None:
+        ranks.append(effective_rank2)
 
     max_needed = int(max(ranks) + 0.999999)
 
-    print(f"Scan complet: job={job_id} match={match_id} ranks={ranks}")
+    print(
+        f"Scan complet: job={job_id} match={match_id} "
+        f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} simultaneous={simultaneous_mode}"
+    )
 
     try:
         update_scan_job(job_id, status="running", message="Récupération du match principal…", progress=5)
@@ -957,22 +1027,27 @@ def process_scan_job(job_id):
                 message="Calcul simultané: reclassement match par match puis minute par minute…",
                 progress=96,
             )
-            home_scan, away_scan = apply_simultaneous_match_minute_order(home_scan, away_scan)
+            home_scan, away_scan = apply_simultaneous_match_minute_order(
+                home_scan,
+                away_scan,
+                home_team.get("name") or "Domicile",
+                away_team.get("name") or "Extérieur",
+            )
 
         home = {
             **home_team,
             **home_scan,
-            "r1": value_at_rank(home_scan["events"], rank1),
-            "r2": value_at_rank(home_scan["events"], rank2) if rank2 else None,
-            "zoneStats": zone_stats_between_ranks(home_scan["events"], rank1, rank2),
+            "r1": value_at_rank(home_scan["events"], effective_rank1),
+            "r2": value_at_rank(home_scan["events"], effective_rank2) if effective_rank2 else None,
+            "zoneStats": zone_stats_between_ranks(home_scan["events"], effective_rank1, effective_rank2),
         }
 
         away = {
             **away_team,
             **away_scan,
-            "r1": value_at_rank(away_scan["events"], rank1),
-            "r2": value_at_rank(away_scan["events"], rank2) if rank2 else None,
-            "zoneStats": zone_stats_between_ranks(away_scan["events"], rank1, rank2),
+            "r1": value_at_rank(away_scan["events"], effective_rank1),
+            "r2": value_at_rank(away_scan["events"], effective_rank2) if effective_rank2 else None,
+            "zoneStats": zone_stats_between_ranks(away_scan["events"], effective_rank1, effective_rank2),
         }
 
         result = {
@@ -985,10 +1060,12 @@ def process_scan_job(job_id):
             },
             "home": home,
             "away": away,
-            "rank1": rank1,
-            "rank2": rank2,
+            "requestedRank1": rank1,
+            "requestedRank2": rank2,
+            "rank1": effective_rank1,
+            "rank2": effective_rank2,
             "simultaneousMode": simultaneous_mode,
-            "scanModeLabel": "Simultané match par match / minute par minute" if simultaneous_mode else "Standard",
+            "scanModeLabel": "Simultané lié: rangs ×2, match par match / minute par minute" if simultaneous_mode else "Standard",
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
                 "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
@@ -1086,7 +1163,7 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: scan complet côté worker activé.")
     print("Pages SofaScore: 2 pages activées.")
-    print("Mode simultané optionnel: match par match puis minute par minute.")
+    print("Mode simultané lié: rangs ×2, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Calcul pondéré: X / X.125 / X.25 / X.375 / X.5 / X.625 / X.75 / X.875 activé.")
     print("Barème cartons: jaune, 2e jaune, rouge direct, rouge via 2e jaune activé.")
