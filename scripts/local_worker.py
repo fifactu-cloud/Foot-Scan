@@ -893,6 +893,7 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
 
     home_events = []
     away_events = []
+    combined_events = []
     shared_index = 0
     max_len = max(len(home_order), len(away_order))
 
@@ -922,22 +923,28 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
                     copied["simultaneousIndex"] = shared_index
                     copied["simultaneousMatchPair"] = match_index + 1
                     away_events.append(copied)
+                    combined_events.append(dict(copied))
                 else:
                     copied = copy_for_target(event, "home", home_name, home_name, False)
                     copied["simultaneousIndex"] = shared_index
                     copied["simultaneousMatchPair"] = match_index + 1
                     home_events.append(copied)
+                    combined_events.append(dict(copied))
             else:
                 if event.get("side") == "opponent":
                     copied = copy_for_target(event, "home", away_name, home_name, True)
                     copied["simultaneousIndex"] = shared_index
                     copied["simultaneousMatchPair"] = match_index + 1
                     home_events.append(copied)
+                    combined_events.append(dict(copied))
                 else:
                     copied = copy_for_target(event, "away", away_name, away_name, False)
                     copied["simultaneousIndex"] = shared_index
                     copied["simultaneousMatchPair"] = match_index + 1
                     away_events.append(copied)
+                    combined_events.append(dict(copied))
+
+    combined_events.sort(key=lambda event: event.get("simultaneousIndex") or 0)
 
     home_result = dict(home_scan)
     away_result = dict(away_scan)
@@ -946,7 +953,7 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
     home_result["simultaneousLinkedMode"] = True
     away_result["simultaneousLinkedMode"] = True
 
-    return home_result, away_result
+    return home_result, away_result, combined_events
 
 def process_scan_job(job_id):
     raw = redis_cmd("GET", f"{SCAN_JOB_PREFIX}{job_id}")
@@ -1020,6 +1027,8 @@ def process_scan_job(job_id):
             40,
         )
 
+        simultaneous_combined_events = []
+
         if simultaneous_mode:
             update_scan_job(
                 job_id,
@@ -1027,7 +1036,7 @@ def process_scan_job(job_id):
                 message="Calcul simultané: reclassement match par match puis minute par minute…",
                 progress=96,
             )
-            home_scan, away_scan = apply_simultaneous_match_minute_order(
+            home_scan, away_scan, simultaneous_combined_events = apply_simultaneous_match_minute_order(
                 home_scan,
                 away_scan,
                 home_team.get("name") or "Domicile",
@@ -1066,6 +1075,7 @@ def process_scan_job(job_id):
             "rank2": effective_rank2,
             "simultaneousMode": simultaneous_mode,
             "scanModeLabel": "Simultané lié: rangs ×2, match par match / minute par minute" if simultaneous_mode else "Standard",
+            "overallZoneStats": zone_stats_between_ranks(simultaneous_combined_events, effective_rank1, effective_rank2) if simultaneous_mode else None,
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
                 "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
