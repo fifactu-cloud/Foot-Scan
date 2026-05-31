@@ -1,165 +1,136 @@
-const crypto = require("crypto");
+const crypto = require('crypto');
 
-const SCAN_QUEUE_KEY = "footscan:scan:queue";
-const SCAN_JOB_PREFIX = "footscan:scan:job:";
-const JOB_TTL_SECONDS = Number(process.env.SCAN_JOB_TTL_SECONDS || 86400);
+const Q = 'footscan:scan:queue';
+const P = 'footscan:scan:job:';
+const TTL = Number(process.env.SCAN_JOB_TTL_SECONDS || 86400);
 
-function getEnv(name) {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
-  }
-
-  return value;
+function env(n) {
+  if (!process.env[n]) throw new Error('Missing env ' + n);
+  return process.env[n];
 }
 
-async function redisCommand(command) {
-  const url = getEnv("UPSTASH_REDIS_REST_URL");
-  const token = getEnv("UPSTASH_REDIS_REST_TOKEN");
-
-  const response = await fetch(url, {
-    method: "POST",
+async function redis(cmd) {
+  const r = await fetch(env('UPSTASH_REDIS_REST_URL'), {
+    method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+      Authorization: `Bearer ${env('UPSTASH_REDIS_REST_TOKEN')}`,
+      'Content-Type': 'application/json',
     },
-    body: JSON.stringify(command),
+    body: JSON.stringify(cmd),
   });
 
-  const data = await response.json();
+  const j = await r.json();
 
-  if (!response.ok || data.error) {
-    throw new Error(data.error || `Upstash HTTP ${response.status}`);
+  if (!r.ok || j.error) {
+    throw new Error(j.error || `Upstash ${r.status}`);
   }
 
-  return data.result;
+  return j.result;
 }
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let raw = "";
+async function body(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
 
-    req.on("data", (chunk) => {
-      raw += chunk;
-    });
+  return await new Promise((ok, ko) => {
+    let s = '';
 
-    req.on("end", () => {
-      if (!raw) {
-        resolve({});
-        return;
-      }
-
+    req.on('data', (c) => (s += c));
+    req.on('end', () => {
       try {
-        resolve(JSON.parse(raw));
-      } catch (error) {
-        reject(new Error("JSON body invalide"));
+        ok(s ? JSON.parse(s) : {});
+      } catch (e) {
+        ko(e);
       }
     });
-
-    req.on("error", reject);
+    req.on('error', ko);
   });
 }
 
-function normalizeRank(value) {
-  if (value === null || value === undefined || value === "") return null;
+function id(x) {
+  x = String(x || '').trim();
+  if (/^\d+$/.test(x)) return x;
 
-  const number = Number(String(value).replace(",", "."));
+  const m =
+    x.match(/#id:(\d+)/) ||
+    x.match(/\/event\/(\d+)/) ||
+    x.match(/\/(\d+)(?:[/?#]|$)/);
 
-  if (!Number.isFinite(number) || number < 1) {
-    return null;
-  }
-
-  return number;
+  return m ? m[1] : x;
 }
 
-function normalizeSkip(value) {
-  const number = Number(value || 0);
+function rank(x) {
+  if (x === undefined || x === null || x === '') return null;
 
-  if (!Number.isFinite(number) || number < 0) return 0;
-
-  return Math.min(5, Math.floor(number));
+  x = Number(String(x).replace(',', '.'));
+  return Number.isFinite(x) && x >= 1 ? x : null;
 }
 
-function extractMatchId(input) {
-  const value = String(input || "").trim();
-
-  if (/^\d+$/.test(value)) return value;
-
-  const found =
-    value.match(/#id:(\d+)/) ||
-    value.match(/\/event\/(\d+)/) ||
-    value.match(/\/(\d+)(?:[/?#]|$)/);
-
-  return found ? found[1] : value;
+function skip(x) {
+  x = Number(x || 0);
+  return Number.isFinite(x) ? Math.max(0, Math.min(5, Math.floor(x))) : 0;
 }
 
-module.exports = async function handler(req, res) {
-  res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
+function bool(x) {
+  return x === true || x === 'true' || x === 1 || x === '1';
+}
+
+module.exports = async function (req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
   try {
-    if (req.method === "GET") {
+    if (req.method === 'GET') {
       const jobId = req.query.jobId;
 
       if (!jobId) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "jobId manquant" }));
-        return;
+        return res.end(JSON.stringify({ error: 'jobId manquant' }));
       }
 
-      const raw = await redisCommand(["GET", `${SCAN_JOB_PREFIX}${jobId}`]);
+      const raw = await redis(['GET', P + jobId]);
 
       if (!raw) {
         res.statusCode = 404;
-        res.end(JSON.stringify({ error: "Job introuvable ou expiré" }));
-        return;
+        return res.end(JSON.stringify({ error: 'Job introuvable ou expiré' }));
       }
 
-      res.statusCode = 200;
-      res.end(raw);
-      return;
+      return res.end(raw);
     }
 
-    if (req.method !== "POST") {
+    if (req.method !== 'POST') {
       res.statusCode = 405;
-      res.end(JSON.stringify({ error: "Méthode non autorisée" }));
-      return;
+      return res.end(JSON.stringify({ error: 'Méthode non autorisée' }));
     }
 
-    const body = await readBody(req);
+    const b = await body(req);
+    const matchId = id(b.matchId || b.url || b.match);
+    const rank1 = rank(b.rank1);
+    const rank2 = rank(b.rank2);
+    const simultaneousMode = bool(b.simultaneousMode);
 
-    const matchId = extractMatchId(body.matchId || body.url || body.match || "");
-    const rank1 = normalizeRank(body.rank1);
-    const rank2 = normalizeRank(body.rank2);
-    const skipHome = normalizeSkip(body.skipHome);
-    const skipAway = normalizeSkip(body.skipAway);
-
-    if (!matchId || !/^\d+$/.test(matchId)) {
+    if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
-      res.end(JSON.stringify({ error: "Match ID ou URL SofaScore invalide" }));
-      return;
+      return res.end(JSON.stringify({ error: 'Match ID ou URL invalide' }));
     }
 
     if (!rank1) {
       res.statusCode = 400;
-      res.end(JSON.stringify({ error: "Rang 1 invalide" }));
-      return;
+      return res.end(JSON.stringify({ error: 'Rang 1 invalide' }));
     }
 
-    if (body.rank2 !== undefined && body.rank2 !== "" && !rank2) {
+    if (b.rank2 !== undefined && b.rank2 !== '' && !rank2) {
       res.statusCode = 400;
-      res.end(JSON.stringify({ error: "Rang 2 invalide" }));
-      return;
+      return res.end(JSON.stringify({ error: 'Rang 2 invalide' }));
     }
 
-    const jobId = crypto.randomBytes(12).toString("hex");
+    const jid = crypto.randomBytes(12).toString('hex');
     const now = Math.floor(Date.now() / 1000);
 
     const job = {
-      id: jobId,
-      status: "queued",
-      message: "Scan ajouté à la file d’attente.",
+      id: jid,
+      status: 'queued',
+      message: 'Scan ajouté à la file.',
       progress: 0,
       createdAt: now,
       updatedAt: now,
@@ -167,25 +138,18 @@ module.exports = async function handler(req, res) {
         matchId,
         rank1,
         rank2,
-        skipHome,
-        skipAway,
+        skipHome: skip(b.skipHome),
+        skipAway: skip(b.skipAway),
+        simultaneousMode,
       },
     };
 
-    await redisCommand([
-      "SET",
-      `${SCAN_JOB_PREFIX}${jobId}`,
-      JSON.stringify(job),
-      "EX",
-      String(JOB_TTL_SECONDS),
-    ]);
+    await redis(['SET', P + jid, JSON.stringify(job), 'EX', String(TTL)]);
+    await redis(['LPUSH', Q, jid]);
 
-    await redisCommand(["LPUSH", SCAN_QUEUE_KEY, jobId]);
-
-    res.statusCode = 200;
-    res.end(JSON.stringify(job));
-  } catch (error) {
+    return res.end(JSON.stringify(job));
+  } catch (e) {
     res.statusCode = 500;
-    res.end(JSON.stringify({ error: error.message || String(error) }));
+    return res.end(JSON.stringify({ error: e.message || String(e) }));
   }
 };
