@@ -633,51 +633,152 @@ def annotate_rank_source(event, event_index, cumulative_start, cumulative_end, t
 
 
 def value_at_rank(events, rank):
+    """Performance exacte au rang demandé.
+
+    Important: le rang n'est plus arrondi ni ramené au dernier .0/.5.
+    Chaque événement avance de RANK_EVENT_STEP (7.25/8). On convertit donc
+    le rang demandé en position exacte dans la liste d'événements, puis on
+    interpole entre les deux événements autour de cette position.
+
+    Exemple avec RANK_EVENT_STEP = 0.90625:
+    - rang = 30.0000  -> position événement = 33.103448...
+    - résultat = 89.6552% de l'événement #33 + 10.3448% de l'événement #34
+
+    Ainsi, la performance finale peut être une valeur exacte comme 0.1379,
+    et plus seulement une valeur brute du barème (-1, -0.5, 0, +0.5, +1...).
+    """
     if rank is None or rank <= 0:
-        return {"value": None, "sources": [], "rankMode": "quantity"}
+        return {"value": None, "sources": [], "rankMode": "quantity_exact"}
 
     try:
         target_rank = float(rank)
     except Exception:
-        return {"value": None, "sources": [], "rankMode": "quantity"}
+        return {"value": None, "sources": [], "rankMode": "quantity_exact"}
 
     if target_rank <= 0:
-        return {"value": None, "sources": [], "rankMode": "quantity"}
+        return {"value": None, "sources": [], "rankMode": "quantity_exact"}
 
-    cumulative = 0.0
+    clean_events = [event for event in (events or []) if event_rank_quantity(event) > 0]
 
-    for event_index, event in enumerate(events or []):
-        quantity = event_rank_quantity(event)
+    if not clean_events:
+        return {
+            "value": None,
+            "sources": [],
+            "rankMode": "quantity_exact",
+            "targetRank": target_rank,
+            "totalQuantity": 0,
+        }
 
-        if quantity <= 0:
-            continue
+    step = RANK_EVENT_STEP
+    total_quantity = len(clean_events) * step
 
-        cumulative_start = cumulative
-        cumulative_end = cumulative + quantity
+    if target_rank > total_quantity + 1e-9:
+        return {
+            "value": None,
+            "sources": [],
+            "rankMode": "quantity_exact",
+            "targetRank": target_rank,
+            "totalQuantity": round(total_quantity, 6),
+        }
 
-        # L'événement couvre l'intervalle (cumulative_start, cumulative_end].
-        # Chaque événement couvre 7.25 / 8 rang, quelle que soit sa valeur de barème.
-        if target_rank <= cumulative_end + 1e-9 and target_rank > cumulative_start + 1e-9:
-            source = annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank)
+    exact_position = target_rank / step
 
+    # Si le rang tombe exactement sur la borne d'un événement, on prend cet événement.
+    nearest_integer = round(exact_position)
+
+    if nearest_integer >= 1 and abs(exact_position - nearest_integer) < 1e-9:
+        event_index = int(nearest_integer) - 1
+
+        if event_index < 0 or event_index >= len(clean_events):
             return {
-                "value": float(source.get("value", 0)),
-                "sources": [source],
-                "rankMode": "quantity",
+                "value": None,
+                "sources": [],
+                "rankMode": "quantity_exact",
                 "targetRank": target_rank,
-                "totalQuantity": round(total_rank_quantity(events), 4),
+                "exactPosition": exact_position,
+                "totalQuantity": round(total_quantity, 6),
             }
 
-        cumulative = cumulative_end
+        cumulative_start = event_index * step
+        cumulative_end = cumulative_start + step
+        source = annotate_rank_source(clean_events[event_index], event_index, cumulative_start, cumulative_end, target_rank)
+        source["rankIndexExact"] = exact_position
+        source["exactPosition"] = exact_position
+        source["weight"] = 1
+
+        return {
+            "value": float(source.get("value", 0)),
+            "sources": [source],
+            "rankMode": "quantity_exact",
+            "targetRank": target_rank,
+            "exactPosition": exact_position,
+            "totalQuantity": round(total_quantity, 6),
+        }
+
+    lower_rank_index = math.floor(exact_position)
+    fraction = exact_position - lower_rank_index
+
+    # Si la position est avant le premier événement complet, on utilise le premier événement.
+    if lower_rank_index < 1:
+        source = annotate_rank_source(clean_events[0], 0, 0, step, target_rank)
+        source["rankIndexExact"] = exact_position
+        source["exactPosition"] = exact_position
+        source["weight"] = 1
+
+        return {
+            "value": float(source.get("value", 0)),
+            "sources": [source],
+            "rankMode": "quantity_exact",
+            "targetRank": target_rank,
+            "exactPosition": exact_position,
+            "totalQuantity": round(total_quantity, 6),
+        }
+
+    lower_index = lower_rank_index - 1
+    upper_index = lower_rank_index
+
+    if lower_index < 0 or upper_index >= len(clean_events):
+        return {
+            "value": None,
+            "sources": [],
+            "rankMode": "quantity_exact",
+            "targetRank": target_rank,
+            "exactPosition": exact_position,
+            "totalQuantity": round(total_quantity, 6),
+        }
+
+    lower_weight = 1 - fraction
+    upper_weight = fraction
+
+    lower_start = lower_index * step
+    lower_end = lower_start + step
+    upper_start = upper_index * step
+    upper_end = upper_start + step
+
+    lower_source = annotate_rank_source(clean_events[lower_index], lower_index, lower_start, lower_end, target_rank)
+    upper_source = annotate_rank_source(clean_events[upper_index], upper_index, upper_start, upper_end, target_rank)
+
+    lower_source["rankIndexExact"] = exact_position
+    lower_source["exactPosition"] = exact_position
+    lower_source["weight"] = round(lower_weight, 8)
+
+    upper_source["rankIndexExact"] = exact_position
+    upper_source["exactPosition"] = exact_position
+    upper_source["weight"] = round(upper_weight, 8)
+
+    value = (
+        float(lower_source.get("value", 0)) * lower_weight +
+        float(upper_source.get("value", 0)) * upper_weight
+    )
 
     return {
-        "value": None,
-        "sources": [],
-        "rankMode": "quantity",
+        "value": float(value),
+        "sources": [lower_source, upper_source],
+        "rankMode": "quantity_exact",
         "targetRank": target_rank,
-        "totalQuantity": round(cumulative, 4),
+        "exactPosition": exact_position,
+        "totalQuantity": round(total_quantity, 6),
     }
-
 
 def event_intersects_rank_zone(cumulative_start, cumulative_end, low_rank, high_rank):
     # Chaque événement couvre (start, end]. Il est dans la zone s'il touche
