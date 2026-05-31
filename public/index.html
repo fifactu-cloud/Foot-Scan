@@ -1452,10 +1452,10 @@
             <div>
               <div class="auto-title">Calcul automatique des rangs</div>
               <div class="auto-sub">
-                Base libre · valeurs en X.5 acceptées · limites × 22 · marge (20/9) × changements · rouge direct = −1 × curseur, appliqué aux deux rangs.
+                Base libre · valeurs en X.5 acceptées · limites × 19,9375 · marge 0,90625 × changements · rouge direct = −0,90625 × curseur, appliqué aux deux rangs.
               </div>
             </div>
-            <div class="auto-badge">Base 0 → 1000</div>
+            <div class="auto-badge">Base libre</div>
           </div>
 
           <div class="auto-body">
@@ -1463,9 +1463,9 @@
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Base</div>
-                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.01" value="19" />
+                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="16.3125" />
                 </div>
-                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.01" value="19" />
+                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="16.3125" />
               </div>
 
               <div class="auto-control">
@@ -1496,12 +1496,12 @@
             <div class="auto-result">
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang bas</div>
-                <div class="auto-result-value" id="autoLow">100.3333</div>
+                <div class="auto-result-value" id="autoLow">93.3438</div>
               </div>
 
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang haut</div>
-                <div class="auto-result-value" id="autoHigh">113.6667</div>
+                <div class="auto-result-value" id="autoHigh">98.7813</div>
               </div>
             </div>
 
@@ -1748,16 +1748,16 @@
     function calculateRanksFromValues(values) {
       const { base, offensive, changes, reds } = values;
 
-      const offensiveBoost = offensive * 22;
+      const offensiveBoost = offensive * 19.9375;
       const adjustedBase = base + offensiveBoost;
 
-      const marginUnit = 20 / 9;
+      const marginUnit = 0.90625;
       const marginFinal = marginUnit * changes;
 
       const lowBeforeCards = adjustedBase - marginFinal;
       const highBeforeCards = adjustedBase + marginFinal;
 
-      const redEffect = -1 * reds;
+      const redEffect = -0.90625 * reds;
       const totalCardEffect = redEffect;
 
       const low = lowBeforeCards + totalCardEffect;
@@ -1799,11 +1799,11 @@
     function formulaTextForCalc(calc) {
       return (
         `Base : ${formatRank(calc.base)} · ` +
-        `limites : ${calc.offensive} × 22 = ${formatRank(calc.offensiveBoost)} · ` +
+        `limites : ${calc.offensive} × 19.9375 = ${formatRank(calc.offensiveBoost)} · ` +
         `base corrigée : ${formatRank(calc.adjustedBase)} · ` +
-        `marge : (20/9) × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
+        `marge : 0.90625 × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
         `avant rouge : ${formatRank(calc.lowBeforeCards)} / ${formatRank(calc.highBeforeCards)} · ` +
-        `rouges directs : -1 × ${calc.reds} = ${formatValue(calc.redEffect)} · ` +
+        `rouges directs : -0.90625 × ${calc.reds} = ${formatValue(calc.redEffect)} · ` +
         `rouges appliqués aux deux rangs · ` +
         `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
       );
@@ -2139,7 +2139,7 @@
             <div class="stat-header">
               <div>
                 <div class="stat-title">🌐 Zone collective simultanée</div>
-                <div class="stat-subtitle">Décompte général des deux historiques. Les rangs restent ceux indiqués et chaque événement avance de 7.25 / 8. Cette zone n’est attribuée à aucun camp.</div>
+                <div class="stat-subtitle">Décompte général des deux historiques. Pour cette moyenne globale uniquement, les rangs sont divisés par 2. Chaque événement avance de 7.25 / 8. Cette zone n’est attribuée à aucun camp.</div>
               </div>
               <div class="stat-badge">Global</div>
             </div>
@@ -2163,7 +2163,7 @@
             <div>
               <div class="stat-title">🌐 Zone collective simultanée</div>
               <div class="stat-subtitle">
-                Moyenne globale = décompte général ${esc(homeName)} + ${esc(awayName)} + leurs adversaires passés · rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · avancement total ${esc(formatRank(stats.totalQuantity || 0))}.
+                Moyenne globale = décompte général ${esc(homeName)} + ${esc(awayName)} + leurs adversaires passés · rangs utilisés ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} après division par 2 · ${esc(stats.count)} événements · avancement total ${esc(formatRank(stats.totalQuantity || 0))}.
               </div>
             </div>
             <div class="stat-badge">Global</div>
@@ -2178,7 +2178,7 @@
             <div class="stat-card">
               <div class="stat-kicker">Appartenance</div>
               <div class="mode-main">Aucun camp</div>
-              <div class="mode-detail">Calculée sur la liste collective complète, avec les rangs indiqués. Chaque événement avance de 7.25 / 8. Elle n’appartient à aucun camp.</div>
+              <div class="mode-detail">Calculée sur la liste collective complète. Pour cette moyenne globale uniquement, les rangs indiqués sont divisés par 2. Chaque événement avance de 7.25 / 8. Elle n’appartient à aucun camp.</div>
             </div>
 
             <div class="stat-card wide">
@@ -2590,7 +2590,7 @@
         return "zone collective: —";
       }
 
-      return `zone collective moyenne globale: ${formatValue(stats.average)} · plus présent global: ${zoneModeText(stats)} · rangs ${stats.startRankIndex}-${stats.endRankIndex} · avancement ${formatRank(stats.totalQuantity || 0)}`;
+      return `zone collective moyenne globale: ${formatValue(stats.average)} · plus présent global: ${zoneModeText(stats)} · rangs divisés par 2 ${stats.startRankIndex}-${stats.endRankIndex} · avancement ${formatRank(stats.totalQuantity || 0)}`;
     }
 
     function overallZoneStatsLines(result) {
@@ -2612,9 +2612,9 @@
 
       return [
         "ZONE COLLECTIVE SIMULTANÉE",
-        `Performance moyenne globale (${homeName} + ${awayName} + adversaires passés, rangs indiqués) : ${formatValue(stats.average)}`,
+        `Performance moyenne globale (${homeName} + ${awayName} + adversaires passés, rangs divisés par 2) : ${formatValue(stats.average)}`,
         `Performance la plus présente globale : ${zoneModeText(stats)}`,
-        `Zone globale : rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} événements, avancement ${formatRank(stats.totalQuantity || 0)}, pas de division par 2)`,
+        `Zone globale : rang ${stats.startRankIndex} à ${stats.endRankIndex} après division par 2 (${stats.count} événements, avancement ${formatRank(stats.totalQuantity || 0)})`,
       ];
     }
 
@@ -2626,7 +2626,7 @@
         return `zone ${teamName}: —`;
       }
 
-      return `zone ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · rangs ${stats.startRankIndex}-${stats.endRankIndex} · avancement ${formatRank(stats.totalQuantity || 0)}`;
+      return `zone ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · rangs divisés par 2 ${stats.startRankIndex}-${stats.endRankIndex} · avancement ${formatRank(stats.totalQuantity || 0)}`;
     }
 
     function zoneStatsLines(team) {
@@ -2660,7 +2660,7 @@
         `Limites offensives : ${calc.offensive}`,
         `Changements : ${calc.changes}`,
         `Rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`,
-        `Impact rouge direct : -1 × ${calc.reds} = ${formatValue(calc.redEffect)}`,
+        `Impact rouge direct : -0.90625 × ${calc.reds} = ${formatValue(calc.redEffect)}`,
         `Rouge appliqué aux deux rangs : ${formatValue(calc.totalCardEffect)}`,
         `Rang bas calculé : ${formatRank(calc.low)}`,
         `Rang haut calculé : ${formatRank(calc.high)}`,
