@@ -1953,11 +1953,13 @@
       }
 
       const stats = result?.overallZoneStats;
+      const homeName = result?.home?.name || "domicile";
+      const awayName = result?.away?.name || "extérieur";
 
       if (!stats || !stats.count) {
         return `
           <div class="dominance-box">
-            <div class="dominance-label">Zone d'ensemble simultané</div>
+            <div class="dominance-label">Zone collective simultanée</div>
             <div class="dominance-team">Indisponible</div>
             <div class="dominance-meta">Aucune donnée commune disponible entre les rangs.</div>
           </div>
@@ -1966,11 +1968,11 @@
 
       return `
         <div class="dominance-box">
-          <div class="dominance-label">Zone d'ensemble simultané</div>
+          <div class="dominance-label">Zone collective simultanée</div>
           <div class="dominance-team">${esc(formatValue(stats.average))}</div>
           <div class="dominance-meta">
-            Moyenne zone ensemble · #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements<br>
-            Plus présente : ${esc(zoneModeText(stats))}
+            Moyenne globale ${esc(homeName)} + ${esc(awayName)} · #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements<br>
+            Plus présent global : ${esc(zoneModeText(stats))}
           </div>
         </div>
       `;
@@ -2063,15 +2065,29 @@
     }
 
 
+    function originText(item) {
+      const origins = item?.origins || [];
+
+      if (!origins.length) {
+        return "";
+      }
+
+      if (origins.length === 1) {
+        return ` · origine: ${origins[0].label}`;
+      }
+
+      return ` · origines: ${origins.map((origin) => `${origin.label} ×${origin.count}`).join(", ")}`;
+    }
+
     function modeItemText(item) {
       const icon = item?.icon || ICONS[item?.type] || "•";
       const label = item?.label || LABELS[item?.type] || item?.type || "Événement";
-      const side = item?.sideLabel || sideText(item);
+      const target = item?.targetLabel || (item?.sideLabel ? String(item.sideLabel).replace(/^attribué à\s+/i, "") : sideText(item));
       const value = formatValue(item?.value);
       const count = Number(item?.count || 0);
       const suffix = count > 0 ? ` ×${count}` : "";
 
-      return `${icon} ${label} — ${side} · ${value}${suffix}`;
+      return `${icon} ${label} attribué à ${target} · ${value}${suffix}${originText(item)}`;
     }
 
     function zoneModeText(stats) {
@@ -2095,18 +2111,19 @@
 
     function renderZoneStats(team) {
       const stats = team?.zoneStats;
+      const teamName = team?.name || "équipe";
 
       if (!stats || !stats.count) {
         return `
           <div class="section">
-            <div class="section-title">Zone entre les rangs</div>
+            <div class="section-title">Zone attribuée à ${esc(teamName)}</div>
             <div class="mini-values">
               <div class="mini-badge">
-                <span>Moyenne zone</span>
+                <span>Moyenne zone ${esc(teamName)}</span>
                 <strong class="neutral">—</strong>
               </div>
               <div class="mini-badge">
-                <span>Plus présente</span>
+                <span>Plus présent ${esc(teamName)}</span>
                 <strong class="neutral">—</strong>
               </div>
             </div>
@@ -2117,18 +2134,18 @@
       return `
         <div class="section">
           <div class="section-title">
-            Zone entre les rangs
+            Zone attribuée à ${esc(teamName)}
             <span class="count-pill">#${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements</span>
           </div>
 
           <div class="mini-values">
             <div class="mini-badge">
-              <span>Moyenne zone</span>
+              <span>Moyenne zone ${esc(teamName)}</span>
               <strong class="${valueClass(stats.average)}">${esc(formatValue(stats.average))}</strong>
             </div>
 
             <div class="mini-badge">
-              <span>Plus présente</span>
+              <span>Plus présent ${esc(teamName)}</span>
               <strong class="neutral">${esc(zoneModeText(stats))}</strong>
             </div>
           </div>
@@ -2260,7 +2277,7 @@
         const rankIndex = source.rankIndex ? `#${source.rankIndex} · ` : "";
 
         lines.push(
-          `- ${rankIndex}${eventIcon(source)} ${source.minuteLabel} · ${source.side === "team" ? "Équipe analysée" : "Adversaire"} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
+          `- ${rankIndex}${eventIcon(source)} ${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
         );
       }
 
@@ -2276,10 +2293,10 @@
       const stats = result?.overallZoneStats;
 
       if (!stats || !stats.count) {
-        return "zone ensemble: —";
+        return "zone collective: —";
       }
 
-      return `zone ensemble moyenne: ${formatValue(stats.average)} · plus présente: ${zoneModeText(stats)} · #${stats.startRankIndex}-${stats.endRankIndex}`;
+      return `zone collective moyenne globale: ${formatValue(stats.average)} · plus présent global: ${zoneModeText(stats)} · #${stats.startRankIndex}-${stats.endRankIndex}`;
     }
 
     function overallZoneStatsLines(result) {
@@ -2288,46 +2305,50 @@
       }
 
       const stats = result?.overallZoneStats;
+      const homeName = result?.home?.name || "domicile";
+      const awayName = result?.away?.name || "extérieur";
 
       if (!stats || !stats.count) {
         return [
-          "ZONE ENSEMBLE SIMULTANÉ",
-          "Performance moyenne zone ensemble : —",
-          "Performance la plus présente zone ensemble : —",
+          "ZONE COLLECTIVE SIMULTANÉE",
+          "Performance moyenne globale : —",
+          "Performance la plus présente globale : —",
         ];
       }
 
       return [
-        "ZONE ENSEMBLE SIMULTANÉ",
-        `Performance moyenne zone ensemble : ${formatValue(stats.average)}`,
-        `Performance la plus présente zone ensemble : ${zoneModeText(stats)}`,
+        "ZONE COLLECTIVE SIMULTANÉE",
+        `Performance moyenne globale (${homeName} + ${awayName}) : ${formatValue(stats.average)}`,
+        `Performance la plus présente globale : ${zoneModeText(stats)}`,
         `Zone incluse : rang #${stats.startRankIndex} à #${stats.endRankIndex} (${stats.count} événements, rangs finaux inclus)`,
       ];
     }
 
     function zoneStatsCompactText(team) {
       const stats = team?.zoneStats;
+      const teamName = team?.name || "équipe";
 
       if (!stats || !stats.count) {
-        return "zone: —";
+        return `zone ${teamName}: —`;
       }
 
-      return `zone moyenne: ${formatValue(stats.average)} · plus présente: ${zoneModeText(stats)} · #${stats.startRankIndex}-${stats.endRankIndex}`;
+      return `zone ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · #${stats.startRankIndex}-${stats.endRankIndex}`;
     }
 
     function zoneStatsLines(team) {
       const stats = team?.zoneStats;
+      const teamName = team?.name || "équipe";
 
       if (!stats || !stats.count) {
         return [
-          "Performance moyenne zone entre les rangs : —",
-          "Performance la plus présente zone entre les rangs : —",
+          `Performance moyenne zone attribuée à ${teamName} : —`,
+          `Performance la plus présente zone attribuée à ${teamName} : —`,
         ];
       }
 
       return [
-        `Performance moyenne zone entre les rangs : ${formatValue(stats.average)}`,
-        `Performance la plus présente zone entre les rangs : ${zoneModeText(stats)}`,
+        `Performance moyenne zone attribuée à ${teamName} : ${formatValue(stats.average)}`,
+        `Performance la plus présente zone attribuée à ${teamName} : ${zoneModeText(stats)}`,
         `Zone incluse : rang #${stats.startRankIndex} à #${stats.endRankIndex} (${stats.count} événements, rangs finaux inclus)`,
       ];
     }
