@@ -573,7 +573,15 @@ def value_at_rank(events, rank):
 
 
 
-def zone_stats_between_ranks(events, rank1, rank2=None):
+
+def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
+    """Calcule les stats entre deux rangs, rangs finaux inclus.
+
+    group_mode="target" : groupe par événement + équipe attribuée + valeur.
+      -> utile pour une zone d'équipe.
+    group_mode="global" : groupe seulement par événement + valeur.
+      -> utile pour la zone collective simultanée, qui n'appartient à aucun camp.
+    """
     empty = {
         "average": None,
         "modeValues": [],
@@ -582,6 +590,7 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
         "count": 0,
         "startRankIndex": None,
         "endRankIndex": None,
+        "groupMode": group_mode,
     }
 
     if not events or not rank1:
@@ -647,7 +656,14 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
         event_type = event.get("type") or "unknown"
         target = target_label(event)
         origin = origin_label(event)
-        key = f"{event_type}|{target}|{value:.4f}"
+
+        if group_mode == "global":
+            # La zone collective n'appartient à personne : on regroupe l'événement
+            # le plus fréquent toutes équipes attribuées confondues.
+            key = f"{event_type}|{value:.4f}"
+        else:
+            # La zone d'une équipe reste attribuée à cette équipe.
+            key = f"{event_type}|{target}|{value:.4f}"
 
         counts[key] = counts.get(key, 0) + 1
 
@@ -660,10 +676,18 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
                 "value": value,
                 "icon": event.get("icon") or "•",
                 "origins": {},
+                "targets": {},
+                "groupMode": group_mode,
+                "isGlobal": group_mode == "global",
             }
 
         origins = examples[key].setdefault("origins", {})
         origins[origin] = origins.get(origin, 0) + 1
+
+        targets = examples[key].setdefault("targets", {})
+        target_bucket = targets.setdefault(target, {"count": 0, "origins": {}})
+        target_bucket["count"] += 1
+        target_bucket["origins"][origin] = target_bucket["origins"].get(origin, 0) + 1
 
     if not values:
         result = dict(empty)
@@ -680,6 +704,7 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
 
         item = dict(examples[key])
         item["count"] = count
+
         origins_dict = item.get("origins") or {}
         item["origins"] = [
             {"label": label, "count": origin_count}
@@ -688,13 +713,35 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
                 key=lambda pair: (-pair[1], pair[0]),
             )
         ]
+
+        targets_dict = item.get("targets") or {}
+        target_breakdown = []
+
+        for label, info in sorted(
+            targets_dict.items(),
+            key=lambda pair: (-pair[1].get("count", 0), pair[0]),
+        ):
+            origin_items = [
+                {"label": origin_label_value, "count": origin_count}
+                for origin_label_value, origin_count in sorted(
+                    (info.get("origins") or {}).items(),
+                    key=lambda pair: (-pair[1], pair[0]),
+                )
+            ]
+            target_breakdown.append({
+                "label": label,
+                "count": info.get("count", 0),
+                "origins": origin_items,
+            })
+
+        item["targetBreakdown"] = target_breakdown
         mode_items.append(item)
 
     mode_items.sort(key=lambda item: (
         -item.get("count", 0),
-        str(item.get("targetLabel", "")),
         str(item.get("label", "")),
         float(item.get("value", 0)),
+        str(item.get("targetLabel", "")),
     ))
 
     mode_values = sorted({round(float(item["value"]), 4) for item in mode_items})
@@ -707,6 +754,7 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
         "count": len(values),
         "startRankIndex": start_rank_index,
         "endRankIndex": end_rank_index,
+        "groupMode": group_mode,
     }
 
 def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span):
@@ -1020,9 +1068,21 @@ def process_scan_job(job_id):
 
     max_needed = int(max(ranks) + 0.999999)
 
+    # En mode simultané, chaque performance attribuée à une équipe est construite
+    # avec deux historiques :
+    # - le passé direct de cette équipe ;
+    # - l'adversaire passé de l'autre équipe.
+    #
+    # Si on ne récupère que "max_needed" événements bruts par équipe, il peut
+    # manquer des événements après réattribution, car tous les événements bruts ne
+    # finissent pas dans la même liste attribuée. On récupère donc plus large en
+    # simultané, puis on reclasse seulement après.
+    scan_fetch_needed = max_needed * 2 if simultaneous_mode else max_needed
+
     print(
         f"Scan complet: job={job_id} match={match_id} "
-        f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} simultaneous={simultaneous_mode}"
+        f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
+        f"objectif brut={scan_fetch_needed} simultaneous={simultaneous_mode}"
     )
 
     try:
@@ -1048,7 +1108,7 @@ def process_scan_job(job_id):
             job_id,
             home_team["id"],
             skip_home,
-            max_needed,
+            scan_fetch_needed,
             home_team.get("name") or "Domicile",
             12,
             40,
@@ -1058,7 +1118,7 @@ def process_scan_job(job_id):
             job_id,
             away_team["id"],
             skip_away,
-            max_needed,
+            scan_fetch_needed,
             away_team.get("name") or "Extérieur",
             54,
             40,
@@ -1112,7 +1172,7 @@ def process_scan_job(job_id):
             "rank2": effective_rank2,
             "simultaneousMode": simultaneous_mode,
             "scanModeLabel": "Simultané lié: rangs ×2, match par match / minute par minute" if simultaneous_mode else "Standard",
-            "overallZoneStats": zone_stats_between_ranks(simultaneous_combined_events, effective_rank1, effective_rank2) if simultaneous_mode else None,
+            "overallZoneStats": zone_stats_between_ranks(simultaneous_combined_events, effective_rank1, effective_rank2, group_mode="global") if simultaneous_mode else None,
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
                 "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
