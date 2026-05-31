@@ -879,6 +879,179 @@
       line-height: 1.35;
     }
 
+    .focus-box,
+    .collective-box,
+    .zone-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .focus-box::before,
+    .collective-box::before,
+    .zone-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at top right, rgba(34, 197, 94, 0.16), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(56, 189, 248, 0.08), transparent 42%);
+      opacity: 0.9;
+    }
+
+    .focus-box > *,
+    .collective-box > *,
+    .zone-card > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .collective-box {
+      margin: 12px 14px;
+      padding: 15px;
+      border-radius: 18px;
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      background:
+        linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(34, 197, 94, 0.07)),
+        #111827;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 45px rgba(0,0,0,0.28);
+    }
+
+    .stat-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .stat-title {
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 1000;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+    }
+
+    .stat-subtitle {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .stat-badge {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: var(--soft);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    @media (max-width: 620px) {
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stat-card {
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.20);
+      border: 1px solid rgba(255,255,255,0.11);
+    }
+
+    .stat-card.wide {
+      grid-column: 1 / -1;
+    }
+
+    .stat-kicker {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    .stat-number {
+      font-size: 33px;
+      font-weight: 1000;
+      line-height: 1;
+      letter-spacing: -0.07em;
+    }
+
+    .mode-stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .mode-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px;
+      border-radius: 13px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.09);
+    }
+
+    .mode-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      display: grid;
+      place-items: center;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.11);
+      font-size: 18px;
+    }
+
+    .mode-main {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 950;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .mode-detail {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .zone-card {
+      margin: 0;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02)),
+        #111111;
+    }
+
+    .team-card .zone-card {
+      margin: 14px;
+    }
+
     .summary-grid,
     .rank-grid {
       display: grid;
@@ -1958,21 +2131,56 @@
 
       if (!stats || !stats.count) {
         return `
-          <div class="dominance-box">
-            <div class="dominance-label">Zone collective simultanée</div>
-            <div class="dominance-team">Indisponible</div>
-            <div class="dominance-meta">Aucune donnée commune disponible entre les rangs.</div>
+          <div class="collective-box">
+            <div class="stat-header">
+              <div>
+                <div class="stat-title">🌐 Zone collective simultanée</div>
+                <div class="stat-subtitle">Moyenne globale ${esc(homeName)} + ${esc(awayName)}. Cette zone n’est attribuée à aucun camp.</div>
+              </div>
+              <div class="stat-badge">Global</div>
+            </div>
+            <div class="stat-grid">
+              <div class="stat-card">
+                <div class="stat-kicker">Moyenne globale</div>
+                <div class="stat-number neutral">—</div>
+              </div>
+              <div class="stat-card wide">
+                <div class="stat-kicker">Événement dominant global</div>
+                <div class="mode-detail">Aucune donnée commune disponible entre les rangs.</div>
+              </div>
+            </div>
           </div>
         `;
       }
 
       return `
-        <div class="dominance-box">
-          <div class="dominance-label">Zone collective simultanée</div>
-          <div class="dominance-team">${esc(formatValue(stats.average))}</div>
-          <div class="dominance-meta">
-            Moyenne globale ${esc(homeName)} + ${esc(awayName)} · #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements<br>
-            Plus présent global : ${esc(zoneModeText(stats))}
+        <div class="collective-box">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">🌐 Zone collective simultanée</div>
+              <div class="stat-subtitle">
+                Moyenne globale ${esc(homeName)} + ${esc(awayName)} · #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · rangs finaux inclus.
+              </div>
+            </div>
+            <div class="stat-badge">Global</div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-kicker">Moyenne globale</div>
+              <div class="stat-number ${valueClass(stats.average)}">${esc(formatValue(stats.average))}</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-kicker">Appartenance</div>
+              <div class="mode-main">Aucun camp</div>
+              <div class="mode-detail">Cette moyenne sert à lire la tendance collective, pas la domination d’une équipe.</div>
+            </div>
+
+            <div class="stat-card wide">
+              <div class="stat-kicker">Événement le plus présent global</div>
+              ${renderModeItems(stats, { global: true })}
+            </div>
           </div>
         </div>
       `;
@@ -2065,28 +2273,47 @@
     }
 
 
-    function originText(item) {
-      const origins = item?.origins || [];
-
-      if (!origins.length) {
+    function originsTextFromList(origins) {
+      if (!origins || !origins.length) {
         return "";
       }
 
-      if (origins.length === 1) {
-        return ` · origine: ${origins[0].label}`;
+      return origins.map((origin) => `${origin.label} ×${origin.count}`).join(", ");
+    }
+
+    function originText(item) {
+      const text = originsTextFromList(item?.origins || []);
+      return text ? ` · origines : ${text}` : "";
+    }
+
+    function targetBreakdownText(item) {
+      const breakdown = item?.targetBreakdown || [];
+
+      if (!breakdown.length) {
+        return "";
       }
 
-      return ` · origines: ${origins.map((origin) => `${origin.label} ×${origin.count}`).join(", ")}`;
+      return breakdown.map((target) => {
+        const originTextValue = originsTextFromList(target.origins || []);
+        return originTextValue
+          ? `${target.label} ×${target.count} (${originTextValue})`
+          : `${target.label} ×${target.count}`;
+      }).join(" · ");
     }
 
     function modeItemText(item) {
       const icon = item?.icon || ICONS[item?.type] || "•";
       const label = item?.label || LABELS[item?.type] || item?.type || "Événement";
-      const target = item?.targetLabel || (item?.sideLabel ? String(item.sideLabel).replace(/^attribué à\s+/i, "") : sideText(item));
       const value = formatValue(item?.value);
       const count = Number(item?.count || 0);
       const suffix = count > 0 ? ` ×${count}` : "";
 
+      if (item?.isGlobal || item?.groupMode === "global") {
+        const repartition = targetBreakdownText(item);
+        return `${icon} ${label} · ${value}${suffix}${repartition ? ` · répartition : ${repartition}` : ""}`;
+      }
+
+      const target = item?.targetLabel || (item?.sideLabel ? String(item.sideLabel).replace(/^attribué à\s+/i, "") : sideText(item));
       return `${icon} ${label} attribué à ${target} · ${value}${suffix}${originText(item)}`;
     }
 
@@ -2109,22 +2336,69 @@
       return count > 0 ? `${formatted} ×${count}` : formatted;
     }
 
+    function renderModeItems(stats, options = {}) {
+      const items = stats?.modeItems || [];
+      const global = Boolean(options.global);
+
+      if (!items.length) {
+        return `<div class="mode-detail">—</div>`;
+      }
+
+      return `
+        <div class="mode-stack">
+          ${items.map((item) => {
+            const icon = item?.icon || ICONS[item?.type] || "•";
+            const label = item?.label || LABELS[item?.type] || item?.type || "Événement";
+            const value = formatValue(item?.value);
+            const count = Number(item?.count || 0);
+            const target = item?.targetLabel || (item?.sideLabel ? String(item.sideLabel).replace(/^attribué à\s+/i, "") : sideText(item));
+            const repartition = targetBreakdownText(item);
+            const origins = originsTextFromList(item?.origins || []);
+
+            const main = global
+              ? `${label} · ${value} ×${count}`
+              : `${label} attribué à ${target} · ${value} ×${count}`;
+
+            const detail = global
+              ? (repartition ? `Répartition : ${repartition}` : "Global toutes équipes attribuées")
+              : (origins ? `Origines : ${origins}` : "Origine directe");
+
+            return `
+              <div class="mode-row">
+                <div class="mode-icon">${esc(icon)}</div>
+                <div>
+                  <div class="mode-main">${esc(main)}</div>
+                  <div class="mode-detail">${esc(detail)}</div>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
     function renderZoneStats(team) {
       const stats = team?.zoneStats;
       const teamName = team?.name || "équipe";
 
       if (!stats || !stats.count) {
         return `
-          <div class="section">
-            <div class="section-title">Zone attribuée à ${esc(teamName)}</div>
-            <div class="mini-values">
-              <div class="mini-badge">
-                <span>Moyenne zone ${esc(teamName)}</span>
-                <strong class="neutral">—</strong>
+          <div class="zone-card">
+            <div class="stat-header">
+              <div>
+                <div class="stat-title">Zone attribuée à ${esc(teamName)}</div>
+                <div class="stat-subtitle">Événements attribués à ${esc(teamName)} entre les deux rangs.</div>
               </div>
-              <div class="mini-badge">
-                <span>Plus présent ${esc(teamName)}</span>
-                <strong class="neutral">—</strong>
+              <div class="stat-badge">Équipe</div>
+            </div>
+            <div class="stat-grid">
+              <div class="stat-card">
+                <div class="stat-kicker">Moyenne zone</div>
+                <div class="stat-number neutral">—</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-kicker">Plus présent</div>
+                <div class="mode-detail">—</div>
               </div>
             </div>
           </div>
@@ -2132,21 +2406,24 @@
       }
 
       return `
-        <div class="section">
-          <div class="section-title">
-            Zone attribuée à ${esc(teamName)}
-            <span class="count-pill">#${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements</span>
+        <div class="zone-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Zone attribuée à ${esc(teamName)}</div>
+              <div class="stat-subtitle">Rangs #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · rangs finaux inclus.</div>
+            </div>
+            <div class="stat-badge">Équipe</div>
           </div>
 
-          <div class="mini-values">
-            <div class="mini-badge">
-              <span>Moyenne zone ${esc(teamName)}</span>
-              <strong class="${valueClass(stats.average)}">${esc(formatValue(stats.average))}</strong>
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-kicker">Moyenne ${esc(teamName)}</div>
+              <div class="stat-number ${valueClass(stats.average)}">${esc(formatValue(stats.average))}</div>
             </div>
 
-            <div class="mini-badge">
-              <span>Plus présent ${esc(teamName)}</span>
-              <strong class="neutral">${esc(zoneModeText(stats))}</strong>
+            <div class="stat-card wide">
+              <div class="stat-kicker">Événement le plus présent</div>
+              ${renderModeItems(stats, { global: false })}
             </div>
           </div>
         </div>
