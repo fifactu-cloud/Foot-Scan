@@ -1058,8 +1058,8 @@ def process_scan_job(job_id):
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = bool(params.get("simultaneousMode"))
 
-    effective_rank1 = rank1 * 2 if simultaneous_mode else rank1
-    effective_rank2 = rank2 * 2 if (simultaneous_mode and rank2 is not None) else rank2
+    effective_rank1 = rank1
+    effective_rank2 = rank2
 
     ranks = [effective_rank1]
 
@@ -1171,7 +1171,7 @@ def process_scan_job(job_id):
             "rank1": effective_rank1,
             "rank2": effective_rank2,
             "simultaneousMode": simultaneous_mode,
-            "scanModeLabel": "Simultané lié: rangs ×2, match par match / minute par minute" if simultaneous_mode else "Standard",
+            "scanModeLabel": "Simultané lié: mêmes rangs, match par match / minute par minute" if simultaneous_mode else "Standard",
             "overallZoneStats": zone_stats_between_ranks(simultaneous_combined_events, effective_rank1, effective_rank2, group_mode="global") if simultaneous_mode else None,
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
@@ -1270,7 +1270,7 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: scan complet côté worker activé.")
     print("Pages SofaScore: 2 pages activées.")
-    print("Mode simultané lié: rangs ×2, match par match, minute par minute.")
+    print("Mode simultané lié: mêmes rangs, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Calcul pondéré: X / X.125 / X.25 / X.375 / X.5 / X.625 / X.75 / X.875 activé.")
     print("Barème cartons: jaune, 2e jaune, rouge direct, rouge via 2e jaune activé.")
