@@ -757,6 +757,77 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
         "groupMode": group_mode,
     }
 
+
+def zone_events_between_ranks(events, rank1, rank2=None):
+    """Retourne les événements situés entre deux rangs, rangs finaux inclus.
+
+    Cette fonction sert surtout au mode simultané collectif :
+    la zone globale doit être la somme de la zone attribuée à l'équipe A
+    et de la zone attribuée à l'équipe B. Elle ne doit pas être calculée
+    sur une troisième liste commune avec ses propres indices, sinon le total
+    peut devenir inférieur à celui d'une seule équipe.
+    """
+    if not events or not rank1:
+        return [], None, None
+
+    try:
+        first_rank = float(rank1)
+        second_rank = float(rank2) if rank2 is not None else first_rank
+    except Exception:
+        return [], None, None
+
+    low_rank = min(first_rank, second_rank)
+    high_rank = max(first_rank, second_rank)
+
+    start_rank_index = max(1, int(math.floor(low_rank)))
+    end_rank_index = max(start_rank_index, int(math.ceil(high_rank)))
+
+    start_index = start_rank_index - 1
+    end_index = min(len(events), end_rank_index)
+
+    if start_index < 0 or start_index >= len(events) or start_index >= end_index:
+        return [], start_rank_index, end_rank_index
+
+    return list(events[start_index:end_index]), start_rank_index, end_rank_index
+
+
+def simultaneous_overall_zone_stats(home_events, away_events, rank1, rank2=None):
+    """Zone collective simultanée = zone équipe A + zone équipe B.
+
+    Important : on ne reprend pas les rangs sur la liste commune complète.
+    On prend d'abord la zone #bas → #haut dans chaque liste attribuée,
+    puis on additionne les deux zones pour calculer la moyenne globale
+    et l'événement le plus présent global.
+    """
+    home_zone, start_rank_index, end_rank_index = zone_events_between_ranks(home_events, rank1, rank2)
+    away_zone, start2, end2 = zone_events_between_ranks(away_events, rank1, rank2)
+
+    if start_rank_index is None:
+        start_rank_index = start2
+    if end_rank_index is None:
+        end_rank_index = end2
+
+    combined_zone = list(home_zone) + list(away_zone)
+
+    if not combined_zone:
+        result = zone_stats_between_ranks([], rank1, rank2, group_mode="global")
+        result["startRankIndex"] = start_rank_index
+        result["endRankIndex"] = end_rank_index
+        result["globalMethod"] = "home_zone_plus_away_zone"
+        result["homeZoneCount"] = 0
+        result["awayZoneCount"] = 0
+        return result
+
+    # La liste est déjà la zone exacte. On calcule donc les stats de 1 à N,
+    # puis on réaffiche les rangs d'origine pour l'utilisateur.
+    result = zone_stats_between_ranks(combined_zone, 1, len(combined_zone), group_mode="global")
+    result["startRankIndex"] = start_rank_index
+    result["endRankIndex"] = end_rank_index
+    result["globalMethod"] = "home_zone_plus_away_zone"
+    result["homeZoneCount"] = len(home_zone)
+    result["awayZoneCount"] = len(away_zone)
+    return result
+
 def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span):
     update_scan_job(
         job_id,
@@ -1172,7 +1243,7 @@ def process_scan_job(job_id):
             "rank2": effective_rank2,
             "simultaneousMode": simultaneous_mode,
             "scanModeLabel": "Simultané lié: mêmes rangs, match par match / minute par minute" if simultaneous_mode else "Standard",
-            "overallZoneStats": zone_stats_between_ranks(simultaneous_combined_events, effective_rank1, effective_rank2, group_mode="global") if simultaneous_mode else None,
+            "overallZoneStats": simultaneous_overall_zone_stats(home_scan["events"], away_scan["events"], effective_rank1, effective_rank2) if simultaneous_mode else None,
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
                 "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
