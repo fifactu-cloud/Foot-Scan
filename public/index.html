@@ -2180,11 +2180,12 @@
     function rankSourceText(source) {
       const index = source?.rankIndex ? `#${source.rankIndex}` : "";
 
-      if (source?.rankMode === "quantity" && source?.cumulativeEnd != null) {
+      if ((source?.rankMode === "quantity" || source?.rankMode === "quantity_exact") && source?.cumulativeEnd != null) {
         const start = formatRank(source.cumulativeStart || 0);
         const end = formatRank(source.cumulativeEnd);
         const quantity = source.rankQuantity != null ? ` · q ${formatRank(source.rankQuantity)}` : "";
-        return `${index ? `${index} · ` : ""}cumul ${start}→${end}${quantity} · `;
+        const exact = source.rankIndexExact != null ? ` · pos exacte ${formatRank(source.rankIndexExact)}` : "";
+        return `${index ? `${index} · ` : ""}cumul ${start}→${end}${quantity}${exact} · `;
       }
 
       return index ? `${index} · ` : "";
