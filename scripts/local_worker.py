@@ -588,61 +588,138 @@ def parse_incidents(incidents, match, analyzed_team_id):
     return events
 
 
+
+def event_rank_quantity(event):
+    """Quantité qui fait avancer le rang.
+
+    Ancienne logique: 1 événement = 1 rang.
+    Nouvelle logique: c'est la valeur absolue de la performance qui avance.
+    Exemple: jaune -0.25 => +0.25 vers le rang ; but+passe +1.5 => +1.5.
+    """
+    try:
+        quantity = abs(float((event or {}).get("value", 0)))
+    except Exception:
+        return 0.0
+
+    if not math.isfinite(quantity):
+        return 0.0
+
+    return max(0.0, quantity)
+
+
+def total_rank_quantity(events):
+    return sum(event_rank_quantity(event) for event in (events or []))
+
+
+def annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank):
+    source = dict(event)
+    source["rankIndex"] = event_index + 1
+    source["rankQuantity"] = round(event_rank_quantity(event), 4)
+    source["cumulativeStart"] = round(cumulative_start, 4)
+    source["cumulativeEnd"] = round(cumulative_end, 4)
+    source["rankTarget"] = round(float(target_rank), 4)
+    source["weight"] = 1
+    source["rankMode"] = "quantity"
+    return source
+
+
 def value_at_rank(events, rank):
-    if not rank or rank < 1:
-        return {"value": None, "sources": []}
+    if rank is None or rank <= 0:
+        return {"value": None, "sources": [], "rankMode": "quantity"}
 
-    rank = float(rank)
-    base_rank = int(rank)
-    fraction = round(rank - base_rank, 10)
+    try:
+        target_rank = float(rank)
+    except Exception:
+        return {"value": None, "sources": [], "rankMode": "quantity"}
 
-    lower_index = base_rank - 1
-    upper_index = lower_index + 1
+    if target_rank <= 0:
+        return {"value": None, "sources": [], "rankMode": "quantity"}
 
-    if lower_index < 0 or lower_index >= len(events):
-        return {"value": None, "sources": []}
+    cumulative = 0.0
 
-    if abs(fraction) < 0.0000001:
-        source = dict(events[lower_index])
-        source["rankIndex"] = base_rank
-        source["weight"] = 1
+    for event_index, event in enumerate(events or []):
+        quantity = event_rank_quantity(event)
 
-        return {
-            "value": round(source["value"], 4),
-            "sources": [source],
-        }
+        if quantity <= 0:
+            continue
 
-    if upper_index >= len(events):
-        return {"value": None, "sources": []}
+        cumulative_start = cumulative
+        cumulative_end = cumulative + quantity
 
-    lower_weight = 1 - fraction
-    upper_weight = fraction
+        # L'événement couvre l'intervalle (cumulative_start, cumulative_end].
+        # Exemple: un jaune -0.25 couvre 0.25 rang, un but+passe +1.5 couvre 1.5 rang.
+        if target_rank <= cumulative_end + 1e-9 and target_rank > cumulative_start + 1e-9:
+            source = annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank)
 
-    lower_source = dict(events[lower_index])
-    upper_source = dict(events[upper_index])
+            return {
+                "value": round(float(source.get("value", 0)), 4),
+                "sources": [source],
+                "rankMode": "quantity",
+                "targetRank": round(target_rank, 4),
+                "totalQuantity": round(total_rank_quantity(events), 4),
+            }
 
-    lower_source["rankIndex"] = base_rank
-    lower_source["weight"] = round(lower_weight, 4)
-
-    upper_source["rankIndex"] = base_rank + 1
-    upper_source["weight"] = round(upper_weight, 4)
-
-    value = (
-        lower_source["value"] * lower_weight +
-        upper_source["value"] * upper_weight
-    )
+        cumulative = cumulative_end
 
     return {
-        "value": round(value, 4),
-        "sources": [lower_source, upper_source],
+        "value": None,
+        "sources": [],
+        "rankMode": "quantity",
+        "targetRank": round(target_rank, 4),
+        "totalQuantity": round(cumulative, 4),
     }
 
 
+def event_intersects_rank_zone(cumulative_start, cumulative_end, low_rank, high_rank):
+    # Chaque événement couvre (start, end]. Il est dans la zone s'il touche
+    # le rang bas ou s'il commence strictement avant le rang haut.
+    if high_rank < low_rank:
+        low_rank, high_rank = high_rank, low_rank
 
+    return cumulative_end >= low_rank - 1e-9 and cumulative_start < high_rank - 1e-9
+
+
+def events_between_rank_quantities(events, rank1, rank2=None):
+    if not events or not rank1:
+        return [], None, None, 0.0
+
+    try:
+        first_rank = float(rank1)
+        second_rank = float(rank2) if rank2 is not None else first_rank
+    except Exception:
+        return [], None, None, 0.0
+
+    low_rank = min(first_rank, second_rank)
+    high_rank = max(first_rank, second_rank)
+
+    cumulative = 0.0
+    selected = []
+
+    for event_index, event in enumerate(events or []):
+        quantity = event_rank_quantity(event)
+
+        if quantity <= 0:
+            continue
+
+        cumulative_start = cumulative
+        cumulative_end = cumulative + quantity
+
+        if event_intersects_rank_zone(cumulative_start, cumulative_end, low_rank, high_rank):
+            selected.append(annotate_rank_source(event, event_index, cumulative_start, cumulative_end, low_rank))
+
+        cumulative = cumulative_end
+
+        if cumulative_start > high_rank + 1e-9:
+            break
+
+    return selected, round(low_rank, 4), round(high_rank, 4), round(sum(event_rank_quantity(event) for event in selected), 4)
 
 
 def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
     """Calcule les stats entre deux rangs, rangs finaux inclus.
+
+    Nouvelle logique: la progression du rang se fait par quantité de performance.
+    Exemple: un jaune -0.25 avance de 0.25 ; un but + passe +1.5 avance de 1.5.
 
     group_mode="target" : groupe par événement + équipe attribuée + valeur.
       -> utile pour une zone d'équipe.
@@ -657,31 +734,17 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
         "count": 0,
         "startRankIndex": None,
         "endRankIndex": None,
+        "totalQuantity": 0,
+        "rankMode": "quantity",
         "groupMode": group_mode,
     }
 
-    if not events or not rank1:
-        return dict(empty)
+    selected_events, start_rank_value, end_rank_value, selected_quantity = events_between_rank_quantities(events, rank1, rank2)
 
-    try:
-        first_rank = float(rank1)
-        second_rank = float(rank2) if rank2 is not None else first_rank
-    except Exception:
-        return dict(empty)
-
-    low_rank = min(first_rank, second_rank)
-    high_rank = max(first_rank, second_rank)
-
-    start_rank_index = max(1, int(math.floor(low_rank)))
-    end_rank_index = max(start_rank_index, int(math.ceil(high_rank)))
-
-    start_index = start_rank_index - 1
-    end_index = min(len(events), end_rank_index)
-
-    if start_index < 0 or start_index >= len(events) or start_index >= end_index:
+    if not selected_events:
         result = dict(empty)
-        result["startRankIndex"] = start_rank_index
-        result["endRankIndex"] = end_rank_index
+        result["startRankIndex"] = start_rank_value
+        result["endRankIndex"] = end_rank_value
         return result
 
     values = []
@@ -712,7 +775,7 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
 
         return "passé direct"
 
-    for event in events[start_index:end_index]:
+    for event in selected_events:
         try:
             value = round(float(event.get("value", 0)), 4)
         except Exception:
@@ -725,11 +788,8 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
         origin = origin_label(event)
 
         if group_mode == "global":
-            # La zone collective n'appartient à personne : on regroupe l'événement
-            # le plus fréquent toutes équipes attribuées confondues.
             key = f"{event_type}|{value:.4f}"
         else:
-            # La zone d'une équipe reste attribuée à cette équipe.
             key = f"{event_type}|{target}|{value:.4f}"
 
         counts[key] = counts.get(key, 0) + 1
@@ -746,6 +806,7 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
                 "targets": {},
                 "groupMode": group_mode,
                 "isGlobal": group_mode == "global",
+                "rankMode": "quantity",
             }
 
         origins = examples[key].setdefault("origins", {})
@@ -758,8 +819,8 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
 
     if not values:
         result = dict(empty)
-        result["startRankIndex"] = start_rank_index
-        result["endRankIndex"] = end_rank_index
+        result["startRankIndex"] = start_rank_value
+        result["endRankIndex"] = end_rank_value
         return result
 
     mode_count = max(counts.values())
@@ -819,8 +880,10 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
         "modeItems": mode_items,
         "modeCount": mode_count,
         "count": len(values),
-        "startRankIndex": start_rank_index,
-        "endRankIndex": end_rank_index,
+        "startRankIndex": start_rank_value,
+        "endRankIndex": end_rank_value,
+        "totalQuantity": round(selected_quantity, 4),
+        "rankMode": "quantity",
         "groupMode": group_mode,
     }
 
@@ -828,47 +891,22 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
 def zone_events_between_ranks(events, rank1, rank2=None):
     """Retourne les événements situés entre deux rangs, rangs finaux inclus.
 
-    Cette fonction sert surtout au mode simultané collectif :
-    la zone globale doit être la somme de la zone attribuée à l'équipe A
-    et de la zone attribuée à l'équipe B. Elle ne doit pas être calculée
-    sur une troisième liste commune avec ses propres indices, sinon le total
-    peut devenir inférieur à celui d'une seule équipe.
+    Nouvelle logique: la zone est basée sur la quantité cumulée des performances,
+    pas sur le nombre brut d'événements.
     """
-    if not events or not rank1:
-        return [], None, None
-
-    try:
-        first_rank = float(rank1)
-        second_rank = float(rank2) if rank2 is not None else first_rank
-    except Exception:
-        return [], None, None
-
-    low_rank = min(first_rank, second_rank)
-    high_rank = max(first_rank, second_rank)
-
-    start_rank_index = max(1, int(math.floor(low_rank)))
-    end_rank_index = max(start_rank_index, int(math.ceil(high_rank)))
-
-    start_index = start_rank_index - 1
-    end_index = min(len(events), end_rank_index)
-
-    if start_index < 0 or start_index >= len(events) or start_index >= end_index:
-        return [], start_rank_index, end_rank_index
-
-    return list(events[start_index:end_index]), start_rank_index, end_rank_index
+    selected_events, start_rank_value, end_rank_value, _selected_quantity = events_between_rank_quantities(events, rank1, rank2)
+    return selected_events, start_rank_value, end_rank_value
 
 
 def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
     """Zone collective simultanée générale.
 
-    Contrairement aux zones par équipe, la zone globale ne doit pas être
-    calculée comme une moyenne des moyennes A/B, ni comme la somme des deux
-    zones d'équipes aux mêmes rangs.
-
     En simultané, le décompte global parcourt l'ensemble des événements
     réattribués : équipe A + équipe B + adversaire passé de A + adversaire
     passé de B. Comme cette liste globale contient les deux flux ensemble,
     on utilise les rangs divisés par 2 pour obtenir la fenêtre globale.
+
+    La fenêtre globale utilise aussi la nouvelle logique de rang par quantité.
     """
     try:
         used_rank1 = float(rank1) / 2
@@ -878,7 +916,7 @@ def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
         used_rank2 = rank2
 
     result = zone_stats_between_ranks(combined_events or [], used_rank1, used_rank2, group_mode="global")
-    result["globalMethod"] = "combined_all_events_half_ranks"
+    result["globalMethod"] = "combined_all_events_half_ranks_quantity"
     result["rankDivisor"] = 2
     result["originalRank1"] = rank1
     result["originalRank2"] = rank2
@@ -953,7 +991,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     scanned_until = 0
 
     for stage_limit in stages:
-        if len(all_events) >= max_needed:
+        if total_rank_quantity(all_events) >= max_needed:
             break
 
         update_scan_job(
@@ -961,7 +999,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             status="running",
             message=(
                 f"{team_name} · scan progressif jusqu’à {stage_limit} matchs\n"
-                f"Événements trouvés : {len(all_events)}/{max_needed}"
+                f"Quantité trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
             ),
             progress=base_progress + int(progress_span * 0.13),
         )
@@ -977,7 +1015,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 status="running",
                 message=(
                     f"{team_name} · incidents matchs {start + 1}-{batch_end}/{stage_limit}\n"
-                    f"Événements trouvés : {len(all_events)}/{max_needed}"
+                    f"Quantité trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
                 ),
                 progress=base_progress + int(progress_span * (0.15 + 0.80 * stage_position)),
             )
@@ -1020,18 +1058,18 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 all_events.extend(item["events"])
                 matches_used.append(item["matchUsed"])
 
-                if len(all_events) >= max_needed:
+                if total_rank_quantity(all_events) >= max_needed:
                     break
 
             scanned_until = batch_end
 
-            if len(all_events) >= max_needed:
+            if total_rank_quantity(all_events) >= max_needed:
                 break
 
     update_scan_job(
         job_id,
         status="running",
-        message=f"{team_name} · terminé ({len(all_events)} événements, {len(matches_used)} matchs).",
+        message=f"{team_name} · terminé ({len(all_events)} événements, quantité {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs).",
         progress=base_progress + progress_span,
     )
 
@@ -1196,7 +1234,7 @@ def process_scan_job(job_id):
     if effective_rank2 is not None:
         ranks.append(effective_rank2)
 
-    max_needed = int(max(ranks) + 0.999999)
+    max_needed = float(max(ranks))
 
     # En mode simultané, chaque performance attribuée à une équipe est construite
     # avec deux historiques :
@@ -1212,7 +1250,7 @@ def process_scan_job(job_id):
     print(
         f"Scan complet: job={job_id} match={match_id} "
         f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
-        f"objectif brut={scan_fetch_needed} simultaneous={simultaneous_mode}"
+        f"objectif quantité brute={scan_fetch_needed} simultaneous={simultaneous_mode}"
     )
 
     try:
