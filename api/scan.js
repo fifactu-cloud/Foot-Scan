@@ -63,7 +63,7 @@ function rank(x) {
   if (x === undefined || x === null || x === '') return null;
 
   x = Number(String(x).replace(',', '.'));
-  return Number.isFinite(x) && x >= 1 ? x : null;
+  return Number.isFinite(x) && x > 0 ? x : null;
 }
 
 function skip(x) {
