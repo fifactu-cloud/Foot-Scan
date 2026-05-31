@@ -906,23 +906,25 @@ def zone_events_between_ranks(events, rank1, rank2=None):
 def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
     """Zone collective simultanée générale.
 
-    En simultané, le décompte global parcourt l'ensemble des événements
-    réattribués : équipe A + équipe B + adversaire passé de A + adversaire
-    passé de B. Les rangs utilisés restent exactement ceux indiqués par
-    l'utilisateur : il n'y a plus de division par 2 pour la zone globale.
+    Pour la moyenne globale uniquement, on parcourt la liste collective complète :
+    équipe A + équipe B + adversaire passé de A + adversaire passé de B.
+
+    Comme cette liste globale contient les deux flux ensemble, la fenêtre globale
+    utilise les rangs demandés divisés par 2. Les zones par équipe gardent, elles,
+    les rangs indiqués sans division.
 
     Chaque événement fait avancer le rang de 7.25 / 8.
     """
     try:
-        used_rank1 = float(rank1)
-        used_rank2 = float(rank2) if rank2 is not None else used_rank1
+        used_rank1 = float(rank1) / 2
+        used_rank2 = float(rank2) / 2 if rank2 is not None else used_rank1
     except Exception:
         used_rank1 = rank1
         used_rank2 = rank2
 
     result = zone_stats_between_ranks(combined_events or [], used_rank1, used_rank2, group_mode="global")
-    result["globalMethod"] = "combined_all_events_full_ranks_fixed_event_step"
-    result["rankDivisor"] = 1
+    result["globalMethod"] = "combined_all_events_half_ranks_fixed_event_step"
+    result["rankDivisor"] = 2
     result["eventStep"] = RANK_EVENT_STEP
     result["originalRank1"] = rank1
     result["originalRank2"] = rank2
