@@ -1520,6 +1520,15 @@
       return ICONS[event.type] || event.icon || "•";
     }
 
+    function sideText(item) {
+      if (item?.displaySide) return item.displaySide;
+      return item?.side === "team" ? "Équipe analysée" : "Adversaire";
+    }
+
+    function sideCampClass(item) {
+      return item?.side === "opponent" ? "camp-opponent" : "camp-team";
+    }
+
     function weightText(source) {
       const weight = Number(source?.weight || 0);
 
@@ -1843,14 +1852,21 @@
         if (job.status === "done") {
           const resultWithOptions = {
             ...job.result,
-            simultaneousMode: isSimultaneousMode(),
+            simultaneousMode: Boolean(job.result?.simultaneousMode ?? isSimultaneousMode()),
           };
 
           lastResult = {
             createdAt: new Date().toISOString(),
             skipHome: skipHomeValue,
             skipAway: skipAwayValue,
-            autoSearch: calculateAutoRanks(),
+            autoSearch: {
+              ...calculateAutoRanks(),
+              simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
+              usedRank1: resultWithOptions.rank1,
+              usedRank2: resultWithOptions.rank2,
+              requestedRank1: resultWithOptions.requestedRank1,
+              requestedRank2: resultWithOptions.requestedRank2,
+            },
             result: resultWithOptions,
           };
 
@@ -2002,7 +2018,7 @@
               <div>
                 <div>${esc(source.match)}</div>
                 <div class="source-small">
-                  ${esc(rankIndex)}${esc(source.minuteLabel)} · ${esc(source.side === "team" ? "Équipe analysée" : "Adversaire")} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
+                  ${esc(rankIndex)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
                 </div>
               </div>
             </div>
@@ -2017,7 +2033,24 @@
     }
 
 
+    function modeItemText(item) {
+      const icon = item?.icon || ICONS[item?.type] || "•";
+      const label = item?.label || LABELS[item?.type] || item?.type || "Événement";
+      const side = item?.sideLabel || sideText(item);
+      const value = formatValue(item?.value);
+      const count = Number(item?.count || 0);
+      const suffix = count > 0 ? ` ×${count}` : "";
+
+      return `${icon} ${label} — ${side} · ${value}${suffix}`;
+    }
+
     function zoneModeText(stats) {
+      const items = stats?.modeItems || [];
+
+      if (items.length) {
+        return items.map(modeItemText).join(" / ");
+      }
+
       const values = stats?.modeValues || [];
 
       if (!values.length) {
@@ -2078,8 +2111,8 @@
       const matchesUsed = team.matchesUsed || [];
 
       const eventRows = events.map((event) => {
-        const campClass = event.side === "team" ? "camp-team" : "camp-opponent";
-        const campText = event.side === "team" ? "Équipe" : "Adversaire";
+        const campClass = sideCampClass(event);
+        const campText = sideText(event);
 
         return `
           <div class="event-row">
@@ -2233,7 +2266,10 @@
     }
 
     function compactCalcLine(label, calc) {
-      return `${label} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouges ${calc.reds} · rangs ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      const baseLine = `${label} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouges ${calc.reds} · rangs calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      return calc.simultaneousMode
+        ? `${baseLine} · rangs utilisés ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`
+        : baseLine;
     }
 
     function detailedCalcLines(calc) {
@@ -2246,6 +2282,7 @@
         `Rouge appliqué aux deux rangs : ${formatValue(calc.totalCardEffect)}`,
         `Rang bas calculé : ${formatRank(calc.low)}`,
         `Rang haut calculé : ${formatRank(calc.high)}`,
+        ...(calc.simultaneousMode ? [`Mode simultané : rangs utilisés doublés → ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`] : []),
       ];
     }
 
@@ -2254,7 +2291,7 @@
       const lines = [];
 
       lines.push("VALEUR DE RECHERCHE");
-      lines.push(`Mode scan : ${entry.result?.simultaneousMode ? "simultané match par match / minute par minute" : "standard"}`);
+      lines.push(`Mode scan : ${entry.result?.scanModeLabel || (entry.result?.simultaneousMode ? "simultané lié: rangs ×2" : "standard")}`);
 
       if (!calc) {
         lines.push("Calculateur : non enregistré sur cette analyse.");
