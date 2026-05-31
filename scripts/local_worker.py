@@ -809,6 +809,81 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     }
 
 
+
+def apply_simultaneous_match_minute_order(home_scan, away_scan):
+    """Reclasse les événements en mode parallèle.
+
+    Le scan garde une liste par équipe, mais le parcours est construit par
+    paire de matchs: match #1 domicile avec match #1 extérieur, puis minute
+    décroissante à l'intérieur de cette paire. Cela rend explicite le mode
+    "match par match → minute par minute" sans mélanger les valeurs d'une
+    équipe avec celles de l'autre.
+    """
+
+    def group_by_match(scan):
+        order = []
+        grouped = {}
+
+        for match in scan.get("matchesUsed") or []:
+            match_id = match.get("id")
+            if match_id is None:
+                continue
+            order.append(match_id)
+            grouped.setdefault(match_id, [])
+
+        for event in scan.get("events") or []:
+            match_id = event.get("matchId")
+            grouped.setdefault(match_id, []).append(event)
+            if match_id not in order:
+                order.append(match_id)
+
+        return order, grouped
+
+    home_order, home_grouped = group_by_match(home_scan)
+    away_order, away_grouped = group_by_match(away_scan)
+
+    home_events = []
+    away_events = []
+    shared_index = 0
+    max_len = max(len(home_order), len(away_order))
+
+    for match_index in range(max_len):
+        items = []
+
+        if match_index < len(home_order):
+            for original_index, event in enumerate(home_grouped.get(home_order[match_index], [])):
+                items.append(("home", original_index, event))
+
+        if match_index < len(away_order):
+            for original_index, event in enumerate(away_grouped.get(away_order[match_index], [])):
+                items.append(("away", original_index, event))
+
+        def sort_key(item):
+            team_key, original_index, event = item
+            minute = event.get("minute") or 0
+            added = event.get("added") or 0
+            # Minute décroissante, puis domicile/extérieur stable, puis ordre original.
+            return (-(minute + added / 100), 0 if team_key == "home" else 1, original_index)
+
+        for team_key, original_index, event in sorted(items, key=sort_key):
+            shared_index += 1
+            copied = dict(event)
+            copied["simultaneousIndex"] = shared_index
+            copied["simultaneousMatchPair"] = match_index + 1
+
+            if team_key == "home":
+                home_events.append(copied)
+            else:
+                away_events.append(copied)
+
+    home_result = dict(home_scan)
+    away_result = dict(away_scan)
+    home_result["events"] = home_events
+    away_result["events"] = away_events
+
+    return home_result, away_result
+
+
 def process_scan_job(job_id):
     raw = redis_cmd("GET", f"{SCAN_JOB_PREFIX}{job_id}")
 
@@ -825,6 +900,7 @@ def process_scan_job(job_id):
     rank2 = float(rank2) if rank2 is not None else None
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
+    simultaneous_mode = bool(params.get("simultaneousMode"))
 
     ranks = [rank1]
 
@@ -874,6 +950,15 @@ def process_scan_job(job_id):
             40,
         )
 
+        if simultaneous_mode:
+            update_scan_job(
+                job_id,
+                status="running",
+                message="Calcul simultané: reclassement match par match puis minute par minute…",
+                progress=96,
+            )
+            home_scan, away_scan = apply_simultaneous_match_minute_order(home_scan, away_scan)
+
         home = {
             **home_team,
             **home_scan,
@@ -902,6 +987,8 @@ def process_scan_job(job_id):
             "away": away,
             "rank1": rank1,
             "rank2": rank2,
+            "simultaneousMode": simultaneous_mode,
+            "scanModeLabel": "Simultané match par match / minute par minute" if simultaneous_mode else "Standard",
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
                 "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
@@ -999,6 +1086,7 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: scan complet côté worker activé.")
     print("Pages SofaScore: 2 pages activées.")
+    print("Mode simultané optionnel: match par match puis minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Calcul pondéré: X / X.125 / X.25 / X.375 / X.5 / X.625 / X.75 / X.875 activé.")
     print("Barème cartons: jaune, 2e jaune, rouge direct, rouge via 2e jaune activé.")
