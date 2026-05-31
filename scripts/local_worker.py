@@ -590,6 +590,8 @@ def parse_incidents(incidents, match, analyzed_team_id):
 
 
 RANK_EVENT_STEP = 7.25 / 8
+ZONE_FIXED_RANK_LOW = 26.28130
+ZONE_FIXED_RANK_HIGH = 77.9375
 
 
 def event_rank_quantity(event):
@@ -621,10 +623,10 @@ def total_rank_quantity(events):
 def annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank):
     source = dict(event)
     source["rankIndex"] = event_index + 1
-    source["rankQuantity"] = round(event_rank_quantity(event), 4)
-    source["cumulativeStart"] = round(cumulative_start, 4)
-    source["cumulativeEnd"] = round(cumulative_end, 4)
-    source["rankTarget"] = round(float(target_rank), 4)
+    source["rankQuantity"] = event_rank_quantity(event)
+    source["cumulativeStart"] = cumulative_start
+    source["cumulativeEnd"] = cumulative_end
+    source["rankTarget"] = float(target_rank)
     source["weight"] = 1
     source["rankMode"] = "quantity"
     return source
@@ -659,10 +661,10 @@ def value_at_rank(events, rank):
             source = annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank)
 
             return {
-                "value": round(float(source.get("value", 0)), 4),
+                "value": float(source.get("value", 0)),
                 "sources": [source],
                 "rankMode": "quantity",
-                "targetRank": round(target_rank, 4),
+                "targetRank": target_rank,
                 "totalQuantity": round(total_rank_quantity(events), 4),
             }
 
@@ -672,7 +674,7 @@ def value_at_rank(events, rank):
         "value": None,
         "sources": [],
         "rankMode": "quantity",
-        "targetRank": round(target_rank, 4),
+        "targetRank": target_rank,
         "totalQuantity": round(cumulative, 4),
     }
 
@@ -909,22 +911,22 @@ def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
     Pour la moyenne globale uniquement, on parcourt la liste collective complète :
     équipe A + équipe B + adversaire passé de A + adversaire passé de B.
 
-    Comme cette liste globale contient les deux flux ensemble, la fenêtre globale
-    utilise les rangs demandés divisés par 2. Les zones par équipe gardent, elles,
-    les rangs indiqués sans division.
+    Nouvelle règle : pour cette moyenne globale uniquement, les rangs de base
+    sont multipliés par 2. Les zones par équipe gardent, elles, les rangs
+    indiqués sans multiplication.
 
     Chaque événement fait avancer le rang de 7.25 / 8.
     """
     try:
-        used_rank1 = float(rank1) / 2
-        used_rank2 = float(rank2) / 2 if rank2 is not None else used_rank1
+        used_rank1 = float(rank1) * 2
+        used_rank2 = float(rank2) * 2 if rank2 is not None else used_rank1
     except Exception:
         used_rank1 = rank1
         used_rank2 = rank2
 
     result = zone_stats_between_ranks(combined_events or [], used_rank1, used_rank2, group_mode="global")
-    result["globalMethod"] = "combined_all_events_half_ranks_fixed_event_step"
-    result["rankDivisor"] = 2
+    result["globalMethod"] = "combined_all_events_double_ranks_fixed_event_step"
+    result["rankMultiplier"] = 2
     result["eventStep"] = RANK_EVENT_STEP
     result["originalRank1"] = rank1
     result["originalRank2"] = rank2
@@ -1321,7 +1323,7 @@ def process_scan_job(job_id):
             **home_scan,
             "r1": value_at_rank(home_scan["events"], effective_rank1),
             "r2": value_at_rank(home_scan["events"], effective_rank2) if effective_rank2 else None,
-            "zoneStats": zone_stats_between_ranks(home_scan["events"], effective_rank1, effective_rank2),
+            "zoneStats": zone_stats_between_ranks(home_scan["events"], ZONE_FIXED_RANK_LOW, ZONE_FIXED_RANK_HIGH),
         }
 
         away = {
@@ -1329,7 +1331,7 @@ def process_scan_job(job_id):
             **away_scan,
             "r1": value_at_rank(away_scan["events"], effective_rank1),
             "r2": value_at_rank(away_scan["events"], effective_rank2) if effective_rank2 else None,
-            "zoneStats": zone_stats_between_ranks(away_scan["events"], effective_rank1, effective_rank2),
+            "zoneStats": zone_stats_between_ranks(away_scan["events"], ZONE_FIXED_RANK_LOW, ZONE_FIXED_RANK_HIGH),
         }
 
         result = {
@@ -1348,13 +1350,15 @@ def process_scan_job(job_id):
             "rank2": effective_rank2,
             "simultaneousMode": simultaneous_mode,
             "scanModeLabel": "Simultané lié: mêmes rangs, match par match / minute par minute" if simultaneous_mode else "Standard",
-            "overallZoneStats": simultaneous_overall_zone_stats(simultaneous_combined_events, effective_rank1, effective_rank2) if simultaneous_mode else None,
+            "overallZoneStats": None,
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
                 "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
                 "secondMatchesPerTeam": SECOND_MATCHES_PER_TEAM,
                 "maxMatchesPerTeam": MAX_MATCHES_PER_TEAM,
                 "incidentBatchSize": INCIDENT_BATCH_SIZE,
+                "zoneFixedRankLow": ZONE_FIXED_RANK_LOW,
+                "zoneFixedRankHigh": ZONE_FIXED_RANK_HIGH,
             },
         }
 
