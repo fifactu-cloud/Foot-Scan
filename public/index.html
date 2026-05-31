@@ -1334,113 +1334,10 @@
 
             <div class="auto-formula" id="autoFormula"></div>
 
-            <label class="mode-toggle" for="perTeamMode">
-              <input id="perTeamMode" type="checkbox" />
-              <span>Calcul par équipe : bas/haut domicile + bas/haut extérieur, puis moyenne finale.</span>
+            <label class="mode-toggle" for="simultaneousMode">
+              <input id="simultaneousMode" type="checkbox" />
+              <span>Calcul simultané : les deux équipes sont parcourues en parallèle, match par match puis minute par minute.</span>
             </label>
-
-            <label class="mode-toggle" for="inversionMode">
-              <input id="inversionMode" type="checkbox" checked />
-              <span>Inversion X.0 vs X.5 activée.</span>
-            </label>
-
-            <div class="per-team-box" id="perTeamBox">
-              <div class="per-team-grid">
-                <div class="per-team-card">
-                  <div class="per-team-title">Domicile</div>
-
-                  <div class="team-calc-grid">
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Base</div>
-                        <input id="homeBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.01" value="19" />
-                      </div>
-                      <input id="homeBaseRange" type="range" min="0" max="1000" step="0.01" value="19" />
-                    </div>
-
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Limites</div>
-                        <input id="homeOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="4" />
-                      </div>
-                      <input id="homeOffensiveRange" type="range" min="0" max="22" step="0.5" value="4" />
-                    </div>
-
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Changements</div>
-                        <input id="homeChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="3" />
-                      </div>
-                      <input id="homeChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
-                    </div>
-
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Rouges</div>
-                        <input id="homeRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
-                      </div>
-                      <input id="homeRedRange" type="range" min="0" max="22" step="0.5" value="0" />
-                    </div>
-                  </div>
-                </div>
-
-                <div class="per-team-card">
-                  <div class="per-team-title">Extérieur</div>
-
-                  <div class="team-calc-grid">
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Base</div>
-                        <input id="awayBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.01" value="19" />
-                      </div>
-                      <input id="awayBaseRange" type="range" min="0" max="1000" step="0.01" value="19" />
-                    </div>
-
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Limites</div>
-                        <input id="awayOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="4" />
-                      </div>
-                      <input id="awayOffensiveRange" type="range" min="0" max="22" step="0.5" value="4" />
-                    </div>
-
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Changements</div>
-                        <input id="awayChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="3" />
-                      </div>
-                      <input id="awayChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
-                    </div>
-
-                    <div class="auto-control">
-                      <div class="auto-control-top">
-                        <div class="auto-control-title">Rouges</div>
-                        <input id="awayRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="0" />
-                      </div>
-                      <input id="awayRedRange" type="range" min="0" max="22" step="0.5" value="0" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="per-team-results">
-                <div class="per-team-mini">
-                  <div class="per-team-mini-title">Domicile</div>
-                  <div class="per-team-mini-value" id="homeAutoResult">—</div>
-                </div>
-
-                <div class="per-team-mini">
-                  <div class="per-team-mini-title">Extérieur</div>
-                  <div class="per-team-mini-value" id="awayAutoResult">—</div>
-                </div>
-
-                <div class="per-team-mini">
-                  <div class="per-team-mini-title">Moyenne finale</div>
-                  <div class="per-team-mini-value" id="averageAutoResult">—</div>
-                </div>
-              </div>
-            </div>
-
 
             <button class="auto-apply-btn" id="applyAutoRanksBtn" type="button">
               Appliquer aux rangs
@@ -1702,44 +1599,14 @@
       return readCalculatorValues("auto");
     }
 
-    function isPerTeamMode() {
-      return Boolean($("perTeamMode")?.checked);
-    }
-
-    function isInversionEnabled() {
-      return Boolean($("inversionMode")?.checked);
-    }
-
-    function isInversionEnabledForResult(result) {
-      if (typeof result?.inversionEnabled === "boolean") {
-        return result.inversionEnabled;
-      }
-
-      return isInversionEnabled();
+    function isSimultaneousMode() {
+      return Boolean($("simultaneousMode")?.checked);
     }
 
     function calculateAutoRanks() {
-      const single = calculateRanksFromValues(getAutoValues());
-
-      if (!isPerTeamMode()) {
-        return {
-          ...single,
-          mode: "single",
-        };
-      }
-
-      const homeAuto = calculateRanksFromValues(readCalculatorValues("home"));
-      const awayAuto = calculateRanksFromValues(readCalculatorValues("away"));
-      const low = (homeAuto.low + awayAuto.low) / 2;
-      const high = (homeAuto.high + awayAuto.high) / 2;
-
       return {
-        ...single,
-        mode: "perTeam",
-        homeAuto,
-        awayAuto,
-        low,
-        high,
+        ...calculateRanksFromValues(getAutoValues()),
+        mode: "single",
       };
     }
 
@@ -1757,37 +1624,12 @@
     }
 
     function updateAutoCalculator() {
-      const single = calculateRanksFromValues(getAutoValues());
-      writeCalculatorValues("auto", single);
-
-      const homeAuto = calculateRanksFromValues(readCalculatorValues("home"));
-      const awayAuto = calculateRanksFromValues(readCalculatorValues("away"));
-      writeCalculatorValues("home", homeAuto);
-      writeCalculatorValues("away", awayAuto);
-
-      const perTeam = isPerTeamMode();
       const calc = calculateAutoRanks();
-
-      $("perTeamBox").classList.toggle("active", perTeam);
-      $("applyAutoRanksBtn").textContent = perTeam
-        ? "Appliquer la moyenne aux rangs"
-        : "Appliquer aux rangs";
+      writeCalculatorValues("auto", calc);
 
       $("autoLow").textContent = formatRank(calc.low);
       $("autoHigh").textContent = formatRank(calc.high);
-
-      $("homeAutoResult").textContent = `${formatRank(homeAuto.low)} / ${formatRank(homeAuto.high)}`;
-      $("awayAutoResult").textContent = `${formatRank(awayAuto.low)} / ${formatRank(awayAuto.high)}`;
-      $("averageAutoResult").textContent = `${formatRank((homeAuto.low + awayAuto.low) / 2)} / ${formatRank((homeAuto.high + awayAuto.high) / 2)}`;
-
-      if (perTeam) {
-        $("autoFormula").textContent =
-          `Mode par équipe · domicile : ${formatRank(homeAuto.low)} / ${formatRank(homeAuto.high)} · ` +
-          `extérieur : ${formatRank(awayAuto.low)} / ${formatRank(awayAuto.high)} · ` +
-          `moyenne finale : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
-      } else {
-        $("autoFormula").textContent = formulaTextForCalc(calc);
-      }
+      $("autoFormula").textContent = formulaTextForCalc(calc);
     }
 
     function applyAutoRanks() {
@@ -1796,11 +1638,7 @@
       $("rank1").value = formatRank(calc.low);
       $("rank2").value = formatRank(calc.high);
 
-      const message = calc.mode === "perTeam"
-        ? `Moyenne appliquée : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
-        : `Rangs appliqués : ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
-
-      setStatus(message, 0);
+      setStatus(`Rangs appliqués : ${formatRank(calc.low)} / ${formatRank(calc.high)}`, 0);
     }
 
     function averagePerformance(team) {
@@ -1818,89 +1656,14 @@
       return sum / values.length;
     }
 
-    function rankFraction(value) {
-      const number = Math.abs(Number(value));
-
-      if (!Number.isFinite(number)) return null;
-
-      return Math.round((number - Math.floor(number)) * 1000000) / 1000000;
-    }
-
-    function isIntegerRank(value) {
-      const fraction = rankFraction(value);
-      return fraction !== null && Math.abs(fraction) < 0.000001;
-    }
-
-    function isHalfRank(value) {
-      const fraction = rankFraction(value);
-      return fraction !== null && Math.abs(fraction - 0.5) < 0.000001;
-    }
-
-    function hasHalfVsIntegerRank(result) {
-      if (!result || result.rank2 == null) return false;
-
-      return (
-        (isHalfRank(result.rank1) && isIntegerRank(result.rank2)) ||
-        (isIntegerRank(result.rank1) && isHalfRank(result.rank2))
-      );
-    }
-
-    function getInversionReasons(result, homeAvg, awayAvg) {
-      const reasons = [];
-
-      if (isInversionEnabledForResult(result) && hasHalfVsIntegerRank(result)) {
-        reasons.push("rang X.5 contre rang X.0");
-      }
-
-      return reasons;
-    }
-
-    function makeDominanceWinner(team, average, diff, inverted = false, baseLabel = null, inversionReasons = []) {
+    function makeDominanceWinner(team, average, diff) {
       return {
         type: "winner",
         team,
         label: team.name,
         average,
         diff,
-        inverted,
-        baseLabel,
-        inversionReasons,
       };
-    }
-
-    function invertDominanceIfNeeded(result, dominance, homeAvg, awayAvg) {
-      const inversionReasons = getInversionReasons(result, homeAvg, awayAvg);
-
-      if (!inversionReasons.length || dominance.type !== "winner") {
-        return {
-          ...dominance,
-          inverted: false,
-          inversionReasons: [],
-        };
-      }
-
-      const homeId = result?.home?.id;
-      const awayId = result?.away?.id;
-      const winnerId = dominance.team?.id;
-      const invertedTeam = winnerId === homeId ? result.away : result.home;
-      const invertedAverage = winnerId === homeId ? awayAvg : homeAvg;
-
-      if (!invertedTeam || invertedAverage === null) {
-        return {
-          ...dominance,
-          inverted: false,
-          inversionReasons: [],
-        };
-      }
-
-      return makeDominanceWinner(
-        invertedTeam,
-        invertedAverage,
-        dominance.diff,
-        true,
-        dominance.label,
-        inversionReasons
-      );
     }
 
     function getDominance(result) {
@@ -1913,53 +1676,32 @@
           label: "Domination indisponible",
           average: null,
           diff: null,
-          inverted: false,
-          inversionReasons: [],
         };
       }
 
       if (homeAvg !== null && awayAvg === null) {
-        const dominance = makeDominanceWinner(result.home, homeAvg, null);
-        return invertDominanceIfNeeded(result, dominance, homeAvg, awayAvg);
+        return makeDominanceWinner(result.home, homeAvg, null);
       }
 
       if (awayAvg !== null && homeAvg === null) {
-        const dominance = makeDominanceWinner(result.away, awayAvg, null);
-        return invertDominanceIfNeeded(result, dominance, homeAvg, awayAvg);
+        return makeDominanceWinner(result.away, awayAvg, null);
       }
 
       const diff = homeAvg - awayAvg;
       const absDiff = Math.abs(diff);
-      const inversionReasons = getInversionReasons(result, homeAvg, awayAvg);
 
       if (absDiff < DOMINANCE_TIE_THRESHOLD) {
-        if (inversionReasons.length) {
-          return {
-            type: "unpredictable",
-            label: "Victoire sans camp",
-            average: (homeAvg + awayAvg) / 2,
-            diff: absDiff,
-            inverted: true,
-            baseLabel: "Égalité",
-            inversionReasons,
-          };
-        }
-
         return {
           type: "tie",
           label: "Égalité",
           average: (homeAvg + awayAvg) / 2,
           diff: absDiff,
-          inverted: false,
-          inversionReasons: [],
         };
       }
 
-      const dominance = diff > 0
+      return diff > 0
         ? makeDominanceWinner(result.home, homeAvg, Math.abs(diff))
         : makeDominanceWinner(result.away, awayAvg, Math.abs(diff));
-
-      return invertDominanceIfNeeded(result, dominance, homeAvg, awayAvg);
     }
 
     function renderDominance(result) {
@@ -1975,19 +1717,6 @@
         `;
       }
 
-      if (dominance.type === "unpredictable") {
-        return `
-          <div class="dominance-box">
-            <div class="dominance-label">Domination moyenne</div>
-            <div class="dominance-team">Victoire sans camp</div>
-            <div class="dominance-meta">
-              Imprévisible · base : égalité · écart inférieur à ${esc(formatRank(DOMINANCE_TIE_THRESHOLD))}
-              · inversé (${esc(dominance.inversionReasons.join(" + "))})
-            </div>
-          </div>
-        `;
-      }
-
       if (dominance.type === "tie") {
         return `
           <div class="dominance-box">
@@ -1998,17 +1727,13 @@
         `;
       }
 
-      const inversionText = dominance.inverted
-        ? ` · inversé (${esc(dominance.inversionReasons.join(" + "))}) · base : ${esc(dominance.baseLabel)}`
-        : "";
-
       return `
         <div class="dominance-box">
           <div class="dominance-label">Domination moyenne</div>
           <div class="dominance-team">${esc(dominance.label)}</div>
           <div class="dominance-meta">
             Moyenne dominante : ${esc(formatValue(dominance.average))}
-            ${dominance.diff !== null ? ` · écart : ${esc(formatRank(dominance.diff))}` : ""}${inversionText}
+            ${dominance.diff !== null ? ` · écart : ${esc(formatRank(dominance.diff))}` : ""}
           </div>
         </div>
       `;
@@ -2085,6 +1810,7 @@
           rank2,
           skipHome: skipHomeValue,
           skipAway: skipAwayValue,
+          simultaneousMode: isSimultaneousMode(),
         }),
       });
 
@@ -2117,7 +1843,7 @@
         if (job.status === "done") {
           const resultWithOptions = {
             ...job.result,
-            inversionEnabled: isInversionEnabled(),
+            simultaneousMode: isSimultaneousMode(),
           };
 
           lastResult = {
@@ -2213,6 +1939,7 @@
           <div class="summary-head">
             <div class="summary-label">Résumé rapide</div>
             <div class="summary-title">${esc(match.homeTeam.name)} vs ${esc(match.awayTeam.name)}</div>
+            <div class="summary-label">Mode scan : ${esc(result.scanModeLabel || (result.simultaneousMode ? "Simultané match par match / minute par minute" : "Standard"))}</div>
           </div>
 
           ${renderDominance(result)}
@@ -2527,35 +2254,10 @@
       const lines = [];
 
       lines.push("VALEUR DE RECHERCHE");
-      lines.push(`Inversion X.0/X.5 : ${entry.result?.inversionEnabled === false ? "désactivée" : "activée"}`);
+      lines.push(`Mode scan : ${entry.result?.simultaneousMode ? "simultané match par match / minute par minute" : "standard"}`);
 
       if (!calc) {
         lines.push("Calculateur : non enregistré sur cette analyse.");
-        return lines;
-      }
-
-      if (calc.mode === "perTeam") {
-        const homeAuto = calc.homeAuto;
-        const awayAuto = calc.awayAuto;
-
-        if (compact) {
-          lines.push("Mode : moyenne par équipe");
-          lines.push(compactCalcLine("Domicile", homeAuto));
-          lines.push(compactCalcLine("Extérieur", awayAuto));
-          lines.push(`Rangs moyens : ${formatRank(calc.low)} / ${formatRank(calc.high)}`);
-          return lines;
-        }
-
-        lines.push("Mode : moyenne par équipe");
-        lines.push("");
-        lines.push("Domicile :");
-        lines.push(...detailedCalcLines(homeAuto));
-        lines.push("");
-        lines.push("Extérieur :");
-        lines.push(...detailedCalcLines(awayAuto));
-        lines.push("");
-        lines.push(`Rang bas moyen : ${formatRank(calc.low)}`);
-        lines.push(`Rang haut moyen : ${formatRank(calc.high)}`);
         return lines;
       }
 
@@ -2576,28 +2278,17 @@
         return ["Domination moyenne : indisponible"];
       }
 
-      if (dominance.type === "unpredictable") {
-        return [
-          `Domination moyenne : victoire sans camp`,
-          `Imprévisible · base : égalité · écart ${formatRank(dominance.diff)} inférieur à ${formatRank(DOMINANCE_TIE_THRESHOLD)} · inversé (${dominance.inversionReasons.join(" + ")})`,
-        ];
-      }
-
       if (dominance.type === "tie") {
         return [`Domination moyenne : égalité (${formatValue(dominance.average)}) · écart ${formatRank(dominance.diff)} inférieur à ${formatRank(DOMINANCE_TIE_THRESHOLD)}`];
       }
 
-      const inversionText = dominance.inverted
-        ? ` · inversé (${dominance.inversionReasons.join(" + ")}) · base : ${dominance.baseLabel}`
-        : "";
-
       if (compact) {
-        return [`Domination : ${dominance.label} · moyenne ${formatValue(dominance.average)}${inversionText}`];
+        return [`Domination : ${dominance.label} · moyenne ${formatValue(dominance.average)}`];
       }
 
       return [
         `Domination moyenne : ${dominance.label}`,
-        `Moyenne dominante : ${formatValue(dominance.average)}${dominance.diff !== null ? ` · écart : ${formatRank(dominance.diff)}` : ""}${inversionText}`,
+        `Moyenne dominante : ${formatValue(dominance.average)}${dominance.diff !== null ? ` · écart : ${formatRank(dominance.diff)}` : ""}`,
       ];
     }
 
@@ -2864,26 +2555,7 @@
     bindRangeAndNumber("autoChangeRange", "autoChangeNumber", updateAutoCalculator);
     bindRangeAndNumber("autoRedRange", "autoRedNumber", updateAutoCalculator);
 
-    bindRangeAndNumber("homeBaseRange", "homeBaseNumber", updateAutoCalculator);
-    bindRangeAndNumber("homeOffensiveRange", "homeOffensiveNumber", updateAutoCalculator);
-    bindRangeAndNumber("homeChangeRange", "homeChangeNumber", updateAutoCalculator);
-    bindRangeAndNumber("homeRedRange", "homeRedNumber", updateAutoCalculator);
-
-    bindRangeAndNumber("awayBaseRange", "awayBaseNumber", updateAutoCalculator);
-    bindRangeAndNumber("awayOffensiveRange", "awayOffensiveNumber", updateAutoCalculator);
-    bindRangeAndNumber("awayChangeRange", "awayChangeNumber", updateAutoCalculator);
-    bindRangeAndNumber("awayRedRange", "awayRedNumber", updateAutoCalculator);
-
-    $("perTeamMode").addEventListener("change", updateAutoCalculator);
-    $("inversionMode").addEventListener("change", () => {
-      if (lastResult?.result) {
-        lastResult.result = {
-          ...lastResult.result,
-          inversionEnabled: isInversionEnabled(),
-        };
-        renderResult(lastResult.result);
-      }
-    });
+    $("simultaneousMode").addEventListener("change", updateAutoCalculator);
     $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
 
     updateReportCount();
