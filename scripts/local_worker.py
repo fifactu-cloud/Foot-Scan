@@ -612,10 +612,29 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
     counts = {}
     examples = {}
 
-    def display_side(event):
-        if event.get("displaySide"):
-            return event.get("displaySide")
+    def fallback_target_label(event):
+        display_side = event.get("displaySide")
+
+        if display_side:
+            text = str(display_side)
+            for prefix in ["Attribué à ", "Performance "]:
+                if text.startswith(prefix):
+                    return text[len(prefix):]
+            return text
+
         return "Équipe analysée" if event.get("side") == "team" else "Adversaire"
+
+    def target_label(event):
+        return event.get("targetName") or fallback_target_label(event)
+
+    def origin_label(event):
+        if event.get("originLabel"):
+            return event.get("originLabel")
+
+        if event.get("linkedFromOpponentPast"):
+            return "adversaire passé"
+
+        return "passé direct"
 
     for event in events[start_index:end_index]:
         try:
@@ -626,9 +645,9 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
         values.append(value)
 
         event_type = event.get("type") or "unknown"
-        side = event.get("side") or "unknown"
-        side_label = display_side(event)
-        key = f"{event_type}|{side}|{side_label}|{value:.4f}"
+        target = target_label(event)
+        origin = origin_label(event)
+        key = f"{event_type}|{target}|{value:.4f}"
 
         counts[key] = counts.get(key, 0) + 1
 
@@ -636,11 +655,15 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
             examples[key] = {
                 "type": event_type,
                 "label": LABELS.get(event_type, event_type),
-                "side": side,
-                "sideLabel": side_label,
+                "targetLabel": target,
+                "sideLabel": f"attribué à {target}",
                 "value": value,
                 "icon": event.get("icon") or "•",
+                "origins": {},
             }
+
+        origins = examples[key].setdefault("origins", {})
+        origins[origin] = origins.get(origin, 0) + 1
 
     if not values:
         result = dict(empty)
@@ -654,14 +677,23 @@ def zone_stats_between_ranks(events, rank1, rank2=None):
     for key, count in counts.items():
         if count != mode_count:
             continue
+
         item = dict(examples[key])
         item["count"] = count
+        origins_dict = item.get("origins") or {}
+        item["origins"] = [
+            {"label": label, "count": origin_count}
+            for label, origin_count in sorted(
+                origins_dict.items(),
+                key=lambda pair: (-pair[1], pair[0]),
+            )
+        ]
         mode_items.append(item)
 
     mode_items.sort(key=lambda item: (
         -item.get("count", 0),
+        str(item.get("targetLabel", "")),
         str(item.get("label", "")),
-        str(item.get("sideLabel", "")),
         float(item.get("value", 0)),
     ))
 
@@ -871,6 +903,11 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
 
     def copy_for_target(event, target_key, source_name, target_name, linked_from_opponent):
         copied = dict(event)
+        clean_detail = strip_camp_prefix(copied.get("detail"))
+
+        copied["targetName"] = target_name
+        copied["simultaneousTarget"] = target_key
+        copied["displaySide"] = f"Attribué à {target_name}"
 
         if linked_from_opponent:
             try:
@@ -879,13 +916,13 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
                 copied["value"] = copied.get("value")
 
             copied["side"] = "team"
-            copied["displaySide"] = f"Adversaire passé de {source_name} → performance {target_name}"
             copied["linkedFromOpponentPast"] = True
-            copied["detail"] = f"{copied['displaySide']} · {strip_camp_prefix(copied.get('detail'))}"
+            copied["originLabel"] = f"adversaire passé de {source_name}"
+            copied["detail"] = f"Attribué à {target_name} · origine: adversaire passé de {source_name} · {clean_detail}"
         else:
-            copied["displaySide"] = "Équipe analysée"
+            copied["originLabel"] = f"passé direct de {target_name}"
+            copied["detail"] = f"Attribué à {target_name} · origine: passé direct · {clean_detail}"
 
-        copied["simultaneousTarget"] = target_key
         return copied
 
     home_order, home_grouped = group_by_match(home_scan)
