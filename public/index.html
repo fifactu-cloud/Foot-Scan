@@ -2135,7 +2135,7 @@
             <div class="stat-header">
               <div>
                 <div class="stat-title">🌐 Zone collective simultanée</div>
-                <div class="stat-subtitle">Moyenne globale ${esc(homeName)} + ${esc(awayName)}. Cette zone n’est attribuée à aucun camp.</div>
+                <div class="stat-subtitle">Décompte général des deux historiques. Les rangs sont divisés par 2 pour la zone globale. Cette zone n’est attribuée à aucun camp.</div>
               </div>
               <div class="stat-badge">Global</div>
             </div>
@@ -2159,7 +2159,7 @@
             <div>
               <div class="stat-title">🌐 Zone collective simultanée</div>
               <div class="stat-subtitle">
-                Moyenne globale = zone ${esc(homeName)} + zone ${esc(awayName)} · #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · rangs finaux inclus.
+                Moyenne globale = décompte général ${esc(homeName)} + ${esc(awayName)} + leurs adversaires passés · rangs utilisés #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} après division par 2 · ${esc(stats.count)} événements.
               </div>
             </div>
             <div class="stat-badge">Global</div>
@@ -2174,7 +2174,7 @@
             <div class="stat-card">
               <div class="stat-kicker">Appartenance</div>
               <div class="mode-main">Aucun camp</div>
-              <div class="mode-detail">Calculée avec les événements attribués aux deux équipes dans la même zone. Elle n’appartient à aucun camp.</div>
+              <div class="mode-detail">Calculée sur la liste collective complète, avec les rangs divisés par 2. Elle n’appartient à aucun camp.</div>
             </div>
 
             <div class="stat-card wide">
@@ -2573,7 +2573,7 @@
         return "zone collective: —";
       }
 
-      return `zone collective moyenne globale: ${formatValue(stats.average)} · plus présent global: ${zoneModeText(stats)} · #${stats.startRankIndex}-${stats.endRankIndex}`;
+      return `zone collective moyenne globale: ${formatValue(stats.average)} · plus présent global: ${zoneModeText(stats)} · rangs globaux #${stats.startRankIndex}-${stats.endRankIndex} (rangs ÷2)`;
     }
 
     function overallZoneStatsLines(result) {
@@ -2595,9 +2595,9 @@
 
       return [
         "ZONE COLLECTIVE SIMULTANÉE",
-        `Performance moyenne globale (${homeName} + ${awayName}) : ${formatValue(stats.average)}`,
+        `Performance moyenne globale (${homeName} + ${awayName} + adversaires passés, rangs ÷2) : ${formatValue(stats.average)}`,
         `Performance la plus présente globale : ${zoneModeText(stats)}`,
-        `Zone incluse : rang #${stats.startRankIndex} à #${stats.endRankIndex} (${stats.count} événements, rangs finaux inclus)`,
+        `Zone globale : rang #${stats.startRankIndex} à #${stats.endRankIndex} après division par 2 (${stats.count} événements)`,
       ];
     }
 
@@ -2626,7 +2626,7 @@
       return [
         `Performance moyenne zone attribuée à ${teamName} : ${formatValue(stats.average)}`,
         `Performance la plus présente zone attribuée à ${teamName} : ${zoneModeText(stats)}`,
-        `Zone incluse : rang #${stats.startRankIndex} à #${stats.endRankIndex} (${stats.count} événements, rangs finaux inclus)`,
+        `Zone attribuée : rang #${stats.startRankIndex} à #${stats.endRankIndex} (${stats.count} événements, rangs finaux inclus)`,
       ];
     }
 
