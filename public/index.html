@@ -1971,13 +1971,13 @@
       const rank2Raw = String($("rank2").value || "").trim();
       const rank2 = rank2Raw ? parseFloat(rank2Raw.replace(",", ".")) : null;
 
-      if (!matchId || !rank1 || rank1 < 1) {
-        setError("Mets un Match ID ou une URL SofaScore, puis un rang 1 supérieur ou égal à 1.");
+      if (!matchId || !rank1 || rank1 <= 0) {
+        setError("Mets un Match ID ou une URL SofaScore, puis un rang 1 supérieur à 0.");
         return;
       }
 
-      if (rank2 !== null && (!rank2 || rank2 < 1)) {
-        setError("Le rang 2 doit être vide ou supérieur ou égal à 1.");
+      if (rank2 !== null && (!rank2 || rank2 <= 0)) {
+        setError("Le rang 2 doit être vide ou supérieur à 0.");
         return;
       }
 
@@ -2139,7 +2139,7 @@
             <div class="stat-header">
               <div>
                 <div class="stat-title">🌐 Zone collective simultanée</div>
-                <div class="stat-subtitle">Décompte général des deux historiques. Les rangs sont divisés par 2 pour la zone globale. Cette zone n’est attribuée à aucun camp.</div>
+                <div class="stat-subtitle">Décompte général des deux historiques. Les rangs sont divisés par 2 pour la zone globale et avancent par quantité de performance. Cette zone n’est attribuée à aucun camp.</div>
               </div>
               <div class="stat-badge">Global</div>
             </div>
@@ -2163,7 +2163,7 @@
             <div>
               <div class="stat-title">🌐 Zone collective simultanée</div>
               <div class="stat-subtitle">
-                Moyenne globale = décompte général ${esc(homeName)} + ${esc(awayName)} + leurs adversaires passés · rangs utilisés #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} après division par 2 · ${esc(stats.count)} événements.
+                Moyenne globale = décompte général ${esc(homeName)} + ${esc(awayName)} + leurs adversaires passés · rangs quantité ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} après division par 2 · ${esc(stats.count)} événements · quantité ${esc(formatRank(stats.totalQuantity || 0))}.
               </div>
             </div>
             <div class="stat-badge">Global</div>
@@ -2178,7 +2178,7 @@
             <div class="stat-card">
               <div class="stat-kicker">Appartenance</div>
               <div class="mode-main">Aucun camp</div>
-              <div class="mode-detail">Calculée sur la liste collective complète, avec les rangs divisés par 2. Elle n’appartient à aucun camp.</div>
+              <div class="mode-detail">Calculée sur la liste collective complète, avec les rangs divisés par 2. Les rangs avancent par quantité de performance. Elle n’appartient à aucun camp.</div>
             </div>
 
             <div class="stat-card wide">
@@ -2239,6 +2239,19 @@
       `;
     }
 
+    function rankSourceText(source) {
+      const index = source?.rankIndex ? `#${source.rankIndex}` : "";
+
+      if (source?.rankMode === "quantity" && source?.cumulativeEnd != null) {
+        const start = formatRank(source.cumulativeStart || 0);
+        const end = formatRank(source.cumulativeEnd);
+        const quantity = source.rankQuantity != null ? ` · q ${formatRank(source.rankQuantity)}` : "";
+        return `${index ? `${index} · ` : ""}cumul ${start}→${end}${quantity} · `;
+      }
+
+      return index ? `${index} · ` : "";
+    }
+
     function renderValue(label, result) {
       const value = result?.value;
       const sources = result?.sources || [];
@@ -2254,7 +2267,7 @@
         html += `<div class="source-list">`;
 
         for (const source of sources) {
-          const rankIndex = source.rankIndex ? `#${source.rankIndex} · ` : "";
+          const rankText = rankSourceText(source);
 
           html += `
             <div class="source-item">
@@ -2262,7 +2275,7 @@
               <div>
                 <div>${esc(source.match)}</div>
                 <div class="source-small">
-                  ${esc(rankIndex)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
+                  ${esc(rankText)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
                 </div>
               </div>
             </div>
@@ -2414,7 +2427,7 @@
           <div class="stat-header">
             <div>
               <div class="stat-title">Zone attribuée à ${esc(teamName)}</div>
-              <div class="stat-subtitle">Rangs #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · rangs finaux inclus.</div>
+              <div class="stat-subtitle">Rangs quantité ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · quantité totale ${esc(formatRank(stats.totalQuantity || 0))} · rangs finaux inclus.</div>
             </div>
             <div class="stat-badge">Équipe</div>
           </div>
@@ -2555,10 +2568,10 @@
       lines.push("Détail événement :");
 
       for (const source of sources) {
-        const rankIndex = source.rankIndex ? `#${source.rankIndex} · ` : "";
+        const rankText = rankSourceText(source);
 
         lines.push(
-          `- ${rankIndex}${eventIcon(source)} ${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
+          `- ${rankText}${eventIcon(source)} ${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
         );
       }
 
@@ -2577,7 +2590,7 @@
         return "zone collective: —";
       }
 
-      return `zone collective moyenne globale: ${formatValue(stats.average)} · plus présent global: ${zoneModeText(stats)} · rangs globaux #${stats.startRankIndex}-${stats.endRankIndex} (rangs ÷2)`;
+      return `zone collective moyenne globale: ${formatValue(stats.average)} · plus présent global: ${zoneModeText(stats)} · rangs quantité ${stats.startRankIndex}-${stats.endRankIndex} (rangs ÷2) · quantité ${formatRank(stats.totalQuantity || 0)}`;
     }
 
     function overallZoneStatsLines(result) {
@@ -2601,7 +2614,7 @@
         "ZONE COLLECTIVE SIMULTANÉE",
         `Performance moyenne globale (${homeName} + ${awayName} + adversaires passés, rangs ÷2) : ${formatValue(stats.average)}`,
         `Performance la plus présente globale : ${zoneModeText(stats)}`,
-        `Zone globale : rang #${stats.startRankIndex} à #${stats.endRankIndex} après division par 2 (${stats.count} événements)`,
+        `Zone globale : rang quantité ${stats.startRankIndex} à ${stats.endRankIndex} après division par 2 (${stats.count} événements, quantité ${formatRank(stats.totalQuantity || 0)})`,
       ];
     }
 
@@ -2613,7 +2626,7 @@
         return `zone ${teamName}: —`;
       }
 
-      return `zone ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · #${stats.startRankIndex}-${stats.endRankIndex}`;
+      return `zone ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · rangs quantité ${stats.startRankIndex}-${stats.endRankIndex} · quantité ${formatRank(stats.totalQuantity || 0)}`;
     }
 
     function zoneStatsLines(team) {
@@ -2630,7 +2643,7 @@
       return [
         `Performance moyenne zone attribuée à ${teamName} : ${formatValue(stats.average)}`,
         `Performance la plus présente zone attribuée à ${teamName} : ${zoneModeText(stats)}`,
-        `Zone attribuée : rang #${stats.startRankIndex} à #${stats.endRankIndex} (${stats.count} événements, rangs finaux inclus)`,
+        `Zone attribuée : rang quantité ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} événements, quantité ${formatRank(stats.totalQuantity || 0)}, rangs finaux inclus)`,
       ];
     }
 
