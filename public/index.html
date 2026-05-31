@@ -2647,7 +2647,7 @@
         `Rouge appliqué aux deux rangs : ${formatValue(calc.totalCardEffect)}`,
         `Rang bas calculé : ${formatRank(calc.low)}`,
         `Rang haut calculé : ${formatRank(calc.high)}`,
-        ...(calc.simultaneousMode ? [`Mode simultané : rangs utilisés doublés → ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`] : []),
+        ...(calc.simultaneousMode ? [`Mode simultané : mêmes rangs utilisés → ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`] : []),
       ];
     }
 
@@ -2656,7 +2656,7 @@
       const lines = [];
 
       lines.push("VALEUR DE RECHERCHE");
-      lines.push(`Mode scan : ${entry.result?.scanModeLabel || (entry.result?.simultaneousMode ? "simultané lié: rangs ×2" : "standard")}`);
+      lines.push(`Mode scan : ${entry.result?.scanModeLabel || (entry.result?.simultaneousMode ? "simultané lié: mêmes rangs" : "standard")}`);
 
       if (!calc) {
         lines.push("Calculateur : non enregistré sur cette analyse.");
