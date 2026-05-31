@@ -38,6 +38,10 @@ POSITIVE_VALUES = {
     "assist": 0.5,
 }
 
+NEGATIVE_VALUES_FOR_TEAM = {
+    "ownGoal": -1,
+}
+
 CARD_VALUES_FOR_TEAM = {
     "yellow": -0.25,
     "secondYellow": -0.5,
@@ -53,6 +57,7 @@ LABELS = {
     "secondYellow": "Deuxième jaune",
     "red": "Rouge direct",
     "redFromSecondYellow": "Rouge via 2e jaune",
+    "ownGoal": "But contre son camp",
 }
 
 
@@ -364,6 +369,42 @@ def incident_belongs_to_analyzed_team(incident, match, analyzed_team_id):
     return True
 
 
+def is_own_goal_incident(incident):
+    cls = str(incident.get("incidentClass") or "").lower()
+
+    return (
+        incident.get("isOwnGoal") is True or
+        incident.get("ownGoal") is True or
+        cls in {"owngoal", "own_goal", "own goal"} or
+        "own" in cls
+    )
+
+
+def own_goal_committed_by_analyzed_team(incident, match, analyzed_team_id):
+    player = incident.get("player") or {}
+
+    # Pour un CSC, SofaScore peut comptabiliser le but pour l'équipe bénéficiaire.
+    # Dans notre méthode, on veut toujours attribuer l'événement au joueur/club
+    # qui marque contre son camp. On privilégie donc l'équipe du joueur.
+    player_team_id = (
+        ((incident.get("playerTeam") or {}).get("id")) or
+        ((player.get("team") or {}).get("id"))
+    )
+
+    if player_team_id:
+        return player_team_id == analyzed_team_id
+
+    # Repli: si SofaScore place isHome du côté bénéficiaire du but,
+    # l'équipe qui marque contre son camp est l'autre côté.
+    if isinstance(incident.get("isHome"), bool):
+        home_team = match.get("homeTeam") or {}
+        analyzed_is_home = home_team.get("id") == analyzed_team_id
+        own_goal_team_is_home = not incident.get("isHome")
+        return own_goal_team_is_home == analyzed_is_home
+
+    return incident_belongs_to_analyzed_team(incident, match, analyzed_team_id)
+
+
 def signed_attack_value(kind, is_for_analyzed_team):
     base = POSITIVE_VALUES.get(kind, 0)
     return base if is_for_analyzed_team else -base
@@ -371,6 +412,11 @@ def signed_attack_value(kind, is_for_analyzed_team):
 
 def signed_card_value(kind, is_for_analyzed_team):
     base = CARD_VALUES_FOR_TEAM.get(kind, 0)
+    return base if is_for_analyzed_team else -base
+
+
+def signed_own_goal_value(is_for_analyzed_team):
+    base = NEGATIVE_VALUES_FOR_TEAM["ownGoal"]
     return base if is_for_analyzed_team else -base
 
 
@@ -396,8 +442,28 @@ def parse_incidents(incidents, match, analyzed_team_id):
 
         if inc.get("incidentType") == "goal":
             player = inc.get("player") or {}
-            assist1 = inc.get("assist1") or None
             scorer = player.get("name") or "—"
+
+            if is_own_goal_incident(inc):
+                is_for_team = own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
+                camp_label = "Équipe analysée" if is_for_team else "Adversaire"
+                side = "team" if is_for_team else "opponent"
+
+                events.append({
+                    "type": "ownGoal",
+                    "value": signed_own_goal_value(is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · CSC · {scorer}",
+                    "icon": "🥅",
+                })
+                continue
+
+            assist1 = inc.get("assist1") or None
             assister = assist1.get("name") if isinstance(assist1, dict) else None
 
             if assister:
@@ -509,6 +575,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
         order = {
             "goalWithAssist": 0,
             "goal": 0,
+            "ownGoal": 0,
             "assist": 1,
             "secondYellow": 2,
             "redFromSecondYellow": 3,
