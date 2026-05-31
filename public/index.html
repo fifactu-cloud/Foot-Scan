@@ -2159,7 +2159,7 @@
             <div>
               <div class="stat-title">🌐 Zone collective simultanée</div>
               <div class="stat-subtitle">
-                Moyenne globale ${esc(homeName)} + ${esc(awayName)} · #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · rangs finaux inclus.
+                Moyenne globale = zone ${esc(homeName)} + zone ${esc(awayName)} · #${esc(stats.startRankIndex)} à #${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · rangs finaux inclus.
               </div>
             </div>
             <div class="stat-badge">Global</div>
@@ -2174,7 +2174,7 @@
             <div class="stat-card">
               <div class="stat-kicker">Appartenance</div>
               <div class="mode-main">Aucun camp</div>
-              <div class="mode-detail">Cette moyenne sert à lire la tendance collective, pas la domination d’une équipe.</div>
+              <div class="mode-detail">Calculée avec les événements attribués aux deux équipes dans la même zone. Elle n’appartient à aucun camp.</div>
             </div>
 
             <div class="stat-card wide">
@@ -2360,7 +2360,7 @@
               : `${label} attribué à ${target} · ${value} ×${count}`;
 
             const detail = global
-              ? (repartition ? `Répartition : ${repartition}` : "Global toutes équipes attribuées")
+              ? (repartition ? `Répartition globale : ${repartition}` : "Global = zones des deux équipes additionnées")
               : (origins ? `Origines : ${origins}` : "Origine directe");
 
             return `
