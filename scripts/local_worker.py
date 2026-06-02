@@ -590,8 +590,8 @@ def parse_incidents(incidents, match, analyzed_team_id):
 
 
 RANK_EVENT_STEP = 7.25 / 8
-ZONE_FIXED_RANK_LOW = 26.28130
-ZONE_FIXED_RANK_HIGH = 77.9375
+ZONE_FIXED_RANK_LOW = 22.2031
+ZONE_FIXED_RANK_HIGH = 81.5625
 
 
 def event_rank_quantity(event):
@@ -997,6 +997,94 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
     }
 
 
+def display_events_until_rank(events, high_rank):
+    """Retourne seulement les événements à afficher jusqu'au rang haut.
+
+    Les calculs peuvent scanner plus loin (notamment pour les zones fixes),
+    mais l'interface ne doit pas afficher toute la recherche SofaScore.
+    On garde donc du premier événement jusqu'à l'événement qui couvre le rang haut.
+    """
+    if not events:
+        return []
+
+    try:
+        limit = float(high_rank)
+    except Exception:
+        limit = None
+
+    if limit is None or limit <= 0:
+        return []
+
+    cumulative = 0.0
+    selected = []
+
+    for event_index, event in enumerate(events or []):
+        quantity = event_rank_quantity(event)
+
+        if quantity <= 0:
+            continue
+
+        cumulative_start = cumulative
+        cumulative_end = cumulative + quantity
+
+        if cumulative_start <= limit + 1e-9:
+            annotated = annotate_rank_source(event, event_index, cumulative_start, cumulative_end, limit)
+            selected.append(annotated)
+
+        cumulative = cumulative_end
+
+        if cumulative >= limit - 1e-9:
+            break
+
+    return selected
+
+
+def display_matches_until_events(matches_used, display_events):
+    """Garde les matchs du plus récent jusqu'au match du rang haut."""
+    if not matches_used:
+        return []
+
+    if not display_events:
+        return matches_used[:1]
+
+    selected_match_ids = []
+    for event in display_events:
+        match_id = event.get("matchId")
+        if match_id is not None and match_id not in selected_match_ids:
+            selected_match_ids.append(match_id)
+
+    if not selected_match_ids:
+        return matches_used[:1]
+
+    last_position = -1
+    selected_set = set(selected_match_ids)
+
+    for index, match in enumerate(matches_used):
+        if match.get("id") in selected_set:
+            last_position = max(last_position, index)
+
+    if last_position < 0:
+        return matches_used[:1]
+
+    return matches_used[:last_position + 1]
+
+
+def trim_scan_for_display(scan, high_rank):
+    """Conserve les stats calculées sur la liste complète, mais limite l'affichage."""
+    full_events = scan.get("events") or []
+    full_matches = scan.get("matchesUsed") or []
+    display_events = display_events_until_rank(full_events, high_rank)
+    display_matches = display_matches_until_events(full_matches, display_events)
+
+    trimmed = dict(scan)
+    trimmed["eventsTotal"] = len(full_events)
+    trimmed["matchesUsedTotal"] = len(full_matches)
+    trimmed["displayLimitRank"] = high_rank
+    trimmed["events"] = display_events
+    trimmed["matchesUsed"] = display_matches
+    return trimmed
+
+
 def zone_events_between_ranks(events, rank1, rank2=None):
     """Retourne les événements situés entre deux rangs, rangs finaux inclus.
 
@@ -1337,6 +1425,22 @@ def process_scan_job(job_id):
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = bool(params.get("simultaneousMode"))
 
+    try:
+        zone_low = float(params.get("zoneLow") or ZONE_FIXED_RANK_LOW)
+    except Exception:
+        zone_low = ZONE_FIXED_RANK_LOW
+
+    try:
+        zone_high = float(params.get("zoneHigh") or ZONE_FIXED_RANK_HIGH)
+    except Exception:
+        zone_high = ZONE_FIXED_RANK_HIGH
+
+    if zone_high < zone_low:
+        zone_low, zone_high = zone_high, zone_low
+
+    zone_preset_key = str(params.get("zonePresetKey") or "official")
+    zone_preset_label = str(params.get("zonePresetLabel") or "Clubs/Pays Officiel")
+
     effective_rank1 = rank1
     effective_rank2 = rank2
 
@@ -1345,7 +1449,7 @@ def process_scan_job(job_id):
     if effective_rank2 is not None:
         ranks.append(effective_rank2)
 
-    max_needed = float(max(ranks))
+    max_needed = float(max(ranks + [zone_high]))
 
     # En mode simultané, chaque performance attribuée à une équipe est construite
     # avec deux historiques :
@@ -1361,7 +1465,8 @@ def process_scan_job(job_id):
     print(
         f"Scan complet: job={job_id} match={match_id} "
         f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
-        f"objectif avancement brut={scan_fetch_needed} simultaneous={simultaneous_mode}"
+        f"objectif avancement brut={scan_fetch_needed} simultaneous={simultaneous_mode} "
+        f"zone={zone_low}-{zone_high} ({zone_preset_label})"
     )
 
     try:
@@ -1419,20 +1524,24 @@ def process_scan_job(job_id):
                 away_team.get("name") or "Extérieur",
             )
 
+        display_high_rank = max(ranks)
+        home_display_scan = trim_scan_for_display(home_scan, display_high_rank)
+        away_display_scan = trim_scan_for_display(away_scan, display_high_rank)
+
         home = {
             **home_team,
-            **home_scan,
+            **home_display_scan,
             "r1": value_at_rank(home_scan["events"], effective_rank1),
             "r2": value_at_rank(home_scan["events"], effective_rank2) if effective_rank2 else None,
-            "zoneStats": zone_stats_between_ranks(home_scan["events"], ZONE_FIXED_RANK_LOW, ZONE_FIXED_RANK_HIGH),
+            "zoneStats": zone_stats_between_ranks(home_scan["events"], zone_low, zone_high),
         }
 
         away = {
             **away_team,
-            **away_scan,
+            **away_display_scan,
             "r1": value_at_rank(away_scan["events"], effective_rank1),
             "r2": value_at_rank(away_scan["events"], effective_rank2) if effective_rank2 else None,
-            "zoneStats": zone_stats_between_ranks(away_scan["events"], ZONE_FIXED_RANK_LOW, ZONE_FIXED_RANK_HIGH),
+            "zoneStats": zone_stats_between_ranks(away_scan["events"], zone_low, zone_high),
         }
 
         result = {
@@ -1458,8 +1567,10 @@ def process_scan_job(job_id):
                 "secondMatchesPerTeam": SECOND_MATCHES_PER_TEAM,
                 "maxMatchesPerTeam": MAX_MATCHES_PER_TEAM,
                 "incidentBatchSize": INCIDENT_BATCH_SIZE,
-                "zoneFixedRankLow": ZONE_FIXED_RANK_LOW,
-                "zoneFixedRankHigh": ZONE_FIXED_RANK_HIGH,
+                "zoneFixedRankLow": zone_low,
+                "zoneFixedRankHigh": zone_high,
+                "zonePresetKey": zone_preset_key,
+                "zonePresetLabel": zone_preset_label,
             },
         }
 
