@@ -503,6 +503,62 @@
       gap: 12px;
     }
 
+    .preset-box {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(250, 204, 21, 0.20);
+      background:
+        linear-gradient(135deg, rgba(250, 204, 21, 0.08), rgba(56, 189, 248, 0.045)),
+        rgba(0, 0, 0, 0.18);
+    }
+
+    .preset-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 1000;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .preset-hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .preset-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    @media (max-width: 520px) {
+      .preset-actions { grid-template-columns: 1fr; }
+    }
+
+    .preset-btn {
+      min-height: 42px;
+      border-radius: 12px;
+      border: 1px solid rgba(250, 204, 21, 0.24);
+      background: rgba(250, 204, 21, 0.08);
+      color: #fef3c7;
+      font-weight: 1000;
+      letter-spacing: -0.02em;
+    }
+
+    .preset-btn.active {
+      border-color: rgba(34, 197, 94, 0.60);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(56, 189, 248, 0.13));
+      color: #bbf7d0;
+      box-shadow: 0 12px 24px rgba(34, 197, 94, 0.10);
+    }
+
     .auto-control {
       display: grid;
       gap: 8px;
@@ -1459,6 +1515,20 @@
           </div>
 
           <div class="auto-body">
+            <div class="preset-box">
+              <div class="preset-title">
+                <span>Présélections</span>
+                <span id="activePresetLabel">Libre</span>
+              </div>
+              <div class="preset-hint">
+                Les deux présélections appliquent Base 24.5 et Rouge direct 4.5. Les limites offensives et changements restent modifiables.
+              </div>
+              <div class="preset-actions">
+                <button class="preset-btn" id="officialPresetBtn" type="button">Officiel · base 24.5 · rouge 4.5</button>
+                <button class="preset-btn" id="friendlyPresetBtn" type="button">Amical · base 24.5 · rouge 4.5</button>
+              </div>
+            </div>
+
             <div class="auto-grid">
               <div class="auto-control">
                 <div class="auto-control-top">
@@ -1613,6 +1683,7 @@
     let currentJobId = null;
     let pollingTimer = null;
     let lastResult = null;
+    let activePreset = "Libre";
 
     const REPORT_KEY = "footscan_session_report_v1";
     const DOMINANCE_TIE_THRESHOLD = 0;
@@ -1793,6 +1864,7 @@
       return {
         ...calculateRanksFromValues(getAutoValues()),
         mode: "single",
+        presetLabel: activePreset,
       };
     }
 
@@ -1813,9 +1885,37 @@
       const calc = calculateAutoRanks();
       writeCalculatorValues("auto", calc);
 
+      if ($("activePresetLabel")) {
+        $("activePresetLabel").textContent = activePreset;
+      }
+
+      if ($("officialPresetBtn")) {
+        $("officialPresetBtn").classList.toggle("active", activePreset === "Officiel");
+      }
+
+      if ($("friendlyPresetBtn")) {
+        $("friendlyPresetBtn").classList.toggle("active", activePreset === "Amical");
+      }
+
       $("autoLow").textContent = formatRank(calc.low);
       $("autoHigh").textContent = formatRank(calc.high);
       $("autoFormula").textContent = formulaTextForCalc(calc);
+    }
+
+    function applyPreset(label) {
+      activePreset = label;
+
+      $("autoBaseNumber").value = "24.5";
+      $("autoBaseRange").value = "24.5";
+      $("autoRedNumber").value = "4.5";
+      $("autoRedRange").value = "4.5";
+
+      updateAutoCalculator();
+      setStatus(`Présélection ${label} appliquée : base 24.5 · rouge 4.5`, 0);
+    }
+
+    function markPresetAsCustom() {
+      activePreset = "Libre";
     }
 
     function applyAutoRanks() {
@@ -2556,7 +2656,8 @@
     }
 
     function compactCalcLine(label, calc) {
-      const baseLine = `${label} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouges ${calc.reds} · rangs calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      const presetText = calc.presetLabel ? ` · présélection ${calc.presetLabel}` : "";
+      const baseLine = `${label}${presetText} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouges ${calc.reds} · rangs calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
       return calc.simultaneousMode
         ? `${baseLine} · rangs utilisés ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`
         : baseLine;
@@ -2564,6 +2665,7 @@
 
     function detailedCalcLines(calc) {
       return [
+        `Présélection : ${calc.presetLabel || "Libre"}`,
         `Base écrite : ${formatRank(calc.base)}`,
         `Limites offensives : ${calc.offensive}`,
         `Changements : ${calc.changes}`,
@@ -2887,10 +2989,20 @@
     $("downloadFullReportBtn").addEventListener("click", () => downloadReportTxt(false));
     $("clearReportBtn").addEventListener("click", clearReport);
 
-    bindRangeAndNumber("autoBaseRange", "autoBaseNumber", updateAutoCalculator);
-    bindRangeAndNumber("autoOffensiveRange", "autoOffensiveNumber", updateAutoCalculator);
-    bindRangeAndNumber("autoChangeRange", "autoChangeNumber", updateAutoCalculator);
-    bindRangeAndNumber("autoRedRange", "autoRedNumber", updateAutoCalculator);
+    function bindCalculatorInput(rangeId, numberId) {
+      bindRangeAndNumber(rangeId, numberId, () => {
+        markPresetAsCustom();
+        updateAutoCalculator();
+      });
+    }
+
+    bindCalculatorInput("autoBaseRange", "autoBaseNumber");
+    bindCalculatorInput("autoOffensiveRange", "autoOffensiveNumber");
+    bindCalculatorInput("autoChangeRange", "autoChangeNumber");
+    bindCalculatorInput("autoRedRange", "autoRedNumber");
+
+    $("officialPresetBtn").addEventListener("click", () => applyPreset("Officiel"));
+    $("friendlyPresetBtn").addEventListener("click", () => applyPreset("Amical"));
 
     $("simultaneousMode").addEventListener("change", updateAutoCalculator);
     $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
