@@ -497,43 +497,6 @@
       white-space: nowrap;
     }
 
-    .preset-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 9px;
-    }
-
-    @media (max-width: 560px) {
-      .preset-row { grid-template-columns: 1fr; }
-    }
-
-    .preset-btn {
-      min-height: 46px;
-      padding: 10px 12px;
-      border-radius: 13px;
-      border: 1px solid var(--line);
-      background: #171717;
-      color: var(--soft);
-      font-weight: 1000;
-      text-align: left;
-    }
-
-    .preset-btn span {
-      display: block;
-      margin-top: 4px;
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1.25;
-      font-weight: 800;
-    }
-
-    .preset-btn.active {
-      color: white;
-      border-color: rgba(56, 189, 248, 0.55);
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(34, 197, 94, 0.10));
-      box-shadow: 0 12px 26px rgba(56, 189, 248, 0.10);
-    }
-
     .auto-body {
       padding: 13px;
       display: grid;
@@ -1462,7 +1425,7 @@
         <h1 class="home-title">Foot<span>/</span>Scan</h1>
         <p class="hero-text">
           Termux récupère les matchs, calcule les rangs et renvoie le résultat final.
-          Calculateur : base libre 0 → 1000, préréglages Pays Amical / Clubs-Pays Officiel, 2 pages SofaScore.
+          Calculateur : base libre 0 → 1000, valeurs doublées sauf la base, 2 pages SofaScore.
         </p>
       </div>
     </section>
@@ -1489,67 +1452,56 @@
             <div>
               <div class="auto-title">Calcul automatique des rangs</div>
               <div class="auto-sub">
-                Deux préréglages disponibles · base libre modifiable · limites × 19,9375 · marge 0,90625 × changements · rouge direct = −0,90625 × curseur.
+                Base libre · valeurs en X.5 acceptées · limites × 19,9375 · marge 0,90625 × changements · rouge direct = −0,90625 × curseur, appliqué aux deux rangs.
               </div>
             </div>
-            <div class="auto-badge" id="presetBadge">Clubs/Pays Officiel</div>
+            <div class="auto-badge">Base libre</div>
           </div>
 
           <div class="auto-body">
-            <div class="preset-row">
-              <button class="preset-btn" id="presetFriendlyBtn" type="button">
-                Pays Amical
-                <span>Base 16,3125 · L 2 · changements 13 · rouge 9 · zone 11,3281 → 92,8906</span>
-              </button>
-              <button class="preset-btn active" id="presetOfficialBtn" type="button">
-                Clubs/Pays Officiel
-                <span>Base 16,3125 · L 2 · changements 7 · rouge 9 · zone 22,2031 → 81,5625</span>
-              </button>
-            </div>
-
             <div class="auto-grid">
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Base</div>
-                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="16.3125" />
+                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="24.5" />
                 </div>
-                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="16.3125" />
+                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="24.5" />
               </div>
 
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Limites offensives</div>
-                  <input id="autoOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="2" />
+                  <input id="autoOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="4" />
                 </div>
-                <input id="autoOffensiveRange" type="range" min="0" max="22" step="0.5" value="2" />
+                <input id="autoOffensiveRange" type="range" min="0" max="22" step="0.5" value="4" />
               </div>
 
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Changements</div>
-                  <input id="autoChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="7" />
+                  <input id="autoChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="3" />
                 </div>
-                <input id="autoChangeRange" type="range" min="0" max="22" step="0.5" value="7" />
+                <input id="autoChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
               </div>
 
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Rouges directs</div>
-                  <input id="autoRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="9" />
+                  <input id="autoRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="4.5" />
                 </div>
-                <input id="autoRedRange" type="range" min="0" max="22" step="0.5" value="9" />
+                <input id="autoRedRange" type="range" min="0" max="22" step="0.5" value="4.5" />
               </div>
             </div>
 
             <div class="auto-result">
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang bas</div>
-                <div class="auto-result-value" id="autoLow">41.6875</div>
+                <div class="auto-result-value" id="autoLow">97.453125</div>
               </div>
 
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang haut</div>
-                <div class="auto-result-value" id="autoHigh">54.375</div>
+                <div class="auto-result-value" id="autoHigh">102.890625</div>
               </div>
             </div>
 
@@ -1663,32 +1615,7 @@
     let lastResult = null;
 
     const REPORT_KEY = "footscan_session_report_v1";
-    const DOMINANCE_TIE_THRESHOLD = 0.125;
-
-    const AUTO_PRESETS = {
-      friendly: {
-        key: "friendly",
-        label: "Pays Amical",
-        base: 16.3125,
-        offensive: 2,
-        changes: 13,
-        reds: 9,
-        zoneLow: 11.3281,
-        zoneHigh: 92.8906,
-      },
-      official: {
-        key: "official",
-        label: "Clubs/Pays Officiel",
-        base: 16.3125,
-        offensive: 2,
-        changes: 7,
-        reds: 9,
-        zoneLow: 22.2031,
-        zoneHigh: 81.5625,
-      },
-    };
-
-    let activePresetKey = "official";
+    const DOMINANCE_TIE_THRESHOLD = 0;
 
     const LABELS = {
       goal: "But",
@@ -1854,39 +1781,6 @@
       };
     }
 
-    function currentPreset() {
-      return AUTO_PRESETS[activePresetKey] || AUTO_PRESETS.official;
-    }
-
-    function setActivePreset(key, applyValues = true) {
-      const preset = AUTO_PRESETS[key] || AUTO_PRESETS.official;
-      activePresetKey = preset.key;
-
-      if (applyValues) {
-        writeCalculatorValues("auto", calculateRanksFromValues(preset));
-      }
-
-      const friendlyBtn = $("presetFriendlyBtn");
-      const officialBtn = $("presetOfficialBtn");
-      const badge = $("presetBadge");
-
-      if (friendlyBtn) friendlyBtn.classList.toggle("active", preset.key === "friendly");
-      if (officialBtn) officialBtn.classList.toggle("active", preset.key === "official");
-      if (badge) badge.textContent = preset.label;
-
-      updateAutoCalculator();
-    }
-
-    function zoneSettingsForScan() {
-      const preset = currentPreset();
-      return {
-        zoneLow: preset.zoneLow,
-        zoneHigh: preset.zoneHigh,
-        zonePresetKey: preset.key,
-        zonePresetLabel: preset.label,
-      };
-    }
-
     function getAutoValues() {
       return readCalculatorValues("auto");
     }
@@ -1896,17 +1790,14 @@
     }
 
     function calculateAutoRanks() {
-      const zone = zoneSettingsForScan();
       return {
         ...calculateRanksFromValues(getAutoValues()),
-        ...zone,
         mode: "single",
       };
     }
 
     function formulaTextForCalc(calc) {
       return (
-        `Préréglage : ${calc.zonePresetLabel} · zone stats : ${formatRank(calc.zoneLow)} → ${formatRank(calc.zoneHigh)} · ` +
         `Base : ${formatRank(calc.base)} · ` +
         `limites : ${calc.offensive} × 19.9375 = ${formatRank(calc.offensiveBoost)} · ` +
         `base corrigée : ${formatRank(calc.adjustedBase)} · ` +
@@ -1985,7 +1876,7 @@
       const diff = homeAvg - awayAvg;
       const absDiff = Math.abs(diff);
 
-      if (absDiff < DOMINANCE_TIE_THRESHOLD) {
+      if (absDiff < 0.000000001) {
         return {
           type: "tie",
           label: "Égalité",
@@ -2017,7 +1908,7 @@
           <div class="dominance-box">
             <div class="dominance-label">Domination moyenne</div>
             <div class="dominance-team">Égalité</div>
-            <div class="dominance-meta">Moyenne des deux rangs : ${esc(formatValue(dominance.average))} · écart inférieur à ${esc(formatRank(DOMINANCE_TIE_THRESHOLD))}</div>
+            <div class="dominance-meta">Moyenne des deux rangs : ${esc(formatValue(dominance.average))}</div>
           </div>
         `;
       }
@@ -2106,7 +1997,6 @@
           skipHome: skipHomeValue,
           skipAway: skipAwayValue,
           simultaneousMode: isSimultaneousMode(),
-          ...zoneSettingsForScan(),
         }),
       });
 
@@ -2452,8 +2342,8 @@
           <div class="zone-card">
             <div class="stat-header">
               <div>
-                <div class="stat-title">Zone préréglée attribuée à ${esc(teamName)}</div>
-                <div class="stat-subtitle">Événements attribués à ${esc(teamName)} entre les deux rangs.</div>
+                <div class="stat-title">Zone des rangs attribuée à ${esc(teamName)}</div>
+                <div class="stat-subtitle">Événements attribués à ${esc(teamName)} entre le rang bas et le rang haut final.</div>
               </div>
               <div class="stat-badge">Équipe</div>
             </div>
@@ -2475,8 +2365,8 @@
         <div class="zone-card">
           <div class="stat-header">
             <div>
-              <div class="stat-title">Zone préréglée attribuée à ${esc(teamName)}</div>
-              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · avancement total ${esc(formatRank(stats.totalQuantity || 0))} · 7.25/8 par événement · zone préréglée.</div>
+              <div class="stat-title">Zone des rangs attribuée à ${esc(teamName)}</div>
+              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · avancement total ${esc(formatRank(stats.totalQuantity || 0))} · 7.25/8 par événement · zone rang bas → rang haut final.</div>
             </div>
             <div class="stat-badge">Équipe</div>
           </div>
@@ -2549,7 +2439,7 @@
 
               <div>
                 <div class="team-name">${esc(team.name)}</div>
-                <div class="team-meta">${events.length} événements affichés · ${matchesUsed.length} matchs affichés · arrêt au rang haut</div>
+                <div class="team-meta">${events.length} événements · ${matchesUsed.length} matchs utilisés</div>
               </div>
             </div>
           </div>
@@ -2644,7 +2534,7 @@
         return `zone ${teamName}: —`;
       }
 
-      return `zone préréglée ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · rangs ${stats.startRankIndex}-${stats.endRankIndex} · avancement ${formatRank(stats.totalQuantity || 0)}`;
+      return `zone rangs finaux ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · rangs ${stats.startRankIndex}-${stats.endRankIndex} · avancement ${formatRank(stats.totalQuantity || 0)}`;
     }
 
     function zoneStatsLines(team) {
@@ -2661,7 +2551,7 @@
       return [
         `Performance moyenne zone attribuée à ${teamName} : ${formatValue(stats.average)}`,
         `Performance la plus présente zone attribuée à ${teamName} : ${zoneModeText(stats)}`,
-        `Zone préréglée attribuée : rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} événements, avancement ${formatRank(stats.totalQuantity || 0)}, 7.25/8 par événement)`,
+        `Zone rangs finaux attribuée : rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} événements, avancement ${formatRank(stats.totalQuantity || 0)}, 7.25/8 par événement)`,
       ];
     }
 
@@ -2680,7 +2570,6 @@
         `Rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`,
         `Impact rouge direct : -0.90625 × ${calc.reds} = ${formatValue(calc.redEffect)}`,
         `Rouge appliqué aux deux rangs : ${formatValue(calc.totalCardEffect)}`,
-        `Préréglage zone : ${calc.zonePresetLabel || "—"} (${formatRank(calc.zoneLow)} à ${formatRank(calc.zoneHigh)})`,
         `Rang bas calculé : ${formatRank(calc.low)}`,
         `Rang haut calculé : ${formatRank(calc.high)}`,
         ...(calc.simultaneousMode ? [`Mode simultané : mêmes rangs utilisés → ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`] : []),
@@ -2717,7 +2606,7 @@
       }
 
       if (dominance.type === "tie") {
-        return [`Domination moyenne : égalité (${formatValue(dominance.average)}) · écart ${formatRank(dominance.diff)} inférieur à ${formatRank(DOMINANCE_TIE_THRESHOLD)}`];
+        return [`Domination moyenne : égalité (${formatValue(dominance.average)})`];
       }
 
       if (compact) {
@@ -2989,9 +2878,6 @@
     renderSkipButtons("skipHome", () => skipHomeValue, (value) => skipHomeValue = value);
     renderSkipButtons("skipAway", () => skipAwayValue, (value) => skipAwayValue = value);
 
-    $("presetFriendlyBtn").addEventListener("click", () => setActivePreset("friendly", true));
-    $("presetOfficialBtn").addEventListener("click", () => setActivePreset("official", true));
-
     $("scanBtn").addEventListener("click", handleScan);
     $("addReportBtn").addEventListener("click", addCurrentAnalysisToReport);
     $("copySimpleReportBtn").addEventListener("click", () => copyReport(true));
@@ -3010,7 +2896,6 @@
     $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
 
     updateReportCount();
-    setActivePreset(activePresetKey, false);
     updateAutoCalculator();
   </script>
 </body>
