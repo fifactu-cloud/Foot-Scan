@@ -66,13 +66,6 @@ function rank(x) {
   return Number.isFinite(x) && x > 0 ? x : null;
 }
 
-function numberValue(x, fallback = null) {
-  if (x === undefined || x === null || x === '') return fallback;
-
-  x = Number(String(x).replace(',', '.'));
-  return Number.isFinite(x) ? x : fallback;
-}
-
 function skip(x) {
   x = Number(x || 0);
   return Number.isFinite(x) ? Math.max(0, Math.min(5, Math.floor(x))) : 0;
@@ -115,10 +108,6 @@ module.exports = async function (req, res) {
     const rank1 = rank(b.rank1);
     const rank2 = rank(b.rank2);
     const simultaneousMode = bool(b.simultaneousMode);
-    const zoneLow = numberValue(b.zoneLow, null);
-    const zoneHigh = numberValue(b.zoneHigh, null);
-    const zonePresetKey = String(b.zonePresetKey || '').slice(0, 80);
-    const zonePresetLabel = String(b.zonePresetLabel || '').slice(0, 120);
 
     if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
@@ -152,10 +141,6 @@ module.exports = async function (req, res) {
         skipHome: skip(b.skipHome),
         skipAway: skip(b.skipAway),
         simultaneousMode,
-        zoneLow,
-        zoneHigh,
-        zonePresetKey,
-        zonePresetLabel,
       },
     };
 
