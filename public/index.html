@@ -1544,11 +1544,11 @@
                 <span id="activePresetLabel">Libre</span>
               </div>
               <div class="preset-hint">
-                Présélections restaurées : Pays amicaux et Clubs/Pays officiel. Les deux appliquent Base 24.5 et Rouge direct 4.5. Les limites offensives et changements restent modifiables.
+                Présélections restaurées : Clubs/Pays officiel et Pays amicaux. Les deux appliquent Base 24.5 et Rouge direct 4.5. Officiel = limites 2 / changements 7. Amical = limites 2 / changements 13.
               </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiel<small>base 24.5 · rouge 4.5</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>base 24.5 · rouge 4.5</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiel<small>base 24.5 · L 2 · changements 7 · rouge 4.5</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>base 24.5 · L 2 · changements 13 · rouge 4.5</small></button>
               </div>
             </div>
 
@@ -1928,13 +1928,24 @@
     function applyPreset(label) {
       activePreset = label;
 
+      const isFriendly = label === "Pays Amicaux";
+      const offensive = "2";
+      const changes = isFriendly ? "13" : "7";
+
       $("autoBaseNumber").value = "24.5";
       $("autoBaseRange").value = "24.5";
+
+      $("autoOffensiveNumber").value = offensive;
+      $("autoOffensiveRange").value = offensive;
+
+      $("autoChangeNumber").value = changes;
+      $("autoChangeRange").value = changes;
+
       $("autoRedNumber").value = "4.5";
       $("autoRedRange").value = "4.5";
 
       updateAutoCalculator();
-      setStatus(`Présélection ${label} appliquée : base 24.5 · rouge 4.5`, 0);
+      setStatus(`Présélection ${label} appliquée : base 24.5 · limites ${offensive} · changements ${changes} · rouge 4.5`, 0);
     }
 
     function markPresetAsCustom() {
