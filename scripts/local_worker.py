@@ -30,7 +30,11 @@ PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "20"))
 INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM", "15"))
 SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
 MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "100"))
-INCIDENT_BATCH_SIZE = int(os.environ.get("FOOTSCAN_INCIDENT_BATCH_SIZE", "4"))
+INCIDENT_BATCH_SIZE = int(os.environ.get("FOOTSCAN_INCIDENT_BATCH_SIZE", "2"))
+INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "2"))
+SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "3"))
+SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.8"))
+PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
 RANK_EVENT_STEP = 7.25 / 8
 
 POSITIVE_VALUES = {
@@ -108,6 +112,10 @@ def read_url(url, headers):
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         return e.code, body
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        # Erreurs réseau Termux / mobile : on remonte une erreur spéciale.
+        # sofa_fetch fera les retry avant d'abandonner.
+        return 0, str(e)
 
 
 def validate_json(status, body, path, source):
@@ -155,18 +163,27 @@ def sofa_fetch(path):
 
     last_error = None
 
-    for url in urls:
-        status, body = read_url(url, headers)
-        valid_body, error = validate_json(status, body, clean_path, url)
+    for attempt in range(1, SOFA_FETCH_RETRIES + 1):
+        for url in urls:
+            status, body = read_url(url, headers)
+            valid_body, error = validate_json(status, body, clean_path, url)
 
-        if valid_body is not None:
-            return valid_body
+            if valid_body is not None:
+                return valid_body
 
-        last_error = error
-        print(f"Échec: {error}", file=sys.stderr)
+            last_error = error
+
+            # 404 = page absente : inutile de retenter plusieurs fois.
+            if status == 404:
+                print(f"Échec définitif: {error}", file=sys.stderr)
+                raise RuntimeError(error)
+
+            print(f"Échec tentative {attempt}/{SOFA_FETCH_RETRIES}: {error}", file=sys.stderr)
+
+        if attempt < SOFA_FETCH_RETRIES:
+            time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
 
     raise RuntimeError(last_error or f"Impossible de récupérer {clean_path}")
-
 
 def cache_key(path):
     return f"{CACHE_PREFIX}{path.lstrip('/')}"
@@ -254,6 +271,9 @@ def enqueue_prefetch(path):
 
 
 def maybe_enqueue_incidents_from_team_page(path, body):
+    if not PREFETCH_ENABLED:
+        return
+
     clean_path = path.lstrip("/")
 
     if not re.match(r"^team/\d+/events/last/\d+$", clean_path):
@@ -998,6 +1018,21 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 )
                 break
 
+            # Erreur réseau sur une page historique : si on a déjà des pages, on continue
+            # avec ce qu'on a au lieu de faire planter tout le scan. Si la page 0 plante,
+            # on remonte l'erreur car on n'a aucune base pour analyser l'équipe.
+            if pages:
+                update_scan_job(
+                    job_id,
+                    status="running",
+                    message=(
+                        f"{team_name} · page {page + 1} ignorée après erreur réseau.\n"
+                        f"Pages déjà récupérées : {page}/{PAGES_TO_LOAD}"
+                    ),
+                    progress=base_progress + int(progress_span * 0.10),
+                )
+                break
+
             raise
 
         page_events = data.get("events") if isinstance(data, dict) else data
@@ -1086,7 +1121,9 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 
             scanned = []
 
-            with ThreadPoolExecutor(max_workers=len(batch) or 1) as executor:
+            max_workers = max(1, min(len(batch) or 1, INCIDENT_MAX_WORKERS))
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {}
 
                 for idx, match in enumerate(batch):
@@ -1095,7 +1132,28 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 
                 for future in as_completed(futures):
                     idx, match = futures[future]
-                    data = future.result()
+
+                    try:
+                        data = future.result()
+                    except Exception as e:
+                        # Erreur réseau ou match incident indisponible : on ignore ce match
+                        # au lieu de faire échouer tout le scan.
+                        print(f"Match ignoré après erreur incidents {match.get('id')}: {e}", file=sys.stderr)
+                        scanned.append({
+                            "idx": idx,
+                            "match": match,
+                            "events": [],
+                            "matchUsed": {
+                                "id": match.get("id"),
+                                "label": make_match_label(match),
+                                "count": 0,
+                                "startTimestamp": match.get("startTimestamp") or 0,
+                                "competition": get_competition_name(match),
+                                "error": str(e),
+                            },
+                        })
+                        continue
+
                     incidents = data.get("incidents") if isinstance(data, dict) else data
 
                     if not isinstance(incidents, list):
@@ -1502,12 +1560,13 @@ def main():
 
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: scan complet côté worker activé.")
-    print("Pages SofaScore: 10 pages activées.")
+    print("Pages SofaScore: jusqu’à 20 pages, arrêt automatique si 404/page vide.")
     print("Mode simultané lié: mêmes rangs, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Calcul pondéré: X / X.125 / X.25 / X.375 / X.5 / X.625 / X.75 / X.875 activé.")
     print("Barème cartons: jaune, 2e jaune, rouge direct, rouge via 2e jaune activé.")
-    print("Version rapide: préchargement incidents activé.")
+    print("Stabilité réseau: retry SofaScore + incidents ignorés en cas d’erreur.")
+    print("Préchargement incidents: désactivé par défaut pour économiser les requêtes.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
     while True:
