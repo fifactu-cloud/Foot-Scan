@@ -421,12 +421,23 @@ def signed_own_goal_value(is_for_analyzed_team):
 
 
 def parse_incidents(incidents, match, analyzed_team_id):
+    """Récupère uniquement les buts.
+
+    Depuis cette version, les cartons et les passes décisives seules ne sont
+    plus parcourus. Les seuls événements conservés sont :
+    - but sans passe
+    - but avec passe
+    - but contre son camp
+    """
     events = []
     match_label = make_match_label(match)
     match_id = match.get("id")
 
     for inc in incidents:
         if not isinstance(inc, dict):
+            continue
+
+        if inc.get("incidentType") != "goal":
             continue
 
         minute = inc.get("time")
@@ -440,135 +451,57 @@ def parse_incidents(incidents, match, analyzed_team_id):
         camp_label = "Équipe analysée" if is_for_team else "Adversaire"
         side = "team" if is_for_team else "opponent"
 
-        if inc.get("incidentType") == "goal":
-            player = inc.get("player") or {}
-            scorer = player.get("name") or "—"
+        player = inc.get("player") or {}
+        scorer = player.get("name") or "—"
 
-            if is_own_goal_incident(inc):
-                is_for_team = own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
-                camp_label = "Équipe analysée" if is_for_team else "Adversaire"
-                side = "team" if is_for_team else "opponent"
+        if is_own_goal_incident(inc):
+            is_for_team = own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
+            camp_label = "Équipe analysée" if is_for_team else "Adversaire"
+            side = "team" if is_for_team else "opponent"
 
-                events.append({
-                    "type": "ownGoal",
-                    "value": signed_own_goal_value(is_for_team),
-                    "minute": minute,
-                    "added": added,
-                    "minuteLabel": minute_label,
-                    "match": match_label,
-                    "matchId": match_id,
-                    "side": side,
-                    "detail": f"{camp_label} · CSC · {scorer}",
-                    "icon": "🥅",
-                })
-                continue
+            events.append({
+                "type": "ownGoal",
+                "value": signed_own_goal_value(is_for_team),
+                "minute": minute,
+                "added": added,
+                "minuteLabel": minute_label,
+                "match": match_label,
+                "matchId": match_id,
+                "side": side,
+                "detail": f"{camp_label} · CSC · {scorer}",
+                "icon": "🥅",
+            })
+            continue
 
-            assist1 = inc.get("assist1") or None
-            assister = assist1.get("name") if isinstance(assist1, dict) else None
+        assist1 = inc.get("assist1") or None
+        assister = assist1.get("name") if isinstance(assist1, dict) else None
 
-            if assister:
-                events.append({
-                    "type": "goalWithAssist",
-                    "value": signed_attack_value("goalWithAssist", is_for_team),
-                    "minute": minute,
-                    "added": added,
-                    "minuteLabel": minute_label,
-                    "match": match_label,
-                    "matchId": match_id,
-                    "side": side,
-                    "detail": f"{camp_label} · {scorer} — passe : {assister}",
-                    "icon": "⚽",
-                })
-
-                events.append({
-                    "type": "assist",
-                    "value": signed_attack_value("assist", is_for_team),
-                    "minute": minute,
-                    "added": added,
-                    "minuteLabel": minute_label,
-                    "match": match_label,
-                    "matchId": match_id,
-                    "side": side,
-                    "detail": f"{camp_label} · {assister} → {scorer}",
-                    "icon": "🅰️",
-                })
-            else:
-                events.append({
-                    "type": "goal",
-                    "value": signed_attack_value("goal", is_for_team),
-                    "minute": minute,
-                    "added": added,
-                    "minuteLabel": minute_label,
-                    "match": match_label,
-                    "matchId": match_id,
-                    "side": side,
-                    "detail": f"{camp_label} · {scorer}",
-                    "icon": "⚽",
-                })
-
-        if inc.get("incidentType") == "card":
-            player = inc.get("player") or {}
-
-            if not player.get("id"):
-                continue
-
-            cls = inc.get("incidentClass")
-            player_name = player.get("name") or "—"
-
-            if cls == "yellow":
-                events.append({
-                    "type": "yellow",
-                    "value": signed_card_value("yellow", is_for_team),
-                    "minute": minute,
-                    "added": added,
-                    "minuteLabel": minute_label,
-                    "match": match_label,
-                    "matchId": match_id,
-                    "side": side,
-                    "detail": f"{camp_label} · {player_name}",
-                    "icon": "🟨",
-                })
-
-            elif cls == "yellowRed":
-                events.append({
-                    "type": "secondYellow",
-                    "value": signed_card_value("secondYellow", is_for_team),
-                    "minute": minute,
-                    "added": added,
-                    "minuteLabel": minute_label,
-                    "match": match_label,
-                    "matchId": match_id,
-                    "side": side,
-                    "detail": f"{camp_label} · {player_name}",
-                    "icon": "🟧",
-                })
-
-                events.append({
-                    "type": "redFromSecondYellow",
-                    "value": signed_card_value("redFromSecondYellow", is_for_team),
-                    "minute": minute,
-                    "added": added,
-                    "minuteLabel": minute_label,
-                    "match": match_label,
-                    "matchId": match_id,
-                    "side": side,
-                    "detail": f"{camp_label} · {player_name}",
-                    "icon": "🟥",
-                })
-
-            elif cls == "red":
-                events.append({
-                    "type": "red",
-                    "value": signed_card_value("red", is_for_team),
-                    "minute": minute,
-                    "added": added,
-                    "minuteLabel": minute_label,
-                    "match": match_label,
-                    "matchId": match_id,
-                    "side": side,
-                    "detail": f"{camp_label} · {player_name}",
-                    "icon": "🟥",
-                })
+        if assister:
+            events.append({
+                "type": "goalWithAssist",
+                "value": signed_attack_value("goalWithAssist", is_for_team),
+                "minute": minute,
+                "added": added,
+                "minuteLabel": minute_label,
+                "match": match_label,
+                "matchId": match_id,
+                "side": side,
+                "detail": f"{camp_label} · {scorer} — passe : {assister}",
+                "icon": "⚽",
+            })
+        else:
+            events.append({
+                "type": "goal",
+                "value": signed_attack_value("goal", is_for_team),
+                "minute": minute,
+                "added": added,
+                "minuteLabel": minute_label,
+                "match": match_label,
+                "matchId": match_id,
+                "side": side,
+                "detail": f"{camp_label} · {scorer}",
+                "icon": "⚽",
+            })
 
     def sort_key(ev):
         time_value = ev.get("minute", 0) + (ev.get("added", 0) or 0) / 100
@@ -576,22 +509,11 @@ def parse_incidents(incidents, match, analyzed_team_id):
             "goalWithAssist": 0,
             "goal": 0,
             "ownGoal": 0,
-            "assist": 1,
-            "secondYellow": 2,
-            "redFromSecondYellow": 3,
-            "yellow": 4,
-            "red": 4,
         }.get(ev.get("type"), 9)
         return (-time_value, order)
 
     events.sort(key=sort_key)
     return events
-
-
-
-RANK_EVENT_STEP = 7.25 / 8
-ZONE_FIXED_RANK_LOW = 30.390675  # conservé uniquement pour compatibilité ancienne, non utilisé
-ZONE_FIXED_RANK_HIGH = 82.046875  # conservé uniquement pour compatibilité ancienne, non utilisé
 
 
 def event_rank_quantity(event):
