@@ -26,10 +26,10 @@ SCAN_JOB_TTL_SECONDS = int(os.environ.get("SCAN_JOB_TTL_SECONDS", "86400"))
 SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "0.5"))
 PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAGE", "17"))
 
-PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "10"))
+PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "20"))
 INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM", "15"))
 SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
-MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "20"))
+MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "100"))
 INCIDENT_BATCH_SIZE = int(os.environ.get("FOOTSCAN_INCIDENT_BATCH_SIZE", "4"))
 RANK_EVENT_STEP = 7.25 / 8
 
@@ -977,11 +977,41 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             progress=base_progress + int(progress_span * 0.10 * ((page + 1) / PAGES_TO_LOAD)),
         )
 
-        data = get_json(f"team/{analyzed_team_id}/events/last/{page}")
+        page_path = f"team/{analyzed_team_id}/events/last/{page}"
+
+        try:
+            data = get_json(page_path)
+        except Exception as e:
+            error_text = str(e)
+
+            # SofaScore renvoie parfois 404 quand une équipe n'a plus de page historique.
+            # Ce n'est pas une vraie erreur de scan : on s'arrête simplement aux pages déjà récupérées.
+            if "HTTP 404" in error_text or "Not Found" in error_text:
+                update_scan_job(
+                    job_id,
+                    status="running",
+                    message=(
+                        f"{team_name} · fin de l'historique SofaScore à la page {page + 1}.\n"
+                        f"Pages récupérées : {page}/{PAGES_TO_LOAD}"
+                    ),
+                    progress=base_progress + int(progress_span * 0.10),
+                )
+                break
+
+            raise
+
         page_events = data.get("events") if isinstance(data, dict) else data
 
-        if isinstance(page_events, list):
+        if isinstance(page_events, list) and page_events:
             pages.extend(page_events)
+        else:
+            update_scan_job(
+                job_id,
+                status="running",
+                message=f"{team_name} · page {page + 1} vide, arrêt de l'historique.",
+                progress=base_progress + int(progress_span * 0.10),
+            )
+            break
 
     by_id = {}
 
