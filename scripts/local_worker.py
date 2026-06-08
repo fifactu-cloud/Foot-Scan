@@ -44,7 +44,6 @@ GOAL_ERROR_VALUE = 1 / 3
 POSITIVE_VALUES = {
     "goalWithAssist": GOAL_WITH_PASSER_VALUE,
     "goal": GOAL_WITHOUT_PASSER_VALUE,
-    "goalNoAssistError": GOAL_ERROR_VALUE,
 }
 
 NEGATIVE_VALUES_FOR_TEAM = {
@@ -61,7 +60,7 @@ CARD_VALUES_FOR_TEAM = {
 LABELS = {
     "goal": "But sans passeur",
     "goalWithAssist": "But avec passeur",
-    "goalNoAssistError": "Erreur sur but sans passeur",
+    "goalNoAssistError": "CSC / erreur",
     "assist": "Passe décisive",
     "yellow": "Jaune",
     "secondYellow": "Deuxième jaune",
@@ -452,8 +451,11 @@ def parse_incidents(incidents, match, analyzed_team_id):
     Depuis cette version, les cartons et les passes décisives seules ne sont
     plus parcourus. Les seuls événements conservés sont :
     - but avec passeur = performance 1
-    - but sans passeur = 2/3 de performance 1 + erreur adverse = 1/3
-    - CSC = 1/3 de performance 1
+    - but sans passeur = 2/3 de performance 1
+    - CSC / erreur adverse = 1/3 de performance 1
+
+    Le 1/3 d'un but sans passeur est classé dans la catégorie CSC / erreur :
+    il compte comme une erreur de l'équipe qui encaisse.
     """
     events = []
     match_label = make_match_label(match)
@@ -539,16 +541,16 @@ def parse_incidents(incidents, match, analyzed_team_id):
             error_side = "team" if error_is_for_team else "opponent"
 
             events.append({
-                "type": "goalNoAssistError",
-                "value": signed_attack_value("goalNoAssistError", is_for_team),
+                "type": "ownGoal",
+                "value": signed_own_goal_value(error_is_for_team),
                 "minute": minute,
                 "added": added,
                 "minuteLabel": minute_label,
                 "match": match_label,
                 "matchId": match_id,
                 "side": error_side,
-                "detail": f"{error_camp_label} · erreur sur but sans passeur · {scorer}",
-                "icon": "🎯",
+                "detail": f"{error_camp_label} · CSC / erreur sur but sans passeur · {scorer}",
+                "icon": "🥅",
                 "subOrder": 1,
             })
 
@@ -557,8 +559,8 @@ def parse_incidents(incidents, match, analyzed_team_id):
         order = {
             "goalWithAssist": 0,
             "goal": 0,
-            "goalNoAssistError": 1,
             "ownGoal": 1,
+            "goalNoAssistError": 1,
         }.get(ev.get("type"), 9)
         return (-time_value, ev.get("subOrder", order), order)
 
