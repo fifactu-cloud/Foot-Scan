@@ -232,6 +232,8 @@
 
     .match-hero {
       padding: 16px;
+      position: relative;
+      overflow: hidden;
     }
 
     .match-teams {
@@ -2307,6 +2309,92 @@
       100% { transform: translateX(120%); opacity: 0; }
     }
 
+
+    @keyframes cupBallRoll {
+      0% { transform: translate3d(22px, 0, 0) rotate(0deg); }
+      48% { transform: translate3d(-18px, 2px, 0) rotate(-178deg); }
+      100% { transform: translate3d(22px, 0, 0) rotate(-360deg); }
+    }
+
+    @keyframes cupBallShadow {
+      0%, 100% { transform: translateX(20px) scaleX(.82); opacity: .30; }
+      48% { transform: translateX(-18px) scaleX(1); opacity: .42; }
+    }
+
+    @keyframes ballTrailSweep {
+      0% { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+      22%, 66% { opacity: .55; }
+      100% { transform: translateX(150%) skewX(-18deg); opacity: 0; }
+    }
+
+    .rolling-cup-ball {
+      position: absolute;
+      right: 22px;
+      bottom: 18px;
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      z-index: 1;
+      pointer-events: none;
+      opacity: .86;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,.98) 0 19%, transparent 20%),
+        conic-gradient(from -18deg, #2f7dff 0 17%, #ffffff 17% 26%, #22c55e 26% 35%, #ffffff 35% 49%, #ef1f4f 49% 65%, #ffffff 65% 78%, #10b981 78% 87%, #ffffff 87% 100%);
+      box-shadow:
+        inset -9px -12px 18px rgba(2, 6, 23, .25),
+        inset 7px 8px 14px rgba(255,255,255,.42),
+        0 16px 28px rgba(0,0,0,.28);
+      animation: cupBallRoll 5.2s ease-in-out infinite;
+    }
+
+    .rolling-cup-ball::before {
+      content: "26";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 28px;
+      height: 28px;
+      transform: translate(-50%, -50%);
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      background: linear-gradient(135deg, rgba(59,130,246,.92), rgba(14,165,233,.72));
+      color: #fff;
+      font-size: 13px;
+      font-weight: 1000;
+      letter-spacing: -.1em;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.45);
+    }
+
+    .rolling-cup-ball::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: -13px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(0,0,0,.52);
+      filter: blur(4px);
+      animation: cupBallShadow 5.2s ease-in-out infinite;
+    }
+
+    .hero::before,
+    .auto-box::before,
+    .scan-btn::before {
+      will-change: transform, opacity;
+    }
+
+    .hero::before {
+      animation: ballTrailSweep 6.8s ease-in-out infinite;
+    }
+
+    .event-icon {
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,.16), transparent 24%),
+        linear-gradient(135deg, rgba(56,189,248,.18), rgba(255,54,93,.13));
+    }
+
     html,
     body {
       width: 100%;
@@ -2490,6 +2578,41 @@
         min-width: 0;
         width: 100%;
       }
+
+
+      .rolling-cup-ball {
+        width: 46px;
+        height: 46px;
+        right: 12px;
+        bottom: 12px;
+        opacity: .72;
+        animation-duration: 4.6s;
+      }
+
+      .rolling-cup-ball::before {
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        font-size: 10px;
+      }
+
+      .match-ball {
+        bottom: auto;
+        top: 12px;
+      }
+
+      .notice {
+        border-color: rgba(250, 204, 21, .28);
+        box-shadow: 0 16px 44px rgba(250, 204, 21, .06), inset 0 1px 0 rgba(255,255,255,.06);
+      }
+
+      .notice-icon {
+        animation: tapFlash 2.8s ease-in-out infinite;
+      }
+
+      .scan-btn {
+        background-size: 220% 100%;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -2525,19 +2648,20 @@
   <main class="app">
     <section class="hero" id="hero">
       <div class="hero-inner">
-        <div class="kicker">⚡ Scan complet côté worker</div>
+        <div class="kicker">🔎 Scan Complet Côté Worker</div>
+        <div class="rolling-cup-ball" aria-hidden="true"></div>
         <h1 class="home-title">Foot<span>/</span>Scan</h1>
         <p class="hero-text">
-          Termux récupère les matchs, calcule les rangs et renvoie le résultat final.
-          Nouvelle version : 3 catégories de buts, Base 31,3125, Avancement réglable par événement et interface mobile derby bleu/rouge plus travaillée.
+          Termux récupère les matchs, calcule les rangs et renvoie le résultat final pendant que le ballon tourne côté worker.
+          Nouvelle Version : 3 Catégories De Buts, Base Conservée, Avancement Réglable Par Événement Et Interface Mobile Bleu/Rouge Avec Animations Ballon.
         </p>
       </div>
     </section>
 
     <section class="panel notice panel-pad">
-      <div class="notice-icon">⚡</div>
+      <div class="notice-icon">⚠️</div>
       <div>
-        <div class="notice-title">Termux doit rester ouvert</div>
+        <div class="notice-title">⚠️ Termux Doit Rester Ouvert</div>
         <p class="notice-text">
           Lance <code>python scripts/local_worker.py</code>. Le navigateur ne pilote plus les incidents un par un.
         </p>
@@ -2569,11 +2693,11 @@
                 <span id="activePresetLabel">Libre</span>
               </div>
               <div class="preset-hint">
-                Présélections Match : mêmes curseurs qu’avant pour les Changements. Base 31,3125 pour toutes les Bases. Avancement par défaut 0,6667. Aucun Rouge dans le Calcul Automatique.
+                Présélections Match : mêmes curseurs qu’avant pour les Changements. Base 31,3125 pour toutes les Bases. Avancement par défaut 1. Aucun Rouge dans le Calcul Automatique.
               </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiels<small>Base 31,3125 · Avancement 0,6667 · Changements 7</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>Base 31,3125 · Avancement 0,6667 · Changements 13</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiels<small>Base 31,3125 · Avancement 1 · Changements 7</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>Base 31,3125 · Avancement 1 · Changements 13</small></button>
               </div>
             </div>
 
@@ -2589,9 +2713,9 @@
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Avancement</div>
-                  <input id="autoAdvanceNumber" class="auto-number" type="number" min="0.0001" max="5" step="0.0001" value="0.6667" />
+                  <input id="autoAdvanceNumber" class="auto-number" type="number" min="0.0001" max="5" step="0.0001" value="1" />
                 </div>
-                <input id="autoAdvanceRange" type="range" min="0.0001" max="5" step="0.0001" value="0.6667" />
+                <input id="autoAdvanceRange" type="range" min="0.0001" max="5" step="0.0001" value="1" />
               </div>
 
               <div class="auto-control">
@@ -2946,7 +3070,7 @@
       activePreset = label;
 
       const isFriendly = label === "Pays Amicaux";
-      const advancement = "0.6667";
+      const advancement = "1";
       const changes = isFriendly ? "13" : "7";
 
       $("autoBaseNumber").value = "31.3125";
@@ -3179,10 +3303,10 @@
       }
 
       setError("");
-      setStatus("Création du job de scan…", 1);
+      setStatus("🔎 Création Du Job De Scan…", 1);
       $("result").innerHTML = "";
       $("scanBtn").disabled = true;
-      $("scanBtn").textContent = "Scan en cours…";
+      $("scanBtn").textContent = "🔎 Scan En Cours…";
 
       const scanCalc = calculateAutoRanks();
       const rankEventMode = isPerformanceAdvanceMode() ? "performance" : "fixed";
@@ -3228,7 +3352,7 @@
           throw new Error(job.error || `HTTP ${response.status}`);
         }
 
-        setStatus(job.message || job.status || "Scan en cours…", job.progress || 0);
+        setStatus(job.message || job.status || "🔎 Scan En Cours…", job.progress || 0);
 
         if (job.status === "done") {
           const resultWithOptions = {
@@ -3258,7 +3382,7 @@
           };
 
           renderResult(resultWithOptions);
-          setStatus("Scan terminé. Tu peux ajouter cette analyse au rapport.", 100);
+          setStatus("🔎 Scan Terminé. Tu Peux Ajouter Cette Analyse Au Rapport.", 100);
           $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter L’Analyse Actuelle” pour l’enregistrer dans le rapport.";
           finishScan();
           return;
@@ -3294,7 +3418,8 @@
 
       $("hero").innerHTML = `
         <div class="match-hero">
-          <div class="kicker">Match analysé</div>
+          <div class="kicker">Match Analysé</div>
+          <div class="rolling-cup-ball match-ball" aria-hidden="true"></div>
 
           <div class="match-teams">
             <div class="match-team">
@@ -3315,7 +3440,7 @@
           </div>
 
           <p class="hero-text">
-            Résultat calculé dans Termux avec les derniers matchs toutes compétitions confondues.
+            Résultat Calculé Dans Termux Avec Les Derniers Matchs Toutes Compétitions Confondues.
           </p>
         </div>
       `;
