@@ -2281,6 +2281,217 @@
       }
     }
 
+
+
+    /* Mobile Derby v3 : dimensions corrigées + animations visibles au scroll */
+    @keyframes mobileStadiumMove {
+      0% { transform: translate3d(-4%, 0, 0) rotate(-7deg); opacity: .42; }
+      50% { transform: translate3d(4%, 9px, 0) rotate(-7deg); opacity: .72; }
+      100% { transform: translate3d(-4%, 0, 0) rotate(-7deg); opacity: .42; }
+    }
+
+    @keyframes mobileLogoFloat {
+      0%, 100% { transform: translateY(0) rotate(-1deg); }
+      50% { transform: translateY(-2px) rotate(1deg); }
+    }
+
+    @keyframes mobileButtonGlow {
+      0% { background-position: 0% 50%; filter: brightness(1); }
+      50% { background-position: 100% 50%; filter: brightness(1.12); }
+      100% { background-position: 0% 50%; filter: brightness(1); }
+    }
+
+    @keyframes mobileLineRun {
+      0% { transform: translateX(-120%); opacity: 0; }
+      20%, 75% { opacity: .65; }
+      100% { transform: translateX(120%); opacity: 0; }
+    }
+
+    html,
+    body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    .fx-card {
+      opacity: 1;
+      transform: none;
+    }
+
+    @media (max-width: 700px) {
+      html,
+      body {
+        max-width: 100vw;
+        overflow-x: clip;
+      }
+
+      body::before {
+        animation: crowdGlow 7s ease-in-out infinite;
+      }
+
+      body::after {
+        animation: mobileStadiumMove 4.8s ease-in-out infinite;
+      }
+
+      .topbar {
+        overflow: hidden;
+      }
+
+      .topbar-inner,
+      .app,
+      .hero,
+      .panel,
+      .report-panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .auto-box,
+      .auto-body,
+      .preset-box,
+      .preset-actions,
+      .preset-btn,
+      .auto-control,
+      .auto-formula,
+      .mode-toggle,
+      .per-team-box,
+      .team-calc-grid,
+      .auto-result,
+      .report-buttons,
+      .match-row,
+      .event-row {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      .app {
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+      }
+
+      .brand-logo {
+        animation: mobileLogoFloat 2.8s ease-in-out infinite;
+      }
+
+      .auto-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .auto-badge {
+        justify-self: start;
+        max-width: 100%;
+      }
+
+      .auto-title,
+      .preset-title,
+      .preset-hint,
+      .preset-btn,
+      .preset-btn small,
+      .auto-formula,
+      .mode-toggle,
+      .report-title,
+      .report-hint,
+      .row-title,
+      .row-sub,
+      .source-small {
+        overflow-wrap: anywhere;
+        word-break: normal;
+      }
+
+      .preset-title {
+        letter-spacing: .12em;
+      }
+
+      .preset-hint {
+        font-size: 11.5px;
+        line-height: 1.42;
+      }
+
+      .preset-btn {
+        min-height: 58px;
+        padding: 11px 10px;
+        line-height: 1.08;
+      }
+
+      .preset-btn small {
+        display: block;
+        font-size: 10.5px;
+        line-height: 1.25;
+        letter-spacing: .015em;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) minmax(74px, 86px);
+        gap: 8px;
+      }
+
+      .auto-number {
+        width: 86px;
+        min-width: 0;
+        padding-left: 6px;
+        padding-right: 6px;
+        font-size: 13px;
+      }
+
+      .auto-result {
+        grid-template-columns: 1fr;
+      }
+
+      .scan-btn,
+      .auto-apply-btn,
+      .report-btn.primary,
+      .preset-btn.active,
+      .skip-grid button.active {
+        animation: mobileButtonGlow 3.6s ease infinite;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .scan-btn::after,
+      .auto-apply-btn::after,
+      .preset-btn.active::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 58%;
+        pointer-events: none;
+        background: linear-gradient(100deg, transparent, rgba(255,255,255,.22), transparent);
+        animation: mobileLineRun 2.9s ease-in-out infinite;
+      }
+
+      .panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .report-panel,
+      .hero {
+        contain: paint;
+      }
+
+      .fx-card {
+        opacity: 0;
+        transform: translateY(18px) scale(.985);
+        transition: opacity .46s ease, transform .46s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease;
+      }
+
+      .fx-card.is-visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .fx-card.is-visible:nth-of-type(2n) {
+        transition-delay: .04s;
+      }
+
+      input[type="range"] {
+        min-width: 0;
+        width: 100%;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -2318,7 +2529,7 @@
         <h1 class="home-title">Foot<span>/</span>Scan</h1>
         <p class="hero-text">
           Termux récupère les matchs, calcule les rangs et renvoie le résultat final.
-          Nouvelle version : 3 catégories de buts, base 31,3125, marge changements à 1,5 et interface mobile derby bleu/rouge plus travaillée.
+          Nouvelle Version : 3 Catégories De Buts, Base 31,3125, Marge Changements À 1,5 Et Interface Mobile Derby Bleu/Rouge Plus Travaillée.
         </p>
       </div>
     </section>
@@ -2343,12 +2554,12 @@
         <div class="auto-box">
           <div class="auto-head">
             <div>
-              <div class="auto-title">Calcul automatique des rangs</div>
+              <div class="auto-title">Calcul Automatique Des Rangs</div>
               <div class="auto-sub">
-                Base libre · défaut 31,3125 · valeurs X.5 acceptées · limites × 19,9375 · changements × 1,5 · aucun curseur rouge.
+                Base Libre · Défaut 31,3125 · Valeurs X.5 Acceptées · Limites × 19,9375 · Changements × 1,5 · Aucun Curseur Rouge.
               </div>
             </div>
-            <div class="auto-badge">Base libre</div>
+            <div class="auto-badge">Base Libre</div>
           </div>
 
           <div class="auto-body">
@@ -2358,11 +2569,11 @@
                 <span id="activePresetLabel">Libre</span>
               </div>
               <div class="preset-hint">
-                Présélections match : mêmes curseurs qu’avant pour les changements. Base 31,3125 pour toutes les bases. Aucun rouge dans le calcul automatique.
+                Présélections Match : mêmes curseurs qu’avant pour les Changements. Base 31,3125 pour toutes les Bases. Aucun Rouge dans le Calcul Automatique.
               </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiel<small>base 31,3125 · L 2 · changements 7</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>base 31,3125 · L 2 · changements 13</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiels<small>Base 31,3125 · Limites 2 · Changements 7</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>Base 31,3125 · Limites 2 · Changements 13</small></button>
               </div>
             </div>
 
@@ -2678,7 +2889,7 @@
       return (
         `Base : ${formatRank(calc.base)} · ` +
         `limites : ${calc.offensive} × 19.9375 = ${formatRank(calc.offensiveBoost)} · ` +
-        `base corrigée : ${formatRank(calc.adjustedBase)} · ` +
+        `Base Corrigée : ${formatRank(calc.adjustedBase)} · ` +
         `marge : 1.5 × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
         `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
       );
@@ -2693,7 +2904,7 @@
       }
 
       if ($("officialPresetBtn")) {
-        $("officialPresetBtn").classList.toggle("active", activePreset === "Clubs/Pays Officiel");
+        $("officialPresetBtn").classList.toggle("active", activePreset === "Clubs/Pays Officiels");
       }
 
       if ($("friendlyPresetBtn")) {
@@ -2722,7 +2933,7 @@
       $("autoChangeRange").value = changes;
 
       updateAutoCalculator();
-      setStatus(`Présélection ${label} appliquée : base 31,3125 · limites ${offensive} · changements ${changes}`, 0);
+      setStatus(`Présélection ${label} appliquée : Base 31,3125 · Limites ${offensive} · Changements ${changes}`, 0);
     }
 
     function markPresetAsCustom() {
@@ -3468,7 +3679,7 @@
 
     function compactCalcLine(label, calc) {
       const presetText = calc.presetLabel ? ` · présélection ${calc.presetLabel}` : "";
-      const baseLine = `${label}${presetText} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rangs calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      const baseLine = `${label}${presetText} : Base ${formatRank(calc.base)} · Limites ${calc.offensive} · Changements ${calc.changes} · Rangs Calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
       return calc.simultaneousMode
         ? `${baseLine} · rangs utilisés ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`
         : baseLine;
@@ -3811,12 +4022,35 @@
     bindCalculatorInput("autoOffensiveRange", "autoOffensiveNumber");
     bindCalculatorInput("autoChangeRange", "autoChangeNumber");
 
-    $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays Officiel"));
+    $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays Officiels"));
     $("friendlyPresetBtn").addEventListener("click", () => applyPreset("Pays Amicaux"));
 
     $("simultaneousMode").addEventListener("change", updateAutoCalculator);
     $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
 
+
+
+    function initMobileNavigationEffects() {
+      const items = Array.from(document.querySelectorAll(".hero, .panel, .summary, .team-card, .bar-box, .report-panel"));
+      items.forEach((item) => item.classList.add("fx-card"));
+
+      if (!("IntersectionObserver" in window)) {
+        items.forEach((item) => item.classList.add("is-visible"));
+        return;
+      }
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+
+      items.forEach((item) => observer.observe(item));
+    }
+
+    initMobileNavigationEffects();
     updateReportCount();
     updateAutoCalculator();
   </script>
