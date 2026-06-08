@@ -35,7 +35,35 @@ INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "2"))
 SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "3"))
 SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.8"))
 PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
-RANK_EVENT_STEP = 7.25 / 8
+DEFAULT_RANK_EVENT_STEP = 2 / 3
+CURRENT_RANK_EVENT_STEP = DEFAULT_RANK_EVENT_STEP
+CURRENT_RANK_ADVANCEMENT_MODE = "fixed"
+
+
+def configure_rank_advancement(step=None, mode=None):
+    """Configure l'avancement des rangs pour le job en cours.
+
+    mode="fixed" : chaque événement avance de CURRENT_RANK_EVENT_STEP.
+    mode="performance" : chaque événement avance selon sa valeur absolue de performance.
+    """
+    global CURRENT_RANK_EVENT_STEP, CURRENT_RANK_ADVANCEMENT_MODE
+
+    try:
+        parsed_step = float(step) if step is not None else DEFAULT_RANK_EVENT_STEP
+    except Exception:
+        parsed_step = DEFAULT_RANK_EVENT_STEP
+
+    if not math.isfinite(parsed_step) or parsed_step <= 0:
+        parsed_step = DEFAULT_RANK_EVENT_STEP
+
+    CURRENT_RANK_EVENT_STEP = parsed_step
+    CURRENT_RANK_ADVANCEMENT_MODE = "performance" if mode == "performance" else "fixed"
+
+
+def rank_advancement_label():
+    if CURRENT_RANK_ADVANCEMENT_MODE == "performance":
+        return "valeur de performance"
+    return f"{CURRENT_RANK_EVENT_STEP:.4f} par événement"
 
 GOAL_WITH_PASSER_VALUE = 1.0
 GOAL_WITHOUT_PASSER_VALUE = 2 / 3
@@ -58,15 +86,15 @@ CARD_VALUES_FOR_TEAM = {
 }
 
 LABELS = {
-    "goal": "But sans passeur",
-    "goalWithAssist": "But avec passeur",
-    "goalNoAssistError": "CSC / erreur",
+    "goal": "But Sans Passeur",
+    "goalWithAssist": "But Avec Passeur",
+    "goalNoAssistError": "CSC / Erreur",
     "assist": "Passe décisive",
     "yellow": "Jaune",
     "secondYellow": "Deuxième jaune",
     "red": "Rouge direct",
     "redFromSecondYellow": "Rouge via 2e jaune",
-    "ownGoal": "CSC / erreur",
+    "ownGoal": "CSC / Erreur",
 }
 
 
@@ -450,11 +478,11 @@ def parse_incidents(incidents, match, analyzed_team_id):
 
     Depuis cette version, les cartons et les passes décisives seules ne sont
     plus parcourus. Les seuls événements conservés sont :
-    - but avec passeur = performance 1
-    - but sans passeur = 2/3 de performance 1
-    - CSC / erreur adverse = 1/3 de performance 1
+    - But Avec Passeur = performance 1
+    - But Sans Passeur = 2/3 de performance 1
+    - CSC / Erreur adverse = 1/3 de performance 1
 
-    Le 1/3 d'un but sans passeur est classé dans la catégorie CSC / erreur :
+    Le 1/3 d'un But Sans Passeur est classé dans la catégorie CSC / Erreur :
     il compte comme une erreur de l'équipe qui encaisse.
     """
     events = []
@@ -496,7 +524,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 "match": match_label,
                 "matchId": match_id,
                 "side": side,
-                "detail": f"{camp_label} · CSC / erreur · {scorer}",
+                "detail": f"{camp_label} · CSC / Erreur · {scorer}",
                 "icon": "🥅",
             })
             continue
@@ -514,11 +542,11 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 "match": match_label,
                 "matchId": match_id,
                 "side": side,
-                "detail": f"{camp_label} · but avec passeur · {scorer} — passe : {assister}",
+                "detail": f"{camp_label} · But Avec Passeur · {scorer} — passe : {assister}",
                 "icon": "⚽",
             })
         else:
-            # Un but sans passeur est volontairement découpé en deux événements :
+            # Un But Sans Passeur est volontairement découpé en deux événements :
             # 1) le but de l'équipe qui marque = 2/3 de performance 1 ;
             # 2) l'erreur de l'équipe qui encaisse = 1/3 de performance 1.
             # L'ordre est important : but d'abord, erreur ensuite.
@@ -531,7 +559,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 "match": match_label,
                 "matchId": match_id,
                 "side": side,
-                "detail": f"{camp_label} · but sans passeur · {scorer}",
+                "detail": f"{camp_label} · But Sans Passeur · {scorer}",
                 "icon": "⚽",
                 "subOrder": 0,
             })
@@ -549,7 +577,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 "match": match_label,
                 "matchId": match_id,
                 "side": error_side,
-                "detail": f"{error_camp_label} · CSC / erreur sur but sans passeur · {scorer}",
+                "detail": f"{error_camp_label} · CSC / Erreur sur But Sans Passeur · {scorer}",
                 "icon": "🥅",
                 "subOrder": 1,
             })
@@ -571,10 +599,16 @@ def parse_incidents(incidents, match, analyzed_team_id):
 def event_rank_quantity(event):
     """Quantité qui fait avancer le rang.
 
-    Nouvelle logique: chaque événement fait avancer le rang de 7.25 / 8,
-    en classique comme en simultané.
-    Le barème de performance reste inchangé ; il sert à la valeur récupérée,
-    pas à la distance parcourue vers le rang.
+    Mode fixe : chaque événement avance de la valeur choisie dans le curseur
+    Avancement / Progression.
+
+    Mode performance : chaque événement avance selon sa performance absolue :
+    - But Avec Passeur : 1
+    - But Sans Passeur : 2/3
+    - CSC / Erreur : 1/3
+
+    Les valeurs négatives avancent aussi en positif, car le rang représente
+    une distance parcourue dans la liste d'événements.
     """
     if not isinstance(event, dict):
         return 0.0
@@ -587,7 +621,10 @@ def event_rank_quantity(event):
     if not math.isfinite(value):
         return 0.0
 
-    return RANK_EVENT_STEP
+    if CURRENT_RANK_ADVANCEMENT_MODE == "performance":
+        return abs(value)
+
+    return CURRENT_RANK_EVENT_STEP
 
 
 def total_rank_quantity(events):
@@ -609,28 +646,24 @@ def annotate_rank_source(event, event_index, cumulative_start, cumulative_end, t
 def value_at_rank(events, rank):
     """Performance exacte au rang demandé.
 
-    Important: le rang n'est plus arrondi ni ramené au dernier .0/.5.
-    Chaque événement avance de RANK_EVENT_STEP (7.25/8). On convertit donc
-    le rang demandé en position exacte dans la liste d'événements, puis on
-    interpole entre les deux événements autour de cette position.
+    En mode fixe, on garde l'interpolation exacte entre les événements :
+    le rang demandé est converti en position exacte dans la liste.
 
-    Exemple avec RANK_EVENT_STEP = 0.90625:
-    - rang = 30.0000  -> position événement = 33.103448...
-    - résultat = 89.6552% de l'événement #33 + 10.3448% de l'événement #34
-
-    Ainsi, la performance finale peut être une valeur exacte comme 0.1379,
-    et plus seulement une valeur brute du barème (-1, -0.5, 0, +0.5, +1...).
+    En mode performance, l'avancement varie selon l'événement. On cherche
+    donc l'événement dont la zone de cumul contient exactement le rang demandé.
     """
+    mode = CURRENT_RANK_ADVANCEMENT_MODE
+
     if rank is None or rank <= 0:
-        return {"value": None, "sources": [], "rankMode": "quantity_exact"}
+        return {"value": None, "sources": [], "rankMode": "quantity_exact", "eventStepMode": mode}
 
     try:
         target_rank = float(rank)
     except Exception:
-        return {"value": None, "sources": [], "rankMode": "quantity_exact"}
+        return {"value": None, "sources": [], "rankMode": "quantity_exact", "eventStepMode": mode}
 
     if target_rank <= 0:
-        return {"value": None, "sources": [], "rankMode": "quantity_exact"}
+        return {"value": None, "sources": [], "rankMode": "quantity_exact", "eventStepMode": mode}
 
     clean_events = [event for event in (events or []) if event_rank_quantity(event) > 0]
 
@@ -639,22 +672,61 @@ def value_at_rank(events, rank):
             "value": None,
             "sources": [],
             "rankMode": "quantity_exact",
+            "eventStepMode": mode,
+            "eventStep": CURRENT_RANK_EVENT_STEP,
             "targetRank": target_rank,
             "totalQuantity": 0,
         }
 
-    step = RANK_EVENT_STEP
-    total_quantity = len(clean_events) * step
+    total_quantity = sum(event_rank_quantity(event) for event in clean_events)
 
     if target_rank > total_quantity + 1e-9:
         return {
             "value": None,
             "sources": [],
             "rankMode": "quantity_exact",
+            "eventStepMode": mode,
+            "eventStep": CURRENT_RANK_EVENT_STEP,
             "targetRank": target_rank,
             "totalQuantity": round(total_quantity, 6),
         }
 
+    if mode == "performance":
+        cumulative = 0.0
+
+        for event_index, event in enumerate(clean_events):
+            quantity = event_rank_quantity(event)
+            cumulative_start = cumulative
+            cumulative_end = cumulative + quantity
+
+            if cumulative_end >= target_rank - 1e-9:
+                source = annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank)
+                source["weight"] = 1
+                source["rankMode"] = "quantity_performance"
+
+                return {
+                    "value": float(source.get("value", 0)),
+                    "sources": [source],
+                    "rankMode": "quantity_performance",
+                    "eventStepMode": mode,
+                    "eventStep": CURRENT_RANK_EVENT_STEP,
+                    "targetRank": target_rank,
+                    "totalQuantity": round(total_quantity, 6),
+                }
+
+            cumulative = cumulative_end
+
+        return {
+            "value": None,
+            "sources": [],
+            "rankMode": "quantity_performance",
+            "eventStepMode": mode,
+            "eventStep": CURRENT_RANK_EVENT_STEP,
+            "targetRank": target_rank,
+            "totalQuantity": round(total_quantity, 6),
+        }
+
+    step = CURRENT_RANK_EVENT_STEP
     exact_position = target_rank / step
 
     # Si le rang tombe exactement sur la borne d'un événement, on prend cet événement.
@@ -668,6 +740,8 @@ def value_at_rank(events, rank):
                 "value": None,
                 "sources": [],
                 "rankMode": "quantity_exact",
+                "eventStepMode": mode,
+                "eventStep": step,
                 "targetRank": target_rank,
                 "exactPosition": exact_position,
                 "totalQuantity": round(total_quantity, 6),
@@ -684,6 +758,8 @@ def value_at_rank(events, rank):
             "value": float(source.get("value", 0)),
             "sources": [source],
             "rankMode": "quantity_exact",
+            "eventStepMode": mode,
+            "eventStep": step,
             "targetRank": target_rank,
             "exactPosition": exact_position,
             "totalQuantity": round(total_quantity, 6),
@@ -703,6 +779,8 @@ def value_at_rank(events, rank):
             "value": float(source.get("value", 0)),
             "sources": [source],
             "rankMode": "quantity_exact",
+            "eventStepMode": mode,
+            "eventStep": step,
             "targetRank": target_rank,
             "exactPosition": exact_position,
             "totalQuantity": round(total_quantity, 6),
@@ -716,6 +794,8 @@ def value_at_rank(events, rank):
             "value": None,
             "sources": [],
             "rankMode": "quantity_exact",
+            "eventStepMode": mode,
+            "eventStep": step,
             "targetRank": target_rank,
             "exactPosition": exact_position,
             "totalQuantity": round(total_quantity, 6),
@@ -749,6 +829,8 @@ def value_at_rank(events, rank):
         "value": float(value),
         "sources": [lower_source, upper_source],
         "rankMode": "quantity_exact",
+        "eventStepMode": mode,
+        "eventStep": step,
         "targetRank": target_rank,
         "exactPosition": exact_position,
         "totalQuantity": round(total_quantity, 6),
@@ -802,7 +884,7 @@ def events_between_rank_quantities(events, rank1, rank2=None):
 def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
     """Calcule les stats entre deux rangs, rangs finaux inclus.
 
-    Nouvelle logique: chaque événement fait avancer le rang de 7.25 / 8, peu importe sa valeur de barème.
+    Nouvelle logique: l’avancement vient du curseur ou de la valeur de performance selon l’option choisie.
 
     group_mode="target" : groupe par événement + équipe attribuée + valeur.
       -> utile pour une zone d'équipe.
@@ -819,6 +901,9 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
         "endRankIndex": None,
         "totalQuantity": 0,
         "rankMode": "quantity",
+        "eventStepMode": CURRENT_RANK_ADVANCEMENT_MODE,
+        "eventStep": CURRENT_RANK_EVENT_STEP,
+        "eventStepLabel": rank_advancement_label(),
         "groupMode": group_mode,
     }
 
@@ -967,6 +1052,9 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
         "endRankIndex": end_rank_value,
         "totalQuantity": round(selected_quantity, 4),
         "rankMode": "quantity",
+        "eventStepMode": CURRENT_RANK_ADVANCEMENT_MODE,
+        "eventStep": CURRENT_RANK_EVENT_STEP,
+        "eventStepLabel": rank_advancement_label(),
         "groupMode": group_mode,
     }
 
@@ -974,7 +1062,7 @@ def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
 def zone_events_between_ranks(events, rank1, rank2=None):
     """Retourne les événements situés entre deux rangs, rangs finaux inclus.
 
-    Nouvelle logique: la zone est basée sur le cumul fixe de 7.25 / 8 par événement, pas sur un rang 1 événement = 1.
+    Nouvelle logique: la zone est basée sur le cumul d’avancement choisi, pas sur un rang 1 événement = 1.
     """
     selected_events, start_rank_value, end_rank_value, _selected_quantity = events_between_rank_quantities(events, rank1, rank2)
     return selected_events, start_rank_value, end_rank_value
@@ -988,7 +1076,7 @@ def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
 
     Les rangs utilisés restent ceux indiqués : pas de multiplication automatique.
 
-    Chaque événement fait avancer le rang de 7.25 / 8.
+    Chaque événement avance selon le curseur ou selon sa valeur de performance.
     """
     try:
         used_rank1 = float(rank1)
@@ -998,9 +1086,11 @@ def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
         used_rank2 = rank2
 
     result = zone_stats_between_ranks(combined_events or [], used_rank1, used_rank2, group_mode="global")
-    result["globalMethod"] = "combined_all_events_fixed_event_step"
+    result["globalMethod"] = "combined_all_events_rank_advancement"
     result["rankMultiplier"] = 1
-    result["eventStep"] = RANK_EVENT_STEP
+    result["eventStep"] = CURRENT_RANK_EVENT_STEP
+    result["eventStepMode"] = CURRENT_RANK_ADVANCEMENT_MODE
+    result["eventStepLabel"] = rank_advancement_label()
     result["originalRank1"] = rank1
     result["originalRank2"] = rank2
     result["usedRank1"] = used_rank1
@@ -1376,6 +1466,10 @@ def process_scan_job(job_id):
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = bool(params.get("simultaneousMode"))
+    rank_event_step = params.get("rankEventStep", DEFAULT_RANK_EVENT_STEP)
+    rank_event_mode = params.get("rankEventMode") or params.get("rankStepMode") or "fixed"
+    winner_mode = "evolution" if params.get("winnerMode") == "evolution" else "dominance"
+    configure_rank_advancement(rank_event_step, rank_event_mode)
 
     effective_rank1 = rank1
     effective_rank2 = rank2
@@ -1401,7 +1495,8 @@ def process_scan_job(job_id):
     print(
         f"Scan complet: job={job_id} match={match_id} "
         f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
-        f"objectif avancement brut={scan_fetch_needed} simultaneous={simultaneous_mode}"
+        f"objectif avancement brut={scan_fetch_needed} simultaneous={simultaneous_mode} "
+        f"avancement={rank_advancement_label()}"
     )
 
     try:
@@ -1490,6 +1585,10 @@ def process_scan_job(job_id):
             "rank1": effective_rank1,
             "rank2": effective_rank2,
             "simultaneousMode": simultaneous_mode,
+            "rankEventStep": CURRENT_RANK_EVENT_STEP,
+            "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
+            "rankEventStepLabel": rank_advancement_label(),
+            "winnerMode": winner_mode,
             "scanModeLabel": "Simultané lié: mêmes rangs, match par match / minute par minute" if simultaneous_mode else "Standard",
             "overallZoneStats": None,
             "config": {
@@ -1499,6 +1598,10 @@ def process_scan_job(job_id):
                 "maxMatchesPerTeam": MAX_MATCHES_PER_TEAM,
                 "incidentBatchSize": INCIDENT_BATCH_SIZE,
                 "zoneMethod": "final_ranks_low_to_high",
+                "rankEventStep": CURRENT_RANK_EVENT_STEP,
+                "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
+                "rankEventStepLabel": rank_advancement_label(),
+                "winnerMode": winner_mode,
             },
         }
 
@@ -1592,8 +1695,8 @@ def main():
     print("Pages SofaScore: jusqu’à 20 pages, arrêt automatique si 404/page vide.")
     print("Mode simultané lié: mêmes rangs, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Calcul pondéré: X / X.125 / X.25 / X.375 / X.5 / X.625 / X.75 / X.875 activé.")
-    print("Barème cartons: jaune, 2e jaune, rouge direct, rouge via 2e jaune activé.")
+    print("Avancement des rangs: curseur par job, défaut 2/3 par événement.")
+    print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry SofaScore + incidents ignorés en cas d’erreur.")
     print("Préchargement incidents: désactivé par défaut pour économiser les requêtes.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
