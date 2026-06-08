@@ -2529,7 +2529,7 @@
         <h1 class="home-title">Foot<span>/</span>Scan</h1>
         <p class="hero-text">
           Termux récupère les matchs, calcule les rangs et renvoie le résultat final.
-          Nouvelle Version : 3 Catégories De Buts, Base 31,3125, Marge Changements À 1,5 Et Interface Mobile Derby Bleu/Rouge Plus Travaillée.
+          Nouvelle version : 3 catégories de buts, Base 31,3125, Avancement réglable par événement et interface mobile derby bleu/rouge plus travaillée.
         </p>
       </div>
     </section>
@@ -2556,7 +2556,7 @@
             <div>
               <div class="auto-title">Calcul Automatique Des Rangs</div>
               <div class="auto-sub">
-                Base Libre · Défaut 31,3125 · Valeurs X.5 Acceptées · Limites × 19,9375 · Changements × 1,5 · Aucun Curseur Rouge.
+                Base Libre · Défaut 31,3125 · Avancement Par Événement · Changements × 1,5 · Aucun Curseur Rouge.
               </div>
             </div>
             <div class="auto-badge">Base Libre</div>
@@ -2569,11 +2569,11 @@
                 <span id="activePresetLabel">Libre</span>
               </div>
               <div class="preset-hint">
-                Présélections Match : mêmes curseurs qu’avant pour les Changements. Base 31,3125 pour toutes les Bases. Aucun Rouge dans le Calcul Automatique.
+                Présélections Match : mêmes curseurs qu’avant pour les Changements. Base 31,3125 pour toutes les Bases. Avancement par défaut 0,6667. Aucun Rouge dans le Calcul Automatique.
               </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiels<small>Base 31,3125 · Limites 2 · Changements 7</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>Base 31,3125 · Limites 2 · Changements 13</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiels<small>Base 31,3125 · Avancement 0,6667 · Changements 7</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>Base 31,3125 · Avancement 0,6667 · Changements 13</small></button>
               </div>
             </div>
 
@@ -2588,10 +2588,10 @@
 
               <div class="auto-control">
                 <div class="auto-control-top">
-                  <div class="auto-control-title">Limites offensives</div>
-                  <input id="autoOffensiveNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="4" />
+                  <div class="auto-control-title">Avancement</div>
+                  <input id="autoAdvanceNumber" class="auto-number" type="number" min="0.0001" max="5" step="0.0001" value="0.6667" />
                 </div>
-                <input id="autoOffensiveRange" type="range" min="0" max="22" step="0.5" value="4" />
+                <input id="autoAdvanceRange" type="range" min="0.0001" max="5" step="0.0001" value="0.6667" />
               </div>
 
               <div class="auto-control">
@@ -2605,13 +2605,13 @@
 
             <div class="auto-result">
               <div class="auto-result-card">
-                <div class="auto-result-label">Rang bas</div>
-                <div class="auto-result-value" id="autoLow">97.453125</div>
+                <div class="auto-result-label">Rang Bas</div>
+                <div class="auto-result-value" id="autoLow">26.8125</div>
               </div>
 
               <div class="auto-result-card">
-                <div class="auto-result-label">Rang haut</div>
-                <div class="auto-result-value" id="autoHigh">102.890625</div>
+                <div class="auto-result-label">Rang Haut</div>
+                <div class="auto-result-value" id="autoHigh">35.8125</div>
               </div>
             </div>
 
@@ -2619,7 +2619,17 @@
 
             <label class="mode-toggle" for="simultaneousMode">
               <input id="simultaneousMode" type="checkbox" />
-              <span>Calcul simultané : les deux équipes sont parcourues en parallèle, match par match puis minute par minute.</span>
+              <span>Calcul Simultané : les deux équipes sont parcourues en parallèle, match par match puis minute par minute.</span>
+            </label>
+
+            <label class="mode-toggle" for="performanceAdvanceMode">
+              <input id="performanceAdvanceMode" type="checkbox" />
+              <span>Avancement = Valeur De Performance : But Avec Passeur 1, But Sans Passeur 0,6667, CSC / Erreur 0,3333.</span>
+            </label>
+
+            <label class="mode-toggle" for="evolutionWinnerMode">
+              <input id="evolutionWinnerMode" type="checkbox" />
+              <span>Gagnant Par Meilleure Évolution : comparaison de la Moyenne De Zone vers la Moyenne Des Deux Rangs.</span>
             </label>
 
             <button class="auto-apply-btn" id="applyAutoRanksBtn" type="button">
@@ -2635,7 +2645,7 @@
           </div>
 
           <div>
-            <label for="rank2">Rang 2 optionnel</label>
+            <label for="rank2">Rang 2 Optionnel</label>
             <input id="rank2" placeholder="Ex: 75 ou vide" inputmode="decimal" />
           </div>
         </div>
@@ -2662,20 +2672,20 @@
     <section class="report-panel" id="reportPanel">
       <div class="report-head">
         <div>
-          <div class="report-title">Rapport de session</div>
-          <div class="report-count" id="reportCount">0 analyse enregistrée</div>
+          <div class="report-title">Rapport De Session</div>
+          <div class="report-count" id="reportCount">0 Analyse Enregistrée</div>
         </div>
       </div>
 
       <div class="report-body">
         <div class="report-buttons">
-          <button class="report-btn primary" id="addReportBtn" type="button">Ajouter l’analyse actuelle</button>
-          <button class="report-btn" id="copySimpleReportBtn" type="button">Copier simple</button>
-          <button class="report-btn" id="copyFullReportBtn" type="button">Copier complet</button>
-          <button class="report-btn" id="downloadSimpleReportBtn" type="button">TXT simple</button>
-          <button class="report-btn" id="printSimpleReportBtn" type="button">PDF simple</button>
-          <button class="report-btn" id="downloadFullReportBtn" type="button">TXT complet</button>
-          <button class="report-btn red" id="clearReportBtn" type="button">Vider le rapport</button>
+          <button class="report-btn primary" id="addReportBtn" type="button">Ajouter L’Analyse Actuelle</button>
+          <button class="report-btn" id="copySimpleReportBtn" type="button">Copier Simple</button>
+          <button class="report-btn" id="copyFullReportBtn" type="button">Copier Complet</button>
+          <button class="report-btn" id="downloadSimpleReportBtn" type="button">TXT Simple</button>
+          <button class="report-btn" id="printSimpleReportBtn" type="button">PDF Simple</button>
+          <button class="report-btn" id="downloadFullReportBtn" type="button">TXT Complet</button>
+          <button class="report-btn red" id="clearReportBtn" type="button">Vider Le Rapport</button>
         </div>
 
         <div class="report-hint" id="reportHint">
@@ -2691,17 +2701,17 @@
 
       <div class="bar-grid">
         <div class="bar-card">
-          <div class="bar-card-title">✅ Équipe analysée</div>
-          <div class="bar-line"><span>⚽ But avec passeur</span><strong class="positive">+1</strong></div>
-          <div class="bar-line"><span>⚽ But sans passeur</span><strong class="positive">+0.6667</strong></div>
-          <div class="bar-line"><span>🥅 CSC / erreur adverse</span><strong class="positive">+0.3333</strong></div>
+          <div class="bar-card-title">✅ Équipe Analysée</div>
+          <div class="bar-line"><span>⚽ But Avec Passeur</span><strong class="positive">+1</strong></div>
+          <div class="bar-line"><span>⚽ But Sans Passeur</span><strong class="positive">+0.6667</strong></div>
+          <div class="bar-line"><span>🥅 CSC / Erreur Adverse</span><strong class="positive">+0.3333</strong></div>
         </div>
 
         <div class="bar-card">
           <div class="bar-card-title">⚔️ Adversaire</div>
-          <div class="bar-line"><span>⚽ But adverse avec passeur</span><strong class="negative">−1</strong></div>
-          <div class="bar-line"><span>⚽ But adverse sans passeur</span><strong class="negative">−0.6667</strong></div>
-          <div class="bar-line"><span>🥅 CSC / erreur équipe analysée</span><strong class="negative">−0.3333</strong></div>
+          <div class="bar-line"><span>⚽ But Adverse Avec Passeur</span><strong class="negative">−1</strong></div>
+          <div class="bar-line"><span>⚽ But Adverse Sans Passeur</span><strong class="negative">−0.6667</strong></div>
+          <div class="bar-line"><span>🥅 CSC / Erreur Équipe Analysée</span><strong class="negative">−0.3333</strong></div>
         </div>
       </div>
     </details>
@@ -2719,10 +2729,10 @@
     const DOMINANCE_TIE_THRESHOLD = 0;
 
     const LABELS = {
-      goal: "But sans passeur",
-      goalWithAssist: "But avec passeur",
-      goalNoAssistError: "CSC / erreur",
-      ownGoal: "CSC / erreur",
+      goal: "But Sans Passeur",
+      goalWithAssist: "But Avec Passeur",
+      goalNoAssistError: "CSC / Erreur",
+      ownGoal: "CSC / Erreur",
     };
 
     const ICONS = {
@@ -2812,11 +2822,11 @@
 
     function readCalculatorValues(prefix) {
       const rawBase = parseFloat(String($(`${prefix}BaseNumber`).value).replace(",", "."));
-      const rawOffensive = parseFloat(String($(`${prefix}OffensiveNumber`).value).replace(",", "."));
+      const rawAdvancement = parseFloat(String($(`${prefix}AdvanceNumber`).value).replace(",", "."));
       const rawChanges = parseFloat(String($(`${prefix}ChangeNumber`).value).replace(",", "."));
       return {
         base: clamp(rawBase, 0, 1000),
-        offensive: clamp(rawOffensive, 0, 22),
+        advancement: clamp(rawAdvancement, 0.0001, 5),
         changes: clamp(rawChanges, 0, 22),
         reds: 0,
       };
@@ -2826,18 +2836,17 @@
       $(`${prefix}BaseNumber`).value = formatRank(calc.base);
       $(`${prefix}BaseRange`).value = calc.base;
 
-      $(`${prefix}OffensiveNumber`).value = calc.offensive;
-      $(`${prefix}OffensiveRange`).value = calc.offensive;
+      $(`${prefix}AdvanceNumber`).value = formatRank(calc.advancement);
+      $(`${prefix}AdvanceRange`).value = calc.advancement;
 
       $(`${prefix}ChangeNumber`).value = calc.changes;
       $(`${prefix}ChangeRange`).value = calc.changes;
     }
 
     function calculateRanksFromValues(values) {
-      const { base, offensive, changes, reds } = values;
+      const { base, advancement, changes, reds } = values;
 
-      const offensiveBoost = offensive * 19.9375;
-      const adjustedBase = base + offensiveBoost;
+      const adjustedBase = base;
 
       const marginUnit = 1.5;
       const marginFinal = marginUnit * changes;
@@ -2853,10 +2862,9 @@
 
       return {
         base,
-        offensive,
+        advancement,
         changes,
         reds,
-        offensiveBoost,
         adjustedBase,
         marginUnit,
         marginFinal,
@@ -2877,21 +2885,39 @@
       return Boolean($("simultaneousMode")?.checked);
     }
 
+    function isPerformanceAdvanceMode() {
+      return Boolean($("performanceAdvanceMode")?.checked);
+    }
+
+    function isEvolutionWinnerMode() {
+      return Boolean($("evolutionWinnerMode")?.checked);
+    }
+
+    function rankEventModeLabel(mode, step) {
+      if (mode === "performance") return "Valeur De Performance";
+      return `${formatRank(step)} Par Événement`;
+    }
+
     function calculateAutoRanks() {
       return {
         ...calculateRanksFromValues(getAutoValues()),
         mode: "single",
         presetLabel: activePreset,
+        rankEventMode: isPerformanceAdvanceMode() ? "performance" : "fixed",
+        winnerMode: isEvolutionWinnerMode() ? "evolution" : "dominance",
       };
     }
 
     function formulaTextForCalc(calc) {
+      const modeText = isPerformanceAdvanceMode()
+        ? "Avancement : Valeur De Performance"
+        : `Avancement : ${formatRank(calc.advancement)} Par Événement`;
+
       return (
         `Base : ${formatRank(calc.base)} · ` +
-        `limites : ${calc.offensive} × 19.9375 = ${formatRank(calc.offensiveBoost)} · ` +
-        `Base Corrigée : ${formatRank(calc.adjustedBase)} · ` +
-        `marge : 1.5 × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
-        `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
+        `${modeText} · ` +
+        `Marge : 1.5 × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
+        `Rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
       );
     }
 
@@ -2920,20 +2946,20 @@
       activePreset = label;
 
       const isFriendly = label === "Pays Amicaux";
-      const offensive = "2";
+      const advancement = "0.6667";
       const changes = isFriendly ? "13" : "7";
 
       $("autoBaseNumber").value = "31.3125";
       $("autoBaseRange").value = "31.3125";
 
-      $("autoOffensiveNumber").value = offensive;
-      $("autoOffensiveRange").value = offensive;
+      $("autoAdvanceNumber").value = advancement;
+      $("autoAdvanceRange").value = advancement;
 
       $("autoChangeNumber").value = changes;
       $("autoChangeRange").value = changes;
 
       updateAutoCalculator();
-      setStatus(`Présélection ${label} appliquée : Base 31,3125 · Limites ${offensive} · Changements ${changes}`, 0);
+      setStatus(`Présélection ${label} appliquée : Base 31,3125 · Avancement ${advancement} · Changements ${changes}`, 0);
     }
 
     function markPresetAsCustom() {
@@ -2964,63 +2990,111 @@
       return sum / values.length;
     }
 
-    function makeDominanceWinner(team, average, diff) {
+    function roundedForComparison(value) {
+      const number = numberOrNull(value);
+      return number === null ? null : Math.round(number * 10000) / 10000;
+    }
+
+    function winnerModeForResult(result) {
+      return result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance");
+    }
+
+    function teamEvolution(team) {
+      const rankAverage = averagePerformance(team);
+      const zoneAverage = numberOrNull(team?.zoneStats?.average);
+
+      if (rankAverage === null || zoneAverage === null) {
+        return null;
+      }
+
+      return rankAverage - zoneAverage;
+    }
+
+    function makeDominanceWinner(team, metric, diff, mode, extra = {}) {
       return {
         type: "winner",
         team,
         label: team.name,
-        average,
+        average: metric,
+        metric,
         diff,
+        mode,
+        ...extra,
       };
     }
 
     function getDominance(result) {
-      const homeAvg = averagePerformance(result?.home);
-      const awayAvg = averagePerformance(result?.away);
+      const mode = winnerModeForResult(result);
+      const isEvolution = mode === "evolution";
 
-      if (homeAvg === null && awayAvg === null) {
+      const homeMetric = isEvolution ? teamEvolution(result?.home) : averagePerformance(result?.home);
+      const awayMetric = isEvolution ? teamEvolution(result?.away) : averagePerformance(result?.away);
+
+      const labelNone = isEvolution ? "Évolution indisponible" : "Domination indisponible";
+
+      if (homeMetric === null && awayMetric === null) {
         return {
           type: "none",
-          label: "Domination indisponible",
+          label: labelNone,
           average: null,
+          metric: null,
           diff: null,
+          mode,
         };
       }
 
-      if (homeAvg !== null && awayAvg === null) {
-        return makeDominanceWinner(result.home, homeAvg, null);
+      if (homeMetric !== null && awayMetric === null) {
+        return makeDominanceWinner(result.home, homeMetric, null, mode, {
+          rankAverage: averagePerformance(result.home),
+          zoneAverage: numberOrNull(result.home?.zoneStats?.average),
+        });
       }
 
-      if (awayAvg !== null && homeAvg === null) {
-        return makeDominanceWinner(result.away, awayAvg, null);
+      if (awayMetric !== null && homeMetric === null) {
+        return makeDominanceWinner(result.away, awayMetric, null, mode, {
+          rankAverage: averagePerformance(result.away),
+          zoneAverage: numberOrNull(result.away?.zoneStats?.average),
+        });
       }
 
-      const diff = homeAvg - awayAvg;
+      const homeCompare = roundedForComparison(homeMetric);
+      const awayCompare = roundedForComparison(awayMetric);
+      const diff = homeCompare - awayCompare;
       const absDiff = Math.abs(diff);
 
       if (absDiff < 0.000000001) {
         return {
           type: "tie",
           label: "Égalité",
-          average: (homeAvg + awayAvg) / 2,
+          average: (homeMetric + awayMetric) / 2,
+          metric: (homeMetric + awayMetric) / 2,
           diff: absDiff,
+          mode,
         };
       }
 
       return diff > 0
-        ? makeDominanceWinner(result.home, homeAvg, Math.abs(diff))
-        : makeDominanceWinner(result.away, awayAvg, Math.abs(diff));
+        ? makeDominanceWinner(result.home, homeMetric, Math.abs(diff), mode, {
+            rankAverage: averagePerformance(result.home),
+            zoneAverage: numberOrNull(result.home?.zoneStats?.average),
+          })
+        : makeDominanceWinner(result.away, awayMetric, Math.abs(diff), mode, {
+            rankAverage: averagePerformance(result.away),
+            zoneAverage: numberOrNull(result.away?.zoneStats?.average),
+          });
     }
 
     function renderDominance(result) {
       const dominance = getDominance(result);
+      const isEvolution = dominance.mode === "evolution";
+      const title = isEvolution ? "Gagnant Par Évolution" : "Gagnant Par Moyenne Des Rangs";
 
       if (dominance.type === "none") {
         return `
           <div class="dominance-box">
-            <div class="dominance-label">Domination moyenne</div>
+            <div class="dominance-label">${title}</div>
             <div class="dominance-team">Indisponible</div>
-            <div class="dominance-meta">Aucune moyenne disponible sur les rangs.</div>
+            <div class="dominance-meta">${isEvolution ? "Moyenne de zone ou moyenne des rangs indisponible." : "Aucune moyenne disponible sur les rangs."}</div>
           </div>
         `;
       }
@@ -3028,21 +3102,22 @@
       if (dominance.type === "tie") {
         return `
           <div class="dominance-box">
-            <div class="dominance-label">Domination moyenne</div>
+            <div class="dominance-label">${title}</div>
             <div class="dominance-team">Égalité</div>
-            <div class="dominance-meta">Moyenne des deux rangs : ${esc(formatValue(dominance.average))}</div>
+            <div class="dominance-meta">${isEvolution ? "Même évolution affichée après arrondi." : `Moyenne des deux Rangs : ${esc(formatValue(dominance.average))}`}</div>
           </div>
         `;
       }
 
+      const meta = isEvolution
+        ? `Évolution : ${esc(formatValue(dominance.metric))} · Zone ${esc(formatValue(dominance.zoneAverage))} → Rangs ${esc(formatValue(dominance.rankAverage))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`
+        : `Moyenne dominante : ${esc(formatValue(dominance.average))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`;
+
       return `
         <div class="dominance-box">
-          <div class="dominance-label">Domination moyenne</div>
+          <div class="dominance-label">${title}</div>
           <div class="dominance-team">${esc(dominance.label)}</div>
-          <div class="dominance-meta">
-            Moyenne dominante : ${esc(formatValue(dominance.average))}
-            ${dominance.diff !== null ? ` · écart : ${esc(formatRank(dominance.diff))}` : ""}
-          </div>
+          <div class="dominance-meta">${meta}</div>
         </div>
       `;
     }
@@ -3109,6 +3184,10 @@
       $("scanBtn").disabled = true;
       $("scanBtn").textContent = "Scan en cours…";
 
+      const scanCalc = calculateAutoRanks();
+      const rankEventMode = isPerformanceAdvanceMode() ? "performance" : "fixed";
+      const winnerMode = isEvolutionWinnerMode() ? "evolution" : "dominance";
+
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3119,6 +3198,9 @@
           skipHome: skipHomeValue,
           skipAway: skipAwayValue,
           simultaneousMode: isSimultaneousMode(),
+          rankEventStep: scanCalc.advancement,
+          rankEventMode,
+          winnerMode,
         }),
       });
 
@@ -3152,6 +3234,9 @@
           const resultWithOptions = {
             ...job.result,
             simultaneousMode: Boolean(job.result?.simultaneousMode ?? isSimultaneousMode()),
+            rankEventStep: Number(job.result?.rankEventStep ?? calculateAutoRanks().advancement),
+            rankEventMode: job.result?.rankEventMode || (isPerformanceAdvanceMode() ? "performance" : "fixed"),
+            winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
           };
 
           lastResult = {
@@ -3161,6 +3246,9 @@
             autoSearch: {
               ...calculateAutoRanks(),
               simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
+              rankEventStep: resultWithOptions.rankEventStep,
+              rankEventMode: resultWithOptions.rankEventMode,
+              winnerMode: resultWithOptions.winnerMode,
               usedRank1: resultWithOptions.rank1,
               usedRank2: resultWithOptions.rank2,
               requestedRank1: resultWithOptions.requestedRank1,
@@ -3171,7 +3259,7 @@
 
           renderResult(resultWithOptions);
           setStatus("Scan terminé. Tu peux ajouter cette analyse au rapport.", 100);
-          $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter l’analyse actuelle” pour l’enregistrer dans le rapport.";
+          $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter L’Analyse Actuelle” pour l’enregistrer dans le rapport.";
           finishScan();
           return;
         }
@@ -3455,6 +3543,15 @@
       `;
     }
 
+    function zoneAdvancementLabel(stats) {
+      if (stats?.eventStepMode === "performance") {
+        return "Avancement = Valeur De Performance";
+      }
+
+      const step = numberOrNull(stats?.eventStep);
+      return step === null ? "Avancement Par Événement" : `${formatRank(step)} Par Événement`;
+    }
+
     function renderZoneStats(team) {
       const stats = team?.zoneStats;
       const teamName = team?.name || "équipe";
@@ -3465,17 +3562,17 @@
             <div class="stat-header">
               <div>
                 <div class="stat-title">Zone des rangs attribuée à ${esc(teamName)}</div>
-                <div class="stat-subtitle">Événements attribués à ${esc(teamName)} entre le rang bas et le rang haut final.</div>
+                <div class="stat-subtitle">Événements attribués à ${esc(teamName)} entre le Rang Bas et le Rang Haut final.</div>
               </div>
               <div class="stat-badge">Équipe</div>
             </div>
             <div class="stat-grid">
               <div class="stat-card">
-                <div class="stat-kicker">Moyenne zone</div>
+                <div class="stat-kicker">Moyenne Zone</div>
                 <div class="stat-number neutral">—</div>
               </div>
               <div class="stat-card">
-                <div class="stat-kicker">Plus présent</div>
+                <div class="stat-kicker">Plus Présent</div>
                 <div class="mode-detail">—</div>
               </div>
             </div>
@@ -3488,7 +3585,7 @@
           <div class="stat-header">
             <div>
               <div class="stat-title">Zone des rangs attribuée à ${esc(teamName)}</div>
-              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · avancement total ${esc(formatRank(stats.totalQuantity || 0))} · 7.25/8 par événement · zone rang bas → rang haut final.</div>
+              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · Avancement Total ${esc(formatRank(stats.totalQuantity || 0))} · ${esc(zoneAdvancementLabel(stats))} · Zone Rang Bas → Rang Haut Final.</div>
             </div>
             <div class="stat-badge">Équipe</div>
           </div>
@@ -3500,7 +3597,7 @@
             </div>
 
             <div class="stat-card wide">
-              <div class="stat-kicker">Événement le plus présent</div>
+              <div class="stat-kicker">Événement Le Plus Présent</div>
               ${renderModeItems(stats, { global: false })}
             </div>
           </div>
@@ -3673,13 +3770,13 @@
       return [
         `Performance moyenne zone attribuée à ${teamName} : ${formatValue(stats.average)}`,
         `Performance la plus présente zone attribuée à ${teamName} : ${zoneModeText(stats)}`,
-        `Zone rangs finaux attribuée : rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} événements, avancement ${formatRank(stats.totalQuantity || 0)}, 7.25/8 par événement)`,
+        `Zone Rangs Finaux Attribuée : Rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} événements, Avancement ${formatRank(stats.totalQuantity || 0)}, ${zoneAdvancementLabel(stats)})`,
       ];
     }
 
     function compactCalcLine(label, calc) {
       const presetText = calc.presetLabel ? ` · présélection ${calc.presetLabel}` : "";
-      const baseLine = `${label}${presetText} : Base ${formatRank(calc.base)} · Limites ${calc.offensive} · Changements ${calc.changes} · Rangs Calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      const baseLine = `${label}${presetText} : Base ${formatRank(calc.base)} · Avancement ${calc.rankEventMode === "performance" ? "Valeur De Performance" : formatRank(calc.advancement || calc.rankEventStep || 0)} · Changements ${calc.changes} · Rangs Calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
       return calc.simultaneousMode
         ? `${baseLine} · rangs utilisés ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`
         : baseLine;
@@ -3689,11 +3786,11 @@
       return [
         `Présélection : ${calc.presetLabel || "Libre"}`,
         `Base écrite : ${formatRank(calc.base)}`,
-        `Limites offensives : ${calc.offensive}`,
+        `Avancement : ${calc.rankEventMode === "performance" ? "Valeur De Performance" : formatRank(calc.advancement || calc.rankEventStep || 0)}`,
         `Changements : ${calc.changes}`,
         `Cartons ignorés : aucun jaune, second jaune ou rouge n’entre dans le scan`,
-        `Rang bas calculé : ${formatRank(calc.low)}`,
-        `Rang haut calculé : ${formatRank(calc.high)}`,
+        `Rang Bas calculé : ${formatRank(calc.low)}`,
+        `Rang Haut calculé : ${formatRank(calc.high)}`,
         ...(calc.simultaneousMode ? [`Mode simultané : mêmes rangs utilisés → ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`] : []),
       ];
     }
@@ -3722,23 +3819,32 @@
 
     function dominanceLines(result, compact = false) {
       const dominance = getDominance(result);
+      const isEvolution = dominance.mode === "evolution";
+      const title = isEvolution ? "Gagnant Par Évolution" : "Gagnant Par Moyenne Des Rangs";
 
       if (dominance.type === "none") {
-        return ["Domination moyenne : indisponible"];
+        return [`${title} : indisponible`];
       }
 
       if (dominance.type === "tie") {
-        return [`Domination moyenne : égalité (${formatValue(dominance.average)})`];
+        return [`${title} : égalité${isEvolution ? "" : ` (${formatValue(dominance.average)})`}`];
       }
 
       if (compact) {
-        return [`Domination : ${dominance.label} · moyenne ${formatValue(dominance.average)}`];
+        return isEvolution
+          ? [`${title} : ${dominance.label} · évolution ${formatValue(dominance.metric)}`]
+          : [`${title} : ${dominance.label} · moyenne ${formatValue(dominance.average)}`];
       }
 
-      return [
-        `Domination moyenne : ${dominance.label}`,
-        `Moyenne dominante : ${formatValue(dominance.average)}${dominance.diff !== null ? ` · écart : ${formatRank(dominance.diff)}` : ""}`,
-      ];
+      return isEvolution
+        ? [
+            `${title} : ${dominance.label}`,
+            `Évolution : ${formatValue(dominance.metric)} · Zone ${formatValue(dominance.zoneAverage)} → Rangs ${formatValue(dominance.rankAverage)}${dominance.diff !== null ? ` · écart : ${formatRank(dominance.diff)}` : ""}`,
+          ]
+        : [
+            `${title} : ${dominance.label}`,
+            `Moyenne dominante : ${formatValue(dominance.average)}${dominance.diff !== null ? ` · écart : ${formatRank(dominance.diff)}` : ""}`,
+          ];
     }
 
     function teamCompactLine(team, rank1, rank2) {
@@ -4019,13 +4125,15 @@
     }
 
     bindCalculatorInput("autoBaseRange", "autoBaseNumber");
-    bindCalculatorInput("autoOffensiveRange", "autoOffensiveNumber");
+    bindCalculatorInput("autoAdvanceRange", "autoAdvanceNumber");
     bindCalculatorInput("autoChangeRange", "autoChangeNumber");
 
     $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays Officiels"));
     $("friendlyPresetBtn").addEventListener("click", () => applyPreset("Pays Amicaux"));
 
     $("simultaneousMode").addEventListener("change", updateAutoCalculator);
+    $("performanceAdvanceMode").addEventListener("change", updateAutoCalculator);
+    $("evolutionWinnerMode").addEventListener("change", updateAutoCalculator);
     $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
 
 
