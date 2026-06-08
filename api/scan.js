@@ -71,6 +71,13 @@ function skip(x) {
   return Number.isFinite(x) ? Math.max(0, Math.min(5, Math.floor(x))) : 0;
 }
 
+function numeric(x, fallback, min, max) {
+  if (x === undefined || x === null || x === '') return fallback;
+  const n = Number(String(x).replace(',', '.'));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
 function bool(x) {
   return x === true || x === 'true' || x === 1 || x === '1';
 }
@@ -108,6 +115,9 @@ module.exports = async function (req, res) {
     const rank1 = rank(b.rank1);
     const rank2 = rank(b.rank2);
     const simultaneousMode = bool(b.simultaneousMode);
+    const rankEventStep = numeric(b.rankEventStep, 2 / 3, 0.0001, 5);
+    const rankEventMode = b.rankEventMode === 'performance' ? 'performance' : 'fixed';
+    const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
 
     if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
@@ -141,6 +151,9 @@ module.exports = async function (req, res) {
         skipHome: skip(b.skipHome),
         skipAway: skip(b.skipAway),
         simultaneousMode,
+        rankEventStep,
+        rankEventMode,
+        winnerMode,
       },
     };
 
