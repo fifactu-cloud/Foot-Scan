@@ -35,7 +35,7 @@ INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "2"))
 SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "3"))
 SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.8"))
 PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
-DEFAULT_RANK_EVENT_STEP = 2 / 3
+DEFAULT_RANK_EVENT_STEP = 1.0
 CURRENT_RANK_EVENT_STEP = DEFAULT_RANK_EVENT_STEP
 CURRENT_RANK_ADVANCEMENT_MODE = "fixed"
 
@@ -1493,7 +1493,7 @@ def process_scan_job(job_id):
     scan_fetch_needed = max_needed * 2 if simultaneous_mode else max_needed
 
     print(
-        f"Scan complet: job={job_id} match={match_id} "
+        f"🔎 Scan complet: job={job_id} match={match_id} "
         f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
         f"objectif avancement brut={scan_fetch_needed} simultaneous={simultaneous_mode} "
         f"avancement={rank_advancement_label()}"
@@ -1608,13 +1608,13 @@ def process_scan_job(job_id):
         update_scan_job(
             job_id,
             status="done",
-            message="Scan terminé.",
+            message="🔎 Scan terminé.",
             progress=100,
             result=result,
             finishedAt=now_ts(),
         )
 
-        print(f"Scan terminé: {job_id}")
+        print(f"🔎 Scan terminé: {job_id}")
 
     except Exception as e:
         update_scan_job(
@@ -1691,11 +1691,11 @@ def main():
     once = "--once" in sys.argv
 
     print("Foot/Scan worker local démarré.")
-    print("Version niveau 1: scan complet côté worker activé.")
+    print("Version niveau 1: 🔎 scan complet côté worker activé.")
     print("Pages SofaScore: jusqu’à 20 pages, arrêt automatique si 404/page vide.")
     print("Mode simultané lié: mêmes rangs, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Avancement des rangs: curseur par job, défaut 2/3 par événement.")
+    print("Avancement des rangs: curseur par job, défaut 1 par événement.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry SofaScore + incidents ignorés en cas d’erreur.")
     print("Préchargement incidents: désactivé par défaut pour économiser les requêtes.")
