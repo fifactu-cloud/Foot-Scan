@@ -115,7 +115,7 @@ module.exports = async function (req, res) {
     const rank1 = rank(b.rank1);
     const rank2 = rank(b.rank2);
     const simultaneousMode = bool(b.simultaneousMode);
-    const rankEventStep = numeric(b.rankEventStep, 2 / 3, 0.0001, 5);
+    const rankEventStep = numeric(b.rankEventStep, 1, 0.0001, 5);
     const rankEventMode = b.rankEventMode === 'performance' ? 'performance' : 'fixed';
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
 
