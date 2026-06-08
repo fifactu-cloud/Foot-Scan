@@ -1476,6 +1476,147 @@
       text-transform: uppercase;
       margin: 2px 0;
     }
+
+    /* Match-day refresh: plus vivant, plus foot, même police */
+    body {
+      background:
+        radial-gradient(circle at 18% 8%, rgba(34, 197, 94, 0.22), transparent 28%),
+        radial-gradient(circle at 88% 6%, rgba(250, 204, 21, 0.16), transparent 22%),
+        linear-gradient(145deg, #07110b 0%, #080808 44%, #120707 100%);
+    }
+
+    .topbar {
+      background: rgba(6, 14, 9, 0.88);
+      border-bottom: 1px solid rgba(34, 197, 94, 0.20);
+    }
+
+    .brand-logo {
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 25%, #ffffff 0 9%, #22c55e 10% 34%, #166534 35% 100%);
+      box-shadow: 0 14px 34px rgba(34, 197, 94, 0.26);
+      text-shadow: 0 1px 8px rgba(0,0,0,.55);
+    }
+
+    .hero,
+    .panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .report-panel {
+      border-radius: 24px;
+      border-color: rgba(255, 255, 255, 0.13);
+    }
+
+    .hero {
+      background:
+        linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(250, 204, 21, 0.08) 42%, rgba(239, 68, 68, 0.10)),
+        rgba(15, 15, 15, 0.94);
+      position: relative;
+    }
+
+    .hero::after {
+      content: "⚽";
+      position: absolute;
+      right: 18px;
+      top: 12px;
+      font-size: 54px;
+      opacity: .12;
+      filter: grayscale(1);
+    }
+
+    .kicker,
+    .side-pill,
+    .auto-badge,
+    .count-pill {
+      border-radius: 999px;
+    }
+
+    .home-title,
+    .summary-title,
+    .team-name {
+      letter-spacing: -0.075em;
+    }
+
+    .auto-box {
+      border-radius: 24px;
+      border-color: rgba(34, 197, 94, 0.28);
+      background:
+        linear-gradient(135deg, rgba(34, 197, 94, 0.16), rgba(250, 204, 21, 0.06), rgba(56, 189, 248, 0.06)),
+        #0f1110;
+    }
+
+    .auto-title::before {
+      content: "🏟️ ";
+    }
+
+    .auto-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    @media (max-width: 820px) {
+      .auto-grid { grid-template-columns: 1fr; }
+    }
+
+    .auto-control {
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.045);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    .auto-control-title {
+      color: #bbf7d0;
+    }
+
+    .auto-number,
+    input {
+      border-radius: 16px;
+      background: rgba(4, 8, 6, 0.82);
+    }
+
+    input[type="range"] {
+      accent-color: #22c55e;
+    }
+
+    .auto-result-card {
+      border-radius: 20px;
+      background: linear-gradient(160deg, rgba(34,197,94,.12), rgba(255,255,255,.04));
+    }
+
+    .auto-result-value {
+      color: #fef08a;
+      text-shadow: 0 8px 26px rgba(250, 204, 21, 0.16);
+    }
+
+    .scan-btn {
+      border-radius: 18px;
+      background: linear-gradient(135deg, #22c55e, #16a34a 46%, #15803d 100%);
+      box-shadow: 0 18px 40px rgba(34, 197, 94, 0.24);
+    }
+
+    .scan-btn::before {
+      content: "⚽ ";
+    }
+
+    .preset-btn.official {
+      background: linear-gradient(135deg, rgba(34,197,94,.20), rgba(250,204,21,.11));
+      border-color: rgba(34,197,94,.33);
+    }
+
+    .preset-btn.friendly {
+      background: linear-gradient(135deg, rgba(56,189,248,.16), rgba(34,197,94,.09));
+      border-color: rgba(56,189,248,.26);
+    }
+
+    .team-hero {
+      background:
+        linear-gradient(135deg, rgba(34, 197, 94, 0.13), rgba(255, 255, 255, 0.03));
+    }
+
+    .rank-value {
+      text-shadow: 0 14px 34px rgba(0,0,0,.35);
+    }
+
   </style>
 </head>
 
@@ -1504,7 +1645,7 @@
         <h1 class="home-title">Foot<span>/</span>Scan</h1>
         <p class="hero-text">
           Termux récupère les matchs, calcule les rangs et renvoie le résultat final.
-          Calculateur : base libre 0 → 1000, valeurs doublées sauf la base, 2 pages SofaScore.
+          Nouvelle version : scan orienté buts, base 31,3125 par défaut, limites offensives, marge changements à 1,5 et interface plus match-day.
         </p>
       </div>
     </section>
@@ -1531,7 +1672,7 @@
             <div>
               <div class="auto-title">Calcul automatique des rangs</div>
               <div class="auto-sub">
-                Base libre · valeurs en X.5 acceptées · limites × 19,9375 · marge 0,90625 × changements · rouge direct = −0,90625 × curseur, appliqué aux deux rangs.
+                Base libre · défaut 31,3125 · valeurs X.5 acceptées · limites × 19,9375 · changements × 1,5 · aucun curseur rouge.
               </div>
             </div>
             <div class="auto-badge">Base libre</div>
@@ -1544,11 +1685,11 @@
                 <span id="activePresetLabel">Libre</span>
               </div>
               <div class="preset-hint">
-                Présélections restaurées : Clubs/Pays officiel et Pays amicaux. Les deux appliquent Base 24.5 et Rouge direct 4.5. Officiel = limites 2 / changements 7. Amical = limites 2 / changements 13.
+                Présélections match : mêmes curseurs qu’avant pour les changements. Base 31,3125 pour toutes les bases. Aucun rouge dans le calcul automatique.
               </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiel<small>base 24.5 · L 2 · changements 7 · rouge 4.5</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>base 24.5 · L 2 · changements 13 · rouge 4.5</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiel<small>base 31,3125 · L 2 · changements 7</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>base 31,3125 · L 2 · changements 13</small></button>
               </div>
             </div>
 
@@ -1556,9 +1697,9 @@
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Base</div>
-                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="24.5" />
+                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="31.3125" />
                 </div>
-                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="24.5" />
+                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="31.3125" />
               </div>
 
               <div class="auto-control">
@@ -1575,14 +1716,6 @@
                   <input id="autoChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="3" />
                 </div>
                 <input id="autoChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
-              </div>
-
-              <div class="auto-control">
-                <div class="auto-control-top">
-                  <div class="auto-control-title">Rouges directs</div>
-                  <input id="autoRedNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="4.5" />
-                </div>
-                <input id="autoRedRange" type="range" min="0" max="22" step="0.5" value="4.5" />
               </div>
             </div>
 
@@ -1675,16 +1808,18 @@
       <div class="bar-grid">
         <div class="bar-card">
           <div class="bar-card-title">✅ Équipe analysée</div>
-          <div class="bar-line"><span>⚽ But</span><strong class="positive">+1</strong></div>
-          <div class="bar-line"><span>⚽ But + passe</span><strong class="positive">+1.5</strong></div>
-          <div class="bar-line"><span>🥅 But contre son camp</span><strong class="negative">−1</strong></div>
+          <div class="bar-line"><span>⚽ But avec passeur</span><strong class="positive">+1</strong></div>
+          <div class="bar-line"><span>⚽ But sans passeur</span><strong class="positive">+0.6667</strong></div>
+          <div class="bar-line"><span>🎯 Erreur adverse sur but sans passeur</span><strong class="positive">+0.3333</strong></div>
+          <div class="bar-line"><span>🥅 CSC commis</span><strong class="negative">−0.3333</strong></div>
         </div>
 
         <div class="bar-card">
           <div class="bar-card-title">⚔️ Adversaire</div>
-          <div class="bar-line"><span>⚽ But</span><strong class="negative">−1</strong></div>
-          <div class="bar-line"><span>⚽ But + passe</span><strong class="negative">−1.5</strong></div>
-          <div class="bar-line"><span>🥅 But contre son camp</span><strong class="positive">+1</strong></div>
+          <div class="bar-line"><span>⚽ But avec passeur</span><strong class="negative">−1</strong></div>
+          <div class="bar-line"><span>⚽ But sans passeur</span><strong class="negative">−0.6667</strong></div>
+          <div class="bar-line"><span>🎯 Erreur de l’équipe analysée sur but sans passeur</span><strong class="negative">−0.3333</strong></div>
+          <div class="bar-line"><span>🥅 CSC adverse</span><strong class="positive">+0.3333</strong></div>
         </div>
       </div>
     </details>
@@ -1702,14 +1837,16 @@
     const DOMINANCE_TIE_THRESHOLD = 0;
 
     const LABELS = {
-      goal: "But",
-      goalWithAssist: "But + passe",
-      ownGoal: "But contre son camp",
+      goal: "But sans passeur",
+      goalWithAssist: "But avec passeur",
+      goalNoAssistError: "Erreur sur but sans passeur",
+      ownGoal: "CSC / erreur",
     };
 
     const ICONS = {
       goal: "⚽",
       goalWithAssist: "⚽",
+      goalNoAssistError: "🎯",
       ownGoal: "🥅",
     };
 
@@ -1795,13 +1932,11 @@
       const rawBase = parseFloat(String($(`${prefix}BaseNumber`).value).replace(",", "."));
       const rawOffensive = parseFloat(String($(`${prefix}OffensiveNumber`).value).replace(",", "."));
       const rawChanges = parseFloat(String($(`${prefix}ChangeNumber`).value).replace(",", "."));
-      const rawReds = parseFloat(String($(`${prefix}RedNumber`).value).replace(",", "."));
-
       return {
         base: clamp(rawBase, 0, 1000),
         offensive: clamp(rawOffensive, 0, 22),
         changes: clamp(rawChanges, 0, 22),
-        reds: clamp(rawReds, 0, 22),
+        reds: 0,
       };
     }
 
@@ -1814,9 +1949,6 @@
 
       $(`${prefix}ChangeNumber`).value = calc.changes;
       $(`${prefix}ChangeRange`).value = calc.changes;
-
-      $(`${prefix}RedNumber`).value = calc.reds;
-      $(`${prefix}RedRange`).value = calc.reds;
     }
 
     function calculateRanksFromValues(values) {
@@ -1825,17 +1957,17 @@
       const offensiveBoost = offensive * 19.9375;
       const adjustedBase = base + offensiveBoost;
 
-      const marginUnit = 0.90625;
+      const marginUnit = 1.5;
       const marginFinal = marginUnit * changes;
 
       const lowBeforeCards = adjustedBase - marginFinal;
       const highBeforeCards = adjustedBase + marginFinal;
 
-      const redEffect = -0.90625 * reds;
-      const totalCardEffect = redEffect;
+      const redEffect = 0;
+      const totalCardEffect = 0;
 
-      const low = lowBeforeCards + totalCardEffect;
-      const high = highBeforeCards + totalCardEffect;
+      const low = lowBeforeCards;
+      const high = highBeforeCards;
 
       return {
         base,
@@ -1876,10 +2008,7 @@
         `Base : ${formatRank(calc.base)} · ` +
         `limites : ${calc.offensive} × 19.9375 = ${formatRank(calc.offensiveBoost)} · ` +
         `base corrigée : ${formatRank(calc.adjustedBase)} · ` +
-        `marge : 0.90625 × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
-        `avant rouge : ${formatRank(calc.lowBeforeCards)} / ${formatRank(calc.highBeforeCards)} · ` +
-        `rouges directs : -0.90625 × ${calc.reds} = ${formatValue(calc.redEffect)} · ` +
-        `rouges appliqués aux deux rangs · ` +
+        `marge : 1.5 × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
         `rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
       );
     }
@@ -1912,8 +2041,8 @@
       const offensive = "2";
       const changes = isFriendly ? "13" : "7";
 
-      $("autoBaseNumber").value = "24.5";
-      $("autoBaseRange").value = "24.5";
+      $("autoBaseNumber").value = "31.3125";
+      $("autoBaseRange").value = "31.3125";
 
       $("autoOffensiveNumber").value = offensive;
       $("autoOffensiveRange").value = offensive;
@@ -1921,11 +2050,8 @@
       $("autoChangeNumber").value = changes;
       $("autoChangeRange").value = changes;
 
-      $("autoRedNumber").value = "4.5";
-      $("autoRedRange").value = "4.5";
-
       updateAutoCalculator();
-      setStatus(`Présélection ${label} appliquée : base 24.5 · limites ${offensive} · changements ${changes} · rouge 4.5`, 0);
+      setStatus(`Présélection ${label} appliquée : base 31,3125 · limites ${offensive} · changements ${changes}`, 0);
     }
 
     function markPresetAsCustom() {
@@ -2671,7 +2797,7 @@
 
     function compactCalcLine(label, calc) {
       const presetText = calc.presetLabel ? ` · présélection ${calc.presetLabel}` : "";
-      const baseLine = `${label}${presetText} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rouges ${calc.reds} · rangs calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      const baseLine = `${label}${presetText} : base ${formatRank(calc.base)} · L ${calc.offensive} · changements ${calc.changes} · rangs calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
       return calc.simultaneousMode
         ? `${baseLine} · rangs utilisés ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`
         : baseLine;
@@ -2683,9 +2809,7 @@
         `Base écrite : ${formatRank(calc.base)}`,
         `Limites offensives : ${calc.offensive}`,
         `Changements : ${calc.changes}`,
-        `Rouge direct dans la valeur : ${calc.reds > 0 ? "oui" : "non"} (${calc.reds})`,
-        `Impact rouge direct : -0.90625 × ${calc.reds} = ${formatValue(calc.redEffect)}`,
-        `Rouge appliqué aux deux rangs : ${formatValue(calc.totalCardEffect)}`,
+        `Rouge direct dans la valeur : retiré du calcul automatique`,
         `Rang bas calculé : ${formatRank(calc.low)}`,
         `Rang haut calculé : ${formatRank(calc.high)}`,
         ...(calc.simultaneousMode ? [`Mode simultané : mêmes rangs utilisés → ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`] : []),
@@ -2923,6 +3047,8 @@
     @page { margin: 16mm; }
     body { font-family: "Google Sans", "Roboto", Arial, sans-serif; color: #111; line-height: 1.25; font-size: 6pt; }
     pre { white-space: pre-wrap; word-break: break-word; font-family: "Google Sans", "Roboto", Arial, sans-serif; font-size: 6pt; line-height: 1.25; }
+
+
   </style>
 </head>
 <body>
@@ -3013,7 +3139,6 @@
     bindCalculatorInput("autoBaseRange", "autoBaseNumber");
     bindCalculatorInput("autoOffensiveRange", "autoOffensiveNumber");
     bindCalculatorInput("autoChangeRange", "autoChangeNumber");
-    bindCalculatorInput("autoRedRange", "autoRedNumber");
 
     $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays Officiel"));
     $("friendlyPresetBtn").addEventListener("click", () => applyPreset("Pays Amicaux"));
