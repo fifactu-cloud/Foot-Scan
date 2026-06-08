@@ -37,14 +37,18 @@ SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.8
 PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
 RANK_EVENT_STEP = 7.25 / 8
 
+GOAL_WITH_PASSER_VALUE = 1.0
+GOAL_WITHOUT_PASSER_VALUE = 2 / 3
+GOAL_ERROR_VALUE = 1 / 3
+
 POSITIVE_VALUES = {
-    "goal": 1,
-    "goalWithAssist": 1.5,
-    "assist": 0.5,
+    "goalWithAssist": GOAL_WITH_PASSER_VALUE,
+    "goal": GOAL_WITHOUT_PASSER_VALUE,
+    "goalNoAssistError": GOAL_ERROR_VALUE,
 }
 
 NEGATIVE_VALUES_FOR_TEAM = {
-    "ownGoal": -1,
+    "ownGoal": -GOAL_ERROR_VALUE,
 }
 
 CARD_VALUES_FOR_TEAM = {
@@ -55,14 +59,15 @@ CARD_VALUES_FOR_TEAM = {
 }
 
 LABELS = {
-    "goal": "But",
-    "goalWithAssist": "But + passe",
+    "goal": "But sans passeur",
+    "goalWithAssist": "But avec passeur",
+    "goalNoAssistError": "Erreur sur but sans passeur",
     "assist": "Passe décisive",
     "yellow": "Jaune",
     "secondYellow": "Deuxième jaune",
     "red": "Rouge direct",
     "redFromSecondYellow": "Rouge via 2e jaune",
-    "ownGoal": "But contre son camp",
+    "ownGoal": "CSC / erreur",
 }
 
 
@@ -446,9 +451,9 @@ def parse_incidents(incidents, match, analyzed_team_id):
 
     Depuis cette version, les cartons et les passes décisives seules ne sont
     plus parcourus. Les seuls événements conservés sont :
-    - but sans passe
-    - but avec passe
-    - but contre son camp
+    - but avec passeur = performance 1
+    - but sans passeur = 2/3 de performance 1 + erreur adverse = 1/3
+    - CSC = 1/3 de performance 1
     """
     events = []
     match_label = make_match_label(match)
@@ -489,7 +494,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 "match": match_label,
                 "matchId": match_id,
                 "side": side,
-                "detail": f"{camp_label} · CSC · {scorer}",
+                "detail": f"{camp_label} · CSC / erreur · {scorer}",
                 "icon": "🥅",
             })
             continue
@@ -507,10 +512,14 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 "match": match_label,
                 "matchId": match_id,
                 "side": side,
-                "detail": f"{camp_label} · {scorer} — passe : {assister}",
+                "detail": f"{camp_label} · but avec passeur · {scorer} — passe : {assister}",
                 "icon": "⚽",
             })
         else:
+            # Un but sans passeur est volontairement découpé en deux événements :
+            # 1) le but de l'équipe qui marque = 2/3 de performance 1 ;
+            # 2) l'erreur de l'équipe qui encaisse = 1/3 de performance 1.
+            # L'ordre est important : but d'abord, erreur ensuite.
             events.append({
                 "type": "goal",
                 "value": signed_attack_value("goal", is_for_team),
@@ -520,8 +529,27 @@ def parse_incidents(incidents, match, analyzed_team_id):
                 "match": match_label,
                 "matchId": match_id,
                 "side": side,
-                "detail": f"{camp_label} · {scorer}",
+                "detail": f"{camp_label} · but sans passeur · {scorer}",
                 "icon": "⚽",
+                "subOrder": 0,
+            })
+
+            error_is_for_team = not is_for_team
+            error_camp_label = "Équipe analysée" if error_is_for_team else "Adversaire"
+            error_side = "team" if error_is_for_team else "opponent"
+
+            events.append({
+                "type": "goalNoAssistError",
+                "value": signed_attack_value("goalNoAssistError", is_for_team),
+                "minute": minute,
+                "added": added,
+                "minuteLabel": minute_label,
+                "match": match_label,
+                "matchId": match_id,
+                "side": error_side,
+                "detail": f"{error_camp_label} · erreur sur but sans passeur · {scorer}",
+                "icon": "🎯",
+                "subOrder": 1,
             })
 
     def sort_key(ev):
@@ -529,9 +557,10 @@ def parse_incidents(incidents, match, analyzed_team_id):
         order = {
             "goalWithAssist": 0,
             "goal": 0,
-            "ownGoal": 0,
+            "goalNoAssistError": 1,
+            "ownGoal": 1,
         }.get(ev.get("type"), 9)
-        return (-time_value, order)
+        return (-time_value, ev.get("subOrder", order), order)
 
     events.sort(key=sort_key)
     return events
@@ -955,22 +984,20 @@ def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
     Pour la moyenne globale uniquement, on parcourt la liste collective complète :
     équipe A + équipe B + adversaire passé de A + adversaire passé de B.
 
-    Nouvelle règle : pour cette moyenne globale uniquement, les rangs de base
-    sont multipliés par 2. Les zones par équipe gardent, elles, les rangs
-    indiqués sans multiplication.
+    Les rangs utilisés restent ceux indiqués : pas de multiplication automatique.
 
     Chaque événement fait avancer le rang de 7.25 / 8.
     """
     try:
-        used_rank1 = float(rank1) * 2
-        used_rank2 = float(rank2) * 2 if rank2 is not None else used_rank1
+        used_rank1 = float(rank1)
+        used_rank2 = float(rank2) if rank2 is not None else used_rank1
     except Exception:
         used_rank1 = rank1
         used_rank2 = rank2
 
     result = zone_stats_between_ranks(combined_events or [], used_rank1, used_rank2, group_mode="global")
-    result["globalMethod"] = "combined_all_events_double_ranks_fixed_event_step"
-    result["rankMultiplier"] = 2
+    result["globalMethod"] = "combined_all_events_fixed_event_step"
+    result["rankMultiplier"] = 1
     result["eventStep"] = RANK_EVENT_STEP
     result["originalRank1"] = rank1
     result["originalRank2"] = rank2
