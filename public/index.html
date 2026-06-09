@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#060817" />
-  <title>Foot/Scan</title>
+  <title>FOOTSCAN</title>
 
   <style>
     * {
@@ -3426,6 +3426,133 @@
       }
     }
 
+
+    /* Harmonisation v7 : FOOTSCAN, couleurs et boutons */
+    :root {
+      --bg: #050816;
+      --panel: #0a1026;
+      --card: #101833;
+      --card-2: #182450;
+      --blue: #40c9ff;
+      --red: #ff3b72;
+      --soft: #e4ecff;
+      --muted: #adbad8;
+    }
+
+    .brand-title,
+    .home-title {
+      text-transform: uppercase;
+    }
+
+    .brand-title {
+      letter-spacing: -0.036em;
+      font-weight: 1000;
+    }
+
+    .home-title {
+      letter-spacing: -0.064em;
+    }
+
+    .brand-title span,
+    .home-title span {
+      color: #40c9ff;
+      text-shadow: 0 0 22px rgba(64, 201, 255, .32);
+    }
+
+    .auto-title {
+      white-space: nowrap;
+      font-size: clamp(16px, 4.1vw, 19px);
+      letter-spacing: -0.012em;
+    }
+
+    .notice-title,
+    .report-title,
+    .bar-box summary {
+      letter-spacing: -0.012em;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .auto-box {
+      border-color: rgba(134, 203, 255, 0.16);
+    }
+
+    .scan-btn,
+    .auto-apply-btn,
+    .report-btn,
+    .preset-btn,
+    .skip-grid button {
+      font-weight: 950;
+      letter-spacing: -0.006em;
+    }
+
+    .scan-btn,
+    .auto-apply-btn,
+    .report-btn.primary,
+    .preset-btn.active,
+    .skip-grid button.active {
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%);
+      background-size: 190% 190%;
+      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 59, 114, .14);
+    }
+
+    .scan-btn {
+      min-height: 59px;
+      font-size: clamp(19px, 5vw, 21px);
+      border-radius: 21px;
+    }
+
+    .auto-apply-btn {
+      font-size: clamp(13px, 3.7vw, 15px);
+      letter-spacing: 0;
+    }
+
+    .preset-btn {
+      font-size: clamp(14px, 3.8vw, 15.5px);
+    }
+
+    .preset-btn small {
+      font-size: clamp(9.5px, 2.9vw, 10.5px);
+    }
+
+    .report-btn {
+      font-size: clamp(12px, 3.3vw, 13px);
+      text-transform: none;
+    }
+
+    .skip-grid button {
+      font-size: clamp(13px, 3.7vw, 14.5px);
+    }
+
+    .auto-control-title,
+    label,
+    .tiny-label,
+    .summary-label,
+    .rank-label,
+    .section-title,
+    .dominance-label {
+      letter-spacing: .11em;
+    }
+
+    @media (max-width: 430px) {
+      .auto-title {
+        font-size: clamp(15px, 4.25vw, 17px);
+      }
+
+      .brand-title {
+        font-size: clamp(20px, 5.8vw, 24px);
+        letter-spacing: -0.03em;
+      }
+
+      .home-title {
+        letter-spacing: -0.058em;
+      }
+    }
+
   </style>
 </head>
 
@@ -3435,7 +3562,7 @@
       <div class="brand">
         <div class="brand-logo">F/</div>
         <div>
-          <div class="brand-title">Foot<span>/</span>Scan</div>
+          <div class="brand-title">FOOT<span>/</span>SCAN</div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -3451,9 +3578,9 @@
     <section class="hero" id="hero">
       <div class="hero-inner">
         <div class="kicker">🔎 Scan Complet Via Données Web</div>
-        <h1 class="home-title">Foot<span>/</span>Scan</h1>
+        <h1 class="home-title">FOOT<span>/</span>SCAN</h1>
         <p class="hero-text">
-          FootScan est un site qui permet d'analyser les confrontations (de football) à partir de l'historique des deux équipes. Le calcul se base sur la performance (via les buts) au fil du temps (du passé vers le présent).
+          FOOTSCAN est un site qui permet d'analyser les confrontations (de football) à partir de l'historique des deux équipes. Le calcul se base sur la performance (via les buts) au fil du temps (du passé vers le présent).
         </p>
       </div>
     </section>
@@ -3477,7 +3604,7 @@
         <div class="auto-box">
           <div class="auto-head">
             <div>
-              <div class="auto-title">CALCUL AUTOMATIQUE DES RANGS</div>
+              <div class="auto-title">CALCUL GUIDÉ DES RANGS</div>
               <div class="auto-sub" aria-hidden="true"></div>
             </div>
           </div>
@@ -4957,11 +5084,11 @@
       const entries = loadReport();
 
       if (!entries.length) {
-        return "Rapport Foot/Scan\n\nAucune analyse enregistrée.";
+        return "Rapport FOOTSCAN\n\nAucune analyse enregistrée.";
       }
 
       return [
-        simple ? "RAPPORT FOOT/SCAN — SIMPLE" : "RAPPORT FOOT/SCAN — COMPLET",
+        simple ? "RAPPORT FOOTSCAN — SIMPLE" : "RAPPORT FOOTSCAN — COMPLET",
         `Généré le : ${new Date().toLocaleString("fr-FR")}`,
         `Nombre d’analyses : ${entries.length}`,
         "",
@@ -4972,7 +5099,7 @@
     }
 
     function reportFilename(kind, extension) {
-      return `rapport-footscan-${kind}-${new Date().toISOString().slice(0, 10)}.${extension}`;
+      return `rapport-FOOTSCAN-${kind}-${new Date().toISOString().slice(0, 10)}.${extension}`;
     }
 
     function downloadTextFile(filename, text) {
@@ -5025,7 +5152,7 @@
 
     function openReportPdf(simple = true) {
       const text = buildReportText(simple);
-      const title = simple ? "Rapport Foot/Scan simple" : "Rapport Foot/Scan complet";
+      const title = simple ? "Rapport FOOTSCAN simple" : "Rapport FOOTSCAN complet";
       const win = window.open("", "_blank");
 
       if (!win) {
