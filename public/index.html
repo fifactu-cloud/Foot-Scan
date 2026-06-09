@@ -4703,6 +4703,224 @@
       }
     }
 
+
+    /* Retouche v26 : fluidité générale + ballon scanner plus fluide */
+    @keyframes scanButtonBallRollV26 {
+      0% {
+        transform: translate3d(0, -50%, 0) rotate(0deg) scale(1);
+        opacity: .96;
+      }
+      14% {
+        transform: translate3d(28px, -53%, 0) rotate(110deg) scale(1.03);
+        opacity: 1;
+      }
+      58% {
+        transform: translate3d(min(36vw, 170px), -50%, 0) rotate(520deg) scale(1);
+        opacity: 1;
+      }
+      84% {
+        opacity: .92;
+      }
+      100% {
+        transform: translate3d(min(53vw, 248px), -50%, 0) rotate(860deg) scale(.92);
+        opacity: 0;
+      }
+    }
+
+    @keyframes scanButtonKickV26 {
+      0% { transform: translateZ(0) scale(1); filter: brightness(1); }
+      20% { transform: translateZ(0) scale(.988); filter: brightness(1.03); }
+      56% { transform: translateZ(0) scale(1.008); filter: brightness(1.08); }
+      100% { transform: translateZ(0) scale(1); filter: brightness(1); }
+    }
+
+    .scan-btn {
+      will-change: transform, filter, background-position;
+      backface-visibility: hidden;
+      transform: translateZ(0);
+    }
+
+    .scan-btn.scan-kick {
+      animation: scanButtonKickV26 .98s cubic-bezier(.22,.61,.36,1) both !important;
+      color: rgba(255,255,255,.08) !important;
+      filter: brightness(1.06) saturate(1.04) !important;
+    }
+
+    .scan-btn.scan-kick::before {
+      position: absolute !important;
+      left: 22px !important;
+      top: 50% !important;
+      margin-right: 0 !important;
+      z-index: 2;
+      will-change: transform, opacity;
+      animation: scanButtonBallRollV26 .98s cubic-bezier(.22,.61,.36,1) forwards !important;
+    }
+
+    .status-box,
+    .status-box.status-selection,
+    .status-box.status-loading,
+    .status-box.status-done,
+    .status-box .progress-fill,
+    .status-box .status-progress-bg,
+    .status-box .status-big-percent {
+      backface-visibility: hidden;
+      transform: translateZ(0);
+    }
+
+    .status-box {
+      transition: opacity .28s ease, transform .28s cubic-bezier(.22,.61,.36,1), background .28s ease, border-color .28s ease, box-shadow .28s ease !important;
+    }
+
+    .status-box.status-loading .status-progress-bg,
+    .status-box.status-loading .progress-fill {
+      transition: width .42s cubic-bezier(.22,.61,.36,1) !important;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      transition: opacity .28s ease, color .28s ease !important;
+    }
+
+    .status-box.status-done {
+      animation: statusSoftInV8 .34s cubic-bezier(.22,.61,.36,1) both !important;
+    }
+
+    .status-done-title {
+      animation: statusSoftInV8 .28s cubic-bezier(.22,.61,.36,1) both, doneTitleFloatV8 2.2s ease-in-out .32s infinite !important;
+    }
+
+
+    /* Retouche v27 : vérification finale fluidité scan + bouton + bloc */
+    .scan-btn:disabled {
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .74) 0%, rgba(59, 107, 255, .66) 46%, rgba(255, 59, 114, .62) 100%),
+        rgba(10, 18, 38, .94) !important;
+      color: rgba(255,255,255,.97) !important;
+      border-color: rgba(255,255,255,.12) !important;
+      box-shadow:
+        0 12px 28px rgba(64, 201, 255, .12),
+        0 10px 24px rgba(255, 59, 114, .10),
+        inset 0 1px 0 rgba(255,255,255,.09) !important;
+      opacity: 1 !important;
+      filter: saturate(1.02) brightness(1.01) !important;
+    }
+
+    .scan-btn.scan-kick {
+      animation: scanButtonKickV26 1.08s cubic-bezier(.22,.61,.36,1) both !important;
+      color: rgba(255,255,255,.06) !important;
+    }
+
+    .scan-btn.scan-kick::before {
+      left: 24px !important;
+      animation: scanButtonBallRollV26 1.08s cubic-bezier(.22,.61,.36,1) forwards !important;
+    }
+
+    .status-box,
+    .status-box.status-selection,
+    .status-box.status-loading,
+    .status-box.status-done {
+      min-height: 78px !important;
+      height: 78px !important;
+      border-radius: 16px !important;
+    }
+
+    .status-box.status-selection {
+      display: grid !important;
+      place-items: center !important;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(64,201,255,.10), transparent 34%),
+        linear-gradient(135deg, rgba(64,201,255,.09), rgba(255,59,114,.07)),
+        rgba(5, 10, 28, .88) !important;
+      border-color: rgba(64, 201, 255, .26) !important;
+    }
+
+    .status-selection-wrap {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 5px;
+    }
+
+    .status-selection-label {
+      font-size: 10px !important;
+      line-height: 1 !important;
+      letter-spacing: .14em !important;
+    }
+
+    .status-selection-value {
+      font-size: clamp(16px, 5vw, 21px) !important;
+      line-height: 1 !important;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-box.status-loading {
+      display: block !important;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(64,201,255,.12), transparent 34%),
+        linear-gradient(135deg, rgba(64,201,255,.11), rgba(255,59,114,.08)),
+        rgba(5, 10, 28, .90) !important;
+      border-color: rgba(64, 201, 255, .26) !important;
+      box-shadow:
+        0 10px 24px rgba(0,0,0,.16),
+        0 0 0 1px rgba(64,201,255,.08),
+        inset 0 1px 0 rgba(255,255,255,.05) !important;
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      opacity: .20 !important;
+      transition: width .56s cubic-bezier(.22,.61,.36,1) !important;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      font-size: clamp(24px, 7vw, 31px) !important;
+      color: rgba(255,255,255,.24) !important;
+      transition: opacity .30s ease !important;
+    }
+
+    .status-box.status-loading .progress-track {
+      height: 6px !important;
+      border-radius: 0 !important;
+      background: rgba(255,255,255,.14) !important;
+      overflow: hidden;
+    }
+
+    .status-box.status-loading .progress-fill {
+      border-radius: 0 !important;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
+      transition: width .56s cubic-bezier(.22,.61,.36,1) !important;
+    }
+
+    .status-box.status-done {
+      animation: statusSoftInV8 .38s cubic-bezier(.22,.61,.36,1) both !important;
+    }
+
+    .status-done-title {
+      animation: statusSoftInV8 .34s cubic-bezier(.22,.61,.36,1) both, doneTitleFloatV8 2.2s ease-in-out .38s infinite !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box,
+      .status-box.status-selection,
+      .status-box.status-loading,
+      .status-box.status-done {
+        min-height: 76px !important;
+        height: 76px !important;
+        padding: 9px 10px !important;
+      }
+
+      .status-selection-label {
+        font-size: 9.4px !important;
+      }
+
+      .status-selection-value {
+        font-size: clamp(15px, 5.3vw, 19px) !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -5363,6 +5581,45 @@
       `;
     }
 
+
+
+    function animateStatusProgress(box, target) {
+      const percentNode = box.querySelector('.status-big-percent');
+      const fillNode = box.querySelector('.progress-fill');
+      const bgNode = box.querySelector('.status-progress-bg');
+      const start = Number(box._displayProgress ?? 0);
+      const end = Math.max(0, Math.min(100, Number(target || 0)));
+
+      if (box._progressRAF) {
+        cancelAnimationFrame(box._progressRAF);
+        box._progressRAF = null;
+      }
+
+      const duration = 560;
+      const t0 = performance.now();
+      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+      const step = (now) => {
+        const t = Math.min(1, (now - t0) / duration);
+        const eased = easeOutCubic(t);
+        const value = start + (end - start) * eased;
+        box._displayProgress = value;
+
+        if (percentNode) percentNode.textContent = `${Math.round(value)}%`;
+        if (fillNode) fillNode.style.width = `${value}%`;
+        if (bgNode) bgNode.style.width = `${value}%`;
+
+        if (t < 1) {
+          box._progressRAF = requestAnimationFrame(step);
+        } else {
+          box._progressRAF = null;
+          box._displayProgress = end;
+        }
+      };
+
+      box._progressRAF = requestAnimationFrame(step);
+    }
+
     function setStatus(message, progress = 0) {
       const box = $("statusBox");
 
@@ -5372,6 +5629,11 @@
       }
 
       if (!message) {
+        if (box._progressRAF) {
+          cancelAnimationFrame(box._progressRAF);
+          box._progressRAF = null;
+        }
+        box._displayProgress = 0;
         box.classList.remove("status-done", "status-loading", "status-selection", "status-fade-out");
         box.innerHTML = "";
         box.style.display = "none";
@@ -5409,10 +5671,8 @@
           const percentNode = box.querySelector('.status-big-percent');
           const fillNode = box.querySelector('.progress-fill');
           const bgNode = box.querySelector('.status-progress-bg');
-          if (percentNode) percentNode.textContent = '100%';
-          if (fillNode) fillNode.style.width = '100%';
-          if (bgNode) bgNode.style.width = '100%';
-          box._doneTimer = window.setTimeout(renderDoneStatus, 560);
+          animateStatusProgress(box, 100);
+          box._doneTimer = window.setTimeout(renderDoneStatus, 980);
           return;
         }
         renderDoneStatus();
@@ -5435,12 +5695,7 @@
         `;
       }
 
-      const percentNode = box.querySelector('.status-big-percent');
-      const fillNode = box.querySelector('.progress-fill');
-      const bgNode = box.querySelector('.status-progress-bg');
-      if (percentNode) percentNode.textContent = `${Math.round(safeProgress)}%`;
-      if (fillNode) fillNode.style.width = `${safeProgress}%`;
-      if (bgNode) bgNode.style.width = `${safeProgress}%`;
+      animateStatusProgress(box, safeProgress);
     }
 
     function setError(message) {
@@ -5460,7 +5715,7 @@
         window.setTimeout(() => {
           button.classList.remove("scan-kick");
           resolve();
-        }, 1140);
+        }, 1080);
       });
     }
 
