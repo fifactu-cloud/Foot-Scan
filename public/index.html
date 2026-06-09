@@ -5365,6 +5365,187 @@
       }
     }
 
+
+    /* Retouche v36 : finitions UI */
+    .mode-toggle {
+      gap: 8px !important;
+      padding: 8px 9px !important;
+      border-radius: 10px !important;
+      font-size: 11px !important;
+      line-height: 1.25 !important;
+      font-weight: 900 !important;
+      background: rgba(56, 189, 248, 0.055) !important;
+    }
+
+    .mode-toggle input {
+      width: 15px !important;
+      height: 15px !important;
+    }
+
+    .mode-toggle span {
+      opacity: .92;
+    }
+
+    .side-pill.side-home,
+    .team-card .side-pill.side-home {
+      color: #dbeafe !important;
+      border-color: rgba(64, 201, 255, .42) !important;
+      background: linear-gradient(135deg, rgba(64,201,255,.18), rgba(59,130,246,.08)) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 0 18px rgba(64,201,255,.08) !important;
+    }
+
+    .side-pill.side-away,
+    .team-card .side-pill.side-away {
+      color: #ffe4e6 !important;
+      border-color: rgba(255, 59, 114, .42) !important;
+      background: linear-gradient(135deg, rgba(255,59,114,.18), rgba(239,68,68,.08)) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 0 18px rgba(255,59,114,.08) !important;
+    }
+
+    .count-pill {
+      min-width: 38px;
+      display: inline-grid !important;
+      place-items: center;
+      padding: 6px 12px !important;
+      border-radius: 999px !important;
+      background: linear-gradient(135deg, rgba(64,201,255,.16), rgba(255,59,114,.12)), rgba(10,16,34,.96) !important;
+      border: 1px solid rgba(255,255,255,.12) !important;
+      color: #eef2ff !important;
+      font-size: 11px !important;
+      font-weight: 1000 !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 18px rgba(0,0,0,.14) !important;
+    }
+
+    .match-number-badge {
+      background: linear-gradient(180deg, rgba(64,201,255,.15), rgba(255,59,114,.10)), rgba(10,16,34,.98) !important;
+      border: 1px solid rgba(255,255,255,.11) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 20px rgba(0,0,0,.18) !important;
+    }
+
+    .match-index {
+      color: #eef2ff !important;
+    }
+
+    .match-count-mini {
+      color: #ffffff !important;
+      background: linear-gradient(135deg, rgba(64,201,255,.20), rgba(255,59,114,.16)) !important;
+    }
+
+    .match-number-badge::before {
+      background: rgba(255,255,255,.16) !important;
+    }
+
+    .rank-value,
+    .rank-card .rank-value {
+      font-size: 33px !important;
+      line-height: 1 !important;
+      letter-spacing: -0.07em !important;
+    }
+
+    .event-list {
+      gap: 10px !important;
+    }
+
+    .event-break {
+      height: 1px;
+      background: var(--line);
+      margin: 4px 8px 2px;
+      border-radius: 0;
+    }
+
+    .event-rich-row {
+      grid-template-columns: auto minmax(0, 1fr) !important;
+      align-items: start !important;
+      gap: 10px !important;
+    }
+
+    .event-rich-row > :last-child {
+      grid-column: auto !important;
+      justify-self: stretch !important;
+    }
+
+    .event-metric-pill {
+      min-width: 86px;
+      height: 36px;
+      display: grid;
+      grid-template-columns: auto auto;
+      align-items: stretch;
+      border-radius: 11px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.11);
+      background: linear-gradient(135deg, rgba(64,201,255,.11), rgba(255,59,114,.08)), rgba(10,16,34,.98);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+
+    .event-metric-code,
+    .event-metric-value {
+      display: grid;
+      place-items: center;
+      padding: 0 10px;
+      line-height: 1;
+      white-space: nowrap;
+      font-weight: 1000;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .event-metric-code {
+      color: #e2e8f0;
+      font-size: 12px;
+      letter-spacing: .04em;
+    }
+
+    .event-metric-value {
+      border-left: 1px solid rgba(255,255,255,.12);
+      font-size: 12px;
+      background: rgba(255,255,255,.03);
+    }
+
+    .event-rich-row .row-title {
+      font-size: 13px !important;
+      line-height: 1.28 !important;
+    }
+
+    .event-rich-row .row-sub {
+      margin-top: 5px !important;
+      line-height: 1.38 !important;
+    }
+
+    details.clean summary {
+      justify-content: flex-start !important;
+      gap: 8px !important;
+    }
+
+    details.clean summary .count-pill {
+      margin-left: 8px !important;
+      margin-right: auto !important;
+    }
+
+    details.clean summary::after {
+      margin-left: auto !important;
+    }
+
+    @media (max-width: 430px) {
+      .event-metric-pill {
+        min-width: 78px;
+        height: 34px;
+      }
+
+      .event-metric-code,
+      .event-metric-value {
+        padding: 0 8px;
+        font-size: 11px;
+      }
+
+      .rank-value,
+      .rank-card .rank-value {
+        font-size: 31px !important;
+      }
+
+      .mode-toggle {
+        font-size: 10.4px !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -5599,6 +5780,19 @@
     };
 
     const $ = (id) => document.getElementById(id);
+
+    function eventShortLabel(event) {
+      switch (event?.type) {
+        case "goalWithAssist":
+          return "BAP";
+        case "goalNoAssistError":
+        case "ownGoal":
+          return "CSC";
+        case "goal":
+        default:
+          return "BSP";
+      }
+    }
 
     function esc(value) {
       return String(value ?? "")
@@ -6116,7 +6310,7 @@
           const fillNode = box.querySelector('.progress-fill');
           const bgNode = box.querySelector('.status-progress-bg');
           animateStatusProgress(box, 100);
-          box._doneTimer = window.setTimeout(renderDoneStatus, 2600);
+          box._doneTimer = window.setTimeout(renderDoneStatus, 3300);
           return;
         }
         renderDoneStatus();
@@ -6324,7 +6518,7 @@
 
           renderResult(resultWithOptions);
           setStatus("Scan Terminé", 100);
-          window.setTimeout(launchFinishFx, 2600);
+          window.setTimeout(launchFinishFx, 3400);
           $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter L’Analyse Actuelle” pour l’enregistrer dans le rapport.";
           finishScan();
           return;
@@ -6673,27 +6867,30 @@
     function renderTeam(team, side, rank1, rank2) {
       const events = team.events || [];
       const matchesUsed = team.matchesUsed || [];
+      const sideClass = side === "Domicile" ? "side-home" : "side-away";
 
-      const eventRows = events.map((event) => {
+      const eventRows = events.map((event, index) => {
         const campClass = sideCampClass(event);
         const campText = sideText(event);
+        const label = LABELS[event.type] || event.type || "Événement";
+        const separator = index > 0 && events[index - 1]?.match !== event?.match
+          ? `<div class="event-break" aria-hidden="true"></div>`
+          : "";
 
         return `
-          <div class="event-row">
-            <div class="event-icon">${esc(eventIcon(event))}</div>
-
-            <div class="row-main">
-              <div class="row-title">
-                <span class="camp-badge ${campClass}">${campText}</span>
-                ${esc(LABELS[event.type] || event.type)}
-              </div>
-
-              <div class="row-sub">
-                ${esc(event.minuteLabel)} · ${esc(event.detail)} · ${esc(event.match)}
-              </div>
+          ${separator}
+          <div class="event-row event-rich-row">
+            <div class="event-metric-pill">
+              <span class="event-metric-code">${esc(eventShortLabel(event))}</span>
+              <span class="event-metric-value ${valueClass(event.value)}">${esc(formatValue(event.value))}</span>
             </div>
 
-            <div class="row-score ${valueClass(event.value)}">${esc(formatValue(event.value))}</div>
+            <div class="row-main">
+              <div class="row-title">${esc(event.match)}</div>
+              <div class="row-sub">
+                <span class="camp-badge ${campClass}">${campText}</span>${esc(label)} · ${esc(event.minuteLabel)}${event.detail ? ` · ${esc(event.detail)}` : ""}
+              </div>
+            </div>
           </div>
         `;
       }).join("");
@@ -6715,7 +6912,7 @@
       return `
         <section class="team-card">
           <div class="team-hero">
-            <div class="side-pill">${esc(side)}</div>
+            <div class="side-pill ${sideClass}">${esc(side)}</div>
 
             <div class="team-header-line">
               <div class="logo-m">
@@ -6730,15 +6927,15 @@
           </div>
 
           <div class="rank-grid ${rank2 ? "" : "one"}">
-            ${renderValue(`Performance rang ${rank1}`, team.r1)}
-            ${rank2 ? renderValue(`Performance rang ${rank2}`, team.r2) : ""}
+            ${renderValue(`Performance Rang ${rank1}`, team.r1)}
+            ${rank2 ? renderValue(`Performance Rang ${rank2}`, team.r2) : ""}
           </div>
 
           ${renderZoneStats(team)}
 
           <div class="section">
             <div class="section-title">
-              Matchs utilisés
+              Matchs Utilisés
               <span class="count-pill">${matchesUsed.length}</span>
             </div>
 
@@ -6747,7 +6944,7 @@
 
           <details class="clean">
             <summary>
-              Événements trouvés
+              Événements Trouvés
               <span class="count-pill">${events.length}</span>
             </summary>
 
