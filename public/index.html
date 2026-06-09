@@ -2947,6 +2947,476 @@
       }
     }
 
+
+
+    /* Harmonisation générale v6 : typo, espacements, alignements */
+    :root {
+      --title-size: clamp(17px, 4.4vw, 20px);
+      --text-size: clamp(12.5px, 3.35vw, 14px);
+      --label-size: 10px;
+      --compact-gap: 10px;
+      --content-pad: clamp(13px, 3.8vw, 16px);
+    }
+
+    .app {
+      display: grid;
+      gap: 12px;
+      padding-top: 12px;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .auto-box {
+      border-radius: 24px;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .bar-box {
+      margin-top: 0;
+    }
+
+    .hero-inner,
+    .panel-pad,
+    .match-hero,
+    .report-head,
+    .summary-head,
+    .team-hero,
+    .report-body,
+    .section,
+    .auto-head,
+    .auto-body {
+      padding: var(--content-pad);
+    }
+
+    .brand-title {
+      font-size: clamp(21px, 5.8vw, 26px);
+      letter-spacing: -0.052em;
+    }
+
+    .home-title {
+      font-size: clamp(42px, 11.6vw, 70px);
+      letter-spacing: -0.088em;
+      line-height: .92;
+    }
+
+    .hero-text,
+    .notice-text,
+    .small-text,
+    .mode-toggle,
+    .auto-formula,
+    .report-hint,
+    .dominance-meta,
+    .team-meta,
+    .row-title,
+    .row-sub,
+    .source-small {
+      font-size: var(--text-size);
+      line-height: 1.48;
+    }
+
+    .kicker {
+      font-size: 10px;
+      letter-spacing: .12em;
+      line-height: 1.15;
+      padding: 7px 11px;
+      margin-bottom: 12px;
+    }
+
+    .notice-title,
+    .auto-title,
+    .report-title,
+    .bar-box summary {
+      font-size: var(--title-size);
+      line-height: 1.12;
+      letter-spacing: -0.018em;
+      font-weight: 1000;
+      text-transform: uppercase;
+    }
+
+    .notice-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 7px;
+    }
+
+    .notice-title span:last-child,
+    .auto-title,
+    .report-title,
+    .bar-box summary {
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+
+    .notice-inline-icon {
+      width: 34px;
+      height: 34px;
+      flex-basis: 34px;
+      border-radius: 11px;
+      font-size: 18px;
+    }
+
+    label,
+    .auto-control-title,
+    .tiny-label,
+    .summary-label,
+    .rank-label,
+    .section-title,
+    .dominance-label,
+    .stat-kicker,
+    .auto-result-label,
+    .per-team-mini-title {
+      font-size: var(--label-size);
+      letter-spacing: .12em;
+      line-height: 1.25;
+    }
+
+    .form-grid,
+    .auto-body,
+    .preset-box,
+    .per-team-box,
+    .report-body,
+    .result-shell,
+    .match-list,
+    .event-list,
+    .source-list {
+      gap: 12px;
+    }
+
+    .auto-head,
+    .report-head,
+    .stat-header {
+      align-items: center;
+    }
+
+    .auto-title::before {
+      margin-right: 2px;
+    }
+
+    .preset-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 11px;
+      letter-spacing: .085em;
+      line-height: 1.2;
+    }
+
+    .preset-title span,
+    #activePresetLabel {
+      white-space: nowrap;
+    }
+
+    #activePresetLabel {
+      text-align: right;
+      color: #dbeafe;
+    }
+
+    .preset-actions,
+    .report-buttons {
+      gap: 10px;
+    }
+
+    .preset-btn {
+      min-height: 56px;
+      padding: 12px 11px;
+      font-size: 15px;
+      line-height: 1.12;
+      border-radius: 17px;
+    }
+
+    .preset-btn small {
+      margin-top: 3px;
+      font-size: 10.5px;
+      line-height: 1.25;
+      letter-spacing: .015em;
+    }
+
+    .auto-control,
+    .auto-result-card,
+    .per-team-card,
+    .per-team-mini,
+    .stat-card,
+    .summary-cell,
+    .rank-card,
+    .bar-card,
+    .mini-badge,
+    .match-row,
+    .event-row {
+      border-radius: 18px;
+    }
+
+    .auto-control {
+      gap: 10px;
+      padding: 12px;
+    }
+
+    .auto-control-top {
+      gap: 10px;
+    }
+
+    .auto-number {
+      font-size: 14px;
+    }
+
+    input {
+      font-size: 15.5px;
+      line-height: 1.2;
+    }
+
+    .skip-grid {
+      gap: 8px;
+    }
+
+    .skip-grid button {
+      min-height: 44px;
+      font-size: 14px;
+      border-radius: 14px;
+    }
+
+    .scan-btn {
+      min-height: 60px;
+      font-size: clamp(19px, 5vw, 22px);
+      letter-spacing: -0.018em;
+      border-radius: 20px;
+    }
+
+    .status-box {
+      margin-top: 12px;
+    }
+
+    .status-message {
+      font-size: 12.5px;
+      line-height: 1.35;
+    }
+
+    .status-done-title {
+      font-size: clamp(24px, 6vw, 30px);
+      letter-spacing: -0.035em;
+    }
+
+    .report-count {
+      margin-top: 3px;
+      color: #c7d2fe;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .report-btn,
+    .auto-apply-btn {
+      min-height: 48px;
+      font-size: 13px;
+      line-height: 1.2;
+      border-radius: 16px;
+      padding: 11px 10px;
+    }
+
+    .summary-title,
+    .team-name {
+      letter-spacing: -0.058em;
+      line-height: 1;
+    }
+
+    .summary-title {
+      font-size: clamp(28px, 7.6vw, 42px);
+    }
+
+    .summary-label,
+    .section-title,
+    .rank-label,
+    .dominance-label {
+      color: #b8c6e6;
+    }
+
+    .dominance-box,
+    .collective-box,
+    .team-card .zone-card {
+      margin: 12px var(--content-pad);
+    }
+
+    .mini-badge,
+    .match-row,
+    .event-row,
+    .bar-line {
+      line-height: 1.35;
+    }
+
+    details.clean summary,
+    .bar-box summary {
+      min-height: 54px;
+      padding: var(--content-pad);
+    }
+
+    .bar-grid {
+      padding: 0 var(--content-pad) var(--content-pad);
+      gap: 12px;
+    }
+
+    @media (max-width: 700px) {
+      :root {
+        --content-pad: 14px;
+        --title-size: 18px;
+        --text-size: 12.75px;
+      }
+
+      .app {
+        gap: 12px;
+        padding-left: max(11px, env(safe-area-inset-left));
+        padding-right: max(11px, env(safe-area-inset-right));
+      }
+
+      .hero,
+      .panel,
+      .report-panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .auto-box {
+        border-radius: 23px;
+      }
+
+      .kicker {
+        max-width: 100%;
+        font-size: 9.5px;
+        letter-spacing: .105em;
+      }
+
+      .home-title {
+        font-size: clamp(44px, 13.4vw, 58px);
+        letter-spacing: -0.09em;
+      }
+
+      .hero-text,
+      .notice-text {
+        line-height: 1.52;
+      }
+
+      .notice-title {
+        gap: 9px;
+      }
+
+      .notice-inline-icon {
+        width: 32px;
+        height: 32px;
+        flex-basis: 32px;
+        border-radius: 10px;
+      }
+
+      .auto-head,
+      .report-head {
+        gap: 8px;
+      }
+
+      .auto-title,
+      .report-title,
+      .bar-box summary,
+      .notice-title span:last-child {
+        letter-spacing: -0.01em;
+      }
+
+      .preset-title {
+        font-size: 10.5px;
+        letter-spacing: .07em;
+        gap: 8px;
+      }
+
+      .preset-btn {
+        min-height: 54px;
+        font-size: 14.5px;
+        padding: 11px 9px;
+      }
+
+      .preset-btn small {
+        font-size: 10px;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) 82px;
+      }
+
+      .auto-number {
+        width: 82px;
+        font-size: 13px;
+      }
+
+      .skip-grid {
+        gap: 7px;
+      }
+
+      .skip-grid button {
+        min-height: 42px;
+        font-size: 13.5px;
+      }
+
+      .scan-btn {
+        min-height: 59px;
+        font-size: 20px;
+      }
+
+      .report-buttons {
+        grid-template-columns: 1fr 1fr !important;
+      }
+
+      .report-btn {
+        font-size: 12.5px;
+        min-height: 47px;
+      }
+
+      .summary-title {
+        font-size: clamp(29px, 8.6vw, 38px);
+      }
+
+      .team-name {
+        font-size: clamp(28px, 8.2vw, 38px);
+      }
+
+      .team-card .rank-grid,
+      .summary-grid {
+        gap: 10px;
+        padding: 10px;
+      }
+
+      .rank-card,
+      .summary-cell {
+        border-radius: 19px;
+      }
+
+      .bar-box summary {
+        font-size: 18px;
+      }
+    }
+
+    @media (max-width: 380px) {
+      :root {
+        --title-size: 17px;
+        --text-size: 12.25px;
+      }
+
+      .brand-title {
+        font-size: 19px;
+      }
+
+      .preset-title {
+        letter-spacing: .05em;
+      }
+
+      .preset-btn {
+        font-size: 14px;
+      }
+
+      .report-btn {
+        font-size: 12px;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;
