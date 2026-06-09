@@ -5812,6 +5812,128 @@
       color: #ffeaf2 !important;
     }
 
+
+    /* Retouche v42 : ajustements mobiles demandés */
+    .notice-title {
+      justify-content: center !important;
+      align-items: center !important;
+      gap: 7px !important;
+      padding: 10px 10px !important;
+      border-radius: 18px !important;
+      font-size: clamp(14px, 3.8vw, 15.5px) !important;
+      line-height: 1 !important;
+      letter-spacing: -0.006em !important;
+      text-transform: uppercase !important;
+      white-space: nowrap !important;
+    }
+
+    .notice-title span:last-child {
+      min-width: 0 !important;
+      white-space: nowrap !important;
+      overflow: visible !important;
+    }
+
+    .notice-inline-icon {
+      width: 28px !important;
+      height: 28px !important;
+      flex: 0 0 28px !important;
+      display: inline-grid !important;
+      place-items: center !important;
+      border-radius: 9px !important;
+      border: 1px solid rgba(255, 59, 114, 0.44) !important;
+      background: rgba(255, 59, 114, 0.14) !important;
+      box-shadow: 0 0 0 rgba(255, 59, 114, 0) !important;
+      font-size: 16px !important;
+      animation: termuxStopBlinkV42 1.05s ease-in-out infinite !important;
+    }
+
+    @keyframes termuxStopBlinkV42 {
+      0%, 100% {
+        opacity: .78;
+        transform: scale(1);
+        box-shadow: 0 0 0 rgba(255, 59, 114, 0);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.06);
+        box-shadow: 0 0 18px rgba(255, 59, 114, .36);
+      }
+    }
+
+    @media (max-width: 700px) {
+      .auto-grid {
+        gap: 12px !important;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) minmax(88px, 88px) !important;
+        gap: 10px !important;
+      }
+
+      .auto-number {
+        width: 88px !important;
+        min-width: 88px !important;
+        height: 38px !important;
+        padding: 6px 8px !important;
+        border-radius: 10px !important;
+        font-size: 14px !important;
+      }
+
+      .auto-result,
+      .auto-body {
+        gap: 12px !important;
+      }
+
+      .auto-result-card,
+      .auto-formula,
+      .mode-toggle {
+        border-radius: 18px !important;
+      }
+
+      .mode-toggle {
+        gap: 12px !important;
+        padding: 14px !important;
+        min-height: 82px !important;
+        align-items: center !important;
+        border-color: rgba(64, 201, 255, .26) !important;
+        background: linear-gradient(135deg, rgba(64, 201, 255, .075), rgba(255, 59, 114, .045)), rgba(5, 10, 28, .64) !important;
+        font-size: 12.4px !important;
+        line-height: 1.32 !important;
+        font-weight: 950 !important;
+      }
+
+      .mode-toggle input {
+        width: 19px !important;
+        height: 19px !important;
+        flex: 0 0 19px !important;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .notice-title {
+        gap: 6px !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        font-size: clamp(13.4px, 3.75vw, 14.5px) !important;
+      }
+
+      .notice-inline-icon {
+        width: 26px !important;
+        height: 26px !important;
+        flex-basis: 26px !important;
+        font-size: 15px !important;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) minmax(86px, 86px) !important;
+      }
+
+      .auto-number {
+        width: 86px !important;
+        min-width: 86px !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -5846,7 +5968,7 @@
 
     <section class="panel notice panel-pad">
       <div>
-        <div class="notice-title"><span class="notice-inline-icon">🛑</span><span>Émulateur Termux Obligatoire</span></div>
+        <div class="notice-title"><span class="notice-inline-icon">🛑</span><span>ÉMULATEUR TERMUX OBLIGATOIRE</span></div>
         <p class="notice-text">
           L'application Termux doit obligatoirement être ouverte en arrière-plan (sur mobile ou PC) pendant le scan du match.
         </p>
