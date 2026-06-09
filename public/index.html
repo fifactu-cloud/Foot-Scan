@@ -1519,11 +1519,7 @@
     html { scroll-behavior: smooth; }
 
     body {
-      background:
-        radial-gradient(circle at 12% 0%, rgba(56, 189, 248, 0.34), transparent 30%),
-        radial-gradient(circle at 92% 4%, rgba(255, 54, 93, 0.30), transparent 27%),
-        radial-gradient(circle at 50% 105%, rgba(79, 70, 229, 0.24), transparent 34%),
-        linear-gradient(145deg, #050816 0%, #080b1f 48%, #160711 100%);
+      background: #050816;
       background-attachment: fixed;
       overflow-x: hidden;
     }
@@ -1535,9 +1531,8 @@
       pointer-events: none;
       z-index: -1;
       background:
-        radial-gradient(circle at 24% 18%, rgba(56,189,248,.18), transparent 24%),
-        radial-gradient(circle at 76% 28%, rgba(255,54,93,.18), transparent 25%),
-        linear-gradient(110deg, transparent 0 46%, rgba(255,255,255,.035) 47% 48%, transparent 49% 100%);
+        linear-gradient(110deg, transparent 0 46%, rgba(255,255,255,.018) 47% 48%, transparent 49% 100%);
+      opacity: .45;
       animation: crowdGlow 8s ease-in-out infinite;
     }
 
@@ -1628,15 +1623,21 @@
       opacity: .52;
     }
 
+    @keyframes heroBallRoll {
+      0% { left: -58px; transform: rotate(0deg); }
+      100% { left: calc(100% - 62px); transform: rotate(360deg); }
+    }
+
     .hero::after {
       content: "⚽";
       position: absolute;
-      right: 18px;
+      left: -58px;
       top: 12px;
       font-size: 58px;
       opacity: .16;
       filter: drop-shadow(0 14px 30px rgba(0,0,0,.35));
-      transform: rotate(-8deg);
+      animation: heroBallRoll 9s linear infinite;
+      will-change: left, transform;
     }
 
     .hero-inner { position: relative; z-index: 1; }
@@ -1966,7 +1967,8 @@
         z-index: -1;
         pointer-events: none;
         background:
-          linear-gradient(100deg, transparent 0 38%, rgba(56,189,248,.13) 39% 41%, transparent 42% 58%, rgba(255,54,93,.13) 59% 61%, transparent 62% 100%);
+          linear-gradient(100deg, transparent 0 38%, rgba(56,189,248,.06) 39% 41%, transparent 42% 58%, rgba(255,54,93,.06) 59% 61%, transparent 62% 100%);
+        opacity: .55;
         transform: rotate(-7deg);
         filter: blur(.2px);
       }
@@ -2619,9 +2621,25 @@
 
     /* Retouches ciblées : bouton Scanner, bloc de scan et fin de scan */
     @keyframes scanButtonBallRoll {
-      0% { transform: translateX(0) rotate(0deg) scale(1); opacity: 1; }
-      70% { opacity: 1; }
-      100% { transform: translateX(min(46vw, 210px)) rotate(760deg) scale(.92); opacity: 0; }
+      0% { transform: translateY(-50%) translateX(0) rotate(0deg) scale(1); opacity: 1; }
+      18% { transform: translateY(-52%) translateX(28px) rotate(110deg) scale(1.08); opacity: 1; }
+      78% { opacity: 1; }
+      100% { transform: translateY(-50%) translateX(min(54vw, 260px)) rotate(900deg) scale(.86); opacity: 0; }
+    }
+
+    @keyframes statusSoftIn {
+      0% { opacity: 0; transform: translateY(-8px) scale(.985); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes statusDoneBoxEnter {
+      0% { opacity: .55; transform: translateY(8px) scale(.985); filter: brightness(.9); }
+      100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
+    }
+
+    @keyframes statusDoneTitleEnter {
+      0% { opacity: 0; transform: translateY(10px) scale(.92); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
     }
 
     @keyframes scanPulseDot {
@@ -2640,14 +2658,35 @@
     }
 
     @keyframes statusConfettiLoop {
-      0% { transform: translate3d(0, -18px, 0) rotate(0deg); opacity: 0; }
+      0% { transform: translate3d(0, -20px, 0) rotate(0deg); opacity: 0; }
+      10% { opacity: .96; }
+      88% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 126px, 0) rotate(var(--r, 540deg)); opacity: 0; }
+    }
+
+    @keyframes finishFxFade {
+      0% { opacity: 0; }
+      8%, 82% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes pageConfettiFall {
+      0% { transform: translate3d(0, -24px, 0) rotate(0deg); opacity: 0; }
       8% { opacity: .95; }
-      100% { transform: translate3d(var(--x, 0px), 112px, 0) rotate(var(--r, 540deg)); opacity: 0; }
+      100% { transform: translate3d(var(--x, 0px), 112vh, 0) rotate(var(--r, 720deg)); opacity: 0; }
+    }
+
+    @keyframes pageFireworkBurst {
+      0% { transform: translate3d(0, 0, 0) scale(.3); opacity: 0; }
+      14% { opacity: 1; }
+      100% { transform: translate3d(var(--x, 0px), var(--y, 0px), 0) scale(1); opacity: 0; }
     }
 
     .scan-btn {
       position: relative;
       overflow: hidden;
+      transform: translateZ(0);
+      transition: color .28s ease, text-shadow .28s ease, filter .28s ease, transform .22s ease;
     }
 
     .scan-btn::before {
@@ -2668,13 +2707,21 @@
     }
 
     .scan-btn.scan-kick {
-      color: rgba(255,255,255,.10) !important;
+      color: rgba(255,255,255,.08) !important;
       text-shadow: none !important;
+      filter: brightness(1.08) saturate(1.08);
+      pointer-events: none;
     }
 
     .scan-btn.scan-kick::before {
+      position: absolute;
+      left: calc(50% - 98px);
+      top: 50%;
+      margin-right: 0;
+      z-index: 2;
       color: initial;
-      animation: scanButtonBallRoll .78s cubic-bezier(.2,.82,.22,1) forwards;
+      will-change: transform, opacity;
+      animation: scanButtonBallRoll .96s cubic-bezier(.16,.86,.26,1) forwards;
     }
 
     .status-box {
@@ -2688,6 +2735,8 @@
         rgba(5,10,28,.70);
       border-color: rgba(56,189,248,.30);
       box-shadow: 0 12px 26px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.06);
+      animation: statusSoftIn .32s ease both;
+      transform-origin: top center;
     }
 
     .status-head {
@@ -2740,29 +2789,30 @@
     }
 
     .status-box.status-done {
-      min-height: 84px;
+      min-height: 78px;
       display: grid !important;
       place-items: center;
-      padding: 16px;
+      padding: 14px;
       background:
         radial-gradient(circle at 15% 0%, rgba(56,189,248,.28), transparent 35%),
         radial-gradient(circle at 85% 100%, rgba(255,54,93,.22), transparent 38%),
         linear-gradient(135deg, rgba(56,189,248,.16), rgba(255,54,93,.12)),
         rgba(5,10,28,.86);
       border-color: rgba(56,189,248,.38);
+      animation: statusDoneBoxEnter .52s cubic-bezier(.16,.84,.28,1) both;
     }
 
     .status-done-title {
       position: relative;
       z-index: 2;
       color: #ffffff;
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 1000;
       line-height: 1;
       letter-spacing: -0.04em;
       text-align: center;
       text-shadow: 0 10px 24px rgba(0,0,0,.42), 0 0 18px rgba(56,189,248,.26);
-      animation: statusDoneGlow 1.8s ease-in-out infinite;
+      animation: statusDoneTitleEnter .48s cubic-bezier(.18,.86,.24,1) both, statusDoneGlow 1.8s ease-in-out .48s infinite;
     }
 
     .status-confetti {
@@ -2786,6 +2836,41 @@
       animation-delay: var(--delay, 0ms);
     }
 
+    .finish-fx {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      overflow: hidden;
+      animation: finishFxFade 5.8s linear forwards;
+    }
+
+    .confetti-piece {
+      position: absolute;
+      top: -22px;
+      left: var(--left, 50%);
+      width: 7px;
+      height: 13px;
+      border-radius: 3px;
+      background: var(--c, #38bdf8);
+      box-shadow: 0 0 10px rgba(255,255,255,.12);
+      animation: pageConfettiFall var(--d, 3600ms) cubic-bezier(.18,.72,.26,1) forwards;
+      animation-delay: var(--delay, 0ms);
+      opacity: .95;
+    }
+
+    .firework-dot {
+      position: absolute;
+      left: var(--left, 50%);
+      top: var(--top, 24%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--c, #38bdf8);
+      box-shadow: 0 0 14px var(--c, #38bdf8);
+      animation: pageFireworkBurst 920ms ease-out forwards;
+    }
+
     @media (max-width: 520px) {
       .team-card .rank-grid {
         gap: 10px;
@@ -2794,6 +2879,36 @@
       }
 
       .team-card .rank-card {
+        border: 1px solid rgba(255,255,255,.13);
+        border-radius: 20px;
+        overflow: hidden;
+      }
+    }
+
+    .auto-sub {
+      display: none;
+    }
+
+    .summary,
+    .team-card {
+      isolation: isolate;
+    }
+
+    .summary-head,
+    .team-hero {
+      border-top-left-radius: inherit;
+      border-top-right-radius: inherit;
+      overflow: hidden;
+    }
+
+    @media (max-width: 520px) {
+      .summary-grid {
+        gap: 10px;
+        padding: 10px;
+        background: transparent;
+      }
+
+      .summary-cell {
         border: 1px solid rgba(255,255,255,.13);
         border-radius: 20px;
         overflow: hidden;
@@ -2833,10 +2948,10 @@
   <main class="app">
     <section class="hero" id="hero">
       <div class="hero-inner">
-        <div class="kicker">🔎 Scan Complet Côté Worker</div>
+        <div class="kicker">🔎 Scan Complet Via Données Web</div>
         <h1 class="home-title">Foot<span>/</span>Scan</h1>
         <p class="hero-text">
-          FootScan est un site qui permet d'analyser les confrontations (football) à partir de l'historique des deux équipes. Le calcul se base sur la performance (via les buts) au fil du temps (présent vers le passé).
+          FootScan est un site qui permet d'analyser les confrontations (de football) à partir de l'historique des deux équipes. Le calcul se base sur la performance (via les buts) au fil du temps (du passé vers le présent).
         </p>
       </div>
     </section>
@@ -2862,9 +2977,7 @@
           <div class="auto-head">
             <div>
               <div class="auto-title">Calcul Automatique Des Rangs</div>
-              <div class="auto-sub">
-                Base Libre · Défaut 31,3125 · Progression Par Événement · Changements × 1,5 · Aucun Curseur Rouge.
-              </div>
+              <div class="auto-sub" aria-hidden="true"></div>
             </div>
             <div class="auto-badge">Base Libre</div>
           </div>
@@ -3442,6 +3555,8 @@
         .replace(/\bIncident\(s\)/g, "Événement(s)")
         .replace(/\bIncidents\b/g, "Événements")
         .replace(/\bincidents\b/g, "événements")
+        .replace(/\bAvancement\b/g, "Progression")
+        .replace(/\bavancement\b/g, "progression")
         .replace(/\bpage\b/g, "Page");
       const isDone = safeProgress >= 100 && /scan terminé/i.test(cleanMessage);
 
@@ -3449,8 +3564,8 @@
 
       if (isDone) {
         const colors = ["#38bdf8", "#ff365d", "#22c55e", "#facc15", "#ffffff"];
-        const pieces = Array.from({ length: 20 }, (_, i) => `
-          <span class="status-confetti-piece" style="--left:${(i * 37) % 100}%;--x:${((i % 5) - 2) * 13}px;--r:${360 + (i % 7) * 90}deg;--dur:${1900 + (i % 6) * 210}ms;--delay:-${(i % 10) * 230}ms;--c:${colors[i % colors.length]}"></span>
+        const pieces = Array.from({ length: 28 }, (_, i) => `
+          <span class="status-confetti-piece" style="--left:${(i * 29) % 100}%;--x:${((i % 7) - 3) * 10}px;--r:${360 + (i % 8) * 90}deg;--dur:${2200 + (i % 7) * 190}ms;--delay:-${(i % 14) * 170}ms;--c:${colors[i % colors.length]}"></span>
         `).join("");
 
         box.innerHTML = `
@@ -3484,7 +3599,13 @@
       button.classList.remove("scan-kick");
       void button.offsetWidth;
       button.classList.add("scan-kick");
-      window.setTimeout(() => button.classList.remove("scan-kick"), 840);
+
+      return new Promise((resolve) => {
+        window.setTimeout(() => {
+          button.classList.remove("scan-kick");
+          resolve();
+        }, 980);
+      });
     }
 
     function launchFinishFx() {
@@ -3498,13 +3619,14 @@
 
       const colors = ["#38bdf8", "#ff365d", "#22c55e", "#facc15", "#ffffff"];
 
-      for (let i = 0; i < 42; i++) {
+      for (let i = 0; i < 74; i++) {
         const piece = document.createElement("span");
         piece.className = "confetti-piece";
-        piece.style.left = `${Math.random() * 100}%`;
-        piece.style.setProperty("--x", `${(Math.random() - 0.5) * 120}px`);
-        piece.style.setProperty("--r", `${(Math.random() * 900 + 360).toFixed(0)}deg`);
-        piece.style.setProperty("--d", `${1300 + Math.random() * 950}ms`);
+        piece.style.setProperty("--left", `${Math.random() * 100}%`);
+        piece.style.setProperty("--x", `${(Math.random() - 0.5) * 150}px`);
+        piece.style.setProperty("--r", `${(Math.random() * 980 + 420).toFixed(0)}deg`);
+        piece.style.setProperty("--d", `${2600 + Math.random() * 2200}ms`);
+        piece.style.setProperty("--delay", `${Math.random() * 520}ms`);
         piece.style.setProperty("--c", colors[i % colors.length]);
         fx.appendChild(piece);
       }
@@ -3531,7 +3653,7 @@
         }
       });
 
-      window.setTimeout(() => fx.remove(), 2300);
+      window.setTimeout(() => fx.remove(), 5900);
     }
 
     function extractMatchId(input) {
@@ -3646,6 +3768,7 @@
 
           renderResult(resultWithOptions);
           setStatus("Scan Terminé", 100);
+          launchFinishFx();
           $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter L’Analyse Actuelle” pour l’enregistrer dans le rapport.";
           finishScan();
           return;
@@ -4446,9 +4569,11 @@
     }
 
     async function handleScan() {
-      triggerScanButtonKick();
+      const button = $("scanBtn");
+      if (button.disabled || button.classList.contains("scan-kick")) return;
 
       try {
+        await triggerScanButtonKick();
         await startScanJob();
       } catch (error) {
         setError(error.message || String(error));
