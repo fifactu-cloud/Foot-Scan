@@ -5940,6 +5940,72 @@
       }
     }
 
+
+    /* Retouche v17 : v14 + curseurs violet/rose et rangs bleu/violet */
+    :root {
+      --range-fill-grad-v17: linear-gradient(90deg, #60a5fa 0%, #818cf8 38%, #8b5cf6 68%, #c084fc 100%);
+      --range-thumb-grad-v17: linear-gradient(135deg, #ff4d9d 0%, #d946ef 46%, #a855f7 100%);
+      --rank-grad-v17: linear-gradient(90deg, #7dd3fc 0%, #60a5fa 26%, #818cf8 56%, #8b5cf6 78%, #c084fc 100%);
+    }
+
+    input[type="range"] {
+      accent-color: #8b5cf6 !important;
+      --fill: 50%;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 999px;
+      background:
+        var(--range-fill-grad-v17) 0 / var(--fill) 100% no-repeat,
+        linear-gradient(90deg, rgba(255,255,255,.28), rgba(255,255,255,.2));
+      box-shadow: inset 0 1px 2px rgba(255,255,255,.12), inset 0 -1px 2px rgba(0,0,0,.28);
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255,255,255,.28), rgba(255,255,255,.2));
+      box-shadow: inset 0 1px 2px rgba(255,255,255,.12), inset 0 -1px 2px rgba(0,0,0,.28);
+    }
+
+    input[type="range"]::-moz-range-progress {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--range-fill-grad-v17);
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      margin-top: -8px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.92);
+      background: radial-gradient(circle at 32% 30%, rgba(255,255,255,.35), transparent 26%), var(--range-thumb-grad-v17);
+      box-shadow: 0 0 0 4px rgba(217, 70, 239, .10), 0 10px 20px rgba(168, 85, 247, .22);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(255,255,255,.92);
+      border-radius: 50%;
+      background: var(--range-thumb-grad-v17);
+      box-shadow: 0 0 0 4px rgba(217, 70, 239, .10), 0 10px 20px rgba(168, 85, 247, .22);
+    }
+
+    .rank-value {
+      background: var(--rank-grad-v17) !important;
+      -webkit-background-clip: text !important;
+      background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      color: transparent !important;
+      text-shadow: none !important;
+      filter: drop-shadow(0 10px 24px rgba(96, 165, 250, .10));
+    }
+
   </style>
 </head>
 <body>
@@ -6003,13 +6069,29 @@
       draw();
     }
 
+
+
+    function updateRangeFills() {
+      document.querySelectorAll('input[type="range"]').forEach((slider) => {
+        const min = Number(slider.min || 0);
+        const max = Number(slider.max || 100);
+        const val = Number(slider.value || 0);
+        const pct = max > min ? ((val - min) * 100) / (max - min) : 0;
+        slider.style.setProperty('--fill', `${pct}%`);
+      });
+    }
     function bindRangeAndNumber(rangeId, numberId, callback) {
       $(rangeId).addEventListener("input", () => {
         $(numberId).value = $(rangeId).value;
+        updateRangeFills();
         callback();
       });
 
-      $(numberId).addEventListener("input", callback);
+      $(numberId).addEventListener("input", () => {
+        $(rangeId).value = $(numberId).value;
+        updateRangeFills();
+        callback();
+      });
     }
 
     renderSkipButtons("skipHome", () => skipHomeValue, (value) => skipHomeValue = value);
@@ -6068,6 +6150,7 @@
     initMobileNavigationEffects();
     updateReportCount();
     updateAutoCalculator();
+    updateRangeFills();
   </script>
 </body>
 </html>
