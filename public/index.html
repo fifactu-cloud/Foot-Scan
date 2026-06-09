@@ -3553,16 +3553,357 @@
       }
     }
 
-  </style>
+
+    /* Finitions v8 : effets plus doux et fondus plus fluides */
+    @keyframes scanButtonBallRollV8 {
+      0% { transform: translateY(-50%) translateX(0) rotate(0deg) scale(1); opacity: 0; filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+      8% { opacity: 1; }
+      22% { transform: translateY(-57%) translateX(38px) rotate(150deg) scale(1.08); opacity: 1; filter: drop-shadow(0 10px 14px rgba(0,0,0,.28)); }
+      58% { transform: translateY(-50%) translateX(min(38vw, 180px)) rotate(620deg) scale(1); opacity: 1; }
+      82% { opacity: .92; }
+      100% { transform: translateY(-50%) translateX(min(58vw, 292px)) rotate(1080deg) scale(.72); opacity: 0; filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+    }
+
+    @keyframes scanButtonKickV8 {
+      0% { transform: translateZ(0) scale(1); background-position: 0% 50%; }
+      24% { transform: translateZ(0) scale(.985); background-position: 35% 50%; }
+      62% { transform: translateZ(0) scale(1.012); background-position: 78% 50%; }
+      100% { transform: translateZ(0) scale(1); background-position: 100% 50%; }
+    }
+
+    @keyframes statusFadeOutV8 {
+      0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+      100% { opacity: 0; transform: translateY(6px) scale(.986); filter: blur(2px); }
+    }
+
+    @keyframes statusSoftInV8 {
+      0% { opacity: 0; transform: translateY(-6px) scale(.99); filter: blur(1px); }
+      100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    }
+
+    @keyframes doneTitleFloatV8 {
+      0%, 100% { transform: translateY(0) scale(1); text-shadow: 0 10px 24px rgba(0,0,0,.42), 0 0 18px rgba(64,201,255,.24); }
+      50% { transform: translateY(-1px) scale(1.018); text-shadow: 0 14px 28px rgba(0,0,0,.38), 0 0 26px rgba(64,201,255,.38); }
+    }
+
+    @keyframes statusConfettiLoopV8 {
+      0% { transform: translate3d(0, -24px, 0) rotate(0deg) scale(.92); opacity: 0; }
+      9% { opacity: .98; }
+      88% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 136px, 0) rotate(var(--r, 540deg)) scale(1); opacity: 0; }
+    }
+
+    @keyframes finishFxFadeV8 {
+      0% { opacity: 0; }
+      7%, 88% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes pageConfettiFallV8 {
+      0% { transform: translate3d(0, -8vh, 0) rotate(0deg) scale(.94); opacity: 0; }
+      10% { opacity: .92; }
+      86% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 114vh, 0) rotate(var(--r, 720deg)) scale(1); opacity: 0; }
+    }
+
+    @keyframes pageFireworkBurstV8 {
+      0% { transform: translate3d(0, 0, 0) scale(.18); opacity: 0; filter: blur(.5px); }
+      18% { opacity: 1; }
+      100% { transform: translate3d(var(--x, 0px), var(--y, 0px), 0) scale(1); opacity: 0; filter: blur(0); }
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .auto-box,
+    .preset-btn,
+    .skip-grid button,
+    .report-btn,
+    .auto-apply-btn,
+    input {
+      transition:
+        border-color .26s ease,
+        background-color .26s ease,
+        box-shadow .26s ease,
+        transform .22s ease,
+        opacity .22s ease;
+    }
+
+    .scan-btn {
+      transition:
+        color .32s ease,
+        text-shadow .32s ease,
+        filter .32s ease,
+        transform .24s ease,
+        box-shadow .32s ease;
+      will-change: transform, filter;
+    }
+
+    .scan-btn.scan-kick {
+      animation: scanButtonKickV8 1.14s cubic-bezier(.2,.78,.22,1) both;
+      color: rgba(255,255,255,.035) !important;
+      text-shadow: none !important;
+      filter: brightness(1.09) saturate(1.1);
+    }
+
+    .scan-btn.scan-kick::before {
+      animation: scanButtonBallRollV8 1.14s cubic-bezier(.16,.84,.18,1) forwards;
+    }
+
+    .status-box {
+      animation: statusSoftInV8 .38s cubic-bezier(.2,.76,.22,1) both;
+      will-change: opacity, transform, filter;
+    }
+
+    .status-box.status-fade-out {
+      animation: statusFadeOutV8 .18s ease both;
+    }
+
+    .status-box.status-done {
+      min-height: 84px;
+      animation: statusSoftInV8 .46s cubic-bezier(.16,.84,.22,1) both;
+    }
+
+    .status-done-title {
+      animation: statusSoftInV8 .42s cubic-bezier(.18,.86,.24,1) both, doneTitleFloatV8 2.2s ease-in-out .44s infinite;
+    }
+
+    .status-confetti-piece {
+      animation-name: statusConfettiLoopV8;
+      animation-timing-function: linear;
+    }
+
+    .finish-fx {
+      animation: finishFxFadeV8 12s ease forwards;
+    }
+
+    .finish-fx::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 18% 22%, rgba(64,201,255,.11), transparent 28%),
+        radial-gradient(circle at 82% 18%, rgba(255,59,114,.10), transparent 30%);
+      opacity: .9;
+    }
+
+    .confetti-piece {
+      animation-name: pageConfettiFallV8;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+
+    .firework-dot {
+      animation: pageFireworkBurstV8 1100ms cubic-bezier(.12,.74,.24,1) forwards;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .preset-btn:hover,
+      .skip-grid button:hover,
+      .report-btn:hover,
+      .auto-apply-btn:hover,
+      .scan-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        filter: brightness(1.04);
+      }
+    }
+
+  
+
+    /* Finitions v9 : bloc scan compact, libellés en majuscule et logo plus équilibré */
+    .brand {
+      gap: 9px;
+    }
+
+    .brand-logo {
+      width: 39px;
+      height: 39px;
+      border-radius: 12px;
+      font-size: 15px;
+      letter-spacing: -0.045em;
+      background:
+        radial-gradient(circle at 30% 24%, rgba(255,255,255,.34), transparent 24%),
+        linear-gradient(135deg, #38bdf8 0%, #2657ff 46%, #ff365d 100%);
+      box-shadow: 0 12px 24px rgba(56,189,248,.16), 0 10px 22px rgba(255,54,93,.13), inset 0 1px 0 rgba(255,255,255,.24);
+    }
+
+    .brand-title {
+      font-size: clamp(18px, 4.5vw, 21px);
+      letter-spacing: -0.032em;
+      line-height: .96;
+      background: linear-gradient(90deg, #ffffff 0%, #dbeafe 38%, #93c5fd 64%, #ffffff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: none;
+    }
+
+    .brand-subtitle {
+      margin-top: 3px;
+      font-size: 9px;
+      letter-spacing: .135em;
+    }
+
+    .home-title {
+      font-size: clamp(38px, 10.2vw, 62px);
+      letter-spacing: -0.066em;
+      line-height: .94;
+      background: linear-gradient(90deg, #ffffff 0%, #dbeafe 35%, #60a5fa 62%, #ff9ab2 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 18px 42px rgba(0,0,0,.36);
+    }
+
+    .brand-title span,
+    .home-title span {
+      color: inherit;
+      text-shadow: none;
+    }
+
+    .scan-btn {
+      min-height: 56px;
+      border-radius: 19px;
+      font-size: clamp(18px, 4.7vw, 20px);
+      letter-spacing: .055em;
+      text-transform: uppercase;
+    }
+
+    .scan-btn::before {
+      content: "⚽️";
+      margin-right: 7px;
+      letter-spacing: 0;
+    }
+
+    .scan-btn.scan-kick {
+      letter-spacing: .055em;
+    }
+
+    .status-box {
+      margin-top: 9px;
+      padding: 8px 10px;
+      border-radius: 14px;
+      font-size: 12px;
+      line-height: 1.28;
+      background:
+        radial-gradient(circle at 14% 0%, rgba(56,189,248,.13), transparent 34%),
+        linear-gradient(135deg, rgba(56,189,248,.10), rgba(255,54,93,.055)),
+        rgba(5,10,28,.72);
+      box-shadow: 0 10px 22px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.055);
+    }
+
+    .status-head {
+      gap: 7px;
+    }
+
+    .status-pulse {
+      width: 8px;
+      height: 8px;
+      box-shadow: 0 0 0 4px rgba(56,189,248,.08), 0 0 14px rgba(255,54,93,.16);
+    }
+
+    .status-message {
+      font-size: 11.7px;
+      line-height: 1.24;
+      font-weight: 850;
+    }
+
+    .status-percent {
+      font-size: 10.3px;
+      padding: 3px 6px;
+      min-width: 38px;
+      text-align: center;
+    }
+
+    .status-box .progress-track,
+    .progress-track {
+      height: 6px;
+      margin-top: 7px;
+      border-radius: 999px;
+    }
+
+    .status-box.status-done {
+      min-height: 62px;
+      padding: 10px 12px;
+      border-radius: 15px;
+      background:
+        radial-gradient(circle at 17% 0%, rgba(56,189,248,.24), transparent 36%),
+        radial-gradient(circle at 85% 100%, rgba(255,54,93,.18), transparent 40%),
+        linear-gradient(135deg, rgba(56,189,248,.13), rgba(255,54,93,.10)),
+        rgba(5,10,28,.88);
+    }
+
+    .status-done-title {
+      font-size: clamp(18px, 5vw, 24px);
+      letter-spacing: .055em;
+      text-transform: uppercase;
+      line-height: 1.05;
+    }
+
+    .status-confetti {
+      border-radius: 15px;
+    }
+
+    @media (max-width: 430px) {
+      .brand-logo {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+      }
+
+      .brand-title {
+        font-size: clamp(17px, 5vw, 19px);
+        letter-spacing: -0.025em;
+      }
+
+      .brand-subtitle {
+        font-size: 8px;
+        letter-spacing: .12em;
+      }
+
+      .home-title {
+        font-size: clamp(36px, 11.2vw, 49px);
+        letter-spacing: -0.058em;
+      }
+
+      .scan-btn {
+        min-height: 53px;
+        border-radius: 17px;
+        font-size: clamp(17px, 5vw, 19px);
+      }
+
+      .status-box {
+        margin-top: 8px;
+        padding: 8px 9px;
+      }
+
+      .status-box.status-done {
+        min-height: 58px;
+        padding: 9px 10px;
+      }
+
+      .status-done-title {
+        font-size: clamp(18px, 5.6vw, 22px);
+        letter-spacing: .045em;
+      }
+    }
+</style>
 </head>
 
 <body>
   <div class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <div class="brand-logo">F/</div>
+        <div class="brand-logo">FS</div>
         <div>
-          <div class="brand-title">FOOT<span>/</span>SCAN</div>
+          <div class="brand-title">FOOTSCAN</div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -3578,7 +3919,7 @@
     <section class="hero" id="hero">
       <div class="hero-inner">
         <div class="kicker">🔎 Scan Complet Via Données Web</div>
-        <h1 class="home-title">FOOT<span>/</span>SCAN</h1>
+        <h1 class="home-title">FOOTSCAN</h1>
         <p class="hero-text">
           FOOTSCAN est un site qui permet d'analyser les confrontations (de football) à partir de l'historique des deux équipes. Le calcul se base sur la performance (via les buts) au fil du temps (du passé vers le présent).
         </p>
@@ -3706,7 +4047,7 @@
           </div>
         </div>
 
-        <button class="scan-btn" id="scanBtn">Scanner →</button>
+        <button class="scan-btn" id="scanBtn">SCANNER →</button>
       </div>
 
       <div id="statusBox" class="status-box"></div>
@@ -4168,13 +4509,20 @@
 
     function setStatus(message, progress = 0) {
       const box = $("statusBox");
-      box.style.display = message ? "block" : "none";
+
+      if (box._doneTimer) {
+        clearTimeout(box._doneTimer);
+        box._doneTimer = null;
+      }
 
       if (!message) {
-        box.classList.remove("status-done");
+        box.classList.remove("status-done", "status-fade-out");
         box.innerHTML = "";
+        box.style.display = "none";
         return;
       }
+
+      box.style.display = "block";
 
       const safeProgress = Math.max(0, Math.min(100, Number(progress || 0)));
       const cleanMessage = String(message || "")
@@ -4187,21 +4535,32 @@
         .replace(/\bpage\b/g, "Page");
       const isDone = safeProgress >= 100 && /scan terminé/i.test(cleanMessage);
 
-      box.classList.toggle("status-done", isDone);
-
-      if (isDone) {
-        const colors = ["#38bdf8", "#ff365d", "#22c55e", "#facc15", "#ffffff"];
-        const pieces = Array.from({ length: 28 }, (_, i) => `
-          <span class="status-confetti-piece" style="--left:${(i * 29) % 100}%;--x:${((i % 7) - 3) * 10}px;--r:${360 + (i % 8) * 90}deg;--dur:${2200 + (i % 7) * 190}ms;--delay:-${(i % 14) * 170}ms;--c:${colors[i % colors.length]}"></span>
+      const renderDoneStatus = () => {
+        const colors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
+        const pieces = Array.from({ length: 34 }, (_, i) => `
+          <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${colors[i % colors.length]}"></span>
         `).join("");
 
+        box.classList.remove("status-fade-out");
+        box.classList.add("status-done");
         box.innerHTML = `
           <div class="status-confetti" aria-hidden="true">${pieces}</div>
-          <div class="status-done-title">Scan Terminé</div>
+          <div class="status-done-title">SCAN TERMINÉ</div>
         `;
+      };
+
+      if (isDone) {
+        if (box.classList.contains("status-done")) {
+          renderDoneStatus();
+          return;
+        }
+
+        box.classList.add("status-fade-out");
+        box._doneTimer = window.setTimeout(renderDoneStatus, box.innerHTML.trim() ? 190 : 0);
         return;
       }
 
+      box.classList.remove("status-done", "status-fade-out");
       box.innerHTML = `
         <div class="status-head">
           <span class="status-pulse" aria-hidden="true"></span>
@@ -4231,7 +4590,7 @@
         window.setTimeout(() => {
           button.classList.remove("scan-kick");
           resolve();
-        }, 980);
+        }, 1140);
       });
     }
 
@@ -4246,14 +4605,14 @@
 
       const colors = ["#38bdf8", "#ff365d", "#22c55e", "#facc15", "#ffffff"];
 
-      for (let i = 0; i < 74; i++) {
+      for (let i = 0; i < 96; i++) {
         const piece = document.createElement("span");
         piece.className = "confetti-piece";
         piece.style.setProperty("--left", `${Math.random() * 100}%`);
         piece.style.setProperty("--x", `${(Math.random() - 0.5) * 150}px`);
         piece.style.setProperty("--r", `${(Math.random() * 980 + 420).toFixed(0)}deg`);
-        piece.style.setProperty("--d", `${2600 + Math.random() * 2200}ms`);
-        piece.style.setProperty("--delay", `${Math.random() * 520}ms`);
+        piece.style.setProperty("--d", `${3600 + Math.random() * 2600}ms`);
+        piece.style.setProperty("--delay", `${-Math.random() * 5200}ms`);
         piece.style.setProperty("--c", colors[i % colors.length]);
         fx.appendChild(piece);
       }
@@ -4280,7 +4639,7 @@
         }
       });
 
-      window.setTimeout(() => fx.remove(), 5900);
+      window.setTimeout(() => fx.remove(), 12000);
     }
 
     function extractMatchId(input) {
@@ -4315,10 +4674,11 @@
       }
 
       setError("");
+      document.querySelectorAll(".finish-fx").forEach((element) => element.remove());
       setStatus("🔎 Création Du Job De Scan…", 1);
       $("result").innerHTML = "";
       $("scanBtn").disabled = true;
-      $("scanBtn").textContent = "🔎 Scan En Cours…";
+      $("scanBtn").textContent = "🔎 SCAN EN COURS…";
 
       const scanCalc = calculateAutoRanks();
       const rankEventMode = isPerformanceAdvanceMode() ? "performance" : "fixed";
@@ -4364,7 +4724,7 @@
           throw new Error(job.error || `HTTP ${response.status}`);
         }
 
-        setStatus(job.message || job.status || "🔎 Scan En Cours…", job.progress || 0);
+        setStatus(job.message || job.status || "🔎 SCAN EN COURS…", job.progress || 0);
 
         if (job.status === "done") {
           const resultWithOptions = {
@@ -4423,7 +4783,7 @@
       }
 
       $("scanBtn").disabled = false;
-      $("scanBtn").textContent = "Scanner →";
+      $("scanBtn").textContent = "SCANNER →";
     }
 
     function updateHero(match) {
@@ -5172,6 +5532,168 @@
     body { font-family: "Google Sans", "Roboto", Arial, sans-serif; color: #111; line-height: 1.25; font-size: 6pt; }
     pre { white-space: pre-wrap; word-break: break-word; font-family: "Google Sans", "Roboto", Arial, sans-serif; font-size: 6pt; line-height: 1.25; }
 
+
+
+    /* Finitions v8 : effets plus doux et fondus plus fluides */
+    @keyframes scanButtonBallRollV8 {
+      0% { transform: translateY(-50%) translateX(0) rotate(0deg) scale(1); opacity: 0; filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+      8% { opacity: 1; }
+      22% { transform: translateY(-57%) translateX(38px) rotate(150deg) scale(1.08); opacity: 1; filter: drop-shadow(0 10px 14px rgba(0,0,0,.28)); }
+      58% { transform: translateY(-50%) translateX(min(38vw, 180px)) rotate(620deg) scale(1); opacity: 1; }
+      82% { opacity: .92; }
+      100% { transform: translateY(-50%) translateX(min(58vw, 292px)) rotate(1080deg) scale(.72); opacity: 0; filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+    }
+
+    @keyframes scanButtonKickV8 {
+      0% { transform: translateZ(0) scale(1); background-position: 0% 50%; }
+      24% { transform: translateZ(0) scale(.985); background-position: 35% 50%; }
+      62% { transform: translateZ(0) scale(1.012); background-position: 78% 50%; }
+      100% { transform: translateZ(0) scale(1); background-position: 100% 50%; }
+    }
+
+    @keyframes statusFadeOutV8 {
+      0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+      100% { opacity: 0; transform: translateY(6px) scale(.986); filter: blur(2px); }
+    }
+
+    @keyframes statusSoftInV8 {
+      0% { opacity: 0; transform: translateY(-6px) scale(.99); filter: blur(1px); }
+      100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    }
+
+    @keyframes doneTitleFloatV8 {
+      0%, 100% { transform: translateY(0) scale(1); text-shadow: 0 10px 24px rgba(0,0,0,.42), 0 0 18px rgba(64,201,255,.24); }
+      50% { transform: translateY(-1px) scale(1.018); text-shadow: 0 14px 28px rgba(0,0,0,.38), 0 0 26px rgba(64,201,255,.38); }
+    }
+
+    @keyframes statusConfettiLoopV8 {
+      0% { transform: translate3d(0, -24px, 0) rotate(0deg) scale(.92); opacity: 0; }
+      9% { opacity: .98; }
+      88% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 136px, 0) rotate(var(--r, 540deg)) scale(1); opacity: 0; }
+    }
+
+    @keyframes finishFxFadeV8 {
+      0% { opacity: 0; }
+      7%, 88% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes pageConfettiFallV8 {
+      0% { transform: translate3d(0, -8vh, 0) rotate(0deg) scale(.94); opacity: 0; }
+      10% { opacity: .92; }
+      86% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 114vh, 0) rotate(var(--r, 720deg)) scale(1); opacity: 0; }
+    }
+
+    @keyframes pageFireworkBurstV8 {
+      0% { transform: translate3d(0, 0, 0) scale(.18); opacity: 0; filter: blur(.5px); }
+      18% { opacity: 1; }
+      100% { transform: translate3d(var(--x, 0px), var(--y, 0px), 0) scale(1); opacity: 0; filter: blur(0); }
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .auto-box,
+    .preset-btn,
+    .skip-grid button,
+    .report-btn,
+    .auto-apply-btn,
+    input {
+      transition:
+        border-color .26s ease,
+        background-color .26s ease,
+        box-shadow .26s ease,
+        transform .22s ease,
+        opacity .22s ease;
+    }
+
+    .scan-btn {
+      transition:
+        color .32s ease,
+        text-shadow .32s ease,
+        filter .32s ease,
+        transform .24s ease,
+        box-shadow .32s ease;
+      will-change: transform, filter;
+    }
+
+    .scan-btn.scan-kick {
+      animation: scanButtonKickV8 1.14s cubic-bezier(.2,.78,.22,1) both;
+      color: rgba(255,255,255,.035) !important;
+      text-shadow: none !important;
+      filter: brightness(1.09) saturate(1.1);
+    }
+
+    .scan-btn.scan-kick::before {
+      animation: scanButtonBallRollV8 1.14s cubic-bezier(.16,.84,.18,1) forwards;
+    }
+
+    .status-box {
+      animation: statusSoftInV8 .38s cubic-bezier(.2,.76,.22,1) both;
+      will-change: opacity, transform, filter;
+    }
+
+    .status-box.status-fade-out {
+      animation: statusFadeOutV8 .18s ease both;
+    }
+
+    .status-box.status-done {
+      min-height: 84px;
+      animation: statusSoftInV8 .46s cubic-bezier(.16,.84,.22,1) both;
+    }
+
+    .status-done-title {
+      animation: statusSoftInV8 .42s cubic-bezier(.18,.86,.24,1) both, doneTitleFloatV8 2.2s ease-in-out .44s infinite;
+    }
+
+    .status-confetti-piece {
+      animation-name: statusConfettiLoopV8;
+      animation-timing-function: linear;
+    }
+
+    .finish-fx {
+      animation: finishFxFadeV8 12s ease forwards;
+    }
+
+    .finish-fx::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 18% 22%, rgba(64,201,255,.11), transparent 28%),
+        radial-gradient(circle at 82% 18%, rgba(255,59,114,.10), transparent 30%);
+      opacity: .9;
+    }
+
+    .confetti-piece {
+      animation-name: pageConfettiFallV8;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+
+    .firework-dot {
+      animation: pageFireworkBurstV8 1100ms cubic-bezier(.12,.74,.24,1) forwards;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .preset-btn:hover,
+      .skip-grid button:hover,
+      .report-btn:hover,
+      .auto-apply-btn:hover,
+      .scan-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        filter: brightness(1.04);
+      }
+    }
 
   </style>
 </head>
