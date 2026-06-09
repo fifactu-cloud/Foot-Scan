@@ -7335,6 +7335,92 @@
       box-shadow: none !important;
     }
 
+  
+
+    /* Retouche v54e : centrer uniquement le titre Calcul guidé des rangs */
+    .auto-head {
+      justify-content: center !important;
+      text-align: center !important;
+    }
+
+    .auto-head > div {
+      width: 100% !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+    }
+
+    .auto-title,
+    .auto-sub {
+      width: 100% !important;
+      text-align: center !important;
+    }
+
+  
+
+    /* Retouche v54f : bouton ajouter animé + lignes fines de taille identique */
+    @keyframes addReportGradientFlowV54f {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    #addReportBtn,
+    #addReportBtn.report-btn.primary,
+    #addReportBtn.report-btn.primary:enabled {
+      color: #ffffff !important;
+      border: 1px solid rgba(56,189,248,.38) !important;
+      background-image: linear-gradient(90deg, #40c9ff 0%, #3b82f6 34%, #8b5cf6 68%, #ff4d9d 100%) !important;
+      background-color: transparent !important;
+      background-size: 220% 100% !important;
+      background-position: 0% 50% !important;
+      animation: addReportGradientFlowV54f 3.2s ease-in-out infinite !important;
+      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 77, 157, .14) !important;
+      filter: none !important;
+      will-change: background-position, transform, filter !important;
+    }
+
+    #addReportBtn::before,
+    #addReportBtn::after,
+    #addReportBtn .report-btn-sheen,
+    #addReportBtn .report-btn-glow,
+    .report-btn.primary::before,
+    .report-btn.primary::after {
+      display: none !important;
+      content: none !important;
+    }
+
+    .source-list {
+      position: relative !important;
+      border-top: none !important;
+      padding-top: 13px !important;
+    }
+
+    .source-list::before {
+      content: "" !important;
+      display: block !important;
+      width: calc(100% - 24px) !important;
+      height: 1px !important;
+      margin: 0 auto 13px auto !important;
+      background: rgba(255,255,255,.16) !important;
+      opacity: .92 !important;
+      border-radius: 999px !important;
+      box-shadow: none !important;
+    }
+
+    .source-sep--event,
+    .source-sep--match {
+      width: calc(100% - 24px) !important;
+      height: 1px !important;
+      margin: 9px auto 7px auto !important;
+      background: rgba(255,255,255,.16) !important;
+      opacity: .92 !important;
+      border-radius: 999px !important;
+      box-shadow: none !important;
+    }
+
   </style>
 </head>
 
