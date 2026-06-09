@@ -5546,6 +5546,59 @@
       }
     }
 
+
+    /* Retouche v37 : réglages fins des curseurs et rangs */
+    .auto-control {
+      padding: 10px !important;
+      gap: 8px !important;
+      border-radius: 17px !important;
+    }
+
+    .auto-control-top {
+      grid-template-columns: minmax(0, 1fr) minmax(64px, 76px) !important;
+      gap: 8px !important;
+    }
+
+    .auto-control-title {
+      font-size: 15px !important;
+      line-height: 1.1 !important;
+      font-weight: 1000 !important;
+      letter-spacing: -0.02em !important;
+      color: #e9ecff !important;
+    }
+
+    .auto-number {
+      width: 76px !important;
+      padding: 8px 8px !important;
+      border-radius: 9px !important;
+      font-size: 14px !important;
+    }
+
+    .auto-result-value {
+      font-size: 27px !important;
+      line-height: 1 !important;
+      letter-spacing: -0.055em !important;
+    }
+
+    @media (max-width: 430px) {
+      .auto-control {
+        padding: 9px !important;
+      }
+
+      .auto-control-title {
+        font-size: 14.5px !important;
+      }
+
+      .auto-number {
+        width: 72px !important;
+        padding: 7px 7px !important;
+      }
+
+      .auto-result-value {
+        font-size: 25px !important;
+      }
+    }
+
 </style>
 </head>
 
