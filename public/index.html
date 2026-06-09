@@ -4139,93 +4139,10 @@
       text-shadow: none !important;
     }
 
-    /* Retouche v18 : curseurs visibles sur mobile + rangs bleu/violet */
-    :root {
-      --range-blue-violet: linear-gradient(90deg, #38bdf8 0%, #6366f1 48%, #a855f7 100%);
-      --thumb-pink-violet: linear-gradient(135deg, #ff4d9d 0%, #ec4899 38%, #a855f7 100%);
-      --rank-blue-violet: linear-gradient(90deg, #38bdf8 0%, #60a5fa 34%, #818cf8 62%, #a855f7 100%);
-    }
 
+    /* Retouche v19 : depuis v14, boules des curseurs en violet/rose uniquement */
     input[type="range"] {
-      -webkit-appearance: none !important;
-      appearance: none !important;
-      width: 100% !important;
-      height: 34px !important;
-      min-height: 34px !important;
-      padding: 0 !important;
-      border: 0 !important;
-      background: transparent !important;
-      outline: none !important;
-      accent-color: #a855f7 !important;
-      --fill: 50%;
-    }
-
-    input[type="range"]::-webkit-slider-runnable-track {
-      -webkit-appearance: none !important;
-      appearance: none !important;
-      height: 9px !important;
-      border-radius: 999px !important;
-      background:
-        var(--range-blue-violet) 0 / var(--fill) 100% no-repeat,
-        linear-gradient(90deg, rgba(255,255,255,.34), rgba(255,255,255,.22)) !important;
-      box-shadow:
-        inset 0 1px 2px rgba(255,255,255,.20),
-        inset 0 -1px 2px rgba(0,0,0,.28),
-        0 0 0 1px rgba(255,255,255,.08) !important;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none !important;
-      appearance: none !important;
-      width: 30px !important;
-      height: 30px !important;
-      margin-top: -10.5px !important;
-      border-radius: 50% !important;
-      border: 3px solid rgba(255,255,255,.96) !important;
-      background:
-        radial-gradient(circle at 34% 28%, rgba(255,255,255,.44), transparent 25%),
-        var(--thumb-pink-violet) !important;
-      box-shadow:
-        0 0 0 5px rgba(236, 72, 153, .14),
-        0 10px 24px rgba(168, 85, 247, .30),
-        0 4px 14px rgba(255, 77, 157, .28) !important;
-    }
-
-    input[type="range"]::-moz-range-track {
-      height: 9px !important;
-      border-radius: 999px !important;
-      background: linear-gradient(90deg, rgba(255,255,255,.34), rgba(255,255,255,.22)) !important;
-    }
-
-    input[type="range"]::-moz-range-progress {
-      height: 9px !important;
-      border-radius: 999px !important;
-      background: var(--range-blue-violet) !important;
-    }
-
-    input[type="range"]::-moz-range-thumb {
-      width: 30px !important;
-      height: 30px !important;
-      border-radius: 50% !important;
-      border: 3px solid rgba(255,255,255,.96) !important;
-      background: var(--thumb-pink-violet) !important;
-      box-shadow:
-        0 0 0 5px rgba(236, 72, 153, .14),
-        0 10px 24px rgba(168, 85, 247, .30),
-        0 4px 14px rgba(255, 77, 157, .28) !important;
-    }
-
-    .auto-result-value,
-    .rank-value,
-    .summary strong,
-    .team-card strong {
-      background: var(--rank-blue-violet) !important;
-      -webkit-background-clip: text !important;
-      background-clip: text !important;
-      -webkit-text-fill-color: transparent !important;
-      color: transparent !important;
-      text-shadow: none !important;
-      filter: drop-shadow(0 10px 22px rgba(99, 102, 241, .14));
+      accent-color: #d946ef !important;
     }
 
 </style>
@@ -6092,29 +6009,13 @@
       draw();
     }
 
-
-    function updateSliderColors() {
-      document.querySelectorAll('input[type="range"]').forEach((slider) => {
-        const min = Number(slider.min || 0);
-        const max = Number(slider.max || 100);
-        const val = Number(slider.value || 0);
-        const pct = max > min ? Math.max(0, Math.min(100, ((val - min) * 100) / (max - min))) : 0;
-        slider.style.setProperty('--fill', `${pct}%`);
-      });
-    }
-
     function bindRangeAndNumber(rangeId, numberId, callback) {
       $(rangeId).addEventListener("input", () => {
         $(numberId).value = $(rangeId).value;
-        updateSliderColors();
         callback();
       });
 
-      $(numberId).addEventListener("input", () => {
-        $(rangeId).value = $(numberId).value;
-        updateSliderColors();
-        callback();
-      });
+      $(numberId).addEventListener("input", callback);
     }
 
     renderSkipButtons("skipHome", () => skipHomeValue, (value) => skipHomeValue = value);
@@ -6173,8 +6074,6 @@
     initMobileNavigationEffects();
     updateReportCount();
     updateAutoCalculator();
-    updateSliderColors();
-    setTimeout(updateSliderColors, 100);
   </script>
 </body>
 </html>
