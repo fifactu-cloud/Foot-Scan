@@ -6394,6 +6394,142 @@
       }
     }
 
+
+    /* Retouche v44 : bulle Termux + bouton Ajouter */
+    .notice-title.notice-bubble {
+      justify-content: flex-start !important;
+      padding-left: 10px !important;
+      gap: 9px !important;
+    }
+
+    .notice-inline-icon {
+      margin-left: -2px !important;
+      width: 28px !important;
+      height: 28px !important;
+      flex-basis: 28px !important;
+      font-size: 15px !important;
+    }
+
+    .report-btn.primary,
+    #addReportBtn {
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
+      background-size: 190% 190% !important;
+      animation: derbySweep 5.5s ease infinite !important;
+      border-color: rgba(56,189,248,.38) !important;
+      color: #ffffff !important;
+      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 59, 114, .14) !important;
+    }
+
+    @media (max-width: 430px) {
+      .notice-title.notice-bubble {
+        padding-left: 9px !important;
+        gap: 8px !important;
+      }
+
+      .notice-inline-icon {
+        width: 27px !important;
+        height: 27px !important;
+        flex-basis: 27px !important;
+      }
+    }
+
+
+    /* Retouche v45 : summary plus mixte + bulles plus visibles + vrai confetti animé */
+    .summary {
+      background:
+        radial-gradient(circle at 14% 16%, rgba(64,201,255,.13), transparent 30%),
+        radial-gradient(circle at 88% 20%, rgba(255,77,157,.12), transparent 28%),
+        linear-gradient(135deg, rgba(64,201,255,.08), rgba(255,77,157,.08)),
+        rgba(8, 13, 31, .97) !important;
+      border-color: rgba(255,255,255,.10) !important;
+    }
+
+    .summary-head {
+      background:
+        linear-gradient(135deg, rgba(64,201,255,.07), rgba(255,77,157,.07)),
+        rgba(255,255,255,.015) !important;
+      border-radius: 24px !important;
+    }
+
+    .summary-pill {
+      border-color: rgba(255,255,255,.22) !important;
+      background:
+        linear-gradient(135deg, rgba(64,201,255,.22), rgba(255,77,157,.18)),
+        rgba(16, 23, 44, .96) !important;
+      color: #ffffff !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 8px 18px rgba(0,0,0,.12) !important;
+      text-shadow: 0 1px 8px rgba(0,0,0,.16) !important;
+    }
+
+    .summary-pill-mode {
+      color: #fff7fb !important;
+    }
+
+    .dominance-box {
+      min-height: 138px;
+    }
+
+    .dominance-confetti {
+      z-index: 0 !important;
+      opacity: 1 !important;
+      border-radius: inherit;
+    }
+
+    .dominance-confetti-piece {
+      animation-name: statusConfettiLoopV8 !important;
+      animation-timing-function: linear !important;
+      width: 6px !important;
+      height: 11px !important;
+      opacity: .92 !important;
+    }
+
+    .dominance-celebration::before {
+      font-size: 84px !important;
+      opacity: .05 !important;
+      transform: translate(-50%, -54%) !important;
+      z-index: 0 !important;
+    }
+
+    .dominance-celebration::after {
+      content: none !important;
+    }
+
+    .dominance-box > *:not(.status-confetti) {
+      position: relative;
+      z-index: 1;
+    }
+
+    .dominance-team {
+      text-shadow: 0 8px 18px rgba(0,0,0,.18);
+    }
+
+    .dominance-meta,
+    .dominance-meta-centered {
+      background: rgba(255,255,255,.025);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 14px;
+      padding: 8px 12px;
+      backdrop-filter: blur(3px);
+    }
+
+    @media (max-width: 430px) {
+      .summary-head {
+        border-radius: 22px !important;
+      }
+      .summary-pill {
+        border-color: rgba(255,255,255,.20) !important;
+        background:
+          linear-gradient(135deg, rgba(64,201,255,.20), rgba(255,77,157,.16)),
+          rgba(16, 23, 44, .95) !important;
+      }
+      .dominance-box {
+        min-height: 132px;
+      }
+      .dominance-celebration::before {
+        font-size: 76px !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -6428,7 +6564,7 @@
 
     <section class="panel notice panel-pad">
       <div class="notice-stack">
-        <div class="notice-title notice-bubble"><span class="notice-inline-icon">🛑</span><span>APPLI Termux Obligatoire</span></div>
+        <div class="notice-title notice-bubble"><span class="notice-inline-icon">🛑</span><span>Émulateur Termux Obligatoire</span></div>
         <p class="notice-text notice-bubble">
           L'application Termux doit obligatoirement être ouverte en arrière-plan (sur mobile ou PC) pendant le scan du match.
         </p>
@@ -7013,10 +7149,15 @@
         : winnerName && winnerName === homeName
           ? "winner-home"
           : "winner-neutral";
+      const colors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
+      const confetti = Array.from({ length: 24 }, (_, i) => `
+        <span class="status-confetti-piece dominance-confetti-piece" style="--left:${(i * 31) % 100}%;--x:${((i % 9) - 4) * 8}px;--r:${420 + (i % 10) * 72}deg;--dur:${2400 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${colors[i % colors.length]}"></span>
+      `).join("");
 
       if (dominance.type === "none") {
         return `
           <div class="dominance-box ${toneClass} dominance-celebration">
+            <div class="status-confetti dominance-confetti" aria-hidden="true">${confetti}</div>
             <div class="dominance-team">INDISPONIBLE</div>
             <div class="dominance-meta">${isEvolution ? "Moyenne de zone ou moyenne des rangs indisponible." : "Aucune moyenne disponible sur les rangs."}</div>
           </div>
@@ -7026,6 +7167,7 @@
       if (dominance.type === "tie") {
         return `
           <div class="dominance-box winner-neutral dominance-celebration">
+            <div class="status-confetti dominance-confetti" aria-hidden="true">${confetti}</div>
             <div class="dominance-team">ÉGALITÉ</div>
             <div class="dominance-meta">${isEvolution ? "Même évolution affichée après arrondi." : `Moyenne Dominante : <span class="dominance-value neutral">${esc(formatValue(dominance.average))}</span>`}</div>
           </div>
@@ -7035,11 +7177,12 @@
       const avgClass = valueClass(isEvolution ? dominance.metric : dominance.average);
       const diffClass = dominance.diff !== null ? valueClass(dominance.diff) : "neutral";
       const meta = isEvolution
-        ? `Évolution : <span class="dominance-value ${avgClass}">${esc(formatValue(dominance.metric))}</span> · Zone ${esc(formatValue(dominance.zoneAverage))} → Rangs ${esc(formatValue(dominance.rankAverage))}${dominance.diff !== null ? ` · Écart : <span class="dominance-value ${diffClass}">${esc(formatRank(dominance.diff))}</span>` : ""}`
+        ? `Moyenne Dominante : <span class="dominance-value ${avgClass}">${esc(formatValue(dominance.metric))}</span> · Zone ${esc(formatValue(dominance.zoneAverage))} → Rangs ${esc(formatValue(dominance.rankAverage))}${dominance.diff !== null ? ` · Écart : <span class="dominance-value ${diffClass}">${esc(formatRank(dominance.diff))}</span>` : ""}`
         : `Moyenne Dominante : <span class="dominance-value ${avgClass}">${esc(formatValue(dominance.average))}</span>${dominance.diff !== null ? ` · Écart : <span class="dominance-value ${diffClass}">${esc(formatRank(dominance.diff))}</span>` : ""}`;
 
       return `
         <div class="dominance-box ${toneClass} dominance-celebration">
+          <div class="status-confetti dominance-confetti" aria-hidden="true">${confetti}</div>
           <div class="dominance-team">${esc(String(dominance.label || "").toUpperCase())}</div>
           <div class="dominance-meta dominance-meta-centered">${meta}</div>
         </div>
