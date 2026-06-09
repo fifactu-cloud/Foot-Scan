@@ -4419,6 +4419,147 @@
       }
     }
 
+
+    /* Retouche v23 : bloc de scan plus fluide sur mobile */
+    .status-box,
+    .status-box.status-loading,
+    .status-box.status-selection,
+    .status-box.status-done {
+      min-height: 74px !important;
+      height: 74px;
+      border-radius: 16px;
+      padding: 10px 12px;
+      overflow: hidden;
+      transition: opacity .22s ease, transform .22s ease, background .22s ease, border-color .22s ease, box-shadow .22s ease;
+      animation: none !important;
+    }
+
+    .status-box.status-loading,
+    .status-box.status-selection {
+      display: block;
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .08), rgba(255, 54, 93, .06)),
+        rgba(5, 10, 28, .86);
+      border-color: rgba(64, 201, 255, .26);
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%);
+      opacity: .18;
+      transition: width .36s ease;
+      pointer-events: none;
+    }
+
+    .status-box.status-loading .status-progress-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      position: absolute;
+      inset: 50% 0 auto 0;
+      transform: translateY(-56%);
+      text-align: center;
+      font-size: clamp(26px, 7vw, 31px);
+      font-weight: 1000;
+      letter-spacing: -.05em;
+      color: rgba(255,255,255,.22);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .status-box.status-loading .progress-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.14);
+      overflow: hidden;
+      margin-top: auto;
+    }
+
+    .status-box.status-loading .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%);
+      transition: width .36s ease;
+    }
+
+    .status-box.status-selection {
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .status-selection-wrap {
+      display: grid;
+      gap: 6px;
+      align-items: center;
+      justify-items: center;
+    }
+
+    .status-selection-label {
+      font-size: 10.5px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.72);
+      line-height: 1;
+    }
+
+    .status-selection-value {
+      font-size: clamp(20px, 5.8vw, 24px);
+      font-weight: 1000;
+      letter-spacing: -.04em;
+      line-height: 1;
+      color: #ffffff;
+    }
+
+    .status-box.status-done {
+      display: grid !important;
+      place-items: center;
+      background:
+        radial-gradient(circle at 16% 0%, rgba(64, 201, 255, .24), transparent 34%),
+        radial-gradient(circle at 88% 100%, rgba(255, 54, 93, .18), transparent 40%),
+        linear-gradient(135deg, rgba(64, 201, 255, .12), rgba(255, 54, 93, .09)),
+        rgba(5, 10, 28, .86);
+    }
+
+    .status-box.status-done,
+    .status-done-title {
+      animation: none !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box,
+      .status-box.status-loading,
+      .status-box.status-selection,
+      .status-box.status-done {
+        min-height: 72px !important;
+        height: 72px;
+        padding: 9px 10px;
+      }
+
+      .status-box.status-loading .status-big-percent {
+        font-size: clamp(24px, 8vw, 28px);
+      }
+
+      .status-selection-label {
+        font-size: 9.8px;
+      }
+
+      .status-selection-value {
+        font-size: clamp(18px, 6vw, 22px);
+      }
+    }
+
 </style>
 </head>
 
@@ -4482,7 +4623,7 @@
                 <span id="activePresetLabel">Libre</span>
               </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays<small>Base 31,3125 · Progression 1 · Changements 7</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiels<small>Base 31,3125 · Progression 1 · Changements 7</small></button>
                 <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>Base 31,3125 · Progression 1 · Changements 13</small></button>
               </div>
             </div>
@@ -4861,7 +5002,7 @@
       }
 
       if ($("officialPresetBtn")) {
-        $("officialPresetBtn").classList.toggle("active", activePreset === "Clubs/Pays");
+        $("officialPresetBtn").classList.toggle("active", activePreset === "Clubs/Pays Officiels");
       }
 
       if ($("friendlyPresetBtn")) {
@@ -4890,7 +5031,6 @@
       $("autoChangeRange").value = changes;
 
       updateAutoCalculator();
-      setStatus(`Présélection ${label} appliquée : Base 31,3125 · Progression ${advancement} · Changements ${changes}`, 0);
     }
 
     function markPresetAsCustom() {
@@ -4903,7 +5043,7 @@
       $("rank1").value = formatRank(calc.low);
       $("rank2").value = formatRank(calc.high);
 
-      setStatus(`Rangs appliqués : ${formatRank(calc.low)} / ${formatRank(calc.high)}`, 0);
+      renderSelectedRanksStatus();
     }
 
     function averagePerformance(team) {
@@ -5053,6 +5193,33 @@
       `;
     }
 
+
+
+    function renderSelectedRanksStatus() {
+      const box = $("statusBox");
+      const rank1 = String($("rank1")?.value || "").trim();
+      const rank2 = String($("rank2")?.value || "").trim();
+
+      if (!rank1 && !rank2) {
+        box.classList.remove("status-selection");
+        box.innerHTML = "";
+        box.style.display = "none";
+        return;
+      }
+
+      const value = rank1 && rank2 ? `${rank1} / ${rank2}` : (rank1 || rank2);
+
+      box.style.display = "block";
+      box.classList.remove("status-done", "status-loading", "status-fade-out");
+      box.classList.add("status-selection");
+      box.innerHTML = `
+        <div class="status-selection-wrap">
+          <div class="status-selection-label">RANGS SÉLECTIONNÉS</div>
+          <div class="status-selection-value">${esc(value)}</div>
+        </div>
+      `;
+    }
+
     function setStatus(message, progress = 0) {
       const box = $("statusBox");
 
@@ -5062,23 +5229,21 @@
       }
 
       if (!message) {
-        box.classList.remove("status-done", "status-fade-out");
+        box.classList.remove("status-done", "status-loading", "status-selection", "status-fade-out");
         box.innerHTML = "";
         box.style.display = "none";
         return;
       }
 
-      box.style.display = "block";
-
       const safeProgress = Math.max(0, Math.min(100, Number(progress || 0)));
       const cleanMessage = String(message || "")
         .replace(/(?:⚠️\s*){2,}/g, "⚠️ ")
-        .replace(/\bIncident\(s\)/g, "Événement(s)")
-        .replace(/\bIncidents\b/g, "Événements")
-        .replace(/\bincidents\b/g, "événements")
-        .replace(/\bAvancement\b/g, "Progression")
-        .replace(/\bavancement\b/g, "progression")
-        .replace(/\bpage\b/g, "Page");
+        .replaceAll("Incident(s)", "Événement(s)")
+        .replaceAll("Incidents", "Événements")
+        .replaceAll("incidents", "événements")
+        .replaceAll("Avancement", "Progression")
+        .replaceAll("avancement", "progression")
+        .replaceAll("page", "Page");
       const isDone = safeProgress >= 100 && /scan terminé/i.test(cleanMessage);
 
       const renderDoneStatus = () => {
@@ -5087,8 +5252,9 @@
           <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${colors[i % colors.length]}"></span>
         `).join("");
 
-        box.classList.remove("status-fade-out");
+        box.classList.remove("status-loading", "status-selection", "status-fade-out");
         box.classList.add("status-done");
+        box.style.display = "grid";
         box.innerHTML = `
           <div class="status-confetti" aria-hidden="true">${pieces}</div>
           <div class="status-done-title">SCAN TERMINÉ</div>
@@ -5096,30 +5262,32 @@
       };
 
       if (isDone) {
-        if (box.classList.contains("status-done")) {
-          renderDoneStatus();
-          return;
-        }
-
-        box.classList.add("status-fade-out");
-        box._doneTimer = window.setTimeout(renderDoneStatus, box.innerHTML.trim() ? 190 : 0);
+        renderDoneStatus();
         return;
       }
 
-      box.classList.remove("status-done", "status-fade-out");
-      box.innerHTML = `
-        <div class="status-progress-bg" style="width:${safeProgress}%" aria-hidden="true"></div>
-        <div class="status-progress-content">
-          <div class="status-head">
-            <span class="status-ranks">${esc(getSelectedRanksText())}</span>
-            <span class="status-loading-label">SCAN EN COURS</span>
+      box.style.display = "block";
+      box.classList.remove("status-done", "status-selection", "status-fade-out");
+      box.classList.add("status-loading");
+
+      if (!box.querySelector('.status-progress-content')) {
+        box.innerHTML = `
+          <div class="status-progress-bg" style="width:0%" aria-hidden="true"></div>
+          <div class="status-progress-content">
+            <div class="status-big-percent">0%</div>
+            <div class="progress-track" aria-hidden="true">
+              <div class="progress-fill" style="width:0%"></div>
+            </div>
           </div>
-          <div class="status-big-percent">${Math.round(safeProgress)}%</div>
-          <div class="progress-track" aria-hidden="true">
-            <div class="progress-fill" style="width:${safeProgress}%"></div>
-          </div>
-        </div>
-      `;
+        `;
+      }
+
+      const percentNode = box.querySelector('.status-big-percent');
+      const fillNode = box.querySelector('.progress-fill');
+      const bgNode = box.querySelector('.status-progress-bg');
+      if (percentNode) percentNode.textContent = `${Math.round(safeProgress)}%`;
+      if (fillNode) fillNode.style.width = `${safeProgress}%`;
+      if (bgNode) bgNode.style.width = `${safeProgress}%`;
     }
 
     function setError(message) {
@@ -6356,13 +6524,19 @@
     bindCalculatorInput("autoAdvanceRange", "autoAdvanceNumber");
     bindCalculatorInput("autoChangeRange", "autoChangeNumber");
 
-    $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays"));
+    $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays Officiels"));
     $("friendlyPresetBtn").addEventListener("click", () => applyPreset("Pays Amicaux"));
 
     $("simultaneousMode").addEventListener("change", updateAutoCalculator);
     $("performanceAdvanceMode").addEventListener("change", updateAutoCalculator);
     $("evolutionWinnerMode").addEventListener("change", updateAutoCalculator);
     $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
+    $("rank1").addEventListener("input", () => {
+      if (!currentJobId) renderSelectedRanksStatus();
+    });
+    $("rank2").addEventListener("input", () => {
+      if (!currentJobId) renderSelectedRanksStatus();
+    });
 
 
 
