@@ -2620,13 +2620,13 @@
     /* Retouches ciblées : bouton Scanner, bloc de scan et fin de scan */
     @keyframes scanButtonBallRoll {
       0% { transform: translateX(0) rotate(0deg) scale(1); opacity: 1; }
-      72% { opacity: 1; }
+      70% { opacity: 1; }
       100% { transform: translateX(min(46vw, 210px)) rotate(760deg) scale(.92); opacity: 0; }
     }
 
     @keyframes scanPulseDot {
       0%, 100% { transform: scale(.78); opacity: .68; }
-      50% { transform: scale(1.15); opacity: 1; }
+      50% { transform: scale(1.12); opacity: 1; }
     }
 
     @keyframes scanProgressGlow {
@@ -2634,14 +2634,15 @@
       100% { background-position: 220% 50%; }
     }
 
-    @keyframes confettiFall {
-      0% { transform: translate3d(0, -20px, 0) rotate(0deg); opacity: 1; }
-      100% { transform: translate3d(var(--x, 0px), 105vh, 0) rotate(var(--r, 720deg)); opacity: 0; }
+    @keyframes statusDoneGlow {
+      0%, 100% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.02); filter: brightness(1.14); }
     }
 
-    @keyframes fireworkPop {
-      0% { transform: translate(-50%, -50%) scale(.35); opacity: 1; filter: blur(0); }
-      100% { transform: translate(calc(-50% + var(--x, 0px)), calc(-50% + var(--y, 0px))) scale(1); opacity: 0; filter: blur(.5px); }
+    @keyframes statusConfettiLoop {
+      0% { transform: translate3d(0, -18px, 0) rotate(0deg); opacity: 0; }
+      8% { opacity: .95; }
+      100% { transform: translate3d(var(--x, 0px), 112px, 0) rotate(var(--r, 540deg)); opacity: 0; }
     }
 
     .scan-btn {
@@ -2650,119 +2651,153 @@
     }
 
     .scan-btn::before {
-      content: "";
+      content: "⚽️";
       display: inline-block;
-      width: 22px;
-      height: 22px;
-      margin-right: 9px;
-      border-radius: 50%;
-      vertical-align: -4px;
-      background:
-        radial-gradient(circle at 38% 30%, rgba(255,255,255,.95) 0 12%, transparent 13%),
-        radial-gradient(circle at 58% 54%, rgba(255,255,255,.72) 0 8%, transparent 9%),
-        conic-gradient(from -20deg, #38bdf8 0 24%, #ffffff 24% 34%, #22c55e 34% 53%, #ffffff 53% 62%, #ff365d 62% 82%, #ffffff 82% 100%);
-      box-shadow: inset -4px -5px 7px rgba(2,6,23,.24), inset 3px 3px 6px rgba(255,255,255,.38), 0 5px 12px rgba(0,0,0,.24);
+      margin-right: 10px;
+      width: auto;
+      height: auto;
+      border-radius: 0;
+      background: none !important;
+      box-shadow: none !important;
+      color: initial;
+      font-size: 22px;
+      line-height: 1;
+      vertical-align: -3px;
       transform-origin: center;
+      text-shadow: none;
     }
 
     .scan-btn.scan-kick {
-      color: transparent !important;
+      color: rgba(255,255,255,.10) !important;
       text-shadow: none !important;
     }
 
     .scan-btn.scan-kick::before {
+      color: initial;
       animation: scanButtonBallRoll .78s cubic-bezier(.2,.82,.22,1) forwards;
     }
 
     .status-box {
-      padding: 14px;
-      border-radius: 18px;
+      position: relative;
+      overflow: hidden;
+      padding: 10px 12px;
+      border-radius: 16px;
       background:
-        radial-gradient(circle at 12% 0%, rgba(56,189,248,.18), transparent 34%),
-        linear-gradient(135deg, rgba(56,189,248,.14), rgba(255,54,93,.08)),
-        rgba(5,10,28,.72);
-      border-color: rgba(56,189,248,.34);
-      box-shadow: 0 16px 34px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.07);
+        radial-gradient(circle at 12% 0%, rgba(56,189,248,.16), transparent 32%),
+        linear-gradient(135deg, rgba(56,189,248,.12), rgba(255,54,93,.07)),
+        rgba(5,10,28,.70);
+      border-color: rgba(56,189,248,.30);
+      box-shadow: 0 12px 26px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.06);
     }
 
     .status-head {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
     }
 
     .status-pulse {
-      width: 10px;
-      height: 10px;
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
       background: linear-gradient(135deg, #38bdf8, #ff365d);
-      box-shadow: 0 0 0 6px rgba(56,189,248,.10), 0 0 18px rgba(255,54,93,.20);
-      animation: scanPulseDot 1.1s ease-in-out infinite;
+      box-shadow: 0 0 0 5px rgba(56,189,248,.09), 0 0 16px rgba(255,54,93,.18);
+      animation: scanPulseDot 1.15s ease-in-out infinite;
     }
 
     .status-message {
       color: #e0f2fe;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 850;
-      line-height: 1.35;
+      line-height: 1.28;
       min-width: 0;
     }
 
     .status-percent {
       color: #ffffff;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 1000;
-      padding: 6px 8px;
+      padding: 5px 7px;
       border-radius: 999px;
-      background: rgba(255,255,255,.09);
-      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.13);
     }
 
     .status-box .progress-track {
-      height: 11px;
-      margin-top: 13px;
-      background: rgba(255,255,255,.09);
-      border: 1px solid rgba(255,255,255,.09);
-      box-shadow: inset 0 1px 5px rgba(0,0,0,.28);
+      height: 8px;
+      margin-top: 9px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: inset 0 1px 5px rgba(0,0,0,.24);
     }
 
     .status-box .progress-fill {
       background: linear-gradient(90deg, #38bdf8, #22c55e, #ffffff, #ff365d, #38bdf8);
       background-size: 220% 100%;
       animation: scanProgressGlow 1.65s linear infinite;
-      box-shadow: 0 0 18px rgba(56,189,248,.34);
+      box-shadow: 0 0 16px rgba(56,189,248,.30);
     }
 
-    .finish-fx {
-      position: fixed;
+    .status-box.status-done {
+      min-height: 84px;
+      display: grid !important;
+      place-items: center;
+      padding: 16px;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(56,189,248,.28), transparent 35%),
+        radial-gradient(circle at 85% 100%, rgba(255,54,93,.22), transparent 38%),
+        linear-gradient(135deg, rgba(56,189,248,.16), rgba(255,54,93,.12)),
+        rgba(5,10,28,.86);
+      border-color: rgba(56,189,248,.38);
+    }
+
+    .status-done-title {
+      position: relative;
+      z-index: 2;
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: 1000;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      text-align: center;
+      text-shadow: 0 10px 24px rgba(0,0,0,.42), 0 0 18px rgba(56,189,248,.26);
+      animation: statusDoneGlow 1.8s ease-in-out infinite;
+    }
+
+    .status-confetti {
+      position: absolute;
       inset: 0;
-      z-index: 9999;
       pointer-events: none;
       overflow: hidden;
+      z-index: 1;
     }
 
-    .confetti-piece {
+    .status-confetti-piece {
       position: absolute;
-      top: -16px;
-      width: 8px;
-      height: 14px;
+      top: -14px;
+      left: var(--left, 50%);
+      width: 6px;
+      height: 11px;
       border-radius: 3px;
       background: var(--c, #38bdf8);
-      animation: confettiFall var(--d, 1600ms) ease-out forwards;
-      opacity: .95;
+      opacity: .92;
+      animation: statusConfettiLoop var(--dur, 2200ms) linear infinite;
+      animation-delay: var(--delay, 0ms);
     }
 
-    .firework-dot {
-      position: absolute;
-      left: var(--left, 50%);
-      top: var(--top, 40%);
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--c, #ff365d);
-      box-shadow: 0 0 14px var(--c, #ff365d);
-      animation: fireworkPop .86s ease-out forwards;
+    @media (max-width: 520px) {
+      .team-card .rank-grid {
+        gap: 10px;
+        padding: 10px;
+        background: transparent;
+      }
+
+      .team-card .rank-card {
+        border: 1px solid rgba(255,255,255,.13);
+        border-radius: 20px;
+        overflow: hidden;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -2801,8 +2836,7 @@
         <div class="kicker">🔎 Scan Complet Côté Worker</div>
         <h1 class="home-title">Foot<span>/</span>Scan</h1>
         <p class="hero-text">
-          Termux récupère les matchs, calcule les rangs et renvoie le résultat final pendant que le ballon tourne côté worker.
-          Nouvelle Version : 3 Catégories De Buts, Base Conservée, Avancement Réglable Par Événement Et Interface Mobile Bleu/Rouge Avec Animations Ballon.
+          FootScan est un site qui permet d'analyser les confrontations (football) à partir de l'historique des deux équipes. Le calcul se base sur la performance (via les buts) au fil du temps (présent vers le passé).
         </p>
       </div>
     </section>
@@ -2812,7 +2846,7 @@
       <div>
         <div class="notice-title">⚠️ Termux Doit Rester Ouvert</div>
         <p class="notice-text">
-          Lance <code>python scripts/local_worker.py</code>. Le navigateur ne pilote plus les incidents un par un.
+          L'application Termux doit obligatoirement être ouverte en arrière-plan (sur mobile ou PC) pendant le scan du match.
         </p>
       </div>
     </section>
@@ -2829,7 +2863,7 @@
             <div>
               <div class="auto-title">Calcul Automatique Des Rangs</div>
               <div class="auto-sub">
-                Base Libre · Défaut 31,3125 · Avancement Par Événement · Changements × 1,5 · Aucun Curseur Rouge.
+                Base Libre · Défaut 31,3125 · Progression Par Événement · Changements × 1,5 · Aucun Curseur Rouge.
               </div>
             </div>
             <div class="auto-badge">Base Libre</div>
@@ -2841,12 +2875,9 @@
                 <span>Présélections</span>
                 <span id="activePresetLabel">Libre</span>
               </div>
-              <div class="preset-hint">
-                Présélections Match : mêmes curseurs qu’avant pour les Changements. Base 31,3125 pour toutes les Bases. Avancement par défaut 1. Aucun Rouge dans le Calcul Automatique.
-              </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiels<small>Base 31,3125 · Avancement 1 · Changements 7</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>Base 31,3125 · Avancement 1 · Changements 13</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays<small>Base 31,3125 · Progression 1 · Changements 7</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>Base 31,3125 · Progression 1 · Changements 13</small></button>
               </div>
             </div>
 
@@ -2861,7 +2892,7 @@
 
               <div class="auto-control">
                 <div class="auto-control-top">
-                  <div class="auto-control-title">Avancement</div>
+                  <div class="auto-control-title">Progression</div>
                   <input id="autoAdvanceNumber" class="auto-number" type="number" min="0.0001" max="5" step="0.0001" value="1" />
                 </div>
                 <input id="autoAdvanceRange" type="range" min="0.0001" max="5" step="0.0001" value="1" />
@@ -2897,7 +2928,7 @@
 
             <label class="mode-toggle" for="performanceAdvanceMode">
               <input id="performanceAdvanceMode" type="checkbox" />
-              <span>Avancement = Valeur De Performance : But Avec Passeur 1, But Sans Passeur 0,6667, CSC / Erreur 0,3333.</span>
+              <span>Progression = Valeur De Performance : But Avec Passeur 1, But Sans Passeur 0,6667, CSC / Erreur 0,3333.</span>
             </label>
 
             <label class="mode-toggle" for="evolutionWinnerMode">
@@ -3183,8 +3214,8 @@
 
     function formulaTextForCalc(calc) {
       const modeText = isPerformanceAdvanceMode()
-        ? "Avancement : Valeur De Performance"
-        : `Avancement : ${formatRank(calc.advancement)} Par Événement`;
+        ? "Progression : Valeur De Performance"
+        : `Progression : ${formatRank(calc.advancement)} Par Événement`;
 
       return (
         `Base : ${formatRank(calc.base)} · ` +
@@ -3203,7 +3234,7 @@
       }
 
       if ($("officialPresetBtn")) {
-        $("officialPresetBtn").classList.toggle("active", activePreset === "Clubs/Pays Officiels");
+        $("officialPresetBtn").classList.toggle("active", activePreset === "Clubs/Pays");
       }
 
       if ($("friendlyPresetBtn")) {
@@ -3232,7 +3263,7 @@
       $("autoChangeRange").value = changes;
 
       updateAutoCalculator();
-      setStatus(`Présélection ${label} appliquée : Base 31,3125 · Avancement ${advancement} · Changements ${changes}`, 0);
+      setStatus(`Présélection ${label} appliquée : Base 31,3125 · Progression ${advancement} · Changements ${changes}`, 0);
     }
 
     function markPresetAsCustom() {
@@ -3400,12 +3431,34 @@
       box.style.display = message ? "block" : "none";
 
       if (!message) {
+        box.classList.remove("status-done");
         box.innerHTML = "";
         return;
       }
 
       const safeProgress = Math.max(0, Math.min(100, Number(progress || 0)));
-      const cleanMessage = String(message || "").replace(/(?:⚠️\s*){2,}/g, "⚠️ ");
+      const cleanMessage = String(message || "")
+        .replace(/(?:⚠️\s*){2,}/g, "⚠️ ")
+        .replace(/\bIncident\(s\)/g, "Événement(s)")
+        .replace(/\bIncidents\b/g, "Événements")
+        .replace(/\bincidents\b/g, "événements")
+        .replace(/\bpage\b/g, "Page");
+      const isDone = safeProgress >= 100 && /scan terminé/i.test(cleanMessage);
+
+      box.classList.toggle("status-done", isDone);
+
+      if (isDone) {
+        const colors = ["#38bdf8", "#ff365d", "#22c55e", "#facc15", "#ffffff"];
+        const pieces = Array.from({ length: 20 }, (_, i) => `
+          <span class="status-confetti-piece" style="--left:${(i * 37) % 100}%;--x:${((i % 5) - 2) * 13}px;--r:${360 + (i % 7) * 90}deg;--dur:${1900 + (i % 6) * 210}ms;--delay:-${(i % 10) * 230}ms;--c:${colors[i % colors.length]}"></span>
+        `).join("");
+
+        box.innerHTML = `
+          <div class="status-confetti" aria-hidden="true">${pieces}</div>
+          <div class="status-done-title">Scan Terminé</div>
+        `;
+        return;
+      }
 
       box.innerHTML = `
         <div class="status-head">
@@ -3592,8 +3645,7 @@
           };
 
           renderResult(resultWithOptions);
-          setStatus("🔎 Scan Terminé. Tu Peux Ajouter Cette Analyse Au Rapport.", 100);
-          launchFinishFx();
+          setStatus("Scan Terminé", 100);
           $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter L’Analyse Actuelle” pour l’enregistrer dans le rapport.";
           finishScan();
           return;
@@ -3879,11 +3931,11 @@
 
     function zoneAdvancementLabel(stats) {
       if (stats?.eventStepMode === "performance") {
-        return "Avancement = Valeur De Performance";
+        return "Progression = Valeur De Performance";
       }
 
       const step = numberOrNull(stats?.eventStep);
-      return step === null ? "Avancement Par Événement" : `${formatRank(step)} Par Événement`;
+      return step === null ? "Progression Par Événement" : `${formatRank(step)} Par Événement`;
     }
 
     function renderZoneStats(team) {
@@ -3919,7 +3971,7 @@
           <div class="stat-header">
             <div>
               <div class="stat-title">Zone des rangs attribuée à ${esc(teamName)}</div>
-              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · Avancement Total ${esc(formatRank(stats.totalQuantity || 0))} · ${esc(zoneAdvancementLabel(stats))} · Zone Rang Bas → Rang Haut Final.</div>
+              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · Progression Totale ${esc(formatRank(stats.totalQuantity || 0))} · ${esc(zoneAdvancementLabel(stats))} · Zone Rang Bas → Rang Haut Final.</div>
             </div>
             <div class="stat-badge">Équipe</div>
           </div>
@@ -4087,7 +4139,7 @@
         return `zone ${teamName}: —`;
       }
 
-      return `zone rangs finaux ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · rangs ${stats.startRankIndex}-${stats.endRankIndex} · avancement ${formatRank(stats.totalQuantity || 0)}`;
+      return `zone rangs finaux ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · rangs ${stats.startRankIndex}-${stats.endRankIndex} · progression ${formatRank(stats.totalQuantity || 0)}`;
     }
 
     function zoneStatsLines(team) {
@@ -4104,13 +4156,13 @@
       return [
         `Performance moyenne zone attribuée à ${teamName} : ${formatValue(stats.average)}`,
         `Performance la plus présente zone attribuée à ${teamName} : ${zoneModeText(stats)}`,
-        `Zone Rangs Finaux Attribuée : Rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} événements, Avancement ${formatRank(stats.totalQuantity || 0)}, ${zoneAdvancementLabel(stats)})`,
+        `Zone Rangs Finaux Attribuée : Rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} événements, Progression ${formatRank(stats.totalQuantity || 0)}, ${zoneAdvancementLabel(stats)})`,
       ];
     }
 
     function compactCalcLine(label, calc) {
       const presetText = calc.presetLabel ? ` · présélection ${calc.presetLabel}` : "";
-      const baseLine = `${label}${presetText} : Base ${formatRank(calc.base)} · Avancement ${calc.rankEventMode === "performance" ? "Valeur De Performance" : formatRank(calc.advancement || calc.rankEventStep || 0)} · Changements ${calc.changes} · Rangs Calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      const baseLine = `${label}${presetText} : Base ${formatRank(calc.base)} · Progression ${calc.rankEventMode === "performance" ? "Valeur De Performance" : formatRank(calc.advancement || calc.rankEventStep || 0)} · Changements ${calc.changes} · Rangs Calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
       return calc.simultaneousMode
         ? `${baseLine} · rangs utilisés ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`
         : baseLine;
@@ -4120,7 +4172,7 @@
       return [
         `Présélection : ${calc.presetLabel || "Libre"}`,
         `Base écrite : ${formatRank(calc.base)}`,
-        `Avancement : ${calc.rankEventMode === "performance" ? "Valeur De Performance" : formatRank(calc.advancement || calc.rankEventStep || 0)}`,
+        `Progression : ${calc.rankEventMode === "performance" ? "Valeur De Performance" : formatRank(calc.advancement || calc.rankEventStep || 0)}`,
         `Changements : ${calc.changes}`,
         `Cartons ignorés : aucun jaune, second jaune ou rouge n’entre dans le scan`,
         `Rang Bas calculé : ${formatRank(calc.low)}`,
@@ -4464,7 +4516,7 @@
     bindCalculatorInput("autoAdvanceRange", "autoAdvanceNumber");
     bindCalculatorInput("autoChangeRange", "autoChangeNumber");
 
-    $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays Officiels"));
+    $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays"));
     $("friendlyPresetBtn").addEventListener("click", () => applyPreset("Pays Amicaux"));
 
     $("simultaneousMode").addEventListener("change", updateAutoCalculator);
