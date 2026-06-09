@@ -4264,6 +4264,161 @@
       }
     }
 
+
+    /* Retouche v22 : bloc de scan plein format, rangs visibles, même taille que le bloc final */
+    .status-box,
+    .status-box.status-done,
+    .status-box:not(.status-done) {
+      min-height: 74px;
+      border-radius: 16px;
+      padding: 10px 12px;
+    }
+
+    .status-box {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-box:not(.status-done) {
+      display: block;
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .08), rgba(255, 54, 93, .06)),
+        rgba(5, 10, 28, .86);
+      border-color: rgba(64, 201, 255, .26);
+    }
+
+    .status-progress-bg {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%);
+      opacity: .18;
+      transition: width .34s ease;
+      pointer-events: none;
+    }
+
+    .status-progress-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 7px;
+    }
+
+    .status-box:not(.status-done) .status-head {
+      min-height: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .status-box:not(.status-done) .status-pulse,
+    .status-box:not(.status-done) .status-message,
+    .status-box:not(.status-done) .status-percent {
+      display: none;
+    }
+
+    .status-box:not(.status-done) .status-ranks {
+      font-size: 11px;
+      line-height: 1.1;
+      font-weight: 950;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.92);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 68%;
+    }
+
+    .status-box:not(.status-done) .status-loading-label {
+      font-size: 10.6px;
+      line-height: 1;
+      font-weight: 950;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.88);
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .status-box:not(.status-done) .status-big-percent {
+      position: absolute;
+      inset: 50% 0 auto 0;
+      transform: translateY(-50%);
+      text-align: center;
+      font-size: clamp(24px, 7vw, 30px);
+      font-weight: 1000;
+      letter-spacing: -.04em;
+      color: rgba(255,255,255,.22);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .status-box .progress-track,
+    .status-box:not(.status-done) .progress-track {
+      height: 6px;
+      margin-top: auto;
+      border-radius: 999px;
+      background: rgba(255,255,255,.14);
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    .status-box .progress-fill,
+    .status-box:not(.status-done) .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%);
+      transition: width .34s ease;
+    }
+
+    .status-box.status-done {
+      min-height: 74px;
+      padding: 10px 12px;
+      display: grid !important;
+      place-items: center;
+    }
+
+    .status-done-title {
+      font-size: clamp(19px, 5.2vw, 23px);
+      letter-spacing: .08em;
+    }
+
+    @media (max-width: 430px) {
+      .status-box,
+      .status-box.status-done,
+      .status-box:not(.status-done) {
+        min-height: 72px;
+        padding: 9px 10px;
+      }
+
+      .status-box:not(.status-done) .status-ranks {
+        font-size: 10.2px;
+        max-width: 62%;
+      }
+
+      .status-box:not(.status-done) .status-loading-label {
+        font-size: 9.6px;
+      }
+
+      .status-box:not(.status-done) .status-big-percent {
+        font-size: clamp(22px, 8vw, 27px);
+      }
+
+      .status-box .progress-track,
+      .status-box:not(.status-done) .progress-track {
+        height: 5px;
+      }
+    }
+
 </style>
 </head>
 
@@ -4540,6 +4695,27 @@
       }
 
       return String(Math.round(number * 10000) / 10000);
+    }
+
+
+
+    function getSelectedRanksText() {
+      const rank1 = String($("rank1")?.value || "").trim();
+      const rank2 = String($("rank2")?.value || "").trim();
+
+      if (rank1 && rank2) {
+        return `RANGS : ${rank1} / ${rank2}`;
+      }
+
+      if (rank1) {
+        return `RANG 1 : ${rank1}`;
+      }
+
+      if (rank2) {
+        return `RANG 2 : ${rank2}`;
+      }
+
+      return "RANGS : —";
     }
 
     function clamp(number, min, max) {
@@ -4932,12 +5108,16 @@
 
       box.classList.remove("status-done", "status-fade-out");
       box.innerHTML = `
-        <div class="status-head">
-          <span class="status-loading-label">SCAN EN COURS</span>
-          <span class="status-percent">${Math.round(safeProgress)}%</span>
-        </div>
-        <div class="progress-track" aria-hidden="true">
-          <div class="progress-fill" style="width:${safeProgress}%"></div>
+        <div class="status-progress-bg" style="width:${safeProgress}%" aria-hidden="true"></div>
+        <div class="status-progress-content">
+          <div class="status-head">
+            <span class="status-ranks">${esc(getSelectedRanksText())}</span>
+            <span class="status-loading-label">SCAN EN COURS</span>
+          </div>
+          <div class="status-big-percent">${Math.round(safeProgress)}%</div>
+          <div class="progress-track" aria-hidden="true">
+            <div class="progress-fill" style="width:${safeProgress}%"></div>
+          </div>
         </div>
       `;
     }
