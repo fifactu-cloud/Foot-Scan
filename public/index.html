@@ -7692,7 +7692,7 @@
           ? "winner-home"
           : "winner-neutral";
       const colors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
-      const confetti = Array.from({ length: 18 }, (_, i) => `
+      const confetti = Array.from({ length: 10 }, (_, i) => `
         <span class="status-confetti-piece dominance-confetti-piece" style="--left:${(i * 31) % 100}%;--x:${((i % 9) - 4) * 8}px;--r:${420 + (i % 10) * 72}deg;--dur:${2280 + (i % 9) * 165}ms;--delay:-${(i % 19) * 120}ms;--c:${colors[i % colors.length]}"></span>
       `).join("");
 
@@ -9077,6 +9077,90 @@
       background: rgba(255,255,255,.12) !important;
       opacity: .88 !important;
       border-radius: 999px !important;
+      box-shadow: none !important;
+    }
+
+  
+
+    /* Retouche v53 : restore event cards separation + restore report primary gradient from v35 */
+    #addReportBtn,
+    #addReportBtn.report-btn.primary,
+    #addReportBtn.report-btn.primary:enabled {
+      position: relative !important;
+      overflow: hidden !important;
+      color: #ffffff !important;
+      border-color: rgba(56,189,248,.38) !important;
+      background: linear-gradient(135deg, #38bdf8 0%, #2563eb 42%, #ff365d 100%) !important;
+      background-size: 180% 180% !important;
+      animation: derbySweep 5.5s ease infinite !important;
+      box-shadow: 0 18px 42px rgba(56, 189, 248, 0.20), 0 14px 34px rgba(255, 54, 93, 0.18) !important;
+      filter: none !important;
+      isolation: isolate !important;
+    }
+
+    #addReportBtn::before,
+    #addReportBtn::after,
+    #addReportBtn .report-btn-sheen,
+    #addReportBtn .report-btn-glow {
+      content: none !important;
+      display: none !important;
+    }
+
+    .dominance-celebration .dominance-confetti {
+      opacity: .12 !important;
+    }
+
+    .dominance-celebration .dominance-confetti-piece {
+      opacity: .14 !important;
+      filter: drop-shadow(0 0 2px rgba(255,255,255,.04)) !important;
+    }
+
+    .event-list {
+      display: grid !important;
+      gap: 12px !important;
+    }
+
+    .event-row,
+    .event-row.event-rich-row {
+      grid-template-columns: auto minmax(0, 1fr) !important;
+      align-items: start !important;
+      gap: 12px !important;
+      margin: 0 !important;
+      padding: 13px 14px !important;
+      border-radius: 18px !important;
+      border: 1px solid rgba(148,163,184,.22) !important;
+      background: linear-gradient(160deg, rgba(56,189,248,.07), rgba(255,54,93,.05)), rgba(6,10,28,.82) !important;
+      background-clip: padding-box !important;
+      position: relative !important;
+      overflow: hidden !important;
+    }
+
+    .event-row::before,
+    .event-row.event-rich-row::before {
+      content: "" !important;
+      position: absolute !important;
+      left: 0 !important;
+      top: 10px !important;
+      bottom: 10px !important;
+      width: 4px !important;
+      border-radius: 999px !important;
+      background: linear-gradient(180deg, #38bdf8 0%, rgba(168,85,247,.55) 52%, #ff4d6d 100%) !important;
+      opacity: 1 !important;
+      pointer-events: none !important;
+    }
+
+    .event-row + .event-row,
+    .event-row.event-rich-row + .event-row.event-rich-row {
+      border-top: none !important;
+      padding-top: 13px !important;
+      margin-top: 0 !important;
+    }
+
+    .event-break--match {
+      height: 1px !important;
+      margin: 0 14px !important;
+      border-radius: 999px !important;
+      background: rgba(255,255,255,.18) !important;
       box-shadow: none !important;
     }
 
