@@ -5652,6 +5652,104 @@
       }
     }
 
+
+    /* Retouche v39 : zone des rangs / auto-control placement / dominance crown / VS gradient */
+    .auto-control {
+      padding: 10px 11px 10px !important;
+      gap: 8px !important;
+    }
+
+    .auto-control-top {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) auto !important;
+      align-items: center !important;
+      gap: 10px !important;
+    }
+
+    .auto-control-title {
+      display: flex !important;
+      align-items: center !important;
+      min-height: 100%;
+      margin: 0 !important;
+      font-size: 16px !important;
+      line-height: 1.02 !important;
+      letter-spacing: -0.01em !important;
+      color: #eef2ff !important;
+    }
+
+    .auto-number {
+      align-self: center !important;
+      justify-self: end !important;
+      width: 62px !important;
+      min-width: 62px !important;
+      height: 36px !important;
+      padding: 6px 6px !important;
+      margin: 0 !important;
+      text-align: center !important;
+    }
+
+    .stat-title {
+      text-transform: uppercase !important;
+      letter-spacing: .08em !important;
+    }
+
+    .dominance-label {
+      font-size: clamp(13px, 3.6vw, 16px) !important;
+      line-height: 1.16 !important;
+      letter-spacing: .12em !important;
+    }
+
+    .dominance-team {
+      margin-top: 6px !important;
+    }
+
+    .summary-title {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-wrap: wrap !important;
+      gap: .26em !important;
+    }
+
+    .summary-vs-gradient {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 0 !important;
+      font-weight: 1000 !important;
+      letter-spacing: -.04em !important;
+      line-height: 1 !important;
+    }
+
+    .summary-vs-v {
+      color: #38bdf8 !important;
+      text-shadow: 0 0 14px rgba(56,189,248,.16) !important;
+    }
+
+    .summary-vs-s {
+      color: #ff4d9d !important;
+      text-shadow: 0 0 14px rgba(255,77,157,.16) !important;
+    }
+
+    @media (max-width: 430px) {
+      .auto-control-top {
+        gap: 8px !important;
+      }
+      .auto-control-title {
+        font-size: 15px !important;
+      }
+      .auto-number {
+        width: 58px !important;
+        min-width: 58px !important;
+        height: 34px !important;
+      }
+      .summary-title {
+        gap: .2em !important;
+      }
+      .dominance-label {
+        font-size: 12px !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -6263,7 +6361,7 @@
     function renderDominance(result) {
       const dominance = getDominance(result);
       const isEvolution = dominance.mode === "evolution";
-      const title = isEvolution ? "Gagnant Par Évolution" : "Gagnant Par Moyenne Des Rangs";
+      const title = isEvolution ? "Gagnant Par Évolution" : "👑 Gagnant Par Moyenne Des Rangs";
 
       if (dominance.type === "none") {
         return `
@@ -6287,7 +6385,7 @@
 
       const meta = isEvolution
         ? `Évolution : ${esc(formatValue(dominance.metric))} · Zone ${esc(formatValue(dominance.zoneAverage))} → Rangs ${esc(formatValue(dominance.rankAverage))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`
-        : `Moyenne dominante : ${esc(formatValue(dominance.average))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`;
+        : `Moyenne Dominante : ${esc(formatValue(dominance.average))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`;
 
       return `
         <div class="dominance-box">
@@ -6710,7 +6808,7 @@
         <section class="summary">
           <div class="summary-head">
             <div class="summary-label">Résumé rapide</div>
-            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} VS ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="summary-vs-gradient" aria-label="VS"><span class="summary-vs-v">V</span><span class="summary-vs-s">S</span></span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
             <div class="summary-label">Mode scan : ${esc(result.scanModeLabel || (result.simultaneousMode ? "Simultané match par match / minute par minute" : "Standard"))}</div>
           </div>
 
@@ -6926,7 +7024,7 @@
           <div class="zone-card">
             <div class="stat-header">
               <div>
-                <div class="stat-title">Zone des rangs attribuée à ${esc(teamName)}</div>
+                <div class="stat-title">ZONE DES RANGS</div>
                 <div class="stat-subtitle">Événements attribués à ${esc(teamName)} entre le Rang Bas et le Rang Haut final.</div>
               </div>
               <div class="stat-badge">Équipe</div>
@@ -6949,7 +7047,7 @@
         <div class="zone-card">
           <div class="stat-header">
             <div>
-              <div class="stat-title">Zone des rangs attribuée à ${esc(teamName)}</div>
+              <div class="stat-title">ZONE DES RANGS</div>
               <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} Événements · Progression Totale ${esc(formatRank(stats.totalQuantity || 0))} · ${esc(zoneAdvancementLabel(stats))} · Zone Rang Bas → Rang Haut Final.</div>
             </div>
             <div class="stat-badge">Équipe</div>
@@ -7189,7 +7287,7 @@
     function dominanceLines(result, compact = false) {
       const dominance = getDominance(result);
       const isEvolution = dominance.mode === "evolution";
-      const title = isEvolution ? "Gagnant Par Évolution" : "Gagnant Par Moyenne Des Rangs";
+      const title = isEvolution ? "Gagnant Par Évolution" : "👑 Gagnant Par Moyenne Des Rangs";
 
       if (dominance.type === "none") {
         return [`${title} : indisponible`];
