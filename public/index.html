@@ -7011,7 +7011,68 @@
       border-radius: 999px !important;
     }
 
-</style>
+
+
+    /* Retouche v52 : bouton rapport comme scanner, confetti gagnant adoucis, events trouvés nettoyés */
+    #addReportBtn,
+    #addReportBtn.report-btn.primary,
+    #addReportBtn.report-btn.primary:enabled {
+      position: relative !important;
+      overflow: hidden !important;
+      color: #ffffff !important;
+      background: linear-gradient(90deg, #46cfff 0%, #59b7ff 28%, #5f8dff 58%, #b46dff 78%, #ff5c9c 100%) !important;
+      background-size: 220% 100% !important;
+      background-position: 0% 50% !important;
+      animation: reportBtnGradientV52 2.45s linear infinite !important;
+      border-color: rgba(94,164,255,.38) !important;
+      box-shadow: 0 18px 40px rgba(70,207,255,.18), 0 14px 32px rgba(255,92,156,.14) !important;
+      filter: none !important;
+    }
+
+    #addReportBtn::before,
+    #addReportBtn::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    @keyframes reportBtnGradientV52 {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 220% 50%; }
+    }
+
+    .dominance-celebration .dominance-confetti {
+      opacity: .20 !important;
+    }
+
+    .dominance-celebration .dominance-confetti-piece {
+      opacity: .22 !important;
+      filter: drop-shadow(0 0 2px rgba(255,255,255,.08)) !important;
+    }
+
+    .event-list {
+      gap: 0 !important;
+    }
+
+    .event-row.event-rich-row {
+      margin-top: 0 !important;
+      background: linear-gradient(160deg, rgba(56,189,248,.07), rgba(255,54,93,.04)), rgba(6,10,28,.74) !important;
+      background-clip: padding-box !important;
+    }
+
+    .event-row.event-rich-row + .event-row.event-rich-row {
+      margin-top: 0 !important;
+    }
+
+    .event-break--match {
+      height: 1px !important;
+      margin: 10px 12px 10px !important;
+      background: rgba(255,255,255,.12) !important;
+      opacity: .88 !important;
+      border-radius: 999px !important;
+      box-shadow: none !important;
+    }
+
+  </style>
 </head>
 
 <body>
@@ -7631,7 +7692,7 @@
           ? "winner-home"
           : "winner-neutral";
       const colors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
-      const confetti = Array.from({ length: 54 }, (_, i) => `
+      const confetti = Array.from({ length: 18 }, (_, i) => `
         <span class="status-confetti-piece dominance-confetti-piece" style="--left:${(i * 31) % 100}%;--x:${((i % 9) - 4) * 8}px;--r:${420 + (i % 10) * 72}deg;--dur:${2280 + (i % 9) * 165}ms;--delay:-${(i % 19) * 120}ms;--c:${colors[i % colors.length]}"></span>
       `).join("");
 
@@ -8956,6 +9017,67 @@
         transform: translateY(-1px);
         filter: brightness(1.04);
       }
+    }
+
+  
+
+    /* Retouche v52 : bouton rapport comme scanner, confetti gagnant adoucis, events trouvés nettoyés */
+    #addReportBtn,
+    #addReportBtn.report-btn.primary,
+    #addReportBtn.report-btn.primary:enabled {
+      position: relative !important;
+      overflow: hidden !important;
+      color: #ffffff !important;
+      background: linear-gradient(90deg, #46cfff 0%, #59b7ff 28%, #5f8dff 58%, #b46dff 78%, #ff5c9c 100%) !important;
+      background-size: 220% 100% !important;
+      background-position: 0% 50% !important;
+      animation: reportBtnGradientV52 2.45s linear infinite !important;
+      border-color: rgba(94,164,255,.38) !important;
+      box-shadow: 0 18px 40px rgba(70,207,255,.18), 0 14px 32px rgba(255,92,156,.14) !important;
+      filter: none !important;
+    }
+
+    #addReportBtn::before,
+    #addReportBtn::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    @keyframes reportBtnGradientV52 {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 220% 50%; }
+    }
+
+    .dominance-celebration .dominance-confetti {
+      opacity: .20 !important;
+    }
+
+    .dominance-celebration .dominance-confetti-piece {
+      opacity: .22 !important;
+      filter: drop-shadow(0 0 2px rgba(255,255,255,.08)) !important;
+    }
+
+    .event-list {
+      gap: 0 !important;
+    }
+
+    .event-row.event-rich-row {
+      margin-top: 0 !important;
+      background: linear-gradient(160deg, rgba(56,189,248,.07), rgba(255,54,93,.04)), rgba(6,10,28,.74) !important;
+      background-clip: padding-box !important;
+    }
+
+    .event-row.event-rich-row + .event-row.event-rich-row {
+      margin-top: 0 !important;
+    }
+
+    .event-break--match {
+      height: 1px !important;
+      margin: 10px 12px 10px !important;
+      background: rgba(255,255,255,.12) !important;
+      opacity: .88 !important;
+      border-radius: 999px !important;
+      box-shadow: none !important;
     }
 
   </style>
