@@ -5186,6 +5186,90 @@
       }
     }
 
+
+    /* Retouche v33 : matchs utilisés + détails + compteur détails */
+    .match-row {
+      grid-template-columns: auto minmax(0, 1fr) !important;
+      align-items: stretch !important;
+    }
+
+    .match-row > :last-child {
+      grid-column: auto !important;
+      justify-self: stretch !important;
+    }
+
+    .match-number-badge {
+      width: 42px !important;
+      min-width: 42px !important;
+      height: auto !important;
+      min-height: 58px !important;
+      padding: 0 !important;
+      overflow: hidden;
+      display: grid !important;
+      grid-template-rows: 1fr 1px 1fr;
+      align-items: center;
+      justify-items: center;
+      border-radius: 14px !important;
+    }
+
+    .match-index,
+    .match-count-mini {
+      width: 100%;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+      font-family: inherit;
+      font-weight: 950;
+    }
+
+    .match-index {
+      font-size: 13px;
+      color: rgba(226, 232, 255, .82);
+    }
+
+    .match-count-mini {
+      grid-row: 3;
+      font-size: 13px;
+      color: #ffffff;
+      background: linear-gradient(135deg, rgba(64,201,255,.13), rgba(255,59,114,.10));
+    }
+
+    .match-number-badge::before {
+      content: "";
+      grid-row: 2;
+      width: 70%;
+      height: 1px;
+      background: rgba(255,255,255,.14);
+    }
+
+    details.clean summary {
+      justify-content: flex-start !important;
+      gap: 8px !important;
+    }
+
+    details.clean summary .count-pill {
+      margin-left: auto !important;
+      margin-right: 2px !important;
+    }
+
+    details.clean summary::after {
+      margin-left: 0 !important;
+      flex: 0 0 auto;
+    }
+
+    @media (max-width: 430px) {
+      .match-number-badge {
+        width: 40px !important;
+        min-width: 40px !important;
+        min-height: 56px !important;
+      }
+
+      .match-index,
+      .match-count-mini {
+        font-size: 12.5px;
+      }
+    }
+
 </style>
 </head>
 
@@ -5515,7 +5599,7 @@
       }
 
       const percent = Math.round(weight * 1000) / 10;
-      return ` · poids ${percent}%`;
+      return ` · Poids ${percent}%`;
     }
 
     function readCalculatorValues(prefix) {
@@ -5937,7 +6021,7 @@
           const fillNode = box.querySelector('.progress-fill');
           const bgNode = box.querySelector('.status-progress-bg');
           animateStatusProgress(box, 100);
-          box._doneTimer = window.setTimeout(renderDoneStatus, 1500);
+          box._doneTimer = window.setTimeout(renderDoneStatus, 2600);
           return;
         }
         renderDoneStatus();
@@ -6145,7 +6229,7 @@
 
           renderResult(resultWithOptions);
           setStatus("Scan Terminé", 100);
-          launchFinishFx();
+          window.setTimeout(launchFinishFx, 2600);
           $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter L’Analyse Actuelle” pour l’enregistrer dans le rapport.";
           finishScan();
           return;
@@ -6279,9 +6363,9 @@
       if ((source?.rankMode === "quantity" || source?.rankMode === "quantity_exact") && source?.cumulativeEnd != null) {
         const start = formatRank(source.cumulativeStart || 0);
         const end = formatRank(source.cumulativeEnd);
-        const quantity = source.rankQuantity != null ? ` · q ${formatRank(source.rankQuantity)}` : "";
-        const exact = source.rankIndexExact != null ? ` · pos exacte ${formatRank(source.rankIndexExact)}` : "";
-        return `${index ? `${index} · ` : ""}cumul ${start}→${end}${quantity}${exact} · `;
+        const quantity = source.rankQuantity != null ? ` · Q ${formatRank(source.rankQuantity)}` : "";
+        const exact = source.rankIndexExact != null ? ` · Pos Exacte ${formatRank(source.rankIndexExact)}` : "";
+        return `${index ? `${index} · ` : ""}Cumul ${start}→${end}${quantity}${exact} · `;
       }
 
       return index ? `${index} · ` : "";
@@ -6521,14 +6605,15 @@
 
       const matchRows = matchesUsed.map((match, index) => `
         <div class="match-row">
-          <div class="row-number">${index + 1}</div>
+          <div class="row-number match-number-badge">
+            <span class="match-index">${index + 1}</span>
+            <span class="match-count-mini">${esc(match.count)}</span>
+          </div>
 
           <div class="row-main">
             <div class="row-title">${esc(match.label)}</div>
             <div class="row-sub">${esc(match.competition || "Toutes compétitions")}</div>
           </div>
-
-          <div class="row-score neutral">${esc(match.count)}</div>
         </div>
       `).join("");
 
