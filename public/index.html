@@ -7262,6 +7262,79 @@
       margin: 8px auto 6px auto !important;
     }
 
+  
+
+    /* Retouche v54d : dernière passe ultra-minimale */
+
+    /* Fluidité générale légèrement améliorée */
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body,
+    .app,
+    .team-card,
+    .rank-card,
+    .zone-card,
+    .report-panel,
+    .summary,
+    .match-row,
+    .event-row,
+    .source-item,
+    .report-btn,
+    .scan-btn,
+    details.clean summary,
+    .bar-box summary {
+      -webkit-font-smoothing: antialiased;
+      backface-visibility: hidden;
+      transform: translateZ(0);
+    }
+
+    /* Bouton AJOUTER : nouvelle tentative fidèle au rendu v39 */
+    #addReportBtn,
+    #addReportBtn.report-btn.primary,
+    #addReportBtn.report-btn.primary:enabled {
+      min-height: 48px !important;
+      border-radius: 16px !important;
+      padding: 11px 10px !important;
+      font-size: 13px !important;
+      font-weight: 950 !important;
+      letter-spacing: -0.006em !important;
+      text-transform: uppercase !important;
+      color: #ffffff !important;
+      border: 1px solid rgba(56,189,248,.38) !important;
+      background-image: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
+      background-color: transparent !important;
+      background-size: 190% 190% !important;
+      background-position: 0% 50% !important;
+      animation: derbySweep 5.5s ease infinite !important;
+      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 59, 114, .14) !important;
+      filter: none !important;
+      isolation: auto !important;
+      will-change: background-position, transform, filter !important;
+    }
+
+    #addReportBtn::before,
+    #addReportBtn::after,
+    #addReportBtn .report-btn-sheen,
+    #addReportBtn .report-btn-glow,
+    .report-btn.primary::before,
+    .report-btn.primary::after {
+      display: none !important;
+      content: none !important;
+    }
+
+    /* Lignes de séparation : taille identique partout */
+    .source-sep--event {
+      width: calc(100% - 68px) !important;
+      margin: 8px 10px 6px 58px !important;
+      height: 1px !important;
+      background: rgba(255,255,255,.12) !important;
+      opacity: .9 !important;
+      border-radius: 999px !important;
+      box-shadow: none !important;
+    }
+
   </style>
 </head>
 
