@@ -7421,6 +7421,101 @@
       box-shadow: none !important;
     }
 
+
+    /* Retouche v54f : correctifs demandés */
+    :root {
+      --scan-shared-gradient-v54f: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%);
+    }
+
+    /* 1) Zone des rangs : positif = bleu, négatif = rose */
+    .zone-card .stat-title,
+    .zone-card .stat-number.positive {
+      color: #40c9ff !important;
+    }
+
+    .zone-card .stat-number.negative {
+      color: #ff4d9d !important;
+    }
+
+    .zone-card .stat-number.neutral {
+      color: #ffffff !important;
+    }
+
+    /* 2) Lignes de séparation plus longues, plus proches des bords */
+    .source-list::before,
+    .source-sep--event,
+    .source-sep--match {
+      width: calc(100% - 8px) !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+
+    .source-list::before {
+      margin-top: 0 !important;
+      margin-bottom: 13px !important;
+    }
+
+    .source-sep--event,
+    .source-sep--match {
+      margin-top: 9px !important;
+      margin-bottom: 7px !important;
+    }
+
+    .event-break,
+    .event-break--match {
+      margin-left: 4px !important;
+      margin-right: 4px !important;
+    }
+
+    /* 3) Bouton AJOUTER : exactement le même rendu vivant que SCANNER */
+    #addReportBtn,
+    #addReportBtn.report-btn.primary,
+    #addReportBtn.report-btn.primary:enabled,
+    .report-btn.primary {
+      background: var(--scan-shared-gradient-v54f) !important;
+      background-size: 190% 190% !important;
+      background-position: 0% 50% !important;
+      animation: derbySweep 5.5s ease infinite !important;
+      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 59, 114, .14) !important;
+      border-color: rgba(56,189,248,.38) !important;
+      color: #ffffff !important;
+      filter: none !important;
+      will-change: background-position, transform, filter !important;
+    }
+
+    #addReportBtn::before,
+    #addReportBtn::after,
+    .report-btn.primary::before,
+    .report-btn.primary::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    /* 4) Confetti sur toute la page au scan terminé */
+    .finish-fx {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 2147483647 !important;
+      pointer-events: none !important;
+      overflow: hidden !important;
+      opacity: 1 !important;
+    }
+
+    .finish-fx::before {
+      opacity: 1 !important;
+    }
+
+    .confetti-piece {
+      width: 8px !important;
+      height: 14px !important;
+      opacity: .96 !important;
+      box-shadow: 0 0 10px rgba(255,255,255,.16) !important;
+    }
+
+    .firework-dot {
+      opacity: 1 !important;
+    }
+
   </style>
 </head>
 
@@ -8406,7 +8501,7 @@
 
           renderResult(resultWithOptions);
           setStatus("Scan Terminé", 100);
-          window.setTimeout(launchFinishFx, 3400);
+          window.setTimeout(launchFinishFx, 150);
           $("reportHint").textContent = "Analyse prête. Appuie sur “AJOUTER L’ANALYSE ACTUELLE” pour l’enregistrer dans le rapport.";
           finishScan();
           return;
