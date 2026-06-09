@@ -4113,10 +4113,16 @@
     }
 
 
-    /* Retouche v14 : même fondu FOOTSCAN en haut et en hero */
+    /* Retouche v15 : FOOTSCAN identique en haut et dans le hero */
+    :root {
+      --footscan-gradient: linear-gradient(92deg, #ffffff 0%, #eaf6ff 14%, #8fdcff 32%, #6e7bff 50%, #b05cff 66%, #ff4d9d 82%, #ff365d 100%);
+    }
+
     .brand-title,
     .home-title {
-      background: linear-gradient(92deg, #ffffff 0%, #dff4ff 18%, #7dd3fc 38%, #8b5cf6 66%, #ff4d9d 100%) !important;
+      background: var(--footscan-gradient) !important;
+      background-size: 100% 100% !important;
+      background-repeat: no-repeat !important;
       -webkit-background-clip: text !important;
       background-clip: text !important;
       -webkit-text-fill-color: transparent !important;
@@ -4125,11 +4131,11 @@
     }
 
     .brand-title {
-      filter: drop-shadow(0 8px 20px rgba(59, 130, 246, .16)) drop-shadow(0 8px 18px rgba(236, 72, 153, .10));
+      filter: drop-shadow(0 8px 20px rgba(59, 130, 246, .16)) drop-shadow(0 8px 18px rgba(236, 72, 153, .12));
     }
 
     .home-title {
-      filter: drop-shadow(0 16px 34px rgba(59, 130, 246, .14)) drop-shadow(0 18px 36px rgba(236, 72, 153, .12));
+      filter: drop-shadow(0 16px 34px rgba(59, 130, 246, .14)) drop-shadow(0 18px 36px rgba(236, 72, 153, .14));
     }
 
     .brand-title span,
@@ -4137,6 +4143,142 @@
       -webkit-text-fill-color: inherit !important;
       color: inherit !important;
       text-shadow: none !important;
+    }
+
+    /* Retouche v16 : curseurs + rangs plus violet/rose/rouge */
+    :root {
+      --accent-warm: linear-gradient(90deg, #ff4d9d 0%, #ff3b72 24%, #c084fc 56%, #ff86a4 78%, #ffd5e5 100%);
+      --accent-warm-soft: linear-gradient(135deg, rgba(255, 77, 157, .16), rgba(192, 132, 252, .12) 54%, rgba(255, 59, 114, .14));
+      --accent-warm-track: linear-gradient(90deg, rgba(255, 77, 157, .92) 0%, rgba(255, 59, 114, .95) 30%, rgba(192, 132, 252, .94) 62%, rgba(255, 166, 196, .98) 100%);
+    }
+
+    input[type="range"] {
+      accent-color: #ff4d9d;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 10px !important;
+      border-radius: 999px !important;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,.10)),
+        rgba(255,255,255,.18) !important;
+      box-shadow:
+        inset 0 1px 2px rgba(255,255,255,.14),
+        inset 0 -1px 2px rgba(0,0,0,.28),
+        0 0 0 1px rgba(255,255,255,.08) !important;
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 10px !important;
+      border-radius: 999px !important;
+      background: rgba(255,255,255,.18) !important;
+      box-shadow:
+        inset 0 1px 2px rgba(255,255,255,.14),
+        inset 0 -1px 2px rgba(0,0,0,.28),
+        0 0 0 1px rgba(255,255,255,.08) !important;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      width: 26px !important;
+      height: 26px !important;
+      margin-top: -8px !important;
+      border-radius: 50% !important;
+      border: 2px solid rgba(255,255,255,.92) !important;
+      background:
+        radial-gradient(circle at 35% 32%, rgba(255,255,255,.42), transparent 28%),
+        linear-gradient(135deg, #ff4d9d 0%, #ff3b72 30%, #c084fc 72%, #ffd1e1 100%) !important;
+      box-shadow:
+        0 0 0 4px rgba(255, 77, 157, .10),
+        0 8px 18px rgba(255, 59, 114, .26),
+        0 4px 10px rgba(192, 132, 252, .22) !important;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 26px !important;
+      height: 26px !important;
+      border-radius: 50% !important;
+      border: 2px solid rgba(255,255,255,.92) !important;
+      background:
+        linear-gradient(135deg, #ff4d9d 0%, #ff3b72 30%, #c084fc 72%, #ffd1e1 100%) !important;
+      box-shadow:
+        0 0 0 4px rgba(255, 77, 157, .10),
+        0 8px 18px rgba(255, 59, 114, .26),
+        0 4px 10px rgba(192, 132, 252, .22) !important;
+    }
+
+    /* Remplissage coloré géré par JS via --fill */
+    input[type="range"].warm-slider::-webkit-slider-runnable-track,
+    .slider-wrap input[type="range"]::-webkit-slider-runnable-track {
+      background:
+        linear-gradient(90deg,
+          #ff4d9d 0%,
+          #ff3b72 28%,
+          #c084fc 65%,
+          #ffd5e5 100%) 0/var(--fill, 50%) 100% no-repeat,
+        linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,.10)),
+        rgba(255,255,255,.18) !important;
+    }
+
+    input[type="range"].warm-slider::-moz-range-track,
+    .slider-wrap input[type="range"]::-moz-range-track {
+      background:
+        linear-gradient(90deg,
+          #ff4d9d 0%,
+          #ff3b72 28%,
+          #c084fc 65%,
+          #ffd5e5 100%) 0/var(--fill, 50%) 100% no-repeat,
+        rgba(255,255,255,.18) !important;
+    }
+
+    .rank-card,
+    .rank-box,
+    .rank-result,
+    .rank-display,
+    .rank-value-box {
+      background:
+        radial-gradient(circle at 18% 0%, rgba(255, 77, 157, .12), transparent 34%),
+        radial-gradient(circle at 100% 100%, rgba(192, 132, 252, .12), transparent 42%),
+        linear-gradient(135deg, rgba(255, 77, 157, .08), rgba(192, 132, 252, .08)),
+        rgba(8, 10, 28, .72) !important;
+      border-color: rgba(255, 125, 169, .20) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.04),
+        0 12px 28px rgba(0,0,0,.18) !important;
+    }
+
+    .rank-card .rank-number,
+    .rank-box .rank-number,
+    .rank-result .rank-number,
+    .rank-display .rank-number,
+    .rank-value-box .rank-number,
+    .rank-value,
+    .rank-big,
+    .rang-big,
+    .rank-output,
+    .range-output,
+    .rank-val {
+      background: var(--accent-warm) !important;
+      -webkit-background-clip: text !important;
+      background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      color: transparent !important;
+      text-shadow: none !important;
+      filter: drop-shadow(0 10px 22px rgba(255, 59, 114, .10));
+    }
+
+    @media (max-width: 430px) {
+      input[type="range"]::-webkit-slider-thumb {
+        width: 24px !important;
+        height: 24px !important;
+        margin-top: -7px !important;
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 24px !important;
+        height: 24px !important;
+      }
     }
 
 </style>
