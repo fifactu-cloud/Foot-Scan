@@ -6556,15 +6556,16 @@
 
     .notice-title.notice-bubble {
       display: grid !important;
-      grid-template-columns: 42px minmax(0, 1fr) !important;
+      grid-template-columns: 40px minmax(0, 1fr) !important;
       align-items: center !important;
       width: 100% !important;
-      gap: 12px !important;
-      padding: 14px 18px 14px 14px !important;
+      gap: 10px !important;
+      padding: 14px 16px 14px 12px !important;
       white-space: nowrap !important;
-      font-size: clamp(12.6px, 3.65vw, 15px) !important;
-      letter-spacing: .01em !important;
-      line-height: 1.05 !important;
+      font-size: clamp(13.2px, 3.82vw, 15.6px) !important;
+      font-weight: 1000 !important;
+      letter-spacing: .012em !important;
+      line-height: 1.04 !important;
     }
 
     .notice-title.notice-bubble > span:last-child {
@@ -6693,15 +6694,15 @@
 
     @media (max-width: 430px) {
       .notice-title.notice-bubble {
-        grid-template-columns: 38px minmax(0, 1fr) !important;
-        gap: 10px !important;
-        padding: 13px 14px 13px 12px !important;
-        font-size: 12.8px !important;
+        grid-template-columns: 36px minmax(0, 1fr) !important;
+        gap: 9px !important;
+        padding: 13px 13px 13px 11px !important;
+        font-size: 13.2px !important;
       }
       .notice-inline-icon {
-        width: 31px !important;
-        height: 31px !important;
-        flex-basis: 31px !important;
+        width: 30px !important;
+        height: 30px !important;
+        flex-basis: 30px !important;
         font-size: 18px !important;
       }
       .dominance-celebration::before {
@@ -6862,6 +6863,142 @@
         padding: 11px 13px !important;
         border-radius: 15px !important;
       }
+    }
+
+
+    /* Retouche v49 : bouton rapport animé comme scanner + confetti visibles dans le bloc gagnant */
+    #addReportBtn.report-btn.primary,
+    #addReportBtn.report-btn.primary:enabled,
+    #addReportBtn {
+      position: relative !important;
+      overflow: hidden !important;
+      isolation: isolate !important;
+      background: linear-gradient(135deg, #40c9ff 0%, #5d77ff 46%, #ff4f9a 100%) !important;
+      background-size: 205% 205% !important;
+      background-position: 0% 50% !important;
+      animation: derbySweep 3.45s ease-in-out infinite, reportBtnPulseV49 3.45s ease-in-out infinite !important;
+      border-color: rgba(93,119,255,.34) !important;
+      box-shadow: 0 18px 38px rgba(64, 201, 255, .20), 0 14px 30px rgba(255, 79, 154, .16) !important;
+      color: #ffffff !important;
+      will-change: background-position, filter, transform !important;
+    }
+
+    #addReportBtn::before {
+      content: "" !important;
+      display: block !important;
+      position: absolute !important;
+      inset: 0 !important;
+      background: linear-gradient(112deg, transparent 0%, transparent 28%, rgba(255,255,255,.22) 46%, transparent 62%, transparent 100%) !important;
+      transform: translateX(-126%) !important;
+      animation: reportBtnSheenV49 2.95s ease-in-out infinite !important;
+      pointer-events: none !important;
+      z-index: 1 !important;
+    }
+
+    #addReportBtn > * {
+      position: relative !important;
+      z-index: 2 !important;
+    }
+
+    @keyframes reportBtnPulseV49 {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.09); }
+    }
+
+    @keyframes reportBtnSheenV49 {
+      0%, 12% { transform: translateX(-126%); opacity: 0; }
+      20% { opacity: .95; }
+      52% { transform: translateX(126%); opacity: .92; }
+      100% { transform: translateX(126%); opacity: 0; }
+    }
+
+    .dominance-celebration {
+      position: relative !important;
+      overflow: hidden !important;
+      isolation: isolate !important;
+    }
+
+    .dominance-celebration::before {
+      font-size: 72px !important;
+      opacity: .085 !important;
+      transform: translate(-50%, -56%) !important;
+      z-index: 0 !important;
+    }
+
+    .dominance-celebration .dominance-confetti {
+      position: absolute !important;
+      inset: 0 !important;
+      display: block !important;
+      overflow: hidden !important;
+      opacity: 1 !important;
+      z-index: 1 !important;
+      mix-blend-mode: screen !important;
+      pointer-events: none !important;
+    }
+
+    .dominance-celebration .dominance-confetti-piece {
+      width: 8px !important;
+      height: 15px !important;
+      top: -20px !important;
+      border-radius: 4px !important;
+      opacity: .98 !important;
+      animation: statusConfettiLoopV8 var(--dur, 2350ms) linear infinite !important;
+      animation-delay: var(--delay, 0ms) !important;
+      filter: drop-shadow(0 0 4px rgba(255,255,255,.16)) !important;
+    }
+
+    .dominance-celebration > *:not(.status-confetti) {
+      position: relative !important;
+      z-index: 3 !important;
+    }
+
+    .dominance-team,
+    .dominance-meta,
+    .dominance-meta-centered {
+      position: relative !important;
+      z-index: 3 !important;
+    }
+
+
+    /* Retouche v50 : séparations intelligentes dans les événements */
+    .source-list {
+      border-top: 1px solid rgba(255,255,255,.16) !important;
+      padding-top: 13px !important;
+    }
+
+    .source-title {
+      font-weight: 700 !important;
+      color: var(--text) !important;
+      letter-spacing: -0.01em !important;
+    }
+
+    .source-sep {
+      width: 100% !important;
+      justify-self: stretch !important;
+      border-radius: 999px !important;
+      pointer-events: none !important;
+    }
+
+    .source-sep--event {
+      height: 1px !important;
+      margin: 2px 0 0 38px !important;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.03) 0%, rgba(255,255,255,.085) 22%, rgba(255,255,255,.11) 50%, rgba(255,255,255,.085) 78%, transparent 100%) !important;
+      opacity: .82 !important;
+    }
+
+    .source-sep--match {
+      height: 2px !important;
+      margin: 4px 0 2px 0 !important;
+      background: linear-gradient(90deg, transparent 0%, rgba(92,214,255,.18) 8%, rgba(255,255,255,.16) 48%, rgba(255,111,170,.18) 92%, transparent 100%) !important;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.015), 0 0 12px rgba(0,0,0,.08) !important;
+      opacity: .95 !important;
+    }
+
+    .event-break--match {
+      height: 1px !important;
+      margin: 8px 8px 4px !important;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.08) 10%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.08) 90%, transparent 100%) !important;
+      opacity: .95 !important;
     }
 
 </style>
@@ -7484,8 +7621,8 @@
           ? "winner-home"
           : "winner-neutral";
       const colors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
-      const confetti = Array.from({ length: 40 }, (_, i) => `
-        <span class="status-confetti-piece dominance-confetti-piece" style="--left:${(i * 31) % 100}%;--x:${((i % 9) - 4) * 8}px;--r:${420 + (i % 10) * 72}deg;--dur:${2400 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${colors[i % colors.length]}"></span>
+      const confetti = Array.from({ length: 54 }, (_, i) => `
+        <span class="status-confetti-piece dominance-confetti-piece" style="--left:${(i * 31) % 100}%;--x:${((i % 9) - 4) * 8}px;--r:${420 + (i % 10) * 72}deg;--dur:${2280 + (i % 9) * 165}ms;--delay:-${(i % 19) * 120}ms;--c:${colors[i % colors.length]}"></span>
       `).join("");
 
       if (dominance.type === "none") {
@@ -8012,14 +8149,21 @@
       if (sources.length) {
         html += `<div class="source-list">`;
 
-        for (const source of sources) {
+        for (let i = 0; i < sources.length; i += 1) {
+          const source = sources[i];
+          const previous = i > 0 ? sources[i - 1] : null;
+          const sameMatch = previous && String(previous.match || "") === String(source.match || "");
           const rankText = rankSourceText(source);
+          const separator = !previous
+            ? ""
+            : `<div class="source-sep ${sameMatch ? "source-sep--event" : "source-sep--match"}" aria-hidden="true"></div>`;
 
           html += `
+            ${separator}
             <div class="source-item">
               <div class="event-icon">${esc(eventIcon(source))}</div>
               <div>
-                <div>${esc(source.match)}</div>
+                <div class="source-title">${esc(source.match)}</div>
                 <div class="source-small">
                   ${esc(rankText)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
                 </div>
@@ -8212,8 +8356,9 @@
         const campClass = sideCampClass(event);
         const campText = sideText(event);
         const label = LABELS[event.type] || event.type || "Événement";
-        const separator = index > 0
-          ? `<div class="event-break" aria-hidden="true"></div>`
+        const previous = index > 0 ? events[index - 1] : null;
+        const separator = previous && String(previous.match || "") !== String(event.match || "")
+          ? `<div class="event-break event-break--match" aria-hidden="true"></div>`
           : "";
 
         return `
