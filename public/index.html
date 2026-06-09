@@ -5187,7 +5187,7 @@
     }
 
 
-    /* Retouche v33 : matchs utilisés + détails + compteur détails */
+    /* Retouche v33 : Matchs Utilisés + détails + compteur détails */
     .match-row {
       grid-template-columns: auto minmax(0, 1fr) !important;
       align-items: stretch !important;
@@ -5267,6 +5267,101 @@
       .match-index,
       .match-count-mini {
         font-size: 12.5px;
+      }
+    }
+
+    /* Retouche v35 : hiérarchie résumé rapide + Domicile bleu / Extérieur rouge */
+    .summary-head {
+      padding-top: clamp(16px, 4.2vw, 22px) !important;
+      padding-bottom: clamp(16px, 4.2vw, 22px) !important;
+    }
+
+    .summary-title {
+      font-size: clamp(34px, 10.6vw, 58px) !important;
+      line-height: .94 !important;
+      letter-spacing: -0.066em !important;
+      margin-top: 8px !important;
+      margin-bottom: 8px !important;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: normal;
+    }
+
+    .summary-grid .summary-team-name,
+    .summary-team-name {
+      font-size: clamp(23px, 6.8vw, 34px) !important;
+      line-height: 1 !important;
+      letter-spacing: -0.052em !important;
+      font-weight: 1000 !important;
+    }
+
+    .summary-grid .mini-badge span,
+    .summary-grid .mini-badge strong {
+      font-size: clamp(13px, 3.6vw, 16px) !important;
+    }
+
+    .dominance-label {
+      font-size: clamp(12px, 3.5vw, 15px) !important;
+      letter-spacing: .14em !important;
+      line-height: 1.2 !important;
+      color: #c7d2fe !important;
+    }
+
+    .dominance-team {
+      font-size: clamp(30px, 8.2vw, 44px) !important;
+      line-height: .98 !important;
+      letter-spacing: -0.062em !important;
+    }
+
+    .team-hero .team-name,
+    .team-name {
+      font-size: clamp(27px, 7.2vw, 38px) !important;
+      line-height: 1 !important;
+      letter-spacing: -0.056em !important;
+    }
+
+    .team-meta {
+      text-transform: none !important;
+    }
+
+    .side-pill.side-home,
+    .team-card .side-pill.side-home {
+      color: #dbeafe !important;
+      border-color: rgba(64, 201, 255, .42) !important;
+      background: linear-gradient(135deg, rgba(64,201,255,.18), rgba(59,130,246,.08)) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 0 18px rgba(64,201,255,.08) !important;
+    }
+
+    .side-pill.side-away,
+    .team-card .side-pill.side-away {
+      color: #ffe4e6 !important;
+      border-color: rgba(255, 59, 114, .42) !important;
+      background: linear-gradient(135deg, rgba(255,59,114,.18), rgba(239,68,68,.08)) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 0 18px rgba(255,59,114,.08) !important;
+    }
+
+    @media (max-width: 430px) {
+      .summary-title {
+        font-size: clamp(31px, 9.7vw, 44px) !important;
+        line-height: .93 !important;
+      }
+
+      .summary-grid .summary-team-name,
+      .summary-team-name {
+        font-size: clamp(21px, 6.4vw, 30px) !important;
+      }
+
+      .dominance-label {
+        font-size: clamp(11.5px, 3.25vw, 13.5px) !important;
+      }
+
+      .dominance-team {
+        font-size: clamp(28px, 8.3vw, 38px) !important;
+      }
+
+      .team-hero .team-name,
+      .team-name {
+        font-size: clamp(25px, 7vw, 34px) !important;
       }
     }
 
@@ -5994,7 +6089,7 @@
         .replace(/(?:⚠️\s*){2,}/g, "⚠️ ")
         .replaceAll("Incident(s)", "Événement(s)")
         .replaceAll("Incidents", "Événements")
-        .replaceAll("incidents", "événements")
+        .replaceAll("incidents", "Événements")
         .replaceAll("Avancement", "Progression")
         .replaceAll("avancement", "progression")
         .replaceAll("page", "Page");
@@ -6555,7 +6650,7 @@
           <div class="stat-header">
             <div>
               <div class="stat-title">Zone des rangs attribuée à ${esc(teamName)}</div>
-              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} événements · Progression Totale ${esc(formatRank(stats.totalQuantity || 0))} · ${esc(zoneAdvancementLabel(stats))} · Zone Rang Bas → Rang Haut Final.</div>
+              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} Événements · Progression Totale ${esc(formatRank(stats.totalQuantity || 0))} · ${esc(zoneAdvancementLabel(stats))} · Zone Rang Bas → Rang Haut Final.</div>
             </div>
             <div class="stat-badge">Équipe</div>
           </div>
@@ -6629,7 +6724,7 @@
 
               <div>
                 <div class="team-name">${esc(team.name)}</div>
-                <div class="team-meta">${events.length} événements · ${matchesUsed.length} matchs utilisés</div>
+                <div class="team-meta">${events.length} Événements · ${matchesUsed.length} Matchs Utilisés</div>
               </div>
             </div>
           </div>
@@ -6741,7 +6836,7 @@
       return [
         `Performance moyenne zone attribuée à ${teamName} : ${formatValue(stats.average)}`,
         `Performance la plus présente zone attribuée à ${teamName} : ${zoneModeText(stats)}`,
-        `Zone Rangs Finaux Attribuée : Rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} événements, Progression ${formatRank(stats.totalQuantity || 0)}, ${zoneAdvancementLabel(stats)})`,
+        `Zone Rangs Finaux Attribuée : Rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} Événements, Progression ${formatRank(stats.totalQuantity || 0)}, ${zoneAdvancementLabel(stats)})`,
       ];
     }
 
