@@ -4560,6 +4560,149 @@
       }
     }
 
+
+    /* Retouche v25 : affichage bloc scan / sélection / bouton plus cohérent */
+    .scan-btn:disabled {
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .66) 0%, rgba(59, 107, 255, .58) 46%, rgba(255, 59, 114, .54) 100%),
+        rgba(12, 24, 48, .92) !important;
+      color: rgba(255,255,255,.96) !important;
+      box-shadow: 0 10px 24px rgba(64, 201, 255, .10), inset 0 1px 0 rgba(255,255,255,.08) !important;
+      opacity: 1 !important;
+    }
+
+    .status-box,
+    .status-box.status-selection,
+    .status-box.status-loading,
+    .status-box.status-done {
+      min-height: 78px !important;
+      height: 78px !important;
+      padding: 10px 12px !important;
+      border-radius: 16px !important;
+      overflow: hidden !important;
+      box-sizing: border-box;
+      will-change: opacity, transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+    }
+
+    .status-box.status-selection {
+      display: grid !important;
+      place-items: center;
+      text-align: center;
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .08), rgba(255, 59, 114, .06)),
+        rgba(5, 10, 28, .86) !important;
+      border-color: rgba(64, 201, 255, .26) !important;
+    }
+
+    .status-selection-wrap {
+      width: 100%;
+      min-height: 100%;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 6px;
+    }
+
+    .status-selection-label {
+      font-size: 10.2px !important;
+      letter-spacing: .14em !important;
+      line-height: 1 !important;
+      color: rgba(255,255,255,.74) !important;
+    }
+
+    .status-selection-value {
+      font-size: clamp(17px, 5.3vw, 22px) !important;
+      line-height: 1 !important;
+      letter-spacing: -.03em !important;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-box.status-loading {
+      display: block !important;
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .10), rgba(255, 59, 114, .08)),
+        rgba(5, 10, 28, .86) !important;
+      border-color: rgba(64, 201, 255, .26) !important;
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
+      opacity: .17 !important;
+      transition: width .48s cubic-bezier(.22, .61, .36, 1) !important;
+    }
+
+    .status-box.status-loading .status-progress-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      position: absolute;
+      inset: 50% 0 auto 0;
+      transform: translateY(-52%);
+      text-align: center;
+      font-size: clamp(24px, 7vw, 30px) !important;
+      font-weight: 1000;
+      letter-spacing: -.05em;
+      color: rgba(255,255,255,.26) !important;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .status-box.status-loading .progress-track,
+    .status-box.status-loading .progress-fill {
+      border-radius: 0 !important;
+    }
+
+    .status-box.status-loading .progress-track {
+      height: 6px !important;
+      background: rgba(255,255,255,.14) !important;
+      overflow: hidden;
+      margin-top: auto;
+    }
+
+    .status-box.status-loading .progress-fill {
+      height: 100%;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
+      transition: width .48s cubic-bezier(.22, .61, .36, 1) !important;
+    }
+
+    .status-box.status-done {
+      transition: opacity .22s ease, transform .22s ease, background .22s ease !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box,
+      .status-box.status-selection,
+      .status-box.status-loading,
+      .status-box.status-done {
+        min-height: 76px !important;
+        height: 76px !important;
+        padding: 9px 10px !important;
+      }
+
+      .status-selection-label {
+        font-size: 9.6px !important;
+      }
+
+      .status-selection-value {
+        font-size: clamp(16px, 5.6vw, 20px) !important;
+      }
+
+      .status-box.status-loading .status-big-percent {
+        font-size: clamp(22px, 8vw, 27px) !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -5209,7 +5352,7 @@
 
       const value = rank1 && rank2 ? `${rank1} / ${rank2}` : (rank1 || rank2);
 
-      box.style.display = "block";
+      box.style.display = "grid";
       box.classList.remove("status-done", "status-loading", "status-fade-out");
       box.classList.add("status-selection");
       box.innerHTML = `
@@ -5262,6 +5405,16 @@
       };
 
       if (isDone) {
+        if (box.classList.contains("status-loading")) {
+          const percentNode = box.querySelector('.status-big-percent');
+          const fillNode = box.querySelector('.progress-fill');
+          const bgNode = box.querySelector('.status-progress-bg');
+          if (percentNode) percentNode.textContent = '100%';
+          if (fillNode) fillNode.style.width = '100%';
+          if (bgNode) bgNode.style.width = '100%';
+          box._doneTimer = window.setTimeout(renderDoneStatus, 560);
+          return;
+        }
         renderDoneStatus();
         return;
       }
