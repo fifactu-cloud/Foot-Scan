@@ -168,7 +168,7 @@ def validate_json(status, body, path, source):
         return None, f"{source}: JSON invalide sur {path}: {text[:300]}"
 
     if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        return None, f"{source}: erreur SofaScore sur {path}: {data['error']}"
+        return None, f"{source}: erreur Web sur {path}: {data['error']}"
 
     return body, None
 
@@ -344,7 +344,7 @@ def maybe_enqueue_incidents_from_team_page(path, body):
             count += 1
 
     if count:
-        print(f"Préchargement incidents ajouté: {count} match(s) depuis {clean_path}")
+        print(f"Préchargement événements ajouté: {count} match(s) depuis {clean_path}")
 
 
 def now_ts():
@@ -436,7 +436,7 @@ def is_own_goal_incident(incident):
 def own_goal_committed_by_analyzed_team(incident, match, analyzed_team_id):
     player = incident.get("player") or {}
 
-    # Pour un CSC, SofaScore peut comptabiliser le but pour l'équipe bénéficiaire.
+    # Pour un CSC, Web peut comptabiliser le but pour l'équipe bénéficiaire.
     # Dans notre méthode, on veut toujours attribuer l'événement au joueur/club
     # qui marque contre son camp. On privilégie donc l'équipe du joueur.
     player_team_id = (
@@ -447,7 +447,7 @@ def own_goal_committed_by_analyzed_team(incident, match, analyzed_team_id):
     if player_team_id:
         return player_team_id == analyzed_team_id
 
-    # Repli: si SofaScore place isHome du côté bénéficiaire du but,
+    # Repli: si Web place isHome du côté bénéficiaire du but,
     # l'équipe qui marque contre son camp est l'autre côté.
     if isinstance(incident.get("isHome"), bool):
         home_team = match.get("homeTeam") or {}
@@ -1102,7 +1102,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     update_scan_job(
         job_id,
         status="running",
-        message=f"{team_name} · récupération des pages SofaScore…",
+        message=f"{team_name} · Récupération Des Pages Web…",
         progress=base_progress,
     )
 
@@ -1112,7 +1112,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
         update_scan_job(
             job_id,
             status="running",
-            message=f"{team_name} · page {page + 1}/{PAGES_TO_LOAD}",
+            message=f"{team_name} · Page {page + 1}/{PAGES_TO_LOAD}",
             progress=base_progress + int(progress_span * 0.10 * ((page + 1) / PAGES_TO_LOAD)),
         )
 
@@ -1123,14 +1123,14 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
         except Exception as e:
             error_text = str(e)
 
-            # SofaScore renvoie parfois 404 quand une équipe n'a plus de page historique.
+            # Web renvoie parfois 404 quand une équipe n'a plus de page historique.
             # Ce n'est pas une vraie erreur de scan : on s'arrête simplement aux pages déjà récupérées.
             if "HTTP 404" in error_text or "Not Found" in error_text:
                 update_scan_job(
                     job_id,
                     status="running",
                     message=(
-                        f"{team_name} · fin de l'historique SofaScore à la page {page + 1}.\n"
+                        f"{team_name} · Fin De L'Historique Web À La Page {page + 1}.\n"
                         f"Pages récupérées : {page}/{PAGES_TO_LOAD}"
                     ),
                     progress=base_progress + int(progress_span * 0.10),
@@ -1145,7 +1145,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                     job_id,
                     status="running",
                     message=(
-                        f"{team_name} · page {page + 1} ignorée après erreur réseau.\n"
+                        f"{team_name} · Page {page + 1} Ignorée Après Erreur Réseau.\n"
                         f"Pages déjà récupérées : {page}/{PAGES_TO_LOAD}"
                     ),
                     progress=base_progress + int(progress_span * 0.10),
@@ -1162,7 +1162,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             update_scan_job(
                 job_id,
                 status="running",
-                message=f"{team_name} · page {page + 1} vide, arrêt de l'historique.",
+                message=f"{team_name} · Page {page + 1} Vide, Arrêt De L'Historique.",
                 progress=base_progress + int(progress_span * 0.10),
             )
             break
@@ -1216,8 +1216,8 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             job_id,
             status="running",
             message=(
-                f"{team_name} · scan progressif jusqu’à {stage_limit} matchs\n"
-                f"Avancement trouvé : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
+                f"{team_name} · Scan Progressif Jusqu’à {stage_limit} matchs\n"
+                f"Progression Trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
             ),
             progress=base_progress + int(progress_span * 0.13),
         )
@@ -1232,8 +1232,8 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 job_id,
                 status="running",
                 message=(
-                    f"{team_name} · incidents matchs {start + 1}-{batch_end}/{stage_limit}\n"
-                    f"Avancement trouvé : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
+                    f"{team_name} · Événements Matchs {start + 1}-{batch_end}/{stage_limit}\n"
+                    f"Progression Trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
                 ),
                 progress=base_progress + int(progress_span * (0.15 + 0.80 * stage_position)),
             )
@@ -1257,7 +1257,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                     except Exception as e:
                         # Erreur réseau ou match incident indisponible : on ignore ce match
                         # au lieu de faire échouer tout le scan.
-                        print(f"Match ignoré après erreur incidents {match.get('id')}: {e}", file=sys.stderr)
+                        print(f"Match ignoré après erreur événements {match.get('id')}: {e}", file=sys.stderr)
                         scanned.append({
                             "idx": idx,
                             "match": match,
@@ -1310,7 +1310,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     update_scan_job(
         job_id,
         status="running",
-        message=f"{team_name} · terminé ({len(all_events)} événements, avancement {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs).",
+        message=f"{team_name} · Terminé ({len(all_events)} événements, Progression {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs).",
         progress=base_progress + progress_span,
     )
 
@@ -1495,12 +1495,12 @@ def process_scan_job(job_id):
     print(
         f"🔎 Scan complet: job={job_id} match={match_id} "
         f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
-        f"objectif avancement brut={scan_fetch_needed} simultaneous={simultaneous_mode} "
-        f"avancement={rank_advancement_label()}"
+        f"objectif progression brute={scan_fetch_needed} simultaneous={simultaneous_mode} "
+        f"progression={rank_advancement_label()}"
     )
 
     try:
-        update_scan_job(job_id, status="running", message="Récupération du match principal…", progress=5)
+        update_scan_job(job_id, status="running", message="Récupération Du Match Principal…", progress=5)
 
         match_data = get_json(f"event/{match_id}")
         match = match_data.get("event") if isinstance(match_data, dict) else match_data
@@ -1692,13 +1692,13 @@ def main():
 
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: 🔎 scan complet côté worker activé.")
-    print("Pages SofaScore: jusqu’à 20 pages, arrêt automatique si 404/page vide.")
+    print("Pages Web: jusqu’à 20 Pages, arrêt automatique si 404/Page vide.")
     print("Mode simultané lié: mêmes rangs, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Avancement des rangs: curseur par job, défaut 1 par événement.")
+    print("Progression des rangs: curseur par job, défaut 1 par événement.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
-    print("Stabilité réseau: retry SofaScore + incidents ignorés en cas d’erreur.")
-    print("Préchargement incidents: désactivé par défaut pour économiser les requêtes.")
+    print("Stabilité réseau: retry Web + événements ignorés en cas d’erreur.")
+    print("Préchargement événements: désactivé par défaut pour économiser les requêtes.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
     while True:
