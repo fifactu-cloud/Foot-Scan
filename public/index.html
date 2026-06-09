@@ -349,10 +349,40 @@
     }
 
     .notice-title {
-      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
       font-weight: 1000;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.04em;
       margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
+    .notice-inline-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: inline-grid;
+      place-items: center;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.32);
+      box-shadow: 0 0 0 rgba(239, 68, 68, 0.0);
+      flex: 0 0 40px;
+      animation: stopPulse 1.15s ease-in-out infinite;
+    }
+
+    @keyframes stopPulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 rgba(239, 68, 68, 0.0);
+        border-color: rgba(239, 68, 68, 0.30);
+      }
+      50% {
+        transform: scale(1.06);
+        box-shadow: 0 0 22px rgba(239, 68, 68, 0.34);
+        border-color: rgba(239, 68, 68, 0.78);
+      }
     }
 
     code {
@@ -476,9 +506,10 @@
     }
 
     .auto-title {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 1000;
       letter-spacing: -0.04em;
+      text-transform: uppercase;
     }
 
     .auto-sub {
@@ -861,9 +892,10 @@
     }
 
     .report-title {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 1000;
       letter-spacing: -0.04em;
+      text-transform: uppercase;
     }
 
     .report-count,
@@ -2957,9 +2989,8 @@
     </section>
 
     <section class="panel notice panel-pad">
-      <div class="notice-icon">🛑</div>
       <div>
-        <div class="notice-title">⚠️ Termux Doit Rester Ouvert</div>
+        <div class="notice-title"><span class="notice-inline-icon">🛑</span><span>TERMUX DOIT RESTER OUVERT</span></div>
         <p class="notice-text">
           L'application Termux doit obligatoirement être ouverte en arrière-plan (sur mobile ou PC) pendant le scan du match.
         </p>
@@ -2976,10 +3007,9 @@
         <div class="auto-box">
           <div class="auto-head">
             <div>
-              <div class="auto-title">Calcul Automatique Des Rangs</div>
+              <div class="auto-title">CALCUL AUTOMATIQUE DES RANGS</div>
               <div class="auto-sub" aria-hidden="true"></div>
             </div>
-            <div class="auto-badge">Base Libre</div>
           </div>
 
           <div class="auto-body">
@@ -3089,7 +3119,7 @@
     <section class="report-panel" id="reportPanel">
       <div class="report-head">
         <div>
-          <div class="report-title">Rapport De Session</div>
+          <div class="report-title">RAPPORT DE SESSION</div>
           <div class="report-count" id="reportCount">0 Analyse Enregistrée</div>
         </div>
       </div>
@@ -3114,7 +3144,7 @@
     <div id="result" class="result-shell"></div>
 
     <details class="bar-box">
-      <summary>Barème</summary>
+      <summary>BARÈME</summary>
 
       <div class="bar-grid">
         <div class="bar-card">
@@ -4217,7 +4247,7 @@
 
     function updateReportCount() {
       const count = loadReport().length;
-      $("reportCount").textContent = `${count} analyse${count > 1 ? "s" : ""} enregistrée${count > 1 ? "s" : ""}`;
+      $("reportCount").textContent = `${count} Analyse${count > 1 ? "s" : ""} Enregistrée${count > 1 ? "s" : ""}`;
     }
 
     function rankLines(team, rankLabel, rankResult) {
