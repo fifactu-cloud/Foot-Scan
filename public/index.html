@@ -4112,6 +4112,33 @@
       }
     }
 
+
+    /* Retouche v14 : même fondu FOOTSCAN en haut et en hero */
+    .brand-title,
+    .home-title {
+      background: linear-gradient(92deg, #ffffff 0%, #dff4ff 18%, #7dd3fc 38%, #8b5cf6 66%, #ff4d9d 100%) !important;
+      -webkit-background-clip: text !important;
+      background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      color: transparent !important;
+      text-shadow: none !important;
+    }
+
+    .brand-title {
+      filter: drop-shadow(0 8px 20px rgba(59, 130, 246, .16)) drop-shadow(0 8px 18px rgba(236, 72, 153, .10));
+    }
+
+    .home-title {
+      filter: drop-shadow(0 16px 34px rgba(59, 130, 246, .14)) drop-shadow(0 18px 36px rgba(236, 72, 153, .12));
+    }
+
+    .brand-title span,
+    .home-title span {
+      -webkit-text-fill-color: inherit !important;
+      color: inherit !important;
+      text-shadow: none !important;
+    }
+
 </style>
 </head>
 
