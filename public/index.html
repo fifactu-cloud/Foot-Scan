@@ -7196,112 +7196,55 @@
     }
 
 
-    /* Retouche v55 : corrections ciblées demandées */
-    /* 1) Bouton rapport : retour EXACT au look v39 */
+    /* Retouche v54b : corrections minimales demandées, sans toucher au reste */
     #addReportBtn,
     #addReportBtn.report-btn.primary,
-    #addReportBtn.report-btn.primary:enabled {
-      position: relative !important;
-      overflow: hidden !important;
-      color: #ffffff !important;
-      font-size: clamp(12px, 3.3vw, 13px) !important;
-      font-weight: 950 !important;
-      letter-spacing: -0.006em !important;
-      text-transform: uppercase !important;
-      min-height: 48px !important;
-      border-radius: 16px !important;
-      padding: 11px 10px !important;
-      border: 1px solid rgba(56,189,248,.38) !important;
+    #addReportBtn.report-btn.primary:enabled,
+    .report-btn.primary {
       background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
       background-size: 190% 190% !important;
       background-position: 0% 50% !important;
       animation: derbySweep 5.5s ease infinite !important;
-      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 59, 114, .14) !important;
-      filter: none !important;
-      isolation: auto !important;
       will-change: background-position, transform, filter !important;
+      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 59, 114, .14) !important;
+      border-color: rgba(56,189,248,.38) !important;
+      color: #ffffff !important;
+      filter: none !important;
     }
 
     #addReportBtn::before,
     #addReportBtn::after,
-    #addReportBtn .report-btn-sheen,
-    #addReportBtn .report-btn-glow,
     .report-btn.primary::before,
     .report-btn.primary::after {
-      content: none !important;
       display: none !important;
+      content: none !important;
     }
 
-    /* 2) Enlever les bulles autour du résumé rapide / mode scan tout en gardant le texte */
-    .summary-pill-row {
-      gap: 12px !important;
-      align-items: center !important;
-      flex-wrap: wrap !important;
-    }
-
-    .summary-pill,
-    .summary-pill-mode {
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-      border-radius: 0 !important;
-      padding: 0 !important;
-      min-height: auto !important;
-      filter: none !important;
-    }
-
-    /* 3) Zone des rangs : titre + valeur en bleu, blanc seulement pour 0 */
     .zone-card .stat-title,
     .zone-card .stat-number.positive {
       color: #40c9ff !important;
-      text-shadow: 0 0 18px rgba(64,201,255,.12) !important;
     }
 
     .zone-card .stat-number.neutral {
       color: #ffffff !important;
-      text-shadow: none !important;
     }
 
-    .zone-card .stat-number.negative {
-      color: #fb7185 !important;
-      text-shadow: none !important;
-    }
-
-    /* 4) Gagnant : médaille + confetti plus visibles */
     .dominance-celebration::before {
-      opacity: .16 !important;
-      filter: blur(.15px) drop-shadow(0 0 18px rgba(255,214,10,.18)) !important;
+      opacity: .14 !important;
     }
 
     .dominance-celebration .dominance-confetti {
-      opacity: .42 !important;
+      opacity: .28 !important;
     }
 
     .dominance-celebration .dominance-confetti-piece {
-      opacity: .58 !important;
-      filter: drop-shadow(0 0 3px rgba(255,255,255,.16)) !important;
+      opacity: .40 !important;
+      filter: drop-shadow(0 0 3px rgba(255,255,255,.10)) !important;
     }
 
-    /* 5) Barème : même taille que Rapport de session */
-    .bar-box summary {
-      font-size: 18px !important;
-      font-weight: 1000 !important;
-      letter-spacing: -0.04em !important;
-    }
-
-    /* 6) En-tête Événements Trouvés : même rendu que Matchs Utilisés */
-    .team-card .section-title,
     .team-card details.clean summary {
-      font-size: 18px !important;
-      font-weight: 1000 !important;
-      letter-spacing: .10em !important;
-      text-transform: uppercase !important;
+      font-size: 15px !important;
       line-height: 1.05 !important;
-    }
-
-    .team-card details.clean summary .count-pill,
-    .team-card .section-title .count-pill {
-      letter-spacing: 0 !important;
     }
 
   </style>
