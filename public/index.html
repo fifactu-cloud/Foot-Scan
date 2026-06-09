@@ -6530,6 +6530,185 @@
       }
     }
 
+
+    /* Retouche v46 : gradient bouton rapport, confetti gagnant visibles, bloc scan plus opaque, termux rééquilibré */
+    #addReportBtn.report-btn.primary,
+    #addReportBtn {
+      position: relative !important;
+      overflow: hidden !important;
+      background: linear-gradient(90deg, #47d2ff 0%, #5a7cff 44%, #ff63b5 100%) !important;
+      background-size: 220% 220% !important;
+      animation: derbySweep 4.8s ease-in-out infinite !important;
+      border-color: rgba(90,124,255,.26) !important;
+      box-shadow: 0 16px 34px rgba(71,210,255,.20), 0 12px 28px rgba(255,99,181,.16) !important;
+      color: #ffffff !important;
+    }
+
+    #addReportBtn::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,.18) 18%, transparent 34%, transparent 100%);
+      transform: translateX(-115%);
+      animation: reportPrimaryShineV46 3.6s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .notice-title.notice-bubble {
+      display: grid !important;
+      grid-template-columns: 42px minmax(0, 1fr) !important;
+      align-items: center !important;
+      width: 100% !important;
+      gap: 12px !important;
+      padding: 14px 18px 14px 14px !important;
+      white-space: nowrap !important;
+      font-size: clamp(12.6px, 3.65vw, 15px) !important;
+      letter-spacing: .01em !important;
+      line-height: 1.05 !important;
+    }
+
+    .notice-title.notice-bubble > span:last-child {
+      display: block !important;
+      text-align: center !important;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .notice-inline-icon {
+      width: 34px !important;
+      height: 34px !important;
+      flex-basis: 34px !important;
+      font-size: 19px !important;
+      border-radius: 11px !important;
+      margin-left: 0 !important;
+      justify-self: start !important;
+      box-shadow: 0 0 0 1px rgba(255,77,157,.12), 0 8px 16px rgba(255,59,114,.10) !important;
+    }
+
+    .status-box.status-loading {
+      background:
+        radial-gradient(circle at 12% 0%, rgba(56,189,248,.18), transparent 34%),
+        linear-gradient(135deg, rgba(56,189,248,.15), rgba(255,54,93,.10)),
+        rgba(8, 15, 35, .82) !important;
+      border-color: rgba(56,189,248,.34) !important;
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      opacity: .34 !important;
+      background:
+        linear-gradient(90deg, rgba(71,210,255,.22), rgba(255,99,181,.16)),
+        rgba(255,255,255,.02) !important;
+    }
+
+    .status-box.status-loading .progress-track {
+      background: rgba(255,255,255,.085) !important;
+    }
+
+    .status-box.status-loading .progress-fill {
+      box-shadow: 0 0 18px rgba(71,210,255,.24), 0 0 24px rgba(255,99,181,.18) !important;
+    }
+
+    .event-break {
+      height: 1px !important;
+      margin: 8px 8px 4px !important;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.08) 10%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.08) 90%, transparent 100%) !important;
+      opacity: .95 !important;
+    }
+
+    .event-row + .event-row {
+      border-top: none !important;
+      padding-top: 0 !important;
+      margin-top: 0 !important;
+    }
+
+    .dominance-box {
+      isolation: isolate;
+    }
+
+    .dominance-confetti {
+      z-index: 1 !important;
+      opacity: 1 !important;
+      mix-blend-mode: screen;
+    }
+
+    .dominance-confetti-piece {
+      width: 7px !important;
+      height: 13px !important;
+      opacity: .96 !important;
+      filter: drop-shadow(0 0 6px rgba(255,255,255,.14));
+    }
+
+    .dominance-box > *:not(.status-confetti) {
+      position: relative;
+      z-index: 2 !important;
+    }
+
+    .dominance-celebration::before {
+      font-size: 78px !important;
+      opacity: .065 !important;
+      transform: translate(-50%, -54%) !important;
+      z-index: 0 !important;
+    }
+
+    .team-card.side-home-card .section-title,
+    .team-card.side-home-card details.clean summary {
+      background: linear-gradient(90deg, rgba(64,201,255,.17), rgba(64,201,255,.08)) !important;
+      color: #dff4ff !important;
+      border-color: rgba(64,201,255,.18) !important;
+    }
+
+    .team-card.side-away-card .section-title,
+    .team-card.side-away-card details.clean summary {
+      background: linear-gradient(90deg, rgba(255,77,157,.18), rgba(255,77,157,.08)) !important;
+      color: #ffe8f1 !important;
+      border-color: rgba(255,77,157,.18) !important;
+    }
+
+    .team-card.side-home-card .match-number-badge {
+      background: linear-gradient(180deg, rgba(64,201,255,.16), rgba(64,201,255,.08)), rgba(10,16,34,.98) !important;
+      border-color: rgba(64,201,255,.22) !important;
+    }
+
+    .team-card.side-home-card .match-count-mini {
+      background: linear-gradient(135deg, rgba(64,201,255,.28), rgba(59,130,246,.16)) !important;
+      color: #effaff !important;
+    }
+
+    .team-card.side-away-card .match-number-badge {
+      background: linear-gradient(180deg, rgba(255,77,157,.16), rgba(255,77,157,.08)), rgba(10,16,34,.98) !important;
+      border-color: rgba(255,77,157,.22) !important;
+    }
+
+    .team-card.side-away-card .match-count-mini {
+      background: linear-gradient(135deg, rgba(255,77,157,.28), rgba(255,99,181,.16)) !important;
+      color: #fff3f8 !important;
+    }
+
+    @keyframes reportPrimaryShineV46 {
+      0%, 18% { transform: translateX(-115%); opacity: 0; }
+      24% { opacity: .9; }
+      52% { transform: translateX(135%); opacity: .55; }
+      100% { transform: translateX(135%); opacity: 0; }
+    }
+
+    @media (max-width: 430px) {
+      .notice-title.notice-bubble {
+        grid-template-columns: 38px minmax(0, 1fr) !important;
+        gap: 10px !important;
+        padding: 13px 14px 13px 12px !important;
+        font-size: 12.8px !important;
+      }
+      .notice-inline-icon {
+        width: 31px !important;
+        height: 31px !important;
+        flex-basis: 31px !important;
+        font-size: 18px !important;
+      }
+      .dominance-celebration::before {
+        font-size: 72px !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -7878,7 +8057,7 @@
         const campClass = sideCampClass(event);
         const campText = sideText(event);
         const label = LABELS[event.type] || event.type || "Événement";
-        const separator = index > 0 && events[index - 1]?.match !== event?.match
+        const separator = index > 0
           ? `<div class="event-break" aria-hidden="true"></div>`
           : "";
 
