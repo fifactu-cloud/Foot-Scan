@@ -4140,9 +4140,59 @@
     }
 
 
-    /* Retouche v19 : depuis v14, boules des curseurs en violet/rose uniquement */
+    /* Retouche v20 : v14 uniquement, jauge style bouton Scanner + boule rose */
+    :root {
+      --scan-btn-gradient-v20: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%);
+    }
+
     input[type="range"] {
-      accent-color: #d946ef !important;
+      --fill: 50%;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 999px;
+      background:
+        var(--scan-btn-gradient-v20) 0 / var(--fill) 100% no-repeat,
+        linear-gradient(90deg, rgba(255,255,255,.34), rgba(255,255,255,.24));
+      box-shadow: inset 0 1px 2px rgba(255,255,255,.14), inset 0 -1px 2px rgba(0,0,0,.22);
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255,255,255,.34), rgba(255,255,255,.24));
+      box-shadow: inset 0 1px 2px rgba(255,255,255,.14), inset 0 -1px 2px rgba(0,0,0,.22);
+    }
+
+    input[type="range"]::-moz-range-progress {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--scan-btn-gradient-v20);
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      margin-top: -7px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.88);
+      background: linear-gradient(135deg, #ff62b0 0%, #ff3b72 50%, #d946ef 100%);
+      box-shadow: 0 4px 12px rgba(255, 59, 114, .18);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.88);
+      background: linear-gradient(135deg, #ff62b0 0%, #ff3b72 50%, #d946ef 100%);
+      box-shadow: 0 4px 12px rgba(255, 59, 114, .18);
     }
 
 </style>
@@ -6009,13 +6059,30 @@
       draw();
     }
 
+
+
+    function updateRangeGradientFill() {
+      document.querySelectorAll('input[type="range"]').forEach((slider) => {
+        const min = Number(slider.min || 0);
+        const max = Number(slider.max || 100);
+        const value = Number(slider.value || 0);
+        const pct = max > min ? ((value - min) * 100) / (max - min) : 0;
+        slider.style.setProperty('--fill', `${Math.max(0, Math.min(100, pct))}%`);
+      });
+    }
+
     function bindRangeAndNumber(rangeId, numberId, callback) {
       $(rangeId).addEventListener("input", () => {
         $(numberId).value = $(rangeId).value;
+        updateRangeGradientFill();
         callback();
       });
 
-      $(numberId).addEventListener("input", callback);
+      $(numberId).addEventListener("input", () => {
+        $(rangeId).value = $(numberId).value;
+        updateRangeGradientFill();
+        callback();
+      });
     }
 
     renderSkipButtons("skipHome", () => skipHomeValue, (value) => skipHomeValue = value);
@@ -6074,6 +6141,7 @@
     initMobileNavigationEffects();
     updateReportCount();
     updateAutoCalculator();
+    updateRangeGradientFill();
   </script>
 </body>
 </html>
