@@ -5599,6 +5599,59 @@
       }
     }
 
+
+    /* Retouche v38 : saisie plus compacte + libellés / boutons / équipes */
+    .auto-control-title {
+      font-size: 16px !important;
+      line-height: 1.08 !important;
+      font-weight: 1000 !important;
+      color: #eef2ff !important;
+    }
+
+    .auto-number {
+      width: 68px !important;
+      min-width: 68px !important;
+      padding: 6px 6px !important;
+      border-radius: 8px !important;
+      font-size: 14px !important;
+    }
+
+    .auto-result-value {
+      font-size: 24px !important;
+      line-height: 1 !important;
+      letter-spacing: -0.05em !important;
+    }
+
+    .preset-btn,
+    .auto-apply-btn,
+    .report-btn {
+      text-transform: uppercase !important;
+    }
+
+    .summary-title,
+    .summary-team-name,
+    .team-name,
+    .match-team-name,
+    .dominance-team {
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 430px) {
+      .auto-control-title {
+        font-size: 15px !important;
+      }
+
+      .auto-number {
+        width: 64px !important;
+        min-width: 64px !important;
+        padding: 6px 5px !important;
+      }
+
+      .auto-result-value {
+        font-size: 23px !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -5662,8 +5715,8 @@
                 <span id="activePresetLabel">Libre</span>
               </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 Clubs/Pays Officiels<small>Base 31,3125 · Progression 1 · Changements 7</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 Pays Amicaux<small>Base 31,3125 · Progression 1 · Changements 13</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 CLUBS/PAYS OFFICIELS<small>Base 31,3125 · Progression 1 · Changements 7</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 PAYS AMICAUX<small>Base 31,3125 · Progression 1 · Changements 13</small></button>
               </div>
             </div>
 
@@ -5723,7 +5776,7 @@
             </label>
 
             <button class="auto-apply-btn" id="applyAutoRanksBtn" type="button">
-              Appliquer aux rangs
+              APPLIQUER LES RANGS
             </button>
           </div>
         </div>
@@ -5769,13 +5822,13 @@
 
       <div class="report-body">
         <div class="report-buttons">
-          <button class="report-btn primary" id="addReportBtn" type="button">Ajouter L’Analyse Actuelle</button>
+          <button class="report-btn primary" id="addReportBtn" type="button">AJOUTER L’ANALYSE ACTUELLE</button>
           <button class="report-btn" id="copySimpleReportBtn" type="button">Copier Simple</button>
           <button class="report-btn" id="copyFullReportBtn" type="button">Copier Complet</button>
           <button class="report-btn" id="downloadSimpleReportBtn" type="button">TXT Simple</button>
           <button class="report-btn" id="printSimpleReportBtn" type="button">PDF Simple</button>
           <button class="report-btn" id="downloadFullReportBtn" type="button">TXT Complet</button>
-          <button class="report-btn red" id="clearReportBtn" type="button">Vider Le Rapport</button>
+          <button class="report-btn red" id="clearReportBtn" type="button">VIDER LE RAPPORT</button>
         </div>
 
         <div class="report-hint" id="reportHint">
@@ -6239,7 +6292,7 @@
       return `
         <div class="dominance-box">
           <div class="dominance-label">${title}</div>
-          <div class="dominance-team">${esc(dominance.label)}</div>
+          <div class="dominance-team">${esc(String(dominance.label || "").toUpperCase())}</div>
           <div class="dominance-meta">${meta}</div>
         </div>
       `;
@@ -6572,7 +6625,7 @@
           renderResult(resultWithOptions);
           setStatus("Scan Terminé", 100);
           window.setTimeout(launchFinishFx, 3400);
-          $("reportHint").textContent = "Analyse prête. Appuie sur “Ajouter L’Analyse Actuelle” pour l’enregistrer dans le rapport.";
+          $("reportHint").textContent = "Analyse prête. Appuie sur “AJOUTER L’ANALYSE ACTUELLE” pour l’enregistrer dans le rapport.";
           finishScan();
           return;
         }
@@ -6613,7 +6666,7 @@
               <div class="logo-xl">
                 <img src="${logoUrl(match.homeTeam.id)}" alt="" />
               </div>
-              <div class="match-team-name">${esc(match.homeTeam.name)}</div>
+              <div class="match-team-name">${esc(String(match.homeTeam.name || "").toUpperCase())}</div>
             </div>
 
             <div class="vs-box">VS</div>
@@ -6622,7 +6675,7 @@
               <div class="logo-xl">
                 <img src="${logoUrl(match.awayTeam.id)}" alt="" />
               </div>
-              <div class="match-team-name">${esc(match.awayTeam.name)}</div>
+              <div class="match-team-name">${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
             </div>
           </div>
 
@@ -6657,7 +6710,7 @@
         <section class="summary">
           <div class="summary-head">
             <div class="summary-label">Résumé rapide</div>
-            <div class="summary-title">${esc(match.homeTeam.name)} vs ${esc(match.awayTeam.name)}</div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} VS ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
             <div class="summary-label">Mode scan : ${esc(result.scanModeLabel || (result.simultaneousMode ? "Simultané match par match / minute par minute" : "Standard"))}</div>
           </div>
 
@@ -6679,7 +6732,7 @@
             <div class="logo-s">
               <img src="${logoUrl(team.id)}" alt="" />
             </div>
-            <div class="summary-team-name">${esc(team.name)}</div>
+            <div class="summary-team-name">${esc(String(team.name || "").toUpperCase())}</div>
           </div>
 
           <div class="mini-values">
@@ -6973,7 +7026,7 @@
               </div>
 
               <div>
-                <div class="team-name">${esc(team.name)}</div>
+                <div class="team-name">${esc(String(team.name || "").toUpperCase())}</div>
                 <div class="team-meta">${events.length} Événements · ${matchesUsed.length} Matchs Utilisés</div>
               </div>
             </div>
