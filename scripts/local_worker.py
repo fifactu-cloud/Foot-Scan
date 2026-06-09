@@ -3,7 +3,6 @@ import sys
 import json
 import time
 import re
-import math
 import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -26,56 +25,16 @@ SCAN_JOB_TTL_SECONDS = int(os.environ.get("SCAN_JOB_TTL_SECONDS", "86400"))
 SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "0.5"))
 PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAGE", "17"))
 
-PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "20"))
+PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "2"))
 INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM", "15"))
 SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
-MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "100"))
-INCIDENT_BATCH_SIZE = int(os.environ.get("FOOTSCAN_INCIDENT_BATCH_SIZE", "2"))
-INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "2"))
-SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "3"))
-SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.8"))
-PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
-DEFAULT_RANK_EVENT_STEP = 1.0
-CURRENT_RANK_EVENT_STEP = DEFAULT_RANK_EVENT_STEP
-CURRENT_RANK_ADVANCEMENT_MODE = "fixed"
-
-
-def configure_rank_advancement(step=None, mode=None):
-    """Configure l'avancement des rangs pour le job en cours.
-
-    mode="fixed" : chaque événement avance de CURRENT_RANK_EVENT_STEP.
-    mode="performance" : chaque événement avance selon sa valeur absolue de performance.
-    """
-    global CURRENT_RANK_EVENT_STEP, CURRENT_RANK_ADVANCEMENT_MODE
-
-    try:
-        parsed_step = float(step) if step is not None else DEFAULT_RANK_EVENT_STEP
-    except Exception:
-        parsed_step = DEFAULT_RANK_EVENT_STEP
-
-    if not math.isfinite(parsed_step) or parsed_step <= 0:
-        parsed_step = DEFAULT_RANK_EVENT_STEP
-
-    CURRENT_RANK_EVENT_STEP = parsed_step
-    CURRENT_RANK_ADVANCEMENT_MODE = "performance" if mode == "performance" else "fixed"
-
-
-def rank_advancement_label():
-    if CURRENT_RANK_ADVANCEMENT_MODE == "performance":
-        return "valeur de performance"
-    return f"{CURRENT_RANK_EVENT_STEP:.4f} par événement"
-
-GOAL_WITH_PASSER_VALUE = 1.0
-GOAL_WITHOUT_PASSER_VALUE = 2 / 3
-GOAL_ERROR_VALUE = 1 / 3
+MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "20"))
+INCIDENT_BATCH_SIZE = int(os.environ.get("FOOTSCAN_INCIDENT_BATCH_SIZE", "4"))
 
 POSITIVE_VALUES = {
-    "goalWithAssist": GOAL_WITH_PASSER_VALUE,
-    "goal": GOAL_WITHOUT_PASSER_VALUE,
-}
-
-NEGATIVE_VALUES_FOR_TEAM = {
-    "ownGoal": -GOAL_ERROR_VALUE,
+    "goal": 1,
+    "goalWithAssist": 1.5,
+    "assist": 0.5,
 }
 
 CARD_VALUES_FOR_TEAM = {
@@ -86,15 +45,13 @@ CARD_VALUES_FOR_TEAM = {
 }
 
 LABELS = {
-    "goal": "But Sans Passeur",
-    "goalWithAssist": "But Avec Passeur",
-    "goalNoAssistError": "CSC / Erreur",
+    "goal": "But",
+    "goalWithAssist": "But + passe",
     "assist": "Passe décisive",
     "yellow": "Jaune",
     "secondYellow": "Deuxième jaune",
     "red": "Rouge direct",
     "redFromSecondYellow": "Rouge via 2e jaune",
-    "ownGoal": "CSC / Erreur",
 }
 
 
@@ -144,10 +101,6 @@ def read_url(url, headers):
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         return e.code, body
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        # Erreurs réseau Termux / mobile : on remonte une erreur spéciale.
-        # sofa_fetch fera les retry avant d'abandonner.
-        return 0, str(e)
 
 
 def validate_json(status, body, path, source):
@@ -195,27 +148,18 @@ def sofa_fetch(path):
 
     last_error = None
 
-    for attempt in range(1, SOFA_FETCH_RETRIES + 1):
-        for url in urls:
-            status, body = read_url(url, headers)
-            valid_body, error = validate_json(status, body, clean_path, url)
+    for url in urls:
+        status, body = read_url(url, headers)
+        valid_body, error = validate_json(status, body, clean_path, url)
 
-            if valid_body is not None:
-                return valid_body
+        if valid_body is not None:
+            return valid_body
 
-            last_error = error
-
-            # 404 = page absente : inutile de retenter plusieurs fois.
-            if status == 404:
-                print(f"Échec définitif: {error}", file=sys.stderr)
-                raise RuntimeError(error)
-
-            print(f"Échec tentative {attempt}/{SOFA_FETCH_RETRIES}: {error}", file=sys.stderr)
-
-        if attempt < SOFA_FETCH_RETRIES:
-            time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
+        last_error = error
+        print(f"Échec: {error}", file=sys.stderr)
 
     raise RuntimeError(last_error or f"Impossible de récupérer {clean_path}")
+
 
 def cache_key(path):
     return f"{CACHE_PREFIX}{path.lstrip('/')}"
@@ -303,9 +247,6 @@ def enqueue_prefetch(path):
 
 
 def maybe_enqueue_incidents_from_team_page(path, body):
-    if not PREFETCH_ENABLED:
-        return
-
     clean_path = path.lstrip("/")
 
     if not re.match(r"^team/\d+/events/last/\d+$", clean_path):
@@ -422,42 +363,6 @@ def incident_belongs_to_analyzed_team(incident, match, analyzed_team_id):
     return True
 
 
-def is_own_goal_incident(incident):
-    cls = str(incident.get("incidentClass") or "").lower()
-
-    return (
-        incident.get("isOwnGoal") is True or
-        incident.get("ownGoal") is True or
-        cls in {"owngoal", "own_goal", "own goal"} or
-        "own" in cls
-    )
-
-
-def own_goal_committed_by_analyzed_team(incident, match, analyzed_team_id):
-    player = incident.get("player") or {}
-
-    # Pour un CSC, SofaScore peut comptabiliser le but pour l'équipe bénéficiaire.
-    # Dans notre méthode, on veut toujours attribuer l'événement au joueur/club
-    # qui marque contre son camp. On privilégie donc l'équipe du joueur.
-    player_team_id = (
-        ((incident.get("playerTeam") or {}).get("id")) or
-        ((player.get("team") or {}).get("id"))
-    )
-
-    if player_team_id:
-        return player_team_id == analyzed_team_id
-
-    # Repli: si SofaScore place isHome du côté bénéficiaire du but,
-    # l'équipe qui marque contre son camp est l'autre côté.
-    if isinstance(incident.get("isHome"), bool):
-        home_team = match.get("homeTeam") or {}
-        analyzed_is_home = home_team.get("id") == analyzed_team_id
-        own_goal_team_is_home = not incident.get("isHome")
-        return own_goal_team_is_home == analyzed_is_home
-
-    return incident_belongs_to_analyzed_team(incident, match, analyzed_team_id)
-
-
 def signed_attack_value(kind, is_for_analyzed_team):
     base = POSITIVE_VALUES.get(kind, 0)
     return base if is_for_analyzed_team else -base
@@ -468,32 +373,13 @@ def signed_card_value(kind, is_for_analyzed_team):
     return base if is_for_analyzed_team else -base
 
 
-def signed_own_goal_value(is_for_analyzed_team):
-    base = NEGATIVE_VALUES_FOR_TEAM["ownGoal"]
-    return base if is_for_analyzed_team else -base
-
-
 def parse_incidents(incidents, match, analyzed_team_id):
-    """Récupère uniquement les buts.
-
-    Depuis cette version, les cartons et les passes décisives seules ne sont
-    plus parcourus. Les seuls événements conservés sont :
-    - But Avec Passeur = performance 1
-    - But Sans Passeur = 2/3 de performance 1
-    - CSC / Erreur adverse = 1/3 de performance 1
-
-    Le 1/3 d'un But Sans Passeur est classé dans la catégorie CSC / Erreur :
-    il compte comme une erreur de l'équipe qui encaisse.
-    """
     events = []
     match_label = make_match_label(match)
     match_id = match.get("id")
 
     for inc in incidents:
         if not isinstance(inc, dict):
-            continue
-
-        if inc.get("incidentType") != "goal":
             continue
 
         minute = inc.get("time")
@@ -507,596 +393,182 @@ def parse_incidents(incidents, match, analyzed_team_id):
         camp_label = "Équipe analysée" if is_for_team else "Adversaire"
         side = "team" if is_for_team else "opponent"
 
-        player = inc.get("player") or {}
-        scorer = player.get("name") or "—"
+        if inc.get("incidentType") == "goal":
+            player = inc.get("player") or {}
+            assist1 = inc.get("assist1") or None
+            scorer = player.get("name") or "—"
+            assister = assist1.get("name") if isinstance(assist1, dict) else None
 
-        if is_own_goal_incident(inc):
-            is_for_team = own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
-            camp_label = "Équipe analysée" if is_for_team else "Adversaire"
-            side = "team" if is_for_team else "opponent"
+            if assister:
+                events.append({
+                    "type": "goalWithAssist",
+                    "value": signed_attack_value("goalWithAssist", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {scorer} — passe : {assister}",
+                    "icon": "⚽",
+                })
 
-            events.append({
-                "type": "ownGoal",
-                "value": signed_own_goal_value(is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
-                "detail": f"{camp_label} · CSC / Erreur · {scorer}",
-                "icon": "🥅",
-            })
-            continue
+                events.append({
+                    "type": "assist",
+                    "value": signed_attack_value("assist", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {assister} → {scorer}",
+                    "icon": "🅰️",
+                })
+            else:
+                events.append({
+                    "type": "goal",
+                    "value": signed_attack_value("goal", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {scorer}",
+                    "icon": "⚽",
+                })
 
-        assist1 = inc.get("assist1") or None
-        assister = assist1.get("name") if isinstance(assist1, dict) else None
+        if inc.get("incidentType") == "card":
+            player = inc.get("player") or {}
 
-        if assister:
-            events.append({
-                "type": "goalWithAssist",
-                "value": signed_attack_value("goalWithAssist", is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
-                "detail": f"{camp_label} · But Avec Passeur · {scorer} — passe : {assister}",
-                "icon": "⚽",
-            })
-        else:
-            # Un But Sans Passeur est volontairement découpé en deux événements :
-            # 1) le but de l'équipe qui marque = 2/3 de performance 1 ;
-            # 2) l'erreur de l'équipe qui encaisse = 1/3 de performance 1.
-            # L'ordre est important : but d'abord, erreur ensuite.
-            events.append({
-                "type": "goal",
-                "value": signed_attack_value("goal", is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
-                "detail": f"{camp_label} · But Sans Passeur · {scorer}",
-                "icon": "⚽",
-                "subOrder": 0,
-            })
+            if not player.get("id"):
+                continue
 
-            error_is_for_team = not is_for_team
-            error_camp_label = "Équipe analysée" if error_is_for_team else "Adversaire"
-            error_side = "team" if error_is_for_team else "opponent"
+            cls = inc.get("incidentClass")
+            player_name = player.get("name") or "—"
 
-            events.append({
-                "type": "ownGoal",
-                "value": signed_own_goal_value(error_is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": error_side,
-                "detail": f"{error_camp_label} · CSC / Erreur sur But Sans Passeur · {scorer}",
-                "icon": "🥅",
-                "subOrder": 1,
-            })
+            if cls == "yellow":
+                events.append({
+                    "type": "yellow",
+                    "value": signed_card_value("yellow", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {player_name}",
+                    "icon": "🟨",
+                })
+
+            elif cls == "yellowRed":
+                events.append({
+                    "type": "secondYellow",
+                    "value": signed_card_value("secondYellow", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {player_name}",
+                    "icon": "🟧",
+                })
+
+                events.append({
+                    "type": "redFromSecondYellow",
+                    "value": signed_card_value("redFromSecondYellow", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {player_name}",
+                    "icon": "🟥",
+                })
+
+            elif cls == "red":
+                events.append({
+                    "type": "red",
+                    "value": signed_card_value("red", is_for_team),
+                    "minute": minute,
+                    "added": added,
+                    "minuteLabel": minute_label,
+                    "match": match_label,
+                    "matchId": match_id,
+                    "side": side,
+                    "detail": f"{camp_label} · {player_name}",
+                    "icon": "🟥",
+                })
 
     def sort_key(ev):
         time_value = ev.get("minute", 0) + (ev.get("added", 0) or 0) / 100
         order = {
             "goalWithAssist": 0,
             "goal": 0,
-            "ownGoal": 1,
-            "goalNoAssistError": 1,
+            "assist": 1,
+            "secondYellow": 2,
+            "redFromSecondYellow": 3,
+            "yellow": 4,
+            "red": 4,
         }.get(ev.get("type"), 9)
-        return (-time_value, ev.get("subOrder", order), order)
+        return (-time_value, order)
 
     events.sort(key=sort_key)
     return events
 
 
-def event_rank_quantity(event):
-    """Quantité qui fait avancer le rang.
-
-    Mode fixe : chaque événement avance de la valeur choisie dans le curseur
-    Avancement / Progression.
-
-    Mode performance : chaque événement avance selon sa performance absolue :
-    - But Avec Passeur : 1
-    - But Sans Passeur : 2/3
-    - CSC / Erreur : 1/3
-
-    Les valeurs négatives avancent aussi en positif, car le rang représente
-    une distance parcourue dans la liste d'événements.
-    """
-    if not isinstance(event, dict):
-        return 0.0
-
-    try:
-        value = float(event.get("value", 0))
-    except Exception:
-        return 0.0
-
-    if not math.isfinite(value):
-        return 0.0
-
-    if CURRENT_RANK_ADVANCEMENT_MODE == "performance":
-        return abs(value)
-
-    return CURRENT_RANK_EVENT_STEP
-
-
-def total_rank_quantity(events):
-    return sum(event_rank_quantity(event) for event in (events or []))
-
-
-def annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank):
-    source = dict(event)
-    source["rankIndex"] = event_index + 1
-    source["rankQuantity"] = event_rank_quantity(event)
-    source["cumulativeStart"] = cumulative_start
-    source["cumulativeEnd"] = cumulative_end
-    source["rankTarget"] = float(target_rank)
-    source["weight"] = 1
-    source["rankMode"] = "quantity"
-    return source
-
-
 def value_at_rank(events, rank):
-    """Performance exacte au rang demandé.
+    if not rank or rank < 1:
+        return {"value": None, "sources": []}
 
-    En mode fixe, on garde l'interpolation exacte entre les événements :
-    le rang demandé est converti en position exacte dans la liste.
+    rank = float(rank)
+    base_rank = int(rank)
+    fraction = round(rank - base_rank, 10)
 
-    En mode performance, l'avancement varie selon l'événement. On cherche
-    donc l'événement dont la zone de cumul contient exactement le rang demandé.
-    """
-    mode = CURRENT_RANK_ADVANCEMENT_MODE
+    lower_index = base_rank - 1
+    upper_index = lower_index + 1
 
-    if rank is None or rank <= 0:
-        return {"value": None, "sources": [], "rankMode": "quantity_exact", "eventStepMode": mode}
+    if lower_index < 0 or lower_index >= len(events):
+        return {"value": None, "sources": []}
 
-    try:
-        target_rank = float(rank)
-    except Exception:
-        return {"value": None, "sources": [], "rankMode": "quantity_exact", "eventStepMode": mode}
-
-    if target_rank <= 0:
-        return {"value": None, "sources": [], "rankMode": "quantity_exact", "eventStepMode": mode}
-
-    clean_events = [event for event in (events or []) if event_rank_quantity(event) > 0]
-
-    if not clean_events:
-        return {
-            "value": None,
-            "sources": [],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": CURRENT_RANK_EVENT_STEP,
-            "targetRank": target_rank,
-            "totalQuantity": 0,
-        }
-
-    total_quantity = sum(event_rank_quantity(event) for event in clean_events)
-
-    if target_rank > total_quantity + 1e-9:
-        return {
-            "value": None,
-            "sources": [],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": CURRENT_RANK_EVENT_STEP,
-            "targetRank": target_rank,
-            "totalQuantity": round(total_quantity, 6),
-        }
-
-    if mode == "performance":
-        cumulative = 0.0
-
-        for event_index, event in enumerate(clean_events):
-            quantity = event_rank_quantity(event)
-            cumulative_start = cumulative
-            cumulative_end = cumulative + quantity
-
-            if cumulative_end >= target_rank - 1e-9:
-                source = annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank)
-                source["weight"] = 1
-                source["rankMode"] = "quantity_performance"
-
-                return {
-                    "value": float(source.get("value", 0)),
-                    "sources": [source],
-                    "rankMode": "quantity_performance",
-                    "eventStepMode": mode,
-                    "eventStep": CURRENT_RANK_EVENT_STEP,
-                    "targetRank": target_rank,
-                    "totalQuantity": round(total_quantity, 6),
-                }
-
-            cumulative = cumulative_end
-
-        return {
-            "value": None,
-            "sources": [],
-            "rankMode": "quantity_performance",
-            "eventStepMode": mode,
-            "eventStep": CURRENT_RANK_EVENT_STEP,
-            "targetRank": target_rank,
-            "totalQuantity": round(total_quantity, 6),
-        }
-
-    step = CURRENT_RANK_EVENT_STEP
-    exact_position = target_rank / step
-
-    # Si le rang tombe exactement sur la borne d'un événement, on prend cet événement.
-    nearest_integer = round(exact_position)
-
-    if nearest_integer >= 1 and abs(exact_position - nearest_integer) < 1e-9:
-        event_index = int(nearest_integer) - 1
-
-        if event_index < 0 or event_index >= len(clean_events):
-            return {
-                "value": None,
-                "sources": [],
-                "rankMode": "quantity_exact",
-                "eventStepMode": mode,
-                "eventStep": step,
-                "targetRank": target_rank,
-                "exactPosition": exact_position,
-                "totalQuantity": round(total_quantity, 6),
-            }
-
-        cumulative_start = event_index * step
-        cumulative_end = cumulative_start + step
-        source = annotate_rank_source(clean_events[event_index], event_index, cumulative_start, cumulative_end, target_rank)
-        source["rankIndexExact"] = exact_position
-        source["exactPosition"] = exact_position
+    if abs(fraction) < 0.0000001:
+        source = dict(events[lower_index])
+        source["rankIndex"] = base_rank
         source["weight"] = 1
 
         return {
-            "value": float(source.get("value", 0)),
+            "value": round(source["value"], 4),
             "sources": [source],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": step,
-            "targetRank": target_rank,
-            "exactPosition": exact_position,
-            "totalQuantity": round(total_quantity, 6),
         }
 
-    lower_rank_index = math.floor(exact_position)
-    fraction = exact_position - lower_rank_index
-
-    # Si la position est avant le premier événement complet, on utilise le premier événement.
-    if lower_rank_index < 1:
-        source = annotate_rank_source(clean_events[0], 0, 0, step, target_rank)
-        source["rankIndexExact"] = exact_position
-        source["exactPosition"] = exact_position
-        source["weight"] = 1
-
-        return {
-            "value": float(source.get("value", 0)),
-            "sources": [source],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": step,
-            "targetRank": target_rank,
-            "exactPosition": exact_position,
-            "totalQuantity": round(total_quantity, 6),
-        }
-
-    lower_index = lower_rank_index - 1
-    upper_index = lower_rank_index
-
-    if lower_index < 0 or upper_index >= len(clean_events):
-        return {
-            "value": None,
-            "sources": [],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": step,
-            "targetRank": target_rank,
-            "exactPosition": exact_position,
-            "totalQuantity": round(total_quantity, 6),
-        }
+    if upper_index >= len(events):
+        return {"value": None, "sources": []}
 
     lower_weight = 1 - fraction
     upper_weight = fraction
 
-    lower_start = lower_index * step
-    lower_end = lower_start + step
-    upper_start = upper_index * step
-    upper_end = upper_start + step
+    lower_source = dict(events[lower_index])
+    upper_source = dict(events[upper_index])
 
-    lower_source = annotate_rank_source(clean_events[lower_index], lower_index, lower_start, lower_end, target_rank)
-    upper_source = annotate_rank_source(clean_events[upper_index], upper_index, upper_start, upper_end, target_rank)
+    lower_source["rankIndex"] = base_rank
+    lower_source["weight"] = round(lower_weight, 4)
 
-    lower_source["rankIndexExact"] = exact_position
-    lower_source["exactPosition"] = exact_position
-    lower_source["weight"] = round(lower_weight, 8)
-
-    upper_source["rankIndexExact"] = exact_position
-    upper_source["exactPosition"] = exact_position
-    upper_source["weight"] = round(upper_weight, 8)
+    upper_source["rankIndex"] = base_rank + 1
+    upper_source["weight"] = round(upper_weight, 4)
 
     value = (
-        float(lower_source.get("value", 0)) * lower_weight +
-        float(upper_source.get("value", 0)) * upper_weight
+        lower_source["value"] * lower_weight +
+        upper_source["value"] * upper_weight
     )
 
     return {
-        "value": float(value),
+        "value": round(value, 4),
         "sources": [lower_source, upper_source],
-        "rankMode": "quantity_exact",
-        "eventStepMode": mode,
-        "eventStep": step,
-        "targetRank": target_rank,
-        "exactPosition": exact_position,
-        "totalQuantity": round(total_quantity, 6),
     }
 
-def event_intersects_rank_zone(cumulative_start, cumulative_end, low_rank, high_rank):
-    # Chaque événement couvre (start, end]. Il est dans la zone s'il touche
-    # le rang bas ou s'il commence strictement avant le rang haut.
-    if high_rank < low_rank:
-        low_rank, high_rank = high_rank, low_rank
-
-    return cumulative_end >= low_rank - 1e-9 and cumulative_start < high_rank - 1e-9
-
-
-def events_between_rank_quantities(events, rank1, rank2=None):
-    if not events or not rank1:
-        return [], None, None, 0.0
-
-    try:
-        first_rank = float(rank1)
-        second_rank = float(rank2) if rank2 is not None else first_rank
-    except Exception:
-        return [], None, None, 0.0
-
-    low_rank = min(first_rank, second_rank)
-    high_rank = max(first_rank, second_rank)
-
-    cumulative = 0.0
-    selected = []
-
-    for event_index, event in enumerate(events or []):
-        quantity = event_rank_quantity(event)
-
-        if quantity <= 0:
-            continue
-
-        cumulative_start = cumulative
-        cumulative_end = cumulative + quantity
-
-        if event_intersects_rank_zone(cumulative_start, cumulative_end, low_rank, high_rank):
-            selected.append(annotate_rank_source(event, event_index, cumulative_start, cumulative_end, low_rank))
-
-        cumulative = cumulative_end
-
-        if cumulative_start > high_rank + 1e-9:
-            break
-
-    return selected, round(low_rank, 4), round(high_rank, 4), round(sum(event_rank_quantity(event) for event in selected), 4)
-
-
-def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
-    """Calcule les stats entre deux rangs, rangs finaux inclus.
-
-    Nouvelle logique: l’avancement vient du curseur ou de la valeur de performance selon l’option choisie.
-
-    group_mode="target" : groupe par événement + équipe attribuée + valeur.
-      -> utile pour une zone d'équipe.
-    group_mode="global" : groupe seulement par événement + valeur.
-      -> utile pour la zone collective simultanée, qui n'appartient à aucun camp.
-    """
-    empty = {
-        "average": None,
-        "modeValues": [],
-        "modeItems": [],
-        "modeCount": 0,
-        "count": 0,
-        "startRankIndex": None,
-        "endRankIndex": None,
-        "totalQuantity": 0,
-        "rankMode": "quantity",
-        "eventStepMode": CURRENT_RANK_ADVANCEMENT_MODE,
-        "eventStep": CURRENT_RANK_EVENT_STEP,
-        "eventStepLabel": rank_advancement_label(),
-        "groupMode": group_mode,
-    }
-
-    selected_events, start_rank_value, end_rank_value, selected_quantity = events_between_rank_quantities(events, rank1, rank2)
-
-    if not selected_events:
-        result = dict(empty)
-        result["startRankIndex"] = start_rank_value
-        result["endRankIndex"] = end_rank_value
-        return result
-
-    values = []
-    counts = {}
-    examples = {}
-
-    def fallback_target_label(event):
-        display_side = event.get("displaySide")
-
-        if display_side:
-            text = str(display_side)
-            for prefix in ["Attribué à ", "Performance "]:
-                if text.startswith(prefix):
-                    return text[len(prefix):]
-            return text
-
-        return "Équipe analysée" if event.get("side") == "team" else "Adversaire"
-
-    def target_label(event):
-        return event.get("targetName") or fallback_target_label(event)
-
-    def origin_label(event):
-        if event.get("originLabel"):
-            return event.get("originLabel")
-
-        if event.get("linkedFromOpponentPast"):
-            return "adversaire passé"
-
-        return "passé direct"
-
-    for event in selected_events:
-        try:
-            value = round(float(event.get("value", 0)), 4)
-        except Exception:
-            continue
-
-        values.append(value)
-
-        event_type = event.get("type") or "unknown"
-        target = target_label(event)
-        origin = origin_label(event)
-
-        if group_mode == "global":
-            key = f"{event_type}|{value:.4f}"
-        else:
-            key = f"{event_type}|{target}|{value:.4f}"
-
-        counts[key] = counts.get(key, 0) + 1
-
-        if key not in examples:
-            examples[key] = {
-                "type": event_type,
-                "label": LABELS.get(event_type, event_type),
-                "targetLabel": target,
-                "sideLabel": f"attribué à {target}",
-                "value": value,
-                "icon": event.get("icon") or "•",
-                "origins": {},
-                "targets": {},
-                "groupMode": group_mode,
-                "isGlobal": group_mode == "global",
-                "rankMode": "quantity",
-            }
-
-        origins = examples[key].setdefault("origins", {})
-        origins[origin] = origins.get(origin, 0) + 1
-
-        targets = examples[key].setdefault("targets", {})
-        target_bucket = targets.setdefault(target, {"count": 0, "origins": {}})
-        target_bucket["count"] += 1
-        target_bucket["origins"][origin] = target_bucket["origins"].get(origin, 0) + 1
-
-    if not values:
-        result = dict(empty)
-        result["startRankIndex"] = start_rank_value
-        result["endRankIndex"] = end_rank_value
-        return result
-
-    mode_count = max(counts.values())
-    mode_items = []
-
-    for key, count in counts.items():
-        if count != mode_count:
-            continue
-
-        item = dict(examples[key])
-        item["count"] = count
-
-        origins_dict = item.get("origins") or {}
-        item["origins"] = [
-            {"label": label, "count": origin_count}
-            for label, origin_count in sorted(
-                origins_dict.items(),
-                key=lambda pair: (-pair[1], pair[0]),
-            )
-        ]
-
-        targets_dict = item.get("targets") or {}
-        target_breakdown = []
-
-        for label, info in sorted(
-            targets_dict.items(),
-            key=lambda pair: (-pair[1].get("count", 0), pair[0]),
-        ):
-            origin_items = [
-                {"label": origin_label_value, "count": origin_count}
-                for origin_label_value, origin_count in sorted(
-                    (info.get("origins") or {}).items(),
-                    key=lambda pair: (-pair[1], pair[0]),
-                )
-            ]
-            target_breakdown.append({
-                "label": label,
-                "count": info.get("count", 0),
-                "origins": origin_items,
-            })
-
-        item["targetBreakdown"] = target_breakdown
-        mode_items.append(item)
-
-    mode_items.sort(key=lambda item: (
-        -item.get("count", 0),
-        str(item.get("label", "")),
-        float(item.get("value", 0)),
-        str(item.get("targetLabel", "")),
-    ))
-
-    mode_values = sorted({round(float(item["value"]), 4) for item in mode_items})
-
-    return {
-        "average": round(sum(values) / len(values), 4),
-        "modeValues": mode_values,
-        "modeItems": mode_items,
-        "modeCount": mode_count,
-        "count": len(values),
-        "startRankIndex": start_rank_value,
-        "endRankIndex": end_rank_value,
-        "totalQuantity": round(selected_quantity, 4),
-        "rankMode": "quantity",
-        "eventStepMode": CURRENT_RANK_ADVANCEMENT_MODE,
-        "eventStep": CURRENT_RANK_EVENT_STEP,
-        "eventStepLabel": rank_advancement_label(),
-        "groupMode": group_mode,
-    }
-
-
-def zone_events_between_ranks(events, rank1, rank2=None):
-    """Retourne les événements situés entre deux rangs, rangs finaux inclus.
-
-    Nouvelle logique: la zone est basée sur le cumul d’avancement choisi, pas sur un rang 1 événement = 1.
-    """
-    selected_events, start_rank_value, end_rank_value, _selected_quantity = events_between_rank_quantities(events, rank1, rank2)
-    return selected_events, start_rank_value, end_rank_value
-
-
-def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
-    """Zone collective simultanée générale.
-
-    Pour la moyenne globale uniquement, on parcourt la liste collective complète :
-    équipe A + équipe B + adversaire passé de A + adversaire passé de B.
-
-    Les rangs utilisés restent ceux indiqués : pas de multiplication automatique.
-
-    Chaque événement avance selon le curseur ou selon sa valeur de performance.
-    """
-    try:
-        used_rank1 = float(rank1)
-        used_rank2 = float(rank2) if rank2 is not None else used_rank1
-    except Exception:
-        used_rank1 = rank1
-        used_rank2 = rank2
-
-    result = zone_stats_between_ranks(combined_events or [], used_rank1, used_rank2, group_mode="global")
-    result["globalMethod"] = "combined_all_events_rank_advancement"
-    result["rankMultiplier"] = 1
-    result["eventStep"] = CURRENT_RANK_EVENT_STEP
-    result["eventStepMode"] = CURRENT_RANK_ADVANCEMENT_MODE
-    result["eventStepLabel"] = rank_advancement_label()
-    result["originalRank1"] = rank1
-    result["originalRank2"] = rank2
-    result["usedRank1"] = used_rank1
-    result["usedRank2"] = used_rank2
-    result["combinedEventCount"] = len(combined_events or [])
-    return result
 
 def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span):
     update_scan_job(
@@ -1116,56 +588,11 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             progress=base_progress + int(progress_span * 0.10 * ((page + 1) / PAGES_TO_LOAD)),
         )
 
-        page_path = f"team/{analyzed_team_id}/events/last/{page}"
-
-        try:
-            data = get_json(page_path)
-        except Exception as e:
-            error_text = str(e)
-
-            # SofaScore renvoie parfois 404 quand une équipe n'a plus de page historique.
-            # Ce n'est pas une vraie erreur de scan : on s'arrête simplement aux pages déjà récupérées.
-            if "HTTP 404" in error_text or "Not Found" in error_text:
-                update_scan_job(
-                    job_id,
-                    status="running",
-                    message=(
-                        f"{team_name} · fin de l'historique SofaScore à la page {page + 1}.\n"
-                        f"Pages récupérées : {page}/{PAGES_TO_LOAD}"
-                    ),
-                    progress=base_progress + int(progress_span * 0.10),
-                )
-                break
-
-            # Erreur réseau sur une page historique : si on a déjà des pages, on continue
-            # avec ce qu'on a au lieu de faire planter tout le scan. Si la page 0 plante,
-            # on remonte l'erreur car on n'a aucune base pour analyser l'équipe.
-            if pages:
-                update_scan_job(
-                    job_id,
-                    status="running",
-                    message=(
-                        f"{team_name} · page {page + 1} ignorée après erreur réseau.\n"
-                        f"Pages déjà récupérées : {page}/{PAGES_TO_LOAD}"
-                    ),
-                    progress=base_progress + int(progress_span * 0.10),
-                )
-                break
-
-            raise
-
+        data = get_json(f"team/{analyzed_team_id}/events/last/{page}")
         page_events = data.get("events") if isinstance(data, dict) else data
 
-        if isinstance(page_events, list) and page_events:
+        if isinstance(page_events, list):
             pages.extend(page_events)
-        else:
-            update_scan_job(
-                job_id,
-                status="running",
-                message=f"{team_name} · page {page + 1} vide, arrêt de l'historique.",
-                progress=base_progress + int(progress_span * 0.10),
-            )
-            break
 
     by_id = {}
 
@@ -1209,7 +636,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     scanned_until = 0
 
     for stage_limit in stages:
-        if total_rank_quantity(all_events) >= max_needed:
+        if len(all_events) >= max_needed:
             break
 
         update_scan_job(
@@ -1217,7 +644,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             status="running",
             message=(
                 f"{team_name} · scan progressif jusqu’à {stage_limit} matchs\n"
-                f"Avancement trouvé : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
+                f"Événements trouvés : {len(all_events)}/{max_needed}"
             ),
             progress=base_progress + int(progress_span * 0.13),
         )
@@ -1233,16 +660,14 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 status="running",
                 message=(
                     f"{team_name} · incidents matchs {start + 1}-{batch_end}/{stage_limit}\n"
-                    f"Avancement trouvé : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
+                    f"Événements trouvés : {len(all_events)}/{max_needed}"
                 ),
                 progress=base_progress + int(progress_span * (0.15 + 0.80 * stage_position)),
             )
 
             scanned = []
 
-            max_workers = max(1, min(len(batch) or 1, INCIDENT_MAX_WORKERS))
-
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            with ThreadPoolExecutor(max_workers=len(batch) or 1) as executor:
                 futures = {}
 
                 for idx, match in enumerate(batch):
@@ -1251,28 +676,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 
                 for future in as_completed(futures):
                     idx, match = futures[future]
-
-                    try:
-                        data = future.result()
-                    except Exception as e:
-                        # Erreur réseau ou match incident indisponible : on ignore ce match
-                        # au lieu de faire échouer tout le scan.
-                        print(f"Match ignoré après erreur incidents {match.get('id')}: {e}", file=sys.stderr)
-                        scanned.append({
-                            "idx": idx,
-                            "match": match,
-                            "events": [],
-                            "matchUsed": {
-                                "id": match.get("id"),
-                                "label": make_match_label(match),
-                                "count": 0,
-                                "startTimestamp": match.get("startTimestamp") or 0,
-                                "competition": get_competition_name(match),
-                                "error": str(e),
-                            },
-                        })
-                        continue
-
+                    data = future.result()
                     incidents = data.get("incidents") if isinstance(data, dict) else data
 
                     if not isinstance(incidents, list):
@@ -1299,18 +703,18 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 all_events.extend(item["events"])
                 matches_used.append(item["matchUsed"])
 
-                if total_rank_quantity(all_events) >= max_needed:
+                if len(all_events) >= max_needed:
                     break
 
             scanned_until = batch_end
 
-            if total_rank_quantity(all_events) >= max_needed:
+            if len(all_events) >= max_needed:
                 break
 
     update_scan_job(
         job_id,
         status="running",
-        message=f"{team_name} · terminé ({len(all_events)} événements, avancement {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs).",
+        message=f"{team_name} · terminé ({len(all_events)} événements, {len(matches_used)} matchs).",
         progress=base_progress + progress_span,
     )
 
@@ -1319,135 +723,6 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
         "matchesUsed": matches_used,
     }
 
-
-
-def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domicile", away_name="Extérieur"):
-    """Construit le mode simultané match par match puis minute par minute.
-
-    Règle importante demandée:
-    - les événements de l'équipe analysée restent dans son flux.
-    - les événements de l'adversaire dans le passé de A sont transférés au flux de B,
-      avec la valeur inversée.
-    - les événements de l'adversaire dans le passé de B sont transférés au flux de A,
-      avec la valeur inversée.
-    """
-
-    def strip_camp_prefix(detail):
-        text = str(detail or "")
-        for prefix in ["Équipe analysée · ", "Adversaire · "]:
-            if text.startswith(prefix):
-                return text[len(prefix):]
-        return text
-
-    def group_by_match(scan):
-        order = []
-        grouped = {}
-
-        for match in scan.get("matchesUsed") or []:
-            match_id = match.get("id")
-            if match_id is None:
-                continue
-            order.append(match_id)
-            grouped.setdefault(match_id, [])
-
-        for event in scan.get("events") or []:
-            match_id = event.get("matchId")
-            grouped.setdefault(match_id, []).append(event)
-            if match_id not in order:
-                order.append(match_id)
-
-        return order, grouped
-
-    def copy_for_target(event, target_key, source_name, target_name, linked_from_opponent):
-        copied = dict(event)
-        clean_detail = strip_camp_prefix(copied.get("detail"))
-
-        copied["targetName"] = target_name
-        copied["simultaneousTarget"] = target_key
-        copied["displaySide"] = f"Attribué à {target_name}"
-
-        if linked_from_opponent:
-            try:
-                copied["value"] = round(-float(copied.get("value", 0)), 4)
-            except Exception:
-                copied["value"] = copied.get("value")
-
-            copied["side"] = "team"
-            copied["linkedFromOpponentPast"] = True
-            copied["originLabel"] = f"adversaire passé de {source_name}"
-            copied["detail"] = f"Attribué à {target_name} · origine: adversaire passé de {source_name} · {clean_detail}"
-        else:
-            copied["originLabel"] = f"passé direct de {target_name}"
-            copied["detail"] = f"Attribué à {target_name} · origine: passé direct · {clean_detail}"
-
-        return copied
-
-    home_order, home_grouped = group_by_match(home_scan)
-    away_order, away_grouped = group_by_match(away_scan)
-
-    home_events = []
-    away_events = []
-    combined_events = []
-    shared_index = 0
-    max_len = max(len(home_order), len(away_order))
-
-    for match_index in range(max_len):
-        items = []
-
-        if match_index < len(home_order):
-            for original_index, event in enumerate(home_grouped.get(home_order[match_index], [])):
-                items.append(("home", original_index, event))
-
-        if match_index < len(away_order):
-            for original_index, event in enumerate(away_grouped.get(away_order[match_index], [])):
-                items.append(("away", original_index, event))
-
-        def sort_key(item):
-            source_key, original_index, event = item
-            minute = event.get("minute") or 0
-            added = event.get("added") or 0
-            return (-(minute + added / 100), 0 if source_key == "home" else 1, original_index)
-
-        for source_key, original_index, event in sorted(items, key=sort_key):
-            shared_index += 1
-
-            if source_key == "home":
-                if event.get("side") == "opponent":
-                    copied = copy_for_target(event, "away", home_name, away_name, True)
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    away_events.append(copied)
-                    combined_events.append(dict(copied))
-                else:
-                    copied = copy_for_target(event, "home", home_name, home_name, False)
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    home_events.append(copied)
-                    combined_events.append(dict(copied))
-            else:
-                if event.get("side") == "opponent":
-                    copied = copy_for_target(event, "home", away_name, home_name, True)
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    home_events.append(copied)
-                    combined_events.append(dict(copied))
-                else:
-                    copied = copy_for_target(event, "away", away_name, away_name, False)
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    away_events.append(copied)
-                    combined_events.append(dict(copied))
-
-    combined_events.sort(key=lambda event: event.get("simultaneousIndex") or 0)
-
-    home_result = dict(home_scan)
-    away_result = dict(away_scan)
-    home_result["events"] = home_events
-    away_result["events"] = away_events
-    home_result["simultaneousLinkedMode"] = True
-    away_result["simultaneousLinkedMode"] = True
-
-    return home_result, away_result, combined_events
 
 def process_scan_job(job_id):
     raw = redis_cmd("GET", f"{SCAN_JOB_PREFIX}{job_id}")
@@ -1465,39 +740,15 @@ def process_scan_job(job_id):
     rank2 = float(rank2) if rank2 is not None else None
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
-    simultaneous_mode = bool(params.get("simultaneousMode"))
-    rank_event_step = params.get("rankEventStep", DEFAULT_RANK_EVENT_STEP)
-    rank_event_mode = params.get("rankEventMode") or params.get("rankStepMode") or "fixed"
-    winner_mode = "evolution" if params.get("winnerMode") == "evolution" else "dominance"
-    configure_rank_advancement(rank_event_step, rank_event_mode)
 
-    effective_rank1 = rank1
-    effective_rank2 = rank2
+    ranks = [rank1]
 
-    ranks = [effective_rank1]
+    if rank2 is not None:
+        ranks.append(rank2)
 
-    if effective_rank2 is not None:
-        ranks.append(effective_rank2)
+    max_needed = int(max(ranks) + 0.999999)
 
-    max_needed = float(max(ranks))
-
-    # En mode simultané, chaque performance attribuée à une équipe est construite
-    # avec deux historiques :
-    # - le passé direct de cette équipe ;
-    # - l'adversaire passé de l'autre équipe.
-    #
-    # Si on ne récupère que "max_needed" événements bruts par équipe, il peut
-    # manquer des événements après réattribution, car tous les événements bruts ne
-    # finissent pas dans la même liste attribuée. On récupère donc plus large en
-    # simultané, puis on reclasse seulement après.
-    scan_fetch_needed = max_needed * 2 if simultaneous_mode else max_needed
-
-    print(
-        f"🔎 Scan complet: job={job_id} match={match_id} "
-        f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
-        f"objectif avancement brut={scan_fetch_needed} simultaneous={simultaneous_mode} "
-        f"avancement={rank_advancement_label()}"
-    )
+    print(f"Scan complet: job={job_id} match={match_id} ranks={ranks}")
 
     try:
         update_scan_job(job_id, status="running", message="Récupération du match principal…", progress=5)
@@ -1522,7 +773,7 @@ def process_scan_job(job_id):
             job_id,
             home_team["id"],
             skip_home,
-            scan_fetch_needed,
+            max_needed,
             home_team.get("name") or "Domicile",
             12,
             40,
@@ -1532,42 +783,24 @@ def process_scan_job(job_id):
             job_id,
             away_team["id"],
             skip_away,
-            scan_fetch_needed,
+            max_needed,
             away_team.get("name") or "Extérieur",
             54,
             40,
         )
 
-        simultaneous_combined_events = []
-
-        if simultaneous_mode:
-            update_scan_job(
-                job_id,
-                status="running",
-                message="Calcul simultané: reclassement match par match puis minute par minute…",
-                progress=96,
-            )
-            home_scan, away_scan, simultaneous_combined_events = apply_simultaneous_match_minute_order(
-                home_scan,
-                away_scan,
-                home_team.get("name") or "Domicile",
-                away_team.get("name") or "Extérieur",
-            )
-
         home = {
             **home_team,
             **home_scan,
-            "r1": value_at_rank(home_scan["events"], effective_rank1),
-            "r2": value_at_rank(home_scan["events"], effective_rank2) if effective_rank2 else None,
-            "zoneStats": zone_stats_between_ranks(home_scan["events"], effective_rank1, effective_rank2),
+            "r1": value_at_rank(home_scan["events"], rank1),
+            "r2": value_at_rank(home_scan["events"], rank2) if rank2 else None,
         }
 
         away = {
             **away_team,
             **away_scan,
-            "r1": value_at_rank(away_scan["events"], effective_rank1),
-            "r2": value_at_rank(away_scan["events"], effective_rank2) if effective_rank2 else None,
-            "zoneStats": zone_stats_between_ranks(away_scan["events"], effective_rank1, effective_rank2),
+            "r1": value_at_rank(away_scan["events"], rank1),
+            "r2": value_at_rank(away_scan["events"], rank2) if rank2 else None,
         }
 
         result = {
@@ -1580,41 +813,27 @@ def process_scan_job(job_id):
             },
             "home": home,
             "away": away,
-            "requestedRank1": rank1,
-            "requestedRank2": rank2,
-            "rank1": effective_rank1,
-            "rank2": effective_rank2,
-            "simultaneousMode": simultaneous_mode,
-            "rankEventStep": CURRENT_RANK_EVENT_STEP,
-            "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
-            "rankEventStepLabel": rank_advancement_label(),
-            "winnerMode": winner_mode,
-            "scanModeLabel": "Simultané lié: mêmes rangs, match par match / minute par minute" if simultaneous_mode else "Standard",
-            "overallZoneStats": None,
+            "rank1": rank1,
+            "rank2": rank2,
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
                 "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
                 "secondMatchesPerTeam": SECOND_MATCHES_PER_TEAM,
                 "maxMatchesPerTeam": MAX_MATCHES_PER_TEAM,
                 "incidentBatchSize": INCIDENT_BATCH_SIZE,
-                "zoneMethod": "final_ranks_low_to_high",
-                "rankEventStep": CURRENT_RANK_EVENT_STEP,
-                "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
-                "rankEventStepLabel": rank_advancement_label(),
-                "winnerMode": winner_mode,
             },
         }
 
         update_scan_job(
             job_id,
             status="done",
-            message="🔎 Scan terminé.",
+            message="Scan terminé.",
             progress=100,
             result=result,
             finishedAt=now_ts(),
         )
 
-        print(f"🔎 Scan terminé: {job_id}")
+        print(f"Scan terminé: {job_id}")
 
     except Exception as e:
         update_scan_job(
@@ -1691,14 +910,12 @@ def main():
     once = "--once" in sys.argv
 
     print("Foot/Scan worker local démarré.")
-    print("Version niveau 1: 🔎 scan complet côté worker activé.")
-    print("Pages SofaScore: jusqu’à 20 pages, arrêt automatique si 404/page vide.")
-    print("Mode simultané lié: mêmes rangs, match par match, minute par minute.")
+    print("Version niveau 1: scan complet côté worker activé.")
+    print("Pages SofaScore: 2 pages activées.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Avancement des rangs: curseur par job, défaut 1 par événement.")
-    print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
-    print("Stabilité réseau: retry SofaScore + incidents ignorés en cas d’erreur.")
-    print("Préchargement incidents: désactivé par défaut pour économiser les requêtes.")
+    print("Calcul pondéré: X / X.125 / X.25 / X.375 / X.5 / X.625 / X.75 / X.875 activé.")
+    print("Barème cartons: jaune, 2e jaune, rouge direct, rouge via 2e jaune activé.")
+    print("Version rapide: préchargement incidents activé.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
     while True:
