@@ -6087,6 +6087,58 @@
       }
     }
 
+
+    /* Retouche v45 : compteur rapport dans la grille + centrage emoji Termux */
+    .report-count-pill {
+      cursor: default !important;
+      pointer-events: none !important;
+      user-select: none !important;
+      display: grid !important;
+      place-items: center !important;
+      text-align: center !important;
+      font-weight: 1000 !important;
+      letter-spacing: -0.02em !important;
+      background: rgba(22, 32, 74, 0.88) !important;
+      border-color: rgba(64, 201, 255, 0.28) !important;
+      color: #eef6ff !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), 0 10px 22px rgba(0,0,0,0.16) !important;
+    }
+
+    .notice-inline-icon {
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      font-size: 0 !important;
+      line-height: 0 !important;
+      text-indent: 0 !important;
+    }
+
+    .notice-inline-icon::before {
+      content: "🛑" !important;
+      position: absolute !important;
+      inset: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      font-size: 17px !important;
+      line-height: 1 !important;
+      text-align: center !important;
+      transform: translate(0, 0) !important;
+    }
+
+    @media (max-width: 380px) {
+      .notice-inline-icon::before {
+        font-size: 15.5px !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -6251,7 +6303,6 @@
       <div class="report-head">
         <div>
           <div class="report-title">RAPPORT DE SESSION</div>
-          <div class="report-count" id="reportCount">0 Analyse Enregistrée</div>
         </div>
       </div>
 
@@ -6263,6 +6314,7 @@
           <button class="report-btn" id="downloadSimpleReportBtn" type="button">TXT Simple</button>
           <button class="report-btn" id="printSimpleReportBtn" type="button">PDF Simple</button>
           <button class="report-btn" id="downloadFullReportBtn" type="button">TXT Complet</button>
+          <div class="report-btn report-count-pill" id="reportCount" role="status" aria-live="polite">0 ANALYSE</div>
           <button class="report-btn red" id="clearReportBtn" type="button">VIDER LE RAPPORT</button>
         </div>
 
@@ -7512,7 +7564,7 @@
 
     function updateReportCount() {
       const count = loadReport().length;
-      $("reportCount").textContent = `${count} Analyse${count > 1 ? "s" : ""} Enregistrée${count > 1 ? "s" : ""}`;
+      $("reportCount").textContent = `${count} ANALYSE${count > 1 ? "S" : ""}`;
     }
 
     function rankLines(team, rankLabel, rankResult) {
