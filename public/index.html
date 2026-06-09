@@ -5750,1329 +5750,7 @@
       }
     }
 
-
-    /* Retouche v40 : bulles hero/notice, summary pills, VS line, input width, event counter near arrow */
-    .hero-copy-bubble {
-      display: block;
-      margin-top: 12px !important;
-      padding: 12px 14px !important;
-      border-radius: 16px !important;
-      border: 1px solid rgba(255,255,255,.10) !important;
-      background:
-        linear-gradient(135deg, rgba(64,201,255,.09), rgba(255,59,114,.08)),
-        rgba(7, 13, 31, .72) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
-    }
-
-    .notice-stack {
-      display: grid;
-      gap: 10px;
-      width: 100%;
-    }
-
-    .notice-bubble {
-      display: block;
-      width: 100%;
-      margin: 0 !important;
-      padding: 12px 14px !important;
-      border-radius: 16px !important;
-      border: 1px solid rgba(255,255,255,.10) !important;
-      background:
-        linear-gradient(135deg, rgba(64,201,255,.08), rgba(255,59,114,.07)),
-        rgba(7, 13, 31, .70) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
-    }
-
-    .notice-title.notice-bubble {
-      display: inline-flex !important;
-      width: fit-content;
-      max-width: 100%;
-      margin-bottom: 0 !important;
-    }
-
-    .summary-pill-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-
-    .summary-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 7px 12px;
-      min-height: 34px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.10);
-      background:
-        linear-gradient(135deg, rgba(64,201,255,.12), rgba(255,59,114,.10)),
-        rgba(10, 16, 34, .95);
-      color: #dbeafe;
-      font-size: 10.5px;
-      font-weight: 1000;
-      letter-spacing: .14em;
-      text-transform: uppercase;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
-    }
-
-    .summary-pill-mode {
-      color: #fce7f3;
-      text-align: right;
-    }
-
-    .summary-head {
-      gap: 0 !important;
-    }
-
-    .summary-vs-line {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      margin-top: 10px;
-      overflow: hidden;
-      font-weight: 1000;
-      font-size: clamp(14px, 3.8vw, 18px);
-      letter-spacing: .24em;
-      line-height: 1;
-      text-transform: uppercase;
-      user-select: none;
-      white-space: nowrap;
-      filter: drop-shadow(0 0 14px rgba(255,255,255,.05));
-    }
-
-    .summary-vs-line::before {
-      content: "";
-      position: absolute;
-      inset: -4px 0;
-      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.22) 50%, transparent 100%);
-      mix-blend-mode: screen;
-      opacity: .22;
-      pointer-events: none;
-    }
-
-    .summary-vs-line-left,
-    .summary-vs-line-right {
-      position: relative;
-      display: inline-block;
-    }
-
-    .summary-vs-line-left {
-      color: #40c9ff;
-      background: linear-gradient(90deg, rgba(64,201,255,.18) 0%, rgba(64,201,255,.92) 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      opacity: .92;
-      text-shadow: 0 0 12px rgba(64,201,255,.10);
-    }
-
-    .summary-vs-line-right {
-      color: #ff4d9d;
-      background: linear-gradient(90deg, rgba(255,77,157,.92) 0%, rgba(255,77,157,.18) 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      opacity: .92;
-      text-shadow: 0 0 12px rgba(255,77,157,.10);
-    }
-
-    .summary-vs-line-left::after,
-    .summary-vs-line-right::after {
-      content: attr(data-shine);
-    }
-
-    .auto-number {
-      width: 74px !important;
-      min-width: 74px !important;
-    }
-
-    details.clean summary {
-      justify-content: flex-start !important;
-      gap: 8px !important;
-    }
-
-    details.clean summary .count-pill {
-      margin-left: auto !important;
-      margin-right: 8px !important;
-    }
-
-    details.clean summary::after {
-      margin-left: 0 !important;
-    }
-
-    @media (max-width: 430px) {
-      .summary-pill-row {
-        gap: 8px;
-      }
-      .summary-pill {
-        padding: 6px 10px;
-        font-size: 9.4px;
-        letter-spacing: .12em;
-      }
-      .summary-vs-line {
-        font-size: 13px;
-        letter-spacing: .20em;
-      }
-      .auto-number {
-        width: 70px !important;
-        min-width: 70px !important;
-      }
-      .hero-copy-bubble,
-      .notice-bubble {
-        padding: 11px 12px !important;
-      }
-    }
-
-
-    /* Retouche v41 : résumé réorganisé, dominance célébration, tons domicile/extérieur, bulles claires */
-    .notice-inline-icon {
-      width: 34px !important;
-      height: 34px !important;
-      flex-basis: 34px !important;
-      border-radius: 10px !important;
-      font-size: 18px !important;
-    }
-
-    .summary-pill {
-      border-color: rgba(255,255,255,.16) !important;
-      background:
-        linear-gradient(135deg, rgba(255,255,255,.20), rgba(255,255,255,.08)),
-        rgba(199, 210, 254, .10) !important;
-      color: #eef2ff !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.08) !important;
-      backdrop-filter: blur(6px);
-    }
-
-    .summary-pill-mode {
-      color: #f8fafc !important;
-    }
-
-    .summary-title-stacked {
-      display: grid !important;
-      grid-template-columns: 1fr !important;
-      justify-items: center !important;
-      text-align: center !important;
-      gap: 10px !important;
-      width: 100%;
-    }
-
-    .summary-team-line {
-      width: 100%;
-      text-align: center;
-      overflow-wrap: anywhere;
-    }
-
-    .summary-home-line {
-      color: #f8fbff;
-    }
-
-    .summary-away-line {
-      color: #f8fbff;
-    }
-
-    .summary-vs-line {
-      width: 100%;
-      justify-content: center !important;
-      gap: 0 !important;
-      margin-top: 0 !important;
-      padding: 0 2px;
-      font-size: clamp(16px, 4.2vw, 20px) !important;
-      letter-spacing: .26em !important;
-    }
-
-    .summary-vs-line-left,
-    .summary-vs-line-right {
-      flex: 1 1 auto;
-      text-align: center;
-    }
-
-    .summary-vs-line::before {
-      opacity: .30 !important;
-    }
-
-    .auto-number {
-      width: 81px !important;
-      min-width: 81px !important;
-    }
-
-    .zone-card.zone-home {
-      border-color: rgba(64,201,255,.22) !important;
-      background:
-        linear-gradient(135deg, rgba(64,201,255,.10), rgba(255,255,255,.03)),
-        rgba(13, 20, 39, .96) !important;
-    }
-
-    .zone-card.zone-away {
-      border-color: rgba(255,77,157,.22) !important;
-      background:
-        linear-gradient(135deg, rgba(255,77,157,.11), rgba(255,255,255,.025)),
-        rgba(17, 16, 32, .96) !important;
-    }
-
-    .stat-badge.zone-home {
-      background: linear-gradient(135deg, rgba(64,201,255,.18), rgba(59,130,246,.08)) !important;
-      border-color: rgba(64,201,255,.28) !important;
-      color: #dbeafe !important;
-    }
-
-    .stat-badge.zone-away {
-      background: linear-gradient(135deg, rgba(255,77,157,.18), rgba(168,85,247,.08)) !important;
-      border-color: rgba(255,77,157,.28) !important;
-      color: #ffe4ef !important;
-    }
-
-    .zone-card.zone-home .stat-title,
-    .zone-card.zone-home .stat-number.positive {
-      color: #dff3ff !important;
-    }
-
-    .zone-card.zone-away .stat-title,
-    .zone-card.zone-away .stat-number.positive,
-    .zone-card.zone-away .stat-kicker {
-      color: #ffe4ef !important;
-    }
-
-    .zone-card.zone-away .mode-row {
-      background: rgba(255,77,157,.055) !important;
-      border-color: rgba(255,77,157,.12) !important;
-    }
-
-    .zone-card.zone-home .mode-row {
-      background: rgba(64,201,255,.05) !important;
-      border-color: rgba(64,201,255,.12) !important;
-    }
-
-    .dominance-box {
-      position: relative;
-      overflow: hidden;
-      text-align: center !important;
-      align-items: center !important;
-      justify-items: center !important;
-      border-radius: 18px !important;
-    }
-
-    .dominance-celebration::before {
-      content: "🏅";
-      position: absolute;
-      inset: 50% auto auto 50%;
-      transform: translate(-50%, -58%);
-      font-size: 110px;
-      opacity: .06;
-      filter: blur(.2px);
-      pointer-events: none;
-    }
-
-    .dominance-celebration::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(circle at 14% 18%, rgba(64,201,255,.22) 0 2px, transparent 3px),
-        radial-gradient(circle at 28% 70%, rgba(255,77,157,.20) 0 2.2px, transparent 3px),
-        radial-gradient(circle at 42% 24%, rgba(255,255,255,.14) 0 1.6px, transparent 3px),
-        radial-gradient(circle at 62% 78%, rgba(255,77,157,.18) 0 2px, transparent 3px),
-        radial-gradient(circle at 82% 26%, rgba(64,201,255,.18) 0 2px, transparent 3px),
-        radial-gradient(circle at 90% 68%, rgba(255,255,255,.12) 0 1.6px, transparent 3px);
-      pointer-events: none;
-      opacity: .58;
-    }
-
-    .dominance-box > * {
-      position: relative;
-      z-index: 1;
-    }
-
-    .dominance-team {
-      justify-self: center !important;
-      text-align: center !important;
-      font-size: clamp(31px, 8.3vw, 42px) !important;
-    }
-
-    .dominance-meta,
-    .dominance-meta-centered {
-      text-align: center !important;
-      line-height: 1.45 !important;
-      max-width: 95%;
-    }
-
-    .dominance-value.positive { color: #66d9ff !important; }
-    .dominance-value.negative { color: #ff79ad !important; }
-    .dominance-value.neutral { color: #e5e7eb !important; }
-
-    .winner-home .dominance-team { color: #66d9ff !important; }
-    .winner-away .dominance-team { color: #ff79ad !important; }
-    .winner-neutral .dominance-team { color: #f8fafc !important; }
-
-    .winner-home.dominance-box {
-      background:
-        linear-gradient(135deg, rgba(64,201,255,.11), rgba(255,255,255,.03)),
-        rgba(17, 24, 39, .98) !important;
-      border-color: rgba(64,201,255,.24) !important;
-    }
-
-    .winner-away.dominance-box {
-      background:
-        linear-gradient(135deg, rgba(255,77,157,.12), rgba(255,255,255,.025)),
-        rgba(24, 16, 32, .98) !important;
-      border-color: rgba(255,77,157,.24) !important;
-    }
-
-    .report-btn {
-      background: linear-gradient(135deg, rgba(64,201,255,.08), rgba(255,77,157,.06)), rgba(8, 14, 30, .96) !important;
-      border-color: rgba(255,255,255,.08) !important;
-      color: #dbe4ff !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.03) !important;
-    }
-
-    .report-btn.red {
-      background: linear-gradient(135deg, rgba(255,77,157,.10), rgba(255,77,157,.04)), rgba(18, 12, 25, .96) !important;
-      color: #ffe4ef !important;
-      border-color: rgba(255,77,157,.18) !important;
-    }
-
-    .report-btn.primary {
-      color: #ffffff !important;
-    }
-
-    .event-row + .event-row {
-      border-top: 1px solid rgba(255,255,255,.06);
-      padding-top: 10px;
-      margin-top: 2px;
-    }
-
-    details.clean summary .count-pill {
-      margin-left: auto !important;
-      margin-right: 6px !important;
-    }
-
-    details.clean summary::after {
-      margin-left: 0 !important;
-    }
-
-    @media (max-width: 430px) {
-      .auto-number {
-        width: 78px !important;
-        min-width: 78px !important;
-      }
-      .summary-vs-line {
-        font-size: 14px !important;
-        letter-spacing: .19em !important;
-      }
-      .notice-title.notice-bubble {
-        font-size: 16px !important;
-      }
-      .summary-pill {
-        font-size: 9.6px !important;
-      }
-    }
-
-
-    /* Retouche v42 : ajustements finaux demandés */
-    .notice-title.notice-bubble {
-      width: 100% !important;
-      max-width: 100% !important;
-      justify-content: center !important;
-      text-align: center !important;
-      padding-inline: 14px !important;
-    }
-
-    .notice-inline-icon {
-      width: 30px !important;
-      height: 30px !important;
-      flex-basis: 30px !important;
-      font-size: 16px !important;
-      border-radius: 9px !important;
-    }
-
-    .report-btn.primary {
-      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
-      background-size: 190% 190% !important;
-      animation: derbySweep 5.5s ease infinite !important;
-      border-color: rgba(56,189,248,.38) !important;
-      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 59, 114, .14) !important;
-      color: #fff !important;
-    }
-
-    .dominance-celebration::before {
-      font-size: 92px !important;
-      opacity: .045 !important;
-      transform: translate(-50%, -56%) !important;
-    }
-
-    .dominance-celebration::after {
-      background:
-        radial-gradient(circle at 10% 16%, rgba(64,201,255,.34) 0 2.4px, transparent 3.8px),
-        radial-gradient(circle at 18% 38%, rgba(255,77,157,.28) 0 2.4px, transparent 3.8px),
-        radial-gradient(circle at 30% 74%, rgba(255,255,255,.20) 0 1.8px, transparent 3.4px),
-        radial-gradient(circle at 44% 22%, rgba(255,77,157,.30) 0 2.2px, transparent 3.6px),
-        radial-gradient(circle at 58% 64%, rgba(64,201,255,.30) 0 2.2px, transparent 3.6px),
-        radial-gradient(circle at 72% 18%, rgba(255,255,255,.18) 0 1.8px, transparent 3.4px),
-        radial-gradient(circle at 84% 54%, rgba(255,77,157,.26) 0 2.2px, transparent 3.6px),
-        radial-gradient(circle at 92% 28%, rgba(64,201,255,.28) 0 2.2px, transparent 3.6px),
-        radial-gradient(circle at 80% 78%, rgba(255,255,255,.18) 0 1.8px, transparent 3.4px);
-      opacity: .78 !important;
-    }
-
-    .summary-vs-line {
-      letter-spacing: .18em !important;
-    }
-
-    .summary-vs-joined {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 0 !important;
-      line-height: 1 !important;
-      white-space: nowrap !important;
-    }
-
-    .summary-vs-joined .summary-vs-line-left,
-    .summary-vs-joined .summary-vs-line-right {
-      flex: 0 0 auto !important;
-      display: inline-block !important;
-      text-align: initial !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-
-    .team-card.side-home-card {
-      background:
-        linear-gradient(135deg, rgba(64,201,255,.085), rgba(255,255,255,.018)),
-        rgba(10, 18, 39, .98) !important;
-      border-color: rgba(64,201,255,.16) !important;
-    }
-
-    .team-card.side-away-card {
-      background:
-        linear-gradient(135deg, rgba(255,77,157,.095), rgba(255,255,255,.016)),
-        rgba(18, 14, 31, .98) !important;
-      border-color: rgba(255,77,157,.16) !important;
-    }
-
-    .team-card.side-home-card .team-hero,
-    .team-card.side-home-card .section-title {
-      background: linear-gradient(135deg, rgba(64,201,255,.09), rgba(255,255,255,.018)) !important;
-    }
-
-    .team-card.side-away-card .team-hero,
-    .team-card.side-away-card .section-title {
-      background: linear-gradient(135deg, rgba(255,77,157,.10), rgba(255,255,255,.016)) !important;
-    }
-
-    .team-card.side-away-card .section-title,
-    .team-card.side-away-card .team-meta,
-    .team-card.side-away-card .row-sub,
-    .team-card.side-away-card .stat-subtitle {
-      color: #f2c9dd !important;
-    }
-
-    .team-card.side-away-card .team-name,
-    .team-card.side-away-card .section-title .count-pill {
-      color: #fff2f8 !important;
-    }
-
-    .team-card.side-away-card .match-number-badge,
-    .team-card.side-away-card .row-number,
-    .team-card.side-away-card .event-metric-pill {
-      border-color: rgba(255,77,157,.16) !important;
-      background: linear-gradient(135deg, rgba(255,77,157,.11), rgba(255,255,255,.02)) !important;
-    }
-
-    .team-card.side-home-card .match-number-badge,
-    .team-card.side-home-card .row-number,
-    .team-card.side-home-card .event-metric-pill {
-      border-color: rgba(64,201,255,.15) !important;
-      background: linear-gradient(135deg, rgba(64,201,255,.10), rgba(255,255,255,.02)) !important;
-    }
-
-    @media (max-width: 430px) {
-      .notice-title.notice-bubble {
-        font-size: 15px !important;
-      }
-      .summary-vs-line {
-        letter-spacing: .14em !important;
-      }
-    }
-
-
-    /* Retouche v43 : harmonisation globale des arrondis */
-    .panel,
-    .report-panel,
-    .summary,
-    .team-card,
-    .bar-box,
-    .auto-box {
-      border-radius: 28px !important;
-    }
-
-    .panel-pad {
-      border-radius: 24px !important;
-    }
-
-    .preset-box {
-      border-radius: 26px !important;
-    }
-
-    .auto-control,
-    .per-team-card,
-    .summary-cell,
-    .rank-card,
-    .zone-card,
-    .stat-card {
-      border-radius: 24px !important;
-    }
-
-    .per-team-mini,
-    .mini-badge,
-    .report-btn,
-    .preset-btn,
-    .scan-btn,
-    .auto-apply-btn,
-    .skip-grid button,
-    .mode-row {
-      border-radius: 20px !important;
-    }
-
-    .mode-toggle {
-      padding: 10px 12px !important;
-      border-radius: 16px !important;
-      border: 1px solid rgba(255,255,255,.08) !important;
-      background: linear-gradient(135deg, rgba(64,201,255,.065), rgba(255,77,157,.055)), rgba(10, 16, 32, .62) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.03) !important;
-    }
-
-    .mode-toggle input {
-      width: 15px !important;
-      height: 15px !important;
-      flex: 0 0 15px;
-    }
-
-    .count-pill,
-    .kicker,
-    .side-pill,
-    .auto-badge,
-    .camp-badge {
-      border-radius: 999px !important;
-    }
-
-    .logo-xl { border-radius: 18px !important; }
-    .logo-m { border-radius: 16px !important; }
-    .logo-s { border-radius: 12px !important; }
-
-    @media (max-width: 430px) {
-      .panel,
-      .report-panel,
-      .summary,
-      .team-card,
-      .bar-box,
-      .auto-box {
-        border-radius: 26px !important;
-      }
-
-      .preset-box,
-      .auto-control,
-      .per-team-card,
-      .summary-cell,
-      .rank-card,
-      .zone-card,
-      .stat-card {
-        border-radius: 22px !important;
-      }
-
-      .mode-toggle,
-      .report-btn,
-      .preset-btn,
-      .scan-btn,
-      .auto-apply-btn,
-      .skip-grid button,
-      .mode-row {
-        border-radius: 18px !important;
-      }
-    }
-
-
-    /* Retouche v44 : bulle Termux + bouton Ajouter */
-    .notice-title.notice-bubble {
-      justify-content: flex-start !important;
-      padding-left: 10px !important;
-      gap: 9px !important;
-    }
-
-    .notice-inline-icon {
-      margin-left: -2px !important;
-      width: 28px !important;
-      height: 28px !important;
-      flex-basis: 28px !important;
-      font-size: 15px !important;
-    }
-
-    .report-btn.primary,
-    #addReportBtn {
-      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
-      background-size: 190% 190% !important;
-      animation: derbySweep 5.5s ease infinite !important;
-      border-color: rgba(56,189,248,.38) !important;
-      color: #ffffff !important;
-      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 59, 114, .14) !important;
-    }
-
-    @media (max-width: 430px) {
-      .notice-title.notice-bubble {
-        padding-left: 9px !important;
-        gap: 8px !important;
-      }
-
-      .notice-inline-icon {
-        width: 27px !important;
-        height: 27px !important;
-        flex-basis: 27px !important;
-      }
-    }
-
-
-    /* Retouche v45 : summary plus mixte + bulles plus visibles + vrai confetti animé */
-    .summary {
-      background:
-        radial-gradient(circle at 14% 16%, rgba(64,201,255,.13), transparent 30%),
-        radial-gradient(circle at 88% 20%, rgba(255,77,157,.12), transparent 28%),
-        linear-gradient(135deg, rgba(64,201,255,.08), rgba(255,77,157,.08)),
-        rgba(8, 13, 31, .97) !important;
-      border-color: rgba(255,255,255,.10) !important;
-    }
-
-    .summary-head {
-      background:
-        linear-gradient(135deg, rgba(64,201,255,.07), rgba(255,77,157,.07)),
-        rgba(255,255,255,.015) !important;
-      border-radius: 24px !important;
-    }
-
-    .summary-pill {
-      border-color: rgba(255,255,255,.22) !important;
-      background:
-        linear-gradient(135deg, rgba(64,201,255,.22), rgba(255,77,157,.18)),
-        rgba(16, 23, 44, .96) !important;
-      color: #ffffff !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 8px 18px rgba(0,0,0,.12) !important;
-      text-shadow: 0 1px 8px rgba(0,0,0,.16) !important;
-    }
-
-    .summary-pill-mode {
-      color: #fff7fb !important;
-    }
-
-    .dominance-box {
-      min-height: 138px;
-    }
-
-    .dominance-confetti {
-      z-index: 0 !important;
-      opacity: 1 !important;
-      border-radius: inherit;
-    }
-
-    .dominance-confetti-piece {
-      animation-name: statusConfettiLoopV8 !important;
-      animation-timing-function: linear !important;
-      width: 6px !important;
-      height: 11px !important;
-      opacity: .92 !important;
-    }
-
-    .dominance-celebration::before {
-      font-size: 84px !important;
-      opacity: .05 !important;
-      transform: translate(-50%, -54%) !important;
-      z-index: 0 !important;
-    }
-
-    .dominance-celebration::after {
-      content: none !important;
-    }
-
-    .dominance-box > *:not(.status-confetti) {
-      position: relative;
-      z-index: 1;
-    }
-
-    .dominance-team {
-      text-shadow: 0 8px 18px rgba(0,0,0,.18);
-    }
-
-    .dominance-meta,
-    .dominance-meta-centered {
-      background: rgba(255,255,255,.025);
-      border: 1px solid rgba(255,255,255,.06);
-      border-radius: 14px;
-      padding: 8px 12px;
-      backdrop-filter: blur(3px);
-    }
-
-    @media (max-width: 430px) {
-      .summary-head {
-        border-radius: 22px !important;
-      }
-      .summary-pill {
-        border-color: rgba(255,255,255,.20) !important;
-        background:
-          linear-gradient(135deg, rgba(64,201,255,.20), rgba(255,77,157,.16)),
-          rgba(16, 23, 44, .95) !important;
-      }
-      .dominance-box {
-        min-height: 132px;
-      }
-      .dominance-celebration::before {
-        font-size: 76px !important;
-      }
-    }
-
-
-    /* Retouche v46 : gradient bouton rapport, confetti gagnant visibles, bloc scan plus opaque, termux rééquilibré */
-    #addReportBtn.report-btn.primary,
-    #addReportBtn {
-      position: relative !important;
-      overflow: hidden !important;
-      background: linear-gradient(90deg, #47d2ff 0%, #5a7cff 44%, #ff63b5 100%) !important;
-      background-size: 220% 220% !important;
-      animation: derbySweep 4.8s ease-in-out infinite !important;
-      border-color: rgba(90,124,255,.26) !important;
-      box-shadow: 0 16px 34px rgba(71,210,255,.20), 0 12px 28px rgba(255,99,181,.16) !important;
-      color: #ffffff !important;
-    }
-
-    #addReportBtn::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,.18) 18%, transparent 34%, transparent 100%);
-      transform: translateX(-115%);
-      animation: reportPrimaryShineV46 3.6s ease-in-out infinite;
-      pointer-events: none;
-    }
-
-    .notice-title.notice-bubble {
-      display: grid !important;
-      grid-template-columns: 40px minmax(0, 1fr) !important;
-      align-items: center !important;
-      width: 100% !important;
-      gap: 10px !important;
-      padding: 14px 16px 14px 12px !important;
-      white-space: nowrap !important;
-      font-size: clamp(13.2px, 3.82vw, 15.6px) !important;
-      font-weight: 1000 !important;
-      letter-spacing: .012em !important;
-      line-height: 1.04 !important;
-    }
-
-    .notice-title.notice-bubble > span:last-child {
-      display: block !important;
-      text-align: center !important;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .notice-inline-icon {
-      width: 34px !important;
-      height: 34px !important;
-      flex-basis: 34px !important;
-      font-size: 19px !important;
-      border-radius: 11px !important;
-      margin-left: 0 !important;
-      justify-self: start !important;
-      box-shadow: 0 0 0 1px rgba(255,77,157,.12), 0 8px 16px rgba(255,59,114,.10) !important;
-    }
-
-    .status-box.status-loading {
-      background:
-        radial-gradient(circle at 12% 0%, rgba(56,189,248,.18), transparent 34%),
-        linear-gradient(135deg, rgba(56,189,248,.15), rgba(255,54,93,.10)),
-        rgba(8, 15, 35, .82) !important;
-      border-color: rgba(56,189,248,.34) !important;
-    }
-
-    .status-box.status-loading .status-progress-bg {
-      opacity: .34 !important;
-      background:
-        linear-gradient(90deg, rgba(71,210,255,.22), rgba(255,99,181,.16)),
-        rgba(255,255,255,.02) !important;
-    }
-
-    .status-box.status-loading .progress-track {
-      background: rgba(255,255,255,.085) !important;
-    }
-
-    .status-box.status-loading .progress-fill {
-      box-shadow: 0 0 18px rgba(71,210,255,.24), 0 0 24px rgba(255,99,181,.18) !important;
-    }
-
-    .event-break {
-      height: 1px !important;
-      margin: 10px 10px 6px !important;
-      background: rgba(255,255,255,.12) !important;
-      opacity: .92 !important;
-    }
-
-    .event-row + .event-row {
-      border-top: none !important;
-      padding-top: 0 !important;
-      margin-top: 0 !important;
-    }
-
-    .dominance-box {
-      isolation: isolate;
-    }
-
-    .dominance-confetti {
-      z-index: 1 !important;
-      opacity: .42 !important;
-      mix-blend-mode: screen;
-    }
-
-    .dominance-confetti-piece {
-      width: 7px !important;
-      height: 13px !important;
-      opacity: .48 !important;
-      filter: drop-shadow(0 0 4px rgba(255,255,255,.10));
-    }
-
-    .dominance-box > *:not(.status-confetti) {
-      position: relative;
-      z-index: 2 !important;
-    }
-
-    .dominance-celebration::before {
-      font-size: 78px !important;
-      opacity: .065 !important;
-      transform: translate(-50%, -54%) !important;
-      z-index: 0 !important;
-    }
-
-    .team-card.side-home-card .section-title,
-    .team-card.side-home-card details.clean summary {
-      background: linear-gradient(90deg, rgba(64,201,255,.17), rgba(64,201,255,.08)) !important;
-      color: #dff4ff !important;
-      border-color: rgba(64,201,255,.18) !important;
-    }
-
-    .team-card.side-away-card .section-title,
-    .team-card.side-away-card details.clean summary {
-      background: linear-gradient(90deg, rgba(255,77,157,.18), rgba(255,77,157,.08)) !important;
-      color: #ffe8f1 !important;
-      border-color: rgba(255,77,157,.18) !important;
-    }
-
-    .team-card.side-home-card .match-number-badge {
-      background: linear-gradient(180deg, rgba(64,201,255,.16), rgba(64,201,255,.08)), rgba(10,16,34,.98) !important;
-      border-color: rgba(64,201,255,.22) !important;
-    }
-
-    .team-card.side-home-card .match-count-mini {
-      background: linear-gradient(135deg, rgba(64,201,255,.28), rgba(59,130,246,.16)) !important;
-      color: #effaff !important;
-    }
-
-    .team-card.side-away-card .match-number-badge {
-      background: linear-gradient(180deg, rgba(255,77,157,.16), rgba(255,77,157,.08)), rgba(10,16,34,.98) !important;
-      border-color: rgba(255,77,157,.22) !important;
-    }
-
-    .team-card.side-away-card .match-count-mini {
-      background: linear-gradient(135deg, rgba(255,77,157,.28), rgba(255,99,181,.16)) !important;
-      color: #fff3f8 !important;
-    }
-
-    @keyframes reportPrimaryShineV46 {
-      0%, 18% { transform: translateX(-115%); opacity: 0; }
-      24% { opacity: .9; }
-      52% { transform: translateX(135%); opacity: .55; }
-      100% { transform: translateX(135%); opacity: 0; }
-    }
-
-    @media (max-width: 430px) {
-      .notice-title.notice-bubble {
-        grid-template-columns: 36px minmax(0, 1fr) !important;
-        gap: 9px !important;
-        padding: 13px 13px 13px 11px !important;
-        font-size: 13.2px !important;
-      }
-      .notice-inline-icon {
-        width: 30px !important;
-        height: 30px !important;
-        flex-basis: 30px !important;
-        font-size: 18px !important;
-      }
-      .dominance-celebration::before {
-        font-size: 72px !important;
-      }
-    }
-
-
-    /* Retouche v47 : retour bloc scan v43 + corrections headers, bouton rapport et confetti gagnant */
-    .team-card .section-title,
-    .team-card details.clean summary {
-      position: relative !important;
-      min-height: 50px !important;
-      padding: 12px 14px !important;
-      border-radius: 16px !important;
-      border: 1px solid rgba(255,255,255,.09) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
-      background-clip: padding-box !important;
-      overflow: hidden !important;
-      margin-bottom: 0 !important;
-    }
-
-    .team-card .section-title {
-      margin-bottom: 12px !important;
-    }
-
-    .team-card details.clean {
-      padding: 14px !important;
-      border-top: 1px solid rgba(255,255,255,.10) !important;
-    }
-
-    .team-card details.clean > .section {
-      border-top: 0 !important;
-      padding: 12px 0 0 !important;
-    }
-
-    .team-card details.clean summary .count-pill,
-    .team-card .section-title .count-pill {
-      margin-left: auto !important;
-      margin-right: 0 !important;
-      align-self: center !important;
-    }
-
-    .team-card details.clean summary::after {
-      margin-left: 8px !important;
-    }
-
-    .team-card.side-home-card .section-title,
-    .team-card.side-home-card details.clean summary {
-      background: linear-gradient(90deg, rgba(64,201,255,.17), rgba(64,201,255,.08)) !important;
-      border-color: rgba(64,201,255,.15) !important;
-      color: #e4f7ff !important;
-    }
-
-    .team-card.side-away-card .section-title,
-    .team-card.side-away-card details.clean summary {
-      background: linear-gradient(90deg, rgba(255,77,157,.17), rgba(255,77,157,.08)) !important;
-      border-color: rgba(255,77,157,.15) !important;
-      color: #ffeaf3 !important;
-    }
-
-    .team-card.side-home-card .count-pill {
-      background: linear-gradient(135deg, rgba(64,201,255,.16), rgba(59,130,246,.12)), rgba(10,16,34,.98) !important;
-      border-color: rgba(64,201,255,.20) !important;
-      color: #effaff !important;
-    }
-
-    .team-card.side-away-card .count-pill {
-      background: linear-gradient(135deg, rgba(255,77,157,.16), rgba(255,99,181,.12)), rgba(10,16,34,.98) !important;
-      border-color: rgba(255,77,157,.20) !important;
-      color: #fff3f8 !important;
-    }
-
-    /* Bouton AJOUTER : exactement le comportement du bouton scanner */
-    .report-btn.primary,
-    #addReportBtn {
-      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
-      background-size: 190% 190% !important;
-      background-position: 0% 50% !important;
-      animation: derbySweep 5.5s ease infinite !important;
-      will-change: background-position, transform, filter !important;
-      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(255, 59, 114, .14) !important;
-      border-color: rgba(56,189,248,.38) !important;
-      color: #ffffff !important;
-    }
-
-    #addReportBtn::before,
-    .report-btn.primary::before {
-      display: none !important;
-      content: none !important;
-    }
-
-    /* Bloc sous scanner : retour proche v43 */
-    .status-box.status-loading {
-      display: block !important;
-      background:
-        linear-gradient(135deg, rgba(64, 201, 255, .10), rgba(255, 59, 114, .08)),
-        rgba(5, 10, 28, .86) !important;
-      border-color: rgba(64, 201, 255, .26) !important;
-    }
-
-    .status-box.status-loading .status-progress-bg {
-      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #ff3b72 100%) !important;
-      opacity: .17 !important;
-      transition: width .48s cubic-bezier(.22,.61,.36,1) !important;
-    }
-
-    .status-box.status-loading .progress-track {
-      background: rgba(255,255,255,.09) !important;
-    }
-
-    .status-box.status-loading .progress-fill {
-      background: linear-gradient(90deg, #40c9ff 0%, #ffffff 48%, #ff3b72 100%) !important;
-      background-size: 220% 100% !important;
-      animation: derbySweep 2.4s linear infinite !important;
-      box-shadow: none !important;
-    }
-
-    /* Confetti gagnant : boucle visible derrière le nom */
-    .dominance-celebration::before,
-    .dominance-celebration::after {
-      z-index: 0 !important;
-    }
-
-    .dominance-confetti {
-      inset: 0 !important;
-      z-index: 1 !important;
-      opacity: .42 !important;
-      mix-blend-mode: screen !important;
-    }
-
-    .dominance-confetti-piece {
-      width: 7px !important;
-      height: 13px !important;
-      top: -18px !important;
-      opacity: .48 !important;
-      animation: statusConfettiLoopV8 var(--dur, 2400ms) linear infinite !important;
-      animation-delay: var(--delay, 0ms) !important;
-      filter: drop-shadow(0 0 3px rgba(255,255,255,.10));
-    }
-
-    .dominance-box > *:not(.status-confetti) {
-      position: relative !important;
-      z-index: 2 !important;
-    }
-
-    .dominance-celebration::before {
-      font-size: 74px !important;
-      opacity: .055 !important;
-      transform: translate(-50%, -54%) !important;
-    }
-
-    /* Petites corrections mobiles */
-    @media (max-width: 430px) {
-      .team-card .section-title,
-      .team-card details.clean summary {
-        min-height: 48px !important;
-        padding: 11px 13px !important;
-        border-radius: 15px !important;
-      }
-    }
-
-
-    /* Retouche v49 : bouton rapport animé comme scanner + confetti visibles dans le bloc gagnant */
-    #addReportBtn.report-btn.primary,
-    #addReportBtn.report-btn.primary:enabled,
-    #addReportBtn {
-      position: relative !important;
-      overflow: hidden !important;
-      isolation: isolate !important;
-      background: linear-gradient(135deg, #40c9ff 0%, #4f73ff 46%, #ef5b99 100%) !important;
-      background-size: 280% 280% !important;
-      background-position: 0% 50% !important;
-      animation: derbySweep 2.2s linear infinite !important;
-      border-color: rgba(79,115,255,.36) !important;
-      box-shadow: 0 18px 36px rgba(64,201,255,.22), 0 14px 30px rgba(239,91,153,.18) !important;
-      color: #ffffff !important;
-      will-change: background-position, transform, filter !important;
-    }
-
-    #addReportBtn::before {
-      content: "" !important;
-      display: block !important;
-      position: absolute !important;
-      inset: 0 !important;
-      background: linear-gradient(110deg, transparent 0%, transparent 32%, rgba(255,255,255,.24) 48%, transparent 64%, transparent 100%) !important;
-      transform: translateX(-128%) !important;
-      animation: reportBtnSheenV51 1.95s ease-in-out infinite !important;
-      pointer-events: none !important;
-      z-index: 1 !important;
-    }
-
-    #addReportBtn {
-      filter: saturate(1.04) brightness(1.02) !important;
-    }
-
-    #addReportBtn > * {
-      position: relative !important;
-      z-index: 2 !important;
-    }
-
-    @keyframes reportBtnSheenV51 {
-      0% { transform: translateX(-128%); opacity: 0; }
-      14% { opacity: .0; }
-      26% { opacity: .92; }
-      58% { transform: translateX(138%); opacity: .58; }
-      100% { transform: translateX(138%); opacity: 0; }
-    }
-
-    @keyframes reportBtnSheenV49 {
-      0%, 12% { transform: translateX(-126%); opacity: 0; }
-      20% { opacity: .95; }
-      52% { transform: translateX(126%); opacity: .92; }
-      100% { transform: translateX(126%); opacity: 0; }
-    }
-
-    .dominance-celebration {
-      position: relative !important;
-      overflow: hidden !important;
-      isolation: isolate !important;
-    }
-
-    .dominance-celebration::before {
-      font-size: 72px !important;
-      opacity: .085 !important;
-      transform: translate(-50%, -56%) !important;
-      z-index: 0 !important;
-    }
-
-    .dominance-celebration .dominance-confetti {
-      position: absolute !important;
-      inset: 0 !important;
-      display: block !important;
-      overflow: hidden !important;
-      opacity: 1 !important;
-      z-index: 1 !important;
-      mix-blend-mode: screen !important;
-      pointer-events: none !important;
-    }
-
-    .dominance-celebration .dominance-confetti-piece {
-      width: 8px !important;
-      height: 15px !important;
-      top: -20px !important;
-      border-radius: 4px !important;
-      opacity: .98 !important;
-      animation: statusConfettiLoopV8 var(--dur, 2350ms) linear infinite !important;
-      animation-delay: var(--delay, 0ms) !important;
-      filter: drop-shadow(0 0 4px rgba(255,255,255,.16)) !important;
-    }
-
-    .dominance-celebration > *:not(.status-confetti) {
-      position: relative !important;
-      z-index: 3 !important;
-    }
-
-    .dominance-team,
-    .dominance-meta,
-    .dominance-meta-centered {
-      position: relative !important;
-      z-index: 3 !important;
-    }
-
-
-    /* Retouche v50 : séparations intelligentes dans les événements */
-    .source-list {
-      border-top: 1px solid rgba(255,255,255,.16) !important;
-      padding-top: 13px !important;
-    }
-
-    .source-title {
-      font-weight: 700 !important;
-      color: var(--text) !important;
-      letter-spacing: -0.01em !important;
-    }
-
-    .source-sep {
-      width: 100% !important;
-      justify-self: stretch !important;
-      border-radius: 999px !important;
-      pointer-events: none !important;
-    }
-
-    .source-sep--event {
-      height: 1px !important;
-      width: calc(100% - 62px) !important;
-      margin: 7px 0 5px 56px !important;
-      background: rgba(255,255,255,.12) !important;
-      opacity: .9 !important;
-    }
-
-    .source-sep--match {
-      height: 1px !important;
-      width: 100% !important;
-      margin: 9px 0 7px 0 !important;
-      background: rgba(255,255,255,.16) !important;
-      opacity: .92 !important;
-      box-shadow: none !important;
-    }
-
-    .event-break--match {
-      height: 1px !important;
-      margin: 12px 10px 8px !important;
-      background: rgba(255,255,255,.12) !important;
-      opacity: .92 !important;
-      border-radius: 999px !important;
-    }
-
-
-
-    /* Retouche v52 : bouton rapport comme scanner, confetti gagnant adoucis, events trouvés nettoyés */
-    #addReportBtn,
-    #addReportBtn.report-btn.primary,
-    #addReportBtn.report-btn.primary:enabled {
-      position: relative !important;
-      overflow: hidden !important;
-      color: #ffffff !important;
-      background: linear-gradient(90deg, #46cfff 0%, #59b7ff 28%, #5f8dff 58%, #b46dff 78%, #ff5c9c 100%) !important;
-      background-size: 220% 100% !important;
-      background-position: 0% 50% !important;
-      animation: reportBtnGradientV52 2.45s linear infinite !important;
-      border-color: rgba(94,164,255,.38) !important;
-      box-shadow: 0 18px 40px rgba(70,207,255,.18), 0 14px 32px rgba(255,92,156,.14) !important;
-      filter: none !important;
-    }
-
-    #addReportBtn::before,
-    #addReportBtn::after {
-      content: none !important;
-      display: none !important;
-    }
-
-    @keyframes reportBtnGradientV52 {
-      0% { background-position: 0% 50%; }
-      100% { background-position: 220% 50%; }
-    }
-
-    .dominance-celebration .dominance-confetti {
-      opacity: .20 !important;
-    }
-
-    .dominance-celebration .dominance-confetti-piece {
-      opacity: .22 !important;
-      filter: drop-shadow(0 0 2px rgba(255,255,255,.08)) !important;
-    }
-
-    .event-list {
-      gap: 0 !important;
-    }
-
-    .event-row.event-rich-row {
-      margin-top: 0 !important;
-      background: linear-gradient(160deg, rgba(56,189,248,.07), rgba(255,54,93,.04)), rgba(6,10,28,.74) !important;
-      background-clip: padding-box !important;
-    }
-
-    .event-row.event-rich-row + .event-row.event-rich-row {
-      margin-top: 0 !important;
-    }
-
-    .event-break--match {
-      height: 1px !important;
-      margin: 10px 12px 10px !important;
-      background: rgba(255,255,255,.12) !important;
-      opacity: .88 !important;
-      border-radius: 999px !important;
-      box-shadow: none !important;
-    }
-
-  </style>
+</style>
 </head>
 
 <body>
@@ -7098,16 +5776,16 @@
       <div class="hero-inner">
         <div class="kicker">🔎 Scan Complet Via Données Web</div>
         <h1 class="home-title">FOOTSCAN</h1>
-        <p class="hero-text hero-copy-bubble">
+        <p class="hero-text">
           FOOTSCAN est un site qui permet d'analyser les confrontations (de football) à partir de l'historique des deux équipes. Le calcul se base sur la performance (via les buts) au fil du temps (du passé vers le présent).
         </p>
       </div>
     </section>
 
     <section class="panel notice panel-pad">
-      <div class="notice-stack">
-        <div class="notice-title notice-bubble"><span class="notice-inline-icon">🛑</span><span>Émulateur Termux Obligatoire</span></div>
-        <p class="notice-text notice-bubble">
+      <div>
+        <div class="notice-title"><span class="notice-inline-icon">🛑</span><span>TERMUX DOIT RESTER OUVERT</span></div>
+        <p class="notice-text">
           L'application Termux doit obligatoirement être ouverte en arrière-plan (sur mobile ou PC) pendant le scan du match.
         </p>
       </div>
@@ -7683,24 +6361,13 @@
     function renderDominance(result) {
       const dominance = getDominance(result);
       const isEvolution = dominance.mode === "evolution";
-      const homeName = String(result?.home?.name || "").trim().toLowerCase();
-      const awayName = String(result?.away?.name || "").trim().toLowerCase();
-      const winnerName = String(dominance.label || "").trim().toLowerCase();
-      const toneClass = winnerName && winnerName === awayName
-        ? "winner-away"
-        : winnerName && winnerName === homeName
-          ? "winner-home"
-          : "winner-neutral";
-      const colors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
-      const confetti = Array.from({ length: 10 }, (_, i) => `
-        <span class="status-confetti-piece dominance-confetti-piece" style="--left:${(i * 31) % 100}%;--x:${((i % 9) - 4) * 8}px;--r:${420 + (i % 10) * 72}deg;--dur:${2280 + (i % 9) * 165}ms;--delay:-${(i % 19) * 120}ms;--c:${colors[i % colors.length]}"></span>
-      `).join("");
+      const title = isEvolution ? "Gagnant Par Évolution" : "👑 Gagnant Par Moyenne Des Rangs";
 
       if (dominance.type === "none") {
         return `
-          <div class="dominance-box ${toneClass} dominance-celebration">
-            <div class="status-confetti dominance-confetti" aria-hidden="true">${confetti}</div>
-            <div class="dominance-team">INDISPONIBLE</div>
+          <div class="dominance-box">
+            <div class="dominance-label">${title}</div>
+            <div class="dominance-team">Indisponible</div>
             <div class="dominance-meta">${isEvolution ? "Moyenne de zone ou moyenne des rangs indisponible." : "Aucune moyenne disponible sur les rangs."}</div>
           </div>
         `;
@@ -7708,25 +6375,23 @@
 
       if (dominance.type === "tie") {
         return `
-          <div class="dominance-box winner-neutral dominance-celebration">
-            <div class="status-confetti dominance-confetti" aria-hidden="true">${confetti}</div>
-            <div class="dominance-team">ÉGALITÉ</div>
-            <div class="dominance-meta">${isEvolution ? "Même évolution affichée après arrondi." : `Moyenne Dominante : <span class="dominance-value neutral">${esc(formatValue(dominance.average))}</span>`}</div>
+          <div class="dominance-box">
+            <div class="dominance-label">${title}</div>
+            <div class="dominance-team">Égalité</div>
+            <div class="dominance-meta">${isEvolution ? "Même évolution affichée après arrondi." : `Moyenne des deux Rangs : ${esc(formatValue(dominance.average))}`}</div>
           </div>
         `;
       }
 
-      const avgClass = valueClass(isEvolution ? dominance.metric : dominance.average);
-      const diffClass = dominance.diff !== null ? valueClass(dominance.diff) : "neutral";
       const meta = isEvolution
-        ? `Moyenne Dominante : <span class="dominance-value ${avgClass}">${esc(formatValue(dominance.metric))}</span> · Zone ${esc(formatValue(dominance.zoneAverage))} → Rangs ${esc(formatValue(dominance.rankAverage))}${dominance.diff !== null ? ` · Écart : <span class="dominance-value ${diffClass}">${esc(formatRank(dominance.diff))}</span>` : ""}`
-        : `Moyenne Dominante : <span class="dominance-value ${avgClass}">${esc(formatValue(dominance.average))}</span>${dominance.diff !== null ? ` · Écart : <span class="dominance-value ${diffClass}">${esc(formatRank(dominance.diff))}</span>` : ""}`;
+        ? `Évolution : ${esc(formatValue(dominance.metric))} · Zone ${esc(formatValue(dominance.zoneAverage))} → Rangs ${esc(formatValue(dominance.rankAverage))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`
+        : `Moyenne Dominante : ${esc(formatValue(dominance.average))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`;
 
       return `
-        <div class="dominance-box ${toneClass} dominance-celebration">
-          <div class="status-confetti dominance-confetti" aria-hidden="true">${confetti}</div>
+        <div class="dominance-box">
+          <div class="dominance-label">${title}</div>
           <div class="dominance-team">${esc(String(dominance.label || "").toUpperCase())}</div>
-          <div class="dominance-meta dominance-meta-centered">${meta}</div>
+          <div class="dominance-meta">${meta}</div>
         </div>
       `;
     }
@@ -8112,7 +6777,7 @@
             </div>
           </div>
 
-          <p class="hero-text hero-copy-bubble">
+          <p class="hero-text">
             Résultat Calculé Dans Termux Avec Les Derniers Matchs Toutes Compétitions Confondues.
           </p>
         </div>
@@ -8139,19 +6804,12 @@
     function renderSummary(result) {
       const match = result.match;
 
-      const scanModeLabel = result.scanModeLabel || (result.simultaneousMode ? "Simultané match par match / minute par minute" : "Standard");
       return `
         <section class="summary">
           <div class="summary-head">
-            <div class="summary-pill-row">
-              <div class="summary-pill">RÉSUMÉ RAPIDE</div>
-              <div class="summary-pill summary-pill-mode">MODE ${esc(String(scanModeLabel).toUpperCase())}</div>
-            </div>
-            <div class="summary-title summary-title-stacked">
-              <div class="summary-team-line summary-home-line">${esc(String(match.homeTeam.name || "").toUpperCase())}</div>
-              <div class="summary-vs-line" aria-hidden="true"><span class="summary-vs-joined"><span class="summary-vs-line-left">VVVVVVVV</span><span class="summary-vs-line-right">SSSSSSSS</span></span></div>
-              <div class="summary-team-line summary-away-line">${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
-            </div>
+            <div class="summary-label">Résumé rapide</div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="summary-vs-gradient" aria-label="VS"><span class="summary-vs-v">V</span><span class="summary-vs-s">S</span></span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+            <div class="summary-label">Mode scan : ${esc(result.scanModeLabel || (result.simultaneousMode ? "Simultané match par match / minute par minute" : "Standard"))}</div>
           </div>
 
           ${renderDominance(result)}
@@ -8220,21 +6878,14 @@
       if (sources.length) {
         html += `<div class="source-list">`;
 
-        for (let i = 0; i < sources.length; i += 1) {
-          const source = sources[i];
-          const previous = i > 0 ? sources[i - 1] : null;
-          const sameMatch = previous && String(previous.match || "") === String(source.match || "");
+        for (const source of sources) {
           const rankText = rankSourceText(source);
-          const separator = !previous
-            ? ""
-            : `<div class="source-sep ${sameMatch ? "source-sep--event" : "source-sep--match"}" aria-hidden="true"></div>`;
 
           html += `
-            ${separator}
             <div class="source-item">
               <div class="event-icon">${esc(eventIcon(source))}</div>
               <div>
-                <div class="source-title">${esc(source.match)}</div>
+                <div>${esc(source.match)}</div>
                 <div class="source-small">
                   ${esc(rankText)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
                 </div>
@@ -8364,20 +7015,19 @@
       return step === null ? "Progression Par Événement" : `${formatRank(step)} Par Événement`;
     }
 
-    function renderZoneStats(team, side = "") {
+    function renderZoneStats(team) {
       const stats = team?.zoneStats;
       const teamName = team?.name || "équipe";
-      const sideClass = side === "Extérieur" ? "zone-away" : side === "Domicile" ? "zone-home" : "";
 
       if (!stats || !stats.count) {
         return `
-          <div class="zone-card ${sideClass}">
+          <div class="zone-card">
             <div class="stat-header">
               <div>
                 <div class="stat-title">ZONE DES RANGS</div>
                 <div class="stat-subtitle">Événements attribués à ${esc(teamName)} entre le Rang Bas et le Rang Haut final.</div>
               </div>
-              <div class="stat-badge ${sideClass}">Équipe</div>
+              <div class="stat-badge">Équipe</div>
             </div>
             <div class="stat-grid">
               <div class="stat-card">
@@ -8394,13 +7044,13 @@
       }
 
       return `
-        <div class="zone-card ${sideClass}">
+        <div class="zone-card">
           <div class="stat-header">
             <div>
               <div class="stat-title">ZONE DES RANGS</div>
               <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} Événements · Progression Totale ${esc(formatRank(stats.totalQuantity || 0))} · ${esc(zoneAdvancementLabel(stats))} · Zone Rang Bas → Rang Haut Final.</div>
             </div>
-            <div class="stat-badge ${sideClass}">Équipe</div>
+            <div class="stat-badge">Équipe</div>
           </div>
 
           <div class="stat-grid">
@@ -8427,9 +7077,8 @@
         const campClass = sideCampClass(event);
         const campText = sideText(event);
         const label = LABELS[event.type] || event.type || "Événement";
-        const previous = index > 0 ? events[index - 1] : null;
-        const separator = previous && String(previous.match || "") !== String(event.match || "")
-          ? `<div class="event-break event-break--match" aria-hidden="true"></div>`
+        const separator = index > 0 && events[index - 1]?.match !== event?.match
+          ? `<div class="event-break" aria-hidden="true"></div>`
           : "";
 
         return `
@@ -8465,7 +7114,7 @@
       `).join("");
 
       return `
-        <section class="team-card ${sideClass}-card">
+        <section class="team-card">
           <div class="team-hero">
             <div class="side-pill ${sideClass}">${esc(side)}</div>
 
@@ -8486,7 +7135,7 @@
             ${rank2 ? renderValue(`Performance Rang ${rank2}`, team.r2) : ""}
           </div>
 
-          ${renderZoneStats(team, side)}
+          ${renderZoneStats(team)}
 
           <div class="section">
             <div class="section-title">
@@ -8566,7 +7215,6 @@
     function zoneStatsCompactText(team) {
       const stats = team?.zoneStats;
       const teamName = team?.name || "équipe";
-      const sideClass = side === "Extérieur" ? "zone-away" : side === "Domicile" ? "zone-home" : "";
 
       if (!stats || !stats.count) {
         return `zone ${teamName}: —`;
@@ -8578,7 +7226,6 @@
     function zoneStatsLines(team) {
       const stats = team?.zoneStats;
       const teamName = team?.name || "équipe";
-      const sideClass = side === "Extérieur" ? "zone-away" : side === "Domicile" ? "zone-home" : "";
 
       if (!stats || !stats.count) {
         return [
@@ -9017,151 +7664,6 @@
         transform: translateY(-1px);
         filter: brightness(1.04);
       }
-    }
-
-  
-
-    /* Retouche v52 : bouton rapport comme scanner, confetti gagnant adoucis, events trouvés nettoyés */
-    #addReportBtn,
-    #addReportBtn.report-btn.primary,
-    #addReportBtn.report-btn.primary:enabled {
-      position: relative !important;
-      overflow: hidden !important;
-      color: #ffffff !important;
-      background: linear-gradient(90deg, #46cfff 0%, #59b7ff 28%, #5f8dff 58%, #b46dff 78%, #ff5c9c 100%) !important;
-      background-size: 220% 100% !important;
-      background-position: 0% 50% !important;
-      animation: reportBtnGradientV52 2.45s linear infinite !important;
-      border-color: rgba(94,164,255,.38) !important;
-      box-shadow: 0 18px 40px rgba(70,207,255,.18), 0 14px 32px rgba(255,92,156,.14) !important;
-      filter: none !important;
-    }
-
-    #addReportBtn::before,
-    #addReportBtn::after {
-      content: none !important;
-      display: none !important;
-    }
-
-    @keyframes reportBtnGradientV52 {
-      0% { background-position: 0% 50%; }
-      100% { background-position: 220% 50%; }
-    }
-
-    .dominance-celebration .dominance-confetti {
-      opacity: .20 !important;
-    }
-
-    .dominance-celebration .dominance-confetti-piece {
-      opacity: .22 !important;
-      filter: drop-shadow(0 0 2px rgba(255,255,255,.08)) !important;
-    }
-
-    .event-list {
-      gap: 0 !important;
-    }
-
-    .event-row.event-rich-row {
-      margin-top: 0 !important;
-      background: linear-gradient(160deg, rgba(56,189,248,.07), rgba(255,54,93,.04)), rgba(6,10,28,.74) !important;
-      background-clip: padding-box !important;
-    }
-
-    .event-row.event-rich-row + .event-row.event-rich-row {
-      margin-top: 0 !important;
-    }
-
-    .event-break--match {
-      height: 1px !important;
-      margin: 10px 12px 10px !important;
-      background: rgba(255,255,255,.12) !important;
-      opacity: .88 !important;
-      border-radius: 999px !important;
-      box-shadow: none !important;
-    }
-
-  
-
-    /* Retouche v53 : restore event cards separation + restore report primary gradient from v35 */
-    #addReportBtn,
-    #addReportBtn.report-btn.primary,
-    #addReportBtn.report-btn.primary:enabled {
-      position: relative !important;
-      overflow: hidden !important;
-      color: #ffffff !important;
-      border-color: rgba(56,189,248,.38) !important;
-      background: linear-gradient(135deg, #38bdf8 0%, #2563eb 42%, #ff365d 100%) !important;
-      background-size: 180% 180% !important;
-      animation: derbySweep 5.5s ease infinite !important;
-      box-shadow: 0 18px 42px rgba(56, 189, 248, 0.20), 0 14px 34px rgba(255, 54, 93, 0.18) !important;
-      filter: none !important;
-      isolation: isolate !important;
-    }
-
-    #addReportBtn::before,
-    #addReportBtn::after,
-    #addReportBtn .report-btn-sheen,
-    #addReportBtn .report-btn-glow {
-      content: none !important;
-      display: none !important;
-    }
-
-    .dominance-celebration .dominance-confetti {
-      opacity: .12 !important;
-    }
-
-    .dominance-celebration .dominance-confetti-piece {
-      opacity: .14 !important;
-      filter: drop-shadow(0 0 2px rgba(255,255,255,.04)) !important;
-    }
-
-    .event-list {
-      display: grid !important;
-      gap: 12px !important;
-    }
-
-    .event-row,
-    .event-row.event-rich-row {
-      grid-template-columns: auto minmax(0, 1fr) !important;
-      align-items: start !important;
-      gap: 12px !important;
-      margin: 0 !important;
-      padding: 13px 14px !important;
-      border-radius: 18px !important;
-      border: 1px solid rgba(148,163,184,.22) !important;
-      background: linear-gradient(160deg, rgba(56,189,248,.07), rgba(255,54,93,.05)), rgba(6,10,28,.82) !important;
-      background-clip: padding-box !important;
-      position: relative !important;
-      overflow: hidden !important;
-    }
-
-    .event-row::before,
-    .event-row.event-rich-row::before {
-      content: "" !important;
-      position: absolute !important;
-      left: 0 !important;
-      top: 10px !important;
-      bottom: 10px !important;
-      width: 4px !important;
-      border-radius: 999px !important;
-      background: linear-gradient(180deg, #38bdf8 0%, rgba(168,85,247,.55) 52%, #ff4d6d 100%) !important;
-      opacity: 1 !important;
-      pointer-events: none !important;
-    }
-
-    .event-row + .event-row,
-    .event-row.event-rich-row + .event-row.event-rich-row {
-      border-top: none !important;
-      padding-top: 13px !important;
-      margin-top: 0 !important;
-    }
-
-    .event-break--match {
-      height: 1px !important;
-      margin: 0 14px !important;
-      border-radius: 999px !important;
-      background: rgba(255,255,255,.18) !important;
-      box-shadow: none !important;
     }
 
   </style>
