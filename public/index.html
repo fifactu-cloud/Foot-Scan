@@ -6486,6 +6486,51 @@
       animation: cardPopV46 .4s cubic-bezier(.22, .9, .28, 1) backwards;
     }
 
+
+    /* Retouche v47 : priorité mobile — retours tactiles partout */
+    button {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .mode-toggle {
+      transition: transform .18s cubic-bezier(.34, 1.56, .64, 1);
+    }
+
+    .mode-toggle:active {
+      transform: scale(.985);
+    }
+
+    @media (hover: none) {
+      .logo-xl,
+      .logo-m,
+      .logo-s {
+        transition: transform .2s cubic-bezier(.34, 1.56, .64, 1);
+      }
+
+      .logo-xl:active,
+      .logo-m:active,
+      .logo-s:active {
+        transform: scale(1.08) rotate(-3deg);
+      }
+
+      .summary,
+      .team-card {
+        transition: transform .18s ease, box-shadow .25s ease;
+      }
+
+      .summary:active,
+      .team-card:active {
+        transform: scale(.992);
+        box-shadow: var(--shadow), 0 0 26px rgba(64, 201, 255, .10), inset 0 1px 0 rgba(255, 255, 255, .055);
+      }
+
+      .bar-box summary:active {
+        color: #ffffff;
+      }
+    }
+
 </style>
 </head>
 
@@ -8549,6 +8594,14 @@
 
       items.forEach((item) => observer.observe(item));
     }
+
+    // Retouche v47 : vibration légère au tap des boutons et interrupteurs (Android)
+    document.addEventListener("pointerdown", (e) => {
+      if (typeof navigator.vibrate !== "function") return;
+      if (e.target.closest("button, .mode-toggle, input[type='checkbox']")) {
+        navigator.vibrate(8);
+      }
+    }, { passive: true });
 
     initMobileNavigationEffects();
     updateReportCount();
