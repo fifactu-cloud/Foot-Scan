@@ -6139,6 +6139,353 @@
       }
     }
 
+
+    /* Retouche v46 : app foot plus fun & moderne (mêmes couleurs) */
+
+    /* — Sensations d'app mobile — */
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #050816;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #40c9ff, #ff3b72);
+      border-radius: 999px;
+      border: 2px solid #050816;
+    }
+
+    button:focus-visible {
+      outline: 2px solid rgba(64, 201, 255, .85);
+      outline-offset: 2px;
+    }
+
+    /* — Coup d'envoi : entrée de page orchestrée — */
+    @keyframes cardPopV46 {
+      0% {
+        opacity: 0;
+        transform: translateY(18px) scale(.975);
+      }
+      72% {
+        opacity: 1;
+        transform: translateY(-2px) scale(1.004);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .hero {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) backwards;
+    }
+
+    .panel.notice {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) .08s backwards;
+    }
+
+    section.panel.panel-pad:not(.notice) {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) .16s backwards;
+    }
+
+    .report-panel {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) .24s backwards;
+    }
+
+    .bar-box {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) .32s backwards;
+    }
+
+    .result-shell .summary {
+      animation: cardPopV46 .5s cubic-bezier(.22, .9, .28, 1) backwards;
+    }
+
+    .result-shell .team-card {
+      animation: cardPopV46 .55s cubic-bezier(.22, .9, .28, 1) .08s backwards;
+    }
+
+    /* — Titre FOOTSCAN : reflet maillot animé — */
+    @keyframes titleShineV46 {
+      0%, 100% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+    }
+
+    .home-title {
+      background-image: linear-gradient(95deg, #ffffff 0%, #dff4ff 30%, #40c9ff 48%, #ff3b72 66%, #ffffff 88%);
+      background-size: 240% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: #ffffff;
+      text-shadow: none;
+      animation: titleShineV46 7s ease-in-out infinite;
+    }
+
+    /* — Badge du haut : halo qui respire — */
+    @keyframes kickerPulseV46 {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(64, 201, 255, 0), 0 6px 16px rgba(0, 0, 0, .18);
+      }
+      50% {
+        box-shadow: 0 0 18px 2px rgba(64, 201, 255, .22), 0 6px 16px rgba(0, 0, 0, .18);
+      }
+    }
+
+    .kicker {
+      animation: kickerPulseV46 3.6s ease-in-out infinite;
+    }
+
+    /* — Logo FS : reflet qui passe — */
+    @keyframes logoShineV46 {
+      0%, 64% {
+        transform: translateX(-150%) skewX(-18deg);
+      }
+      86%, 100% {
+        transform: translateX(260%) skewX(-18deg);
+      }
+    }
+
+    .brand-logo::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 46%;
+      background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .42), transparent);
+      transform: translateX(-150%) skewX(-18deg);
+      animation: logoShineV46 4.6s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* — Pastille Worker : onde radar — */
+    @keyframes pingV46 {
+      0% {
+        transform: scale(.7);
+        opacity: .9;
+      }
+      75%, 100% {
+        transform: scale(2.4);
+        opacity: 0;
+      }
+    }
+
+    .worker-dot {
+      position: relative;
+    }
+
+    .worker-dot::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      border: 2px solid rgba(64, 201, 255, .55);
+      animation: pingV46 2s cubic-bezier(0, 0, .2, 1) infinite;
+    }
+
+    /* — Boutons : toucher élastique — */
+    .scan-btn,
+    .auto-apply-btn,
+    .report-btn,
+    .preset-btn,
+    .skip-grid button {
+      transition:
+        transform .18s cubic-bezier(.34, 1.56, .64, 1),
+        filter .2s ease,
+        box-shadow .28s ease,
+        background .28s ease,
+        border-color .28s ease,
+        color .28s ease;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .preset-btn:hover,
+      .skip-grid button:hover,
+      .report-btn:hover,
+      .auto-apply-btn:hover,
+      .scan-btn:hover:not(:disabled) {
+        transform: translateY(-2px) scale(1.012);
+        filter: brightness(1.07) saturate(1.05);
+      }
+    }
+
+    .scan-btn:active:not(:disabled),
+    .auto-apply-btn:active,
+    .report-btn:active,
+    .preset-btn:active,
+    .skip-grid button:active {
+      transform: scale(.96);
+      filter: brightness(1.1);
+    }
+
+    /* — Bouton SCANNER : respiration + ballon qui rebondit — */
+    @keyframes scanGlowV46 {
+      0%, 100% {
+        box-shadow: 0 10px 26px rgba(64, 201, 255, .16), 0 8px 22px rgba(255, 59, 114, .12);
+      }
+      50% {
+        box-shadow: 0 14px 40px rgba(64, 201, 255, .34), 0 12px 34px rgba(255, 59, 114, .26);
+      }
+    }
+
+    .scan-btn:not(:disabled) {
+      animation: scanGlowV46 2.6s ease-in-out infinite;
+    }
+
+    @keyframes ballBobV46 {
+      0%, 100% {
+        transform: translateY(0) rotate(0deg);
+      }
+      30% {
+        transform: translateY(-3px) rotate(-14deg);
+      }
+      60% {
+        transform: translateY(1px) rotate(10deg);
+      }
+    }
+
+    .scan-btn:not(.scan-kick)::before {
+      display: inline-block;
+      animation: ballBobV46 1.7s ease-in-out infinite;
+    }
+
+    /* — Curseurs plus joueurs (mêmes couleurs que la jauge) — */
+    input[type="range"]::-webkit-slider-thumb {
+      width: 22px;
+      height: 22px;
+      margin-top: -7px;
+      border: 2px solid rgba(255, 255, 255, .95);
+      background: linear-gradient(135deg, #40c9ff 0%, #4f73ff 52%, #ff3b72 100%);
+      box-shadow: 0 4px 14px rgba(64, 201, 255, .35), 0 0 0 4px rgba(64, 201, 255, .10);
+      transition: transform .16s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s ease;
+      cursor: grab;
+    }
+
+    input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.22);
+      cursor: grabbing;
+      box-shadow: 0 6px 18px rgba(255, 59, 114, .40), 0 0 0 7px rgba(64, 201, 255, .14);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(255, 255, 255, .95);
+      background: linear-gradient(135deg, #40c9ff 0%, #4f73ff 52%, #ff3b72 100%);
+      box-shadow: 0 4px 14px rgba(64, 201, 255, .35), 0 0 0 4px rgba(64, 201, 255, .10);
+      transition: transform .16s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s ease;
+      cursor: grab;
+    }
+
+    input[type="range"]:active::-moz-range-thumb {
+      transform: scale(1.22);
+      cursor: grabbing;
+      box-shadow: 0 6px 18px rgba(255, 59, 114, .40), 0 0 0 7px rgba(64, 201, 255, .14);
+    }
+
+    /* — Cases à cocher → interrupteurs modernes — */
+    .mode-toggle input {
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      width: 40px !important;
+      height: 22px !important;
+      margin: 0;
+      border-radius: 999px !important;
+      border: 1px solid rgba(255, 255, 255, .22);
+      background: rgba(255, 255, 255, .12);
+      position: relative;
+      cursor: pointer;
+      transition: background .28s ease, border-color .28s ease, box-shadow .28s ease;
+    }
+
+    .mode-toggle input::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, .40);
+      transform: translateY(-50%);
+      transition: transform .26s cubic-bezier(.34, 1.56, .64, 1);
+    }
+
+    .mode-toggle input:checked {
+      background: linear-gradient(135deg, #40c9ff, #ff3b72);
+      border-color: rgba(255, 255, 255, .12);
+      box-shadow: 0 0 16px rgba(64, 201, 255, .30);
+    }
+
+    .mode-toggle input:checked::before {
+      transform: translateY(-50%) translateX(18px);
+    }
+
+    /* — VS : petit battement de cœur — */
+    @keyframes vsPulseV46 {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.08);
+      }
+    }
+
+    .vs-box {
+      animation: vsPulseV46 2.4s ease-in-out infinite;
+    }
+
+    /* — Logos d'équipe : pop au survol — */
+    @media (hover: hover) and (pointer: fine) {
+      .logo-xl,
+      .logo-m,
+      .logo-s {
+        transition: transform .2s cubic-bezier(.34, 1.56, .64, 1);
+      }
+
+      .logo-xl:hover,
+      .logo-m:hover,
+      .logo-s:hover {
+        transform: scale(1.08) rotate(-3deg);
+      }
+
+      .summary:hover,
+      .team-card:hover {
+        box-shadow: var(--shadow), 0 0 30px rgba(64, 201, 255, .08), inset 0 1px 0 rgba(255, 255, 255, .055);
+      }
+    }
+
+    /* — Barème : ouverture animée — */
+    .bar-box summary {
+      cursor: pointer;
+      transition: color .2s ease;
+    }
+
+    .bar-box summary:hover {
+      color: #ffffff;
+    }
+
+    .bar-box[open] .bar-grid {
+      animation: cardPopV46 .4s cubic-bezier(.22, .9, .28, 1) backwards;
+    }
+
 </style>
 </head>
 
