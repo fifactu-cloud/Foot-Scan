@@ -1,53 +1,60 @@
-function svgFallback() {
-  return `
-    <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
-      <defs>
-        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#ef4444"/>
-          <stop offset="1" stop-color="#7f1d1d"/>
-        </linearGradient>
-      </defs>
-      <rect width="96" height="96" rx="30" fill="#171717"/>
-      <circle cx="48" cy="48" r="30" fill="url(#g)" opacity="0.85"/>
-      <text x="48" y="56" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="900" fill="white">FC</text>
-    </svg>
-  `;
-}
+const HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+    'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+    'Chrome/131.0.0.0 Safari/537.36',
+  Accept: 'image/avif,image/webp,image/png,image/*,*/*;q=0.8',
+  'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+  Referer: 'https://www.sofascore.com/',
+  Origin: 'https://www.sofascore.com',
+};
 
-module.exports = async function handler(req, res) {
-  const teamId = String(req.query.teamId || "").trim();
-
-  res.setHeader("Cache-Control", "public, max-age=604800, immutable");
-
-  if (!/^\d+$/.test(teamId)) {
-    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
-    res.statusCode = 200;
-    res.end(svgFallback());
-    return;
-  }
-
+module.exports = async function (req, res) {
   try {
-    const response = await fetch(`https://img.sofascore.com/api/v1/team/${teamId}/image`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
-        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        "Referer": "https://www.sofascore.com/",
-      },
-    });
+    const raw = (req.query && req.query.teamId) || '';
+    const teamId = String(raw).replace(/[^0-9]/g, '');
 
-    if (!response.ok) {
-      throw new Error(`Logo HTTP ${response.status}`);
+    if (!teamId) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(JSON.stringify({ error: 'teamId requis' }));
     }
 
-    const contentType = response.headers.get("content-type") || "image/png";
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const urls = [
+      `https://img.sofascore.com/api/v1/team/${teamId}/image`,
+      `https://api.sofascore.app/api/v1/team/${teamId}/image`,
+      `https://www.sofascore.com/api/v1/team/${teamId}/image`,
+    ];
 
-    res.setHeader("Content-Type", contentType);
-    res.statusCode = 200;
-    res.end(buffer);
-  } catch (error) {
-    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
-    res.statusCode = 200;
-    res.end(svgFallback());
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, { headers: HEADERS, redirect: 'follow' });
+        if (!r.ok) continue;
+
+        const ct = r.headers.get('content-type') || 'image/png';
+        if (!ct.toLowerCase().startsWith('image/')) continue;
+
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length < 120) continue;
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', ct);
+        res.setHeader(
+          'Cache-Control',
+          'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400'
+        );
+        return res.end(buf);
+      } catch (e) {
+        // essaie l'URL suivante
+      }
+    }
+
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify({ error: 'logo introuvable' }));
+  } catch (e) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify({ error: e.message || String(e) }));
   }
 };
