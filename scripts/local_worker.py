@@ -171,7 +171,7 @@ def redis_cmd(*cmd):
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=timeout or SOFA_FETCH_TIMEOUT_SECONDS) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", errors="replace")
@@ -198,7 +198,7 @@ def read_url(url, headers, impersonate=False, timeout=None):
     req = urllib.request.Request(url, headers=headers, method="GET")
 
     try:
-        with urllib.request.urlopen(req, timeout=timeout or SOFA_FETCH_TIMEOUT_SECONDS) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             status = resp.status
             body = resp.read().decode("utf-8", errors="replace")
             return status, body
