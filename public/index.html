@@ -6835,6 +6835,74 @@
       animation: titleGlintV54 5.5s ease-in-out infinite;
     }
 
+
+    /* Retouche v55 : titre vivant (priorité sur le verrou v14) + nouveau fond du bloc hero */
+
+    /* — Grand FOOTSCAN : mêmes couleurs que le petit, mais le dégradé ondule lentement — */
+    @keyframes titleWaveV55 {
+      0%, 100% {
+        background-position: 0% 0;
+      }
+      50% {
+        background-position: 100% 0;
+      }
+    }
+
+    .home-title {
+      background: linear-gradient(92deg,
+        #ffffff 0%, #dff4ff 12%, #7dd3fc 28%,
+        #8b5cf6 48%, #ff4d9d 64%,
+        #dff4ff 82%, #7dd3fc 100%) !important;
+      background-size: 230% 100% !important;
+      -webkit-background-clip: text !important;
+      background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      color: transparent !important;
+      text-shadow: none !important;
+      animation: titleWaveV55 8s ease-in-out infinite;
+    }
+
+    /* — Fond du hero : projecteurs, rond central de terrain et ballon vectoriel flottant — */
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 1;
+      animation: none;
+      background:
+        linear-gradient(115deg, transparent 40%, rgba(124, 199, 255, 0.05) 50%, transparent 60%),
+        radial-gradient(circle at 50% calc(100% - 86px), rgba(255, 255, 255, 0.11) 0 2.5px, transparent 3.5px),
+        radial-gradient(circle at 50% calc(100% + 64px), transparent 148px, rgba(255, 255, 255, 0.09) 149px 151px, transparent 152px),
+        linear-gradient(90deg, transparent 0 calc(50% - 1px), rgba(255, 255, 255, 0.045) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px) 100%),
+        radial-gradient(circle at 8% -12%, rgba(64, 201, 255, 0.20), transparent 46%),
+        radial-gradient(circle at 90% 112%, rgba(255, 59, 114, 0.21), transparent 48%);
+    }
+
+    @keyframes heroBallFloatV55 {
+      0%, 100% {
+        transform: translateY(0) rotate(10deg);
+      }
+      50% {
+        transform: translateY(12px) rotate(17deg);
+      }
+    }
+
+    .hero::after {
+      content: "";
+      left: auto;
+      right: -34px;
+      top: -26px;
+      width: 212px;
+      height: 212px;
+      font-size: 0;
+      opacity: 0.11;
+      filter: none;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3CclipPath id='hc'%3E%3Ccircle cx='24' cy='24' r='19'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg clip-path='url(%23hc)' fill='none' stroke='%23ffffff' stroke-width='1.6'%3E%3Cpath d='M24 16 L31.61 21.53 L28.7 30.47 L19.3 30.47 L16.39 21.53 Z'/%3E%3Cpath d='M24 16 L24 3 M31.61 21.53 L43.97 17.51 M28.7 30.47 L36.34 40.99 M19.3 30.47 L11.66 40.99 M16.39 21.53 L4.03 17.51'/%3E%3Cpath d='M24 3 L31 -2 M24 3 L17 -2 M43.97 17.51 L49 11 M43.97 17.51 L50 19 M36.34 40.99 L44 45 M36.34 40.99 L34 49 M11.66 40.99 L14 49 M11.66 40.99 L4 45 M4.03 17.51 L-2 19 M4.03 17.51 L-1 11'/%3E%3C/g%3E%3Ccircle cx='24' cy='24' r='19' fill='none' stroke='%23ffffff' stroke-width='1.6'/%3E%3C/svg%3E") center / contain no-repeat;
+      animation: heroBallFloatV55 7s ease-in-out infinite;
+      will-change: transform;
+    }
+
 </style>
 </head>
 
@@ -6862,7 +6930,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v54</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v55</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -8917,7 +8985,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v54 chargé");
+    console.log("FOOTSCAN v55 chargé");
 
     // Retouche v47 : vibration légère au tap des boutons et interrupteurs (Android)
     document.addEventListener("pointerdown", (e) => {
