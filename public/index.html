@@ -6695,6 +6695,50 @@
       color: #c9d8f2 !important;
     }
 
+
+    /* Retouche v51 : 🛑 sans bulle (halo pulsant), titre Termux façon pastille kicker, ballon du logo */
+
+    /* — 🛑 : plus de bulle, juste une lumière qui augmente puis diminue — */
+    .notice-inline-icon {
+      animation: none !important;
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+    }
+
+    @keyframes stopGlowV51 {
+      0%, 100% {
+        filter: drop-shadow(0 0 2px rgba(255, 59, 114, 0.25));
+      }
+      50% {
+        filter: drop-shadow(0 0 9px rgba(255, 59, 114, 0.95)) drop-shadow(0 0 16px rgba(255, 59, 114, 0.45));
+      }
+    }
+
+    .notice-inline-icon::before {
+      animation: stopGlowV51 1.5s ease-in-out infinite !important;
+      transform: none !important;
+    }
+
+    /* — Titre Termux : même style que la pastille sous FOOTSCAN, en version rose — */
+    .notice-title {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      padding: 7px 13px 7px 9px !important;
+      border-radius: 999px !important;
+      border: 1px solid rgba(255, 99, 150, 0.36) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.10), rgba(255, 54, 93, 0.16)) !important;
+      box-shadow: none !important;
+    }
+
+    /* — Ballon du logo : un poil plus grand pour bien lire les panneaux — */
+    .brand-ball {
+      width: 68%;
+      height: 68%;
+    }
+
 </style>
 </head>
 
@@ -6703,10 +6747,22 @@
     <div class="topbar-inner">
       <div class="brand">
         <div class="brand-logo" aria-label="FOOTSCAN">
-          <svg class="brand-ball" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-            <circle cx="24" cy="24" r="19" stroke="#ffffff" stroke-width="3" />
-            <path d="M24 15 L32.56 21.22 L29.29 31.28 L18.71 31.28 L15.44 21.22 Z" fill="#ffffff" />
-            <path d="M24 15 L24 5 M32.56 21.22 L42.07 18.13 M29.29 31.28 L35.17 39.37 M18.71 31.28 L12.83 39.37 M15.44 21.22 L5.93 18.13" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+          <svg class="brand-ball" viewBox="0 0 48 48" aria-hidden="true">
+            <defs>
+              <clipPath id="fsBallClip"><circle cx="24" cy="24" r="19" /></clipPath>
+              <path id="fsPent" d="M0 -6.5 L6.18 -2.01 L3.82 5.26 L-3.82 5.26 L-6.18 -2.01 Z" />
+            </defs>
+            <circle cx="24" cy="24" r="19" fill="#ffffff" />
+            <g clip-path="url(#fsBallClip)" fill="#101733">
+              <path d="M24 16 L31.61 21.53 L28.7 30.47 L19.3 30.47 L16.39 21.53 Z" />
+              <path d="M24 16 L24 3 M31.61 21.53 L43.97 17.51 M28.7 30.47 L36.34 40.99 M19.3 30.47 L11.66 40.99 M16.39 21.53 L4.03 17.51" fill="none" stroke="#101733" stroke-width="2" stroke-linecap="round" />
+              <use href="#fsPent" transform="translate(24 3) rotate(180)" />
+              <use href="#fsPent" transform="translate(4.03 17.51) rotate(108)" />
+              <use href="#fsPent" transform="translate(11.66 40.99) rotate(36)" />
+              <use href="#fsPent" transform="translate(36.34 40.99) rotate(324)" />
+              <use href="#fsPent" transform="translate(43.97 17.51) rotate(252)" />
+            </g>
+            <circle cx="24" cy="24" r="19" fill="none" stroke="#101733" stroke-width="2" />
           </svg>
         </div>
         <div>
