@@ -6,6 +6,16 @@ import re
 import math
 import urllib.request
 import urllib.error
+
+# Optionnel : curl_cffi imite l'empreinte TLS de Chrome et contourne
+# le 403 "challenge" anti-bot de SofaScore. Installation dans Termux :
+#     pip install curl_cffi
+try:
+    from curl_cffi import requests as cffi_requests
+    HAS_CURL_CFFI = True
+except Exception:
+    cffi_requests = None
+    HAS_CURL_CFFI = False
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -133,7 +143,16 @@ def redis_cmd(*cmd):
     return data.get("result")
 
 
-def read_url(url, headers):
+def read_url(url, headers, impersonate=False):
+    # Si curl_cffi est dispo, on imite l'empreinte TLS de Chrome :
+    # c'est ce qui contourne le 403 "challenge" (anti-bot) de SofaScore.
+    if impersonate and HAS_CURL_CFFI:
+        try:
+            resp = cffi_requests.get(url, headers=headers, timeout=30, impersonate="chrome")
+            return resp.status_code, resp.text
+        except Exception as e:
+            return 0, str(e)
+
     req = urllib.request.Request(url, headers=headers, method="GET")
 
     try:
@@ -176,9 +195,17 @@ def validate_json(status, body, path, source):
 def sofa_fetch(path):
     clean_path = path.lstrip("/")
 
-    urls = [
-        f"https://www.sofascore.com/api/v1/{clean_path}",
-        f"https://api.sofascore.com/api/v1/{clean_path}",
+    # L'hôte de l'app mobile (api.sofascore.app) est servi par une infra
+    # moins protégée : on le tente en premier. Les hôtes .com déclenchent
+    # un "challenge" anti-bot si l'empreinte TLS n'est pas celle d'un vrai
+    # navigateur, d'où l'impersonation Chrome quand curl_cffi est installé.
+    targets = [
+        (f"https://api.sofascore.app/api/v1/{clean_path}", False),
+        (f"https://api.sofascore.app/api/v1/{clean_path}", True),
+        (f"https://www.sofascore.com/api/v1/{clean_path}", True),
+        (f"https://api.sofascore.com/api/v1/{clean_path}", True),
+        (f"https://www.sofascore.com/api/v1/{clean_path}", False),
+        (f"https://api.sofascore.com/api/v1/{clean_path}", False),
     ]
 
     headers = {
@@ -191,19 +218,27 @@ def sofa_fetch(path):
         "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
         "Referer": "https://www.sofascore.com/",
         "Origin": "https://www.sofascore.com",
+        "Cache-Control": "no-cache",
     }
 
     last_error = None
+    challenge_seen = False
 
     for attempt in range(1, SOFA_FETCH_RETRIES + 1):
-        for url in urls:
-            status, body = read_url(url, headers)
+        for url, impersonate in targets:
+            if impersonate and not HAS_CURL_CFFI:
+                continue
+
+            status, body = read_url(url, headers, impersonate=impersonate)
             valid_body, error = validate_json(status, body, clean_path, url)
 
             if valid_body is not None:
                 return valid_body
 
             last_error = error
+
+            if status == 403 and "challenge" in (body or ""):
+                challenge_seen = True
 
             # 404 = page absente : inutile de retenter plusieurs fois.
             if status == 404:
@@ -214,6 +249,14 @@ def sofa_fetch(path):
 
         if attempt < SOFA_FETCH_RETRIES:
             time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
+
+    if challenge_seen and not HAS_CURL_CFFI:
+        print(
+            "ASTUCE : SofaScore bloque les requêtes Python (403 challenge). "
+            "Installe l'impersonation TLS dans Termux puis relance le worker :\n"
+            "    pip install curl_cffi",
+            file=sys.stderr,
+        )
 
     raise RuntimeError(last_error or f"Impossible de récupérer {clean_path}")
 
