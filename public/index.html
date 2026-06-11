@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#060817" />
   <title>FOOTSCAN</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800;900&display=swap" rel="stylesheet" />
 
   <style>
     * {
@@ -6531,6 +6535,59 @@
       }
     }
 
+
+    /* Retouche v48 : identité visuelle — typo Outfit, logo ballon, fond panneaux de ballon */
+
+    /* — Typographie d'appli moderne — */
+    html,
+    body,
+    button,
+    input {
+      font-family: "Outfit", "Google Sans", "Roboto", "Arial", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .home-title {
+      letter-spacing: -0.05em;
+    }
+
+    .brand-title {
+      letter-spacing: -0.025em;
+    }
+
+    .rank-value,
+    .auto-result-value,
+    .auto-number,
+    .status-percent,
+    .status-big-percent,
+    .count-pill,
+    .stat-badge {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* — Fond : filet d'hexagones (panneaux de ballon), très discret — */
+    body {
+      background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23ffffff' fill-opacity='0.022'/%3E%3C/svg%3E"),
+        radial-gradient(circle at 15% 8%, rgba(64, 201, 255, .10), transparent 38%),
+        radial-gradient(circle at 88% 6%, rgba(255, 59, 114, .09), transparent 36%),
+        linear-gradient(180deg, #060a1e, #04060f);
+    }
+
+    /* — Logo : ballon dessiné qui tourne lentement — */
+    .brand-ball {
+      width: 60%;
+      height: 60%;
+      display: block;
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35));
+      animation: ballSpinV48 16s linear infinite;
+    }
+
+    @keyframes ballSpinV48 {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
 </style>
 </head>
 
@@ -6538,7 +6595,13 @@
   <div class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <div class="brand-logo">FS</div>
+        <div class="brand-logo" aria-label="FOOTSCAN">
+          <svg class="brand-ball" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <circle cx="24" cy="24" r="19" stroke="#ffffff" stroke-width="3" />
+            <path d="M24 15 L32.56 21.22 L29.29 31.28 L18.71 31.28 L15.44 21.22 Z" fill="#ffffff" />
+            <path d="M24 15 L24 5 M32.56 21.22 L42.07 18.13 M29.29 31.28 L35.17 39.37 M18.71 31.28 L12.83 39.37 M15.44 21.22 L5.93 18.13" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+          </svg>
+        </div>
         <div>
           <div class="brand-title">FOOTSCAN</div>
           <div class="brand-subtitle">Performance scanner</div>
