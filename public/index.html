@@ -6134,7 +6134,6 @@
       font-size: 17px !important;
       line-height: 1 !important;
       text-align: center !important;
-      transform: translate(0, 0) !important;
     }
 
     @media (max-width: 380px) {
@@ -6756,18 +6755,34 @@
     /* — Style pastille (façon kicker) décliné en cyan sur les titres de section — */
     .auto-title,
     .report-title {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      width: fit-content;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      width: fit-content !important;
       padding: 7px 13px !important;
-      border-radius: 999px;
-      border: 1px solid rgba(64, 201, 255, 0.30);
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(59, 107, 255, 0.10));
-      color: #e0f2fe;
+      border-radius: 999px !important;
+      border: 1px solid rgba(64, 201, 255, 0.30) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(59, 107, 255, 0.10)) !important;
+      color: #e0f2fe !important;
       font-size: 13px !important;
       letter-spacing: 0.10em !important;
-      line-height: 1.15;
+      line-height: 1.15 !important;
+    }
+
+
+    /* Retouche v53 : badge de version visible dans le topbar */
+    .brand-title .ver-tag {
+      display: inline-block;
+      margin-left: 7px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(134, 203, 255, 0.22);
+      background: rgba(22, 32, 74, 0.6);
+      color: rgba(199, 216, 238, 0.75);
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      vertical-align: middle;
     }
 
 </style>
@@ -6797,7 +6812,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN</div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v53</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -8851,6 +8866,8 @@
 
       items.forEach((item) => observer.observe(item));
     }
+
+    console.log("FOOTSCAN v53 chargé");
 
     // Retouche v47 : vibration légère au tap des boutons et interrupteurs (Android)
     document.addEventListener("pointerdown", (e) => {
