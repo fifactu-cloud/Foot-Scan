@@ -6,6 +6,8 @@ import re
 import math
 import urllib.request
 import urllib.error
+import shutil
+import subprocess
 
 # Optionnel : curl_cffi imite l'empreinte TLS de Chrome et contourne
 # le 403 "challenge" anti-bot de SofaScore. Installation dans Termux :
@@ -169,6 +171,30 @@ def read_url(url, headers, impersonate=False):
         return 0, str(e)
 
 
+def read_url_syscurl(url, headers):
+    """Transport de secours via le binaire curl de Termux (pkg install curl).
+
+    Son empreinte TLS differe de celle de Python : il passe parfois
+    la ou urllib est bloque."""
+    if not shutil.which("curl"):
+        return 0, "curl absent (pkg install curl)"
+
+    cmd = ["curl", "-sS", "--compressed", "--max-time", "30",
+           "-w", "\n%{http_code}", url]
+    for k, v in headers.items():
+        cmd += ["-H", f"{k}: {v}"]
+
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
+        raw = out.stdout
+        if "\n" not in raw:
+            return 0, (out.stderr or "reponse curl vide").strip()
+        body, _, code = raw.rpartition("\n")
+        return int(code or 0), body
+    except Exception as e:
+        return 0, str(e)
+
+
 def validate_json(status, body, path, source):
     if status != 200:
         return None, f"{source}: HTTP {status} sur {path}: {body[:300]}"
@@ -195,24 +221,25 @@ def validate_json(status, body, path, source):
 def sofa_fetch(path):
     clean_path = path.lstrip("/")
 
-    # L'hôte de l'app mobile (api.sofascore.app) est servi par une infra
-    # moins protégée : on le tente en premier. Les hôtes .com déclenchent
-    # un "challenge" anti-bot si l'empreinte TLS n'est pas celle d'un vrai
-    # navigateur, d'où l'impersonation Chrome quand curl_cffi est installé.
-    targets = [
-        (f"https://api.sofascore.app/api/v1/{clean_path}", False),
-        (f"https://api.sofascore.app/api/v1/{clean_path}", True),
-        (f"https://www.sofascore.com/api/v1/{clean_path}", True),
-        (f"https://api.sofascore.com/api/v1/{clean_path}", True),
-        (f"https://www.sofascore.com/api/v1/{clean_path}", False),
-        (f"https://api.sofascore.com/api/v1/{clean_path}", False),
-    ]
+    app_url = f"https://api.sofascore.app/api/v1/{clean_path}"
+    www_url = f"https://www.sofascore.com/api/v1/{clean_path}"
+    api_url = f"https://api.sofascore.com/api/v1/{clean_path}"
 
-    headers = {
+    # L'app Android n'envoie NI Referer NI Origin : les envoyer sur l'hôte
+    # .app paraît suspect. On imite donc l'app sur .app, le navigateur sur .com.
+    app_headers = {
+        "User-Agent": "okhttp/4.12.0",
+        "Accept": "application/json",
+        "Accept-Language": "fr-FR,fr;q=0.9",
+        "Accept-Encoding": "identity",
+        "Cache-Control": "no-cache",
+    }
+
+    browser_headers = {
         "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "Mozilla/5.0 (Linux; Android 14; SM-S918B) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Safari/537.36"
+            "Chrome/131.0.0.0 Mobile Safari/537.36"
         ),
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
@@ -221,16 +248,34 @@ def sofa_fetch(path):
         "Cache-Control": "no-cache",
     }
 
+    # (url, headers, transport) — du plus prometteur au plus désespéré.
+    targets = [
+        (app_url, app_headers, "urllib"),
+        (app_url, app_headers, "syscurl"),
+        (www_url, browser_headers, "cffi"),
+        (api_url, browser_headers, "cffi"),
+        (app_url, app_headers, "cffi"),
+        (www_url, browser_headers, "syscurl"),
+        (api_url, browser_headers, "syscurl"),
+        (www_url, browser_headers, "urllib"),
+        (api_url, browser_headers, "urllib"),
+    ]
+
     last_error = None
     challenge_seen = False
 
     for attempt in range(1, SOFA_FETCH_RETRIES + 1):
-        for url, impersonate in targets:
-            if impersonate and not HAS_CURL_CFFI:
-                continue
+        for url, headers, transport in targets:
+            if transport == "cffi":
+                if not HAS_CURL_CFFI:
+                    continue
+                status, body = read_url(url, headers, impersonate=True)
+            elif transport == "syscurl":
+                status, body = read_url_syscurl(url, headers)
+            else:
+                status, body = read_url(url, headers)
 
-            status, body = read_url(url, headers, impersonate=impersonate)
-            valid_body, error = validate_json(status, body, clean_path, url)
+            valid_body, error = validate_json(status, body, clean_path, f"{url} [{transport}]")
 
             if valid_body is not None:
                 return valid_body
@@ -252,9 +297,16 @@ def sofa_fetch(path):
 
     if challenge_seen and not HAS_CURL_CFFI:
         print(
-            "ASTUCE : SofaScore bloque les requêtes Python (403 challenge). "
-            "Installe l'impersonation TLS dans Termux puis relance le worker :\n"
-            "    pip install curl_cffi",
+            "ASTUCE : SofaScore bloque l'empreinte TLS de Python (403 challenge).\n"
+            "Deux solutions, de la plus simple à la plus robuste :\n"
+            "  1. Dans Termux : pkg install curl   (active le transport curl)\n"
+            "  2. Ubuntu via proot-distro pour utiliser curl_cffi :\n"
+            "       pkg install proot-distro\n"
+            "       proot-distro install ubuntu\n"
+            "       proot-distro login ubuntu\n"
+            "       apt update && apt install -y python3-pip\n"
+            "       pip3 install curl_cffi\n"
+            "       puis relancer le worker depuis Ubuntu.",
             file=sys.stderr,
         )
 
