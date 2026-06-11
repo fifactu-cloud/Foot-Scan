@@ -6785,6 +6785,56 @@
       vertical-align: middle;
     }
 
+
+    /* Retouche v54 : animation 🛑 fiabilisée + lumière qui balaie le grand FOOTSCAN */
+
+    /* — 🛑 : l'animation passe sur le conteneur (la méthode qui marchait en v44) — */
+    @keyframes stopGlowV54 {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px rgba(255, 59, 114, 0.25));
+      }
+      50% {
+        transform: scale(1.22);
+        filter: drop-shadow(0 0 9px rgba(255, 59, 114, 0.95)) drop-shadow(0 0 16px rgba(255, 59, 114, 0.50));
+      }
+    }
+
+    .notice-inline-icon {
+      animation: stopGlowV54 1.5s ease-in-out infinite !important;
+      transform-origin: center center !important;
+      will-change: transform, filter;
+    }
+
+    .notice-inline-icon::before {
+      animation: none !important;
+    }
+
+    /* — Grand FOOTSCAN : blanc comme le petit, avec le même passage de lumière cyan→rose — */
+    @keyframes titleGlintV54 {
+      0%, 52% {
+        background-position: 100% 0;
+      }
+      88%, 100% {
+        background-position: 0% 0;
+      }
+    }
+
+    .home-title {
+      background-image: linear-gradient(100deg,
+        #ffffff 0%, #ffffff 38%,
+        #7fdcff 46%, #ff7aa2 54%,
+        #ffffff 62%, #ffffff 100%);
+      background-size: 300% 100%;
+      background-position: 100% 0;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: #ffffff;
+      text-shadow: none;
+      animation: titleGlintV54 5.5s ease-in-out infinite;
+    }
+
 </style>
 </head>
 
@@ -6812,7 +6862,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v53</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v54</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -8867,7 +8917,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v53 chargé");
+    console.log("FOOTSCAN v54 chargé");
 
     // Retouche v47 : vibration légère au tap des boutons et interrupteurs (Android)
     document.addEventListener("pointerdown", (e) => {
