@@ -6924,7 +6924,179 @@
 
     /* — Ballon du hero : panneaux pleins (le dessin du logo), fini l'effet jante — */
     .hero::after {
-      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3CclipPath id='hb'%3E%3Ccircle cx='24' cy='24' r='19'/%3E%3C/clipPath%3E%3Cpath id='hp' d='M0 -6.5 L6.18 -2.01 L3.82 5.26 L-3.82 5.26 L-6.18 -2.01 Z'/%3E%3C/defs%3E%3Cg clip-path='url(%23hb)' fill='%23ffffff'%3E%3Cpath d='M24 16 L31.61 21.53 L28.7 30.47 L19.3 30.47 L16.39 21.53 Z'/%3E%3Cpath d='M24 16 L24 3 M31.61 21.53 L43.97 17.51 M28.7 30.47 L36.34 40.99 M19.3 30.47 L11.66 40.99 M16.39 21.53 L4.03 17.51' fill='none' stroke='%23ffffff' stroke-width='2'/%3E%3Cuse href='%23hp' transform='translate(24 3) rotate(180)'/%3E%3Cuse href='%23hp' transform='translate(4.03 17.51) rotate(108)'/%3E%3Cuse href='%23hp' transform='translate(11.66 40.99) rotate(36)'/%3E%3Cuse href='%23hp' transform='translate(36.34 40.99) rotate(324)'/%3E%3Cuse href='%23hp' transform='translate(43.97 17.51) rotate(252)'/%3E%3C/g%3E%3Ccircle cx='24' cy='24' r='19' fill='none' stroke='%23ffffff' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3CclipPath id='hb'%3E%3Ccircle cx='24' cy='24' r='19'/%3E%3C/clipPath%3E%3Cpath id='hp' d='M0 -6.5 L6.18 -2.01 L3.82 5.26 L-3.82 5.26 L-6.18 -2.01 Z'/%3E%3C/defs%3E%3Cg clip-path='url(%23hb)' fill='%23ffffff'%3E%3Cpath d='M24 16 L31.61 21.53 L28.7 30.47 L19.3 30.47 L16.39 21.53 Z'/%3E%3Cuse href='%23hp' transform='translate(24 3) rotate(180)'/%3E%3Cuse href='%23hp' transform='translate(4.03 17.51) rotate(108)'/%3E%3Cuse href='%23hp' transform='translate(11.66 40.99) rotate(36)'/%3E%3Cuse href='%23hp' transform='translate(36.34 40.99) rotate(324)'/%3E%3Cuse href='%23hp' transform='translate(43.97 17.51) rotate(252)'/%3E%3C/g%3E%3Ccircle cx='24' cy='24' r='19' fill='none' stroke='%23ffffff' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+
+
+    /* Retouche v58 : après-scan festif — gagnant, VS écho, teintes équipes, clics animés */
+
+    /* — SCANNER retrouve son changement de couleur (perdu en v46), en plus du halo — */
+    .scan-btn:not(:disabled) {
+      animation: derbySweep 5.5s ease infinite, scanGlowV46 2.6s ease-in-out infinite;
+    }
+
+    /* — Titres de section centrés (Rapport de session comme Calcul guidé) — */
+    .auto-title,
+    .report-title {
+      display: flex !important;
+      width: fit-content !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+
+    /* — Bloc gagnant : confettis, trophée en fond, tout centré — */
+    .dominance-box {
+      text-align: center;
+    }
+
+    .dominance-box.dominance-win {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      border: 1px solid transparent !important;
+      background:
+        linear-gradient(rgba(13, 20, 46, 0.94), rgba(13, 20, 46, 0.94)) padding-box,
+        linear-gradient(135deg, rgba(64, 201, 255, 0.65), rgba(255, 59, 114, 0.60)) border-box !important;
+      padding: 16px 14px 15px !important;
+    }
+
+    .dominance-win .dominance-label,
+    .dominance-win .dominance-team,
+    .dominance-win .dominance-meta {
+      position: relative;
+      z-index: 2;
+    }
+
+    .dominance-win .dominance-team {
+      font-size: clamp(22px, 6vw, 30px);
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      color: #ffffff;
+      text-shadow: 0 0 22px rgba(64, 201, 255, 0.25), 0 4px 18px rgba(0, 0, 0, 0.4);
+      margin: 4px 0 3px;
+    }
+
+    .dominance-trophy {
+      position: absolute;
+      right: -10px;
+      bottom: -18px;
+      font-size: 86px;
+      line-height: 1;
+      opacity: 0.16;
+      transform: rotate(-12deg);
+      pointer-events: none;
+      z-index: 0;
+      filter: saturate(1.2);
+    }
+
+    .dominance-win .status-confetti {
+      z-index: 1;
+      opacity: 0.85;
+    }
+
+    /* — En-tête du résumé : label à gauche, mode scan en haut à droite — */
+    .summary-head-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .summary-mode {
+      text-align: right;
+      max-width: 60%;
+    }
+
+    /* — VS en écho : V bleus / S roses, opacité qui fond vers les extrémités — */
+    .vs-echo {
+      display: inline-flex;
+      align-items: baseline;
+      font-style: italic;
+      font-weight: 1000;
+      font-size: 0.78em;
+      line-height: 1;
+      margin: 0 0.12em;
+      transform: translateY(-0.02em);
+    }
+
+    .vs-echo i {
+      font-style: italic;
+      margin-left: -0.14em;
+    }
+
+    .vs-echo i:first-child {
+      margin-left: 0;
+    }
+
+    .vs-echo .ve-v {
+      color: #38bdf8;
+      text-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+    }
+
+    .vs-echo .ve-s {
+      color: #fb7185;
+      text-shadow: 0 0 14px rgba(251, 113, 133, 0.25);
+    }
+
+    .vs-echo i:nth-child(1) { opacity: 0.07; }
+    .vs-echo i:nth-child(2) { opacity: 0.14; }
+    .vs-echo i:nth-child(3) { opacity: 0.26; }
+    .vs-echo i:nth-child(4) { opacity: 0.42; }
+    .vs-echo i:nth-child(5) { opacity: 0.62; }
+    .vs-echo i:nth-child(6) { opacity: 0.82; }
+    .vs-echo i:nth-child(7) { opacity: 1; }
+    .vs-echo i:nth-child(8) { opacity: 1; }
+    .vs-echo i:nth-child(9) { opacity: 0.82; }
+    .vs-echo i:nth-child(10) { opacity: 0.62; }
+    .vs-echo i:nth-child(11) { opacity: 0.42; }
+    .vs-echo i:nth-child(12) { opacity: 0.26; }
+    .vs-echo i:nth-child(13) { opacity: 0.14; }
+    .vs-echo i:nth-child(14) { opacity: 0.07; }
+
+    /* — Teintes : domicile bleu, extérieur rose, résumé mixte — */
+    .team-card:has(.side-pill.side-home) {
+      background:
+        linear-gradient(165deg, rgba(56, 189, 248, 0.11), rgba(56, 189, 248, 0.02) 38%),
+        rgba(10, 15, 36, 0.92) !important;
+      border-color: rgba(56, 189, 248, 0.30) !important;
+    }
+
+    .team-card:has(.side-pill.side-away) {
+      background:
+        linear-gradient(165deg, rgba(251, 113, 133, 0.11), rgba(251, 113, 133, 0.02) 38%),
+        rgba(10, 15, 36, 0.92) !important;
+      border-color: rgba(251, 113, 133, 0.30) !important;
+    }
+
+    .summary-grid .summary-cell:first-child {
+      background: linear-gradient(165deg, rgba(56, 189, 248, 0.10), rgba(10, 15, 36, 0.6)) !important;
+      border-color: rgba(56, 189, 248, 0.26) !important;
+    }
+
+    .summary-grid .summary-cell:last-child {
+      background: linear-gradient(165deg, rgba(251, 113, 133, 0.10), rgba(10, 15, 36, 0.6)) !important;
+      border-color: rgba(251, 113, 133, 0.26) !important;
+    }
+
+    .summary {
+      background:
+        linear-gradient(135deg, rgba(56, 189, 248, 0.07), rgba(251, 113, 133, 0.06)),
+        rgba(10, 15, 36, 0.92) !important;
+      border-color: rgba(134, 203, 255, 0.22) !important;
+    }
+
+    /* — Pop au clic (gagnant, résumé, scan terminé) — */
+    @keyframes fxPopV58 {
+      0% { transform: scale(1); }
+      32% { transform: scale(1.025); }
+      62% { transform: scale(0.992); }
+      100% { transform: scale(1); }
+    }
+
+    .fx-pop {
+      animation: fxPopV58 0.5s cubic-bezier(.34, 1.3, .5, 1) !important;
     }
 
 </style>
@@ -6943,7 +7115,6 @@
             <circle cx="24" cy="24" r="19" fill="#ffffff" />
             <g clip-path="url(#fsBallClip)" fill="#101733">
               <path d="M24 16 L31.61 21.53 L28.7 30.47 L19.3 30.47 L16.39 21.53 Z" />
-              <path d="M24 16 L24 3 M31.61 21.53 L43.97 17.51 M28.7 30.47 L36.34 40.99 M19.3 30.47 L11.66 40.99 M16.39 21.53 L4.03 17.51" fill="none" stroke="#101733" stroke-width="2" stroke-linecap="round" />
               <use href="#fsPent" transform="translate(24 3) rotate(180)" />
               <use href="#fsPent" transform="translate(4.03 17.51) rotate(108)" />
               <use href="#fsPent" transform="translate(11.66 40.99) rotate(36)" />
@@ -6954,7 +7125,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v57</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v58</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -7582,8 +7753,15 @@
         ? `Évolution : ${esc(formatValue(dominance.metric))} · Zone ${esc(formatValue(dominance.zoneAverage))} → Rangs ${esc(formatValue(dominance.rankAverage))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`
         : `Moyenne Dominante : ${esc(formatValue(dominance.average))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`;
 
+      const confColors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
+      const confetti = Array.from({ length: 26 }, (_, i) => `
+        <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
+      `).join("");
+
       return `
-        <div class="dominance-box">
+        <div class="dominance-box dominance-win">
+          <div class="status-confetti" aria-hidden="true">${confetti}</div>
+          <div class="dominance-trophy" aria-hidden="true">🏆</div>
           <div class="dominance-label">${title}</div>
           <div class="dominance-team">${esc(String(dominance.label || "").toUpperCase())}</div>
           <div class="dominance-meta">${meta}</div>
@@ -8002,9 +8180,11 @@
       return `
         <section class="summary">
           <div class="summary-head">
-            <div class="summary-label">Résumé rapide</div>
-            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="summary-vs-gradient" aria-label="VS"><span class="summary-vs-v">V</span><span class="summary-vs-s">S</span></span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
-            <div class="summary-label">Mode scan : ${esc(result.scanModeLabel || (result.simultaneousMode ? "Simultané match par match / minute par minute" : "Standard"))}</div>
+            <div class="summary-head-top">
+              <div class="summary-label">Résumé rapide</div>
+              <div class="summary-label summary-mode">Mode scan : ${esc(result.scanModeLabel || (result.simultaneousMode ? "Simultané match par match / minute par minute" : "Standard"))}</div>
+            </div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo" aria-label="VS">${Array.from({ length: 7 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 7 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
           </div>
 
           ${renderDominance(result)}
@@ -9009,7 +9189,22 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v57 chargé");
+    console.log("FOOTSCAN v58 chargé");
+
+    // Retouche v58 : interactions festives sur les blocs de résultats
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("button, a, input, label, details, summary")) return;
+      const win = e.target.closest(".dominance-box.dominance-win");
+      const done = e.target.closest(".status-done");
+      const sum = e.target.closest(".summary");
+      const target = win || done || sum;
+      if (!target) return;
+      target.classList.remove("fx-pop");
+      void target.offsetWidth;
+      target.classList.add("fx-pop");
+      if (typeof navigator.vibrate === "function") navigator.vibrate(12);
+      if (win || done) launchFinishFx();
+    });
 
     // Retouche v47 : vibration légère au tap des boutons et interrupteurs (Android)
     document.addEventListener("pointerdown", (e) => {
