@@ -80,6 +80,7 @@ INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "6"))
 SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "2"))
 SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.4"))
 SOFA_FETCH_TIMEOUT_SECONDS = int(os.environ.get("SOFA_FETCH_TIMEOUT_SECONDS", "12"))
+SOFA_DEBUG_NETWORK = os.environ.get("SOFA_DEBUG_NETWORK", "0").strip().lower() in ("1", "true", "oui", "yes")
 SOFA_INCIDENT_TIMEOUT_SECONDS = int(os.environ.get("SOFA_INCIDENT_TIMEOUT_SECONDS", "8"))
 SOFA_INCIDENT_RETRIES = int(os.environ.get("SOFA_INCIDENT_RETRIES", "1"))
 PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
@@ -198,7 +199,7 @@ def read_url(url, headers, impersonate=False, timeout=None):
     req = urllib.request.Request(url, headers=headers, method="GET")
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=timeout or SOFA_FETCH_TIMEOUT_SECONDS) as resp:
             status = resp.status
             body = resp.read().decode("utf-8", errors="replace")
             return status, body
@@ -220,7 +221,7 @@ def read_url_syscurl(url, headers, timeout=None):
         return 0, "curl absent (pkg install curl)"
 
     t = int(timeout or SOFA_FETCH_TIMEOUT_SECONDS)
-    cmd = ["curl", "-sS", "--compressed", "--connect-timeout", str(max(3, min(10, t))), "--max-time", str(max(5, t)),
+    cmd = ["curl", "-sS", "-L", "--http1.1", "--compressed", "--connect-timeout", str(max(3, min(10, t))), "--max-time", str(max(5, t)),
            "-w", "\n%{http_code}", url]
     for k, v in headers.items():
         cmd += ["-H", f"{k}: {v}"]
@@ -310,12 +311,14 @@ def sofa_fetch(path, incident_mode=False):
         timeout = SOFA_INCIDENT_TIMEOUT_SECONDS
     else:
         targets = [
-            (app_url, app_headers, "syscurl"),
+            # curl_cffi d'abord quand il est disponible : moins de faux messages
+            # "réponse vide" au démarrage Termux, et meilleure empreinte navigateur.
             (www_url, browser_headers, "cffi"),
             (api_url, browser_headers, "cffi"),
             (app_url, app_headers, "urllib"),
             (www_url, browser_headers, "syscurl"),
             (api_url, browser_headers, "syscurl"),
+            (app_url, app_headers, "syscurl"),
             (www_url, browser_headers, "urllib"),
             (api_url, browser_headers, "urllib"),
         ]
@@ -351,7 +354,8 @@ def sofa_fetch(path, incident_mode=False):
                 print(f"Échec définitif: {error}", file=sys.stderr)
                 raise RuntimeError(error)
 
-            print(f"Échec tentative {attempt}/{retries}: {error}", file=sys.stderr)
+            if SOFA_DEBUG_NETWORK:
+                print(f"Échec tentative {attempt}/{retries}: {error}", file=sys.stderr)
 
         if attempt < retries:
             time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
