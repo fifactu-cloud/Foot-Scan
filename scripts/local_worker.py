@@ -6,18 +6,6 @@ import re
 import math
 import urllib.request
 import urllib.error
-import shutil
-import subprocess
-
-# Optionnel : curl_cffi imite l'empreinte TLS de Chrome et contourne
-# le 403 "challenge" anti-bot de SofaScore. Installation dans Termux :
-#     pip install curl_cffi
-try:
-    from curl_cffi import requests as cffi_requests
-    HAS_CURL_CFFI = True
-except Exception:
-    cffi_requests = None
-    HAS_CURL_CFFI = False
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -43,9 +31,9 @@ INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM
 SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
 MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "100"))
 INCIDENT_BATCH_SIZE = int(os.environ.get("FOOTSCAN_INCIDENT_BATCH_SIZE", "2"))
-INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "6"))
-SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "2"))
-SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.4"))
+INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "2"))
+SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "3"))
+SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.8"))
 PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
 DEFAULT_RANK_EVENT_STEP = 1.0
 CURRENT_RANK_EVENT_STEP = DEFAULT_RANK_EVENT_STEP
@@ -145,16 +133,7 @@ def redis_cmd(*cmd):
     return data.get("result")
 
 
-def read_url(url, headers, impersonate=False):
-    # Si curl_cffi est dispo, on imite l'empreinte TLS de Chrome :
-    # c'est ce qui contourne le 403 "challenge" (anti-bot) de SofaScore.
-    if impersonate and HAS_CURL_CFFI:
-        try:
-            resp = cffi_requests.get(url, headers=headers, timeout=30, impersonate="chrome")
-            return resp.status_code, resp.text
-        except Exception as e:
-            return 0, str(e)
-
+def read_url(url, headers):
     req = urllib.request.Request(url, headers=headers, method="GET")
 
     try:
@@ -168,30 +147,6 @@ def read_url(url, headers, impersonate=False):
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         # Erreurs réseau Termux / mobile : on remonte une erreur spéciale.
         # sofa_fetch fera les retry avant d'abandonner.
-        return 0, str(e)
-
-
-def read_url_syscurl(url, headers):
-    """Transport de secours via le binaire curl de Termux (pkg install curl).
-
-    Son empreinte TLS differe de celle de Python : il passe parfois
-    la ou urllib est bloque."""
-    if not shutil.which("curl"):
-        return 0, "curl absent (pkg install curl)"
-
-    cmd = ["curl", "-sS", "--compressed", "--connect-timeout", "10", "--max-time", "25",
-           "-w", "\n%{http_code}", url]
-    for k, v in headers.items():
-        cmd += ["-H", f"{k}: {v}"]
-
-    try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
-        raw = out.stdout
-        if "\n" not in raw:
-            return 0, (out.stderr or "reponse curl vide").strip()
-        body, _, code = raw.rpartition("\n")
-        return int(code or 0), body
-    except Exception as e:
         return 0, str(e)
 
 
@@ -221,70 +176,34 @@ def validate_json(status, body, path, source):
 def sofa_fetch(path):
     clean_path = path.lstrip("/")
 
-    app_url = f"https://api.sofascore.app/api/v1/{clean_path}"
-    www_url = f"https://www.sofascore.com/api/v1/{clean_path}"
-    api_url = f"https://api.sofascore.com/api/v1/{clean_path}"
+    urls = [
+        f"https://www.sofascore.com/api/v1/{clean_path}",
+        f"https://api.sofascore.com/api/v1/{clean_path}",
+    ]
 
-    # L'app Android n'envoie NI Referer NI Origin : les envoyer sur l'hôte
-    # .app paraît suspect. On imite donc l'app sur .app, le navigateur sur .com.
-    app_headers = {
-        "User-Agent": "okhttp/4.12.0",
-        "Accept": "application/json",
-        "Accept-Language": "fr-FR,fr;q=0.9",
-        "Accept-Encoding": "identity",
-        "Cache-Control": "no-cache",
-    }
-
-    browser_headers = {
+    headers = {
         "User-Agent": (
-            "Mozilla/5.0 (Linux; Android 14; SM-S918B) "
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Mobile Safari/537.36"
+            "Chrome/131.0.0.0 Safari/537.36"
         ),
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
         "Referer": "https://www.sofascore.com/",
         "Origin": "https://www.sofascore.com",
-        "Cache-Control": "no-cache",
     }
 
-    # (url, headers, transport) — du plus prometteur au plus désespéré.
-    # Le binaire curl du système répond 200 de façon fiable ici : on le met
-    # en tête pour éviter les lenteurs/échecs intermittents d'urllib.
-    targets = [
-        (app_url, app_headers, "syscurl"),
-        (app_url, app_headers, "urllib"),
-        (www_url, browser_headers, "syscurl"),
-        (www_url, browser_headers, "cffi"),
-        (api_url, browser_headers, "syscurl"),
-        (api_url, browser_headers, "cffi"),
-        (www_url, browser_headers, "urllib"),
-        (api_url, browser_headers, "urllib"),
-    ]
-
     last_error = None
-    challenge_seen = False
 
     for attempt in range(1, SOFA_FETCH_RETRIES + 1):
-        for url, headers, transport in targets:
-            if transport == "cffi":
-                if not HAS_CURL_CFFI:
-                    continue
-                status, body = read_url(url, headers, impersonate=True)
-            elif transport == "syscurl":
-                status, body = read_url_syscurl(url, headers)
-            else:
-                status, body = read_url(url, headers)
-
-            valid_body, error = validate_json(status, body, clean_path, f"{url} [{transport}]")
+        for url in urls:
+            status, body = read_url(url, headers)
+            valid_body, error = validate_json(status, body, clean_path, url)
 
             if valid_body is not None:
                 return valid_body
 
             last_error = error
-
-            if status == 403 and "challenge" in (body or ""):
-                challenge_seen = True
 
             # 404 = page absente : inutile de retenter plusieurs fois.
             if status == 404:
@@ -296,26 +215,7 @@ def sofa_fetch(path):
         if attempt < SOFA_FETCH_RETRIES:
             time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
 
-    if challenge_seen and not HAS_CURL_CFFI:
-        print(
-            "ASTUCE : SofaScore bloque l'empreinte TLS de Python (403 challenge).\n"
-            "Deux solutions, de la plus simple à la plus robuste :\n"
-            "  1. Dans Termux : pkg install curl   (active le transport curl)\n"
-            "  2. Ubuntu via proot-distro pour utiliser curl_cffi :\n"
-            "       pkg install proot-distro\n"
-            "       proot-distro install ubuntu\n"
-            "       proot-distro login ubuntu\n"
-            "       apt update && apt install -y python3-pip\n"
-            "       pip3 install curl_cffi\n"
-            "       puis relancer le worker depuis Ubuntu.",
-            file=sys.stderr,
-        )
-
-    raise RuntimeError(
-        (last_error or f"Impossible de récupérer {clean_path}")
-        + f" | curl_cffi={'oui' if HAS_CURL_CFFI else 'non'}"
-        + f" curl_systeme={'oui' if shutil.which('curl') else 'non'}"
-    )
+    raise RuntimeError(last_error or f"Impossible de récupérer {clean_path}")
 
 def cache_key(path):
     return f"{CACHE_PREFIX}{path.lstrip('/')}"
