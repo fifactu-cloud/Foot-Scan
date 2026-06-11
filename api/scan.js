@@ -121,7 +121,7 @@ module.exports = async function (req, res) {
 
     if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
-      return res.end(JSON.stringify({ error: 'Match ID ou URL invalide' }));
+      return res.end(JSON.stringify({ error: 'Match ID ou URL WEB invalide' }));
     }
 
     if (!rank1) {
