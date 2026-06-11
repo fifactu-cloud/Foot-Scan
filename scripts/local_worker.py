@@ -43,9 +43,9 @@ INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM
 SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
 MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "100"))
 INCIDENT_BATCH_SIZE = int(os.environ.get("FOOTSCAN_INCIDENT_BATCH_SIZE", "2"))
-INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "2"))
-SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "3"))
-SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.8"))
+INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "6"))
+SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "2"))
+SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.4"))
 PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
 DEFAULT_RANK_EVENT_STEP = 1.0
 CURRENT_RANK_EVENT_STEP = DEFAULT_RANK_EVENT_STEP
@@ -179,7 +179,7 @@ def read_url_syscurl(url, headers):
     if not shutil.which("curl"):
         return 0, "curl absent (pkg install curl)"
 
-    cmd = ["curl", "-sS", "--compressed", "--max-time", "30",
+    cmd = ["curl", "-sS", "--compressed", "--connect-timeout", "10", "--max-time", "25",
            "-w", "\n%{http_code}", url]
     for k, v in headers.items():
         cmd += ["-H", f"{k}: {v}"]
@@ -249,14 +249,15 @@ def sofa_fetch(path):
     }
 
     # (url, headers, transport) — du plus prometteur au plus désespéré.
+    # Le binaire curl du système répond 200 de façon fiable ici : on le met
+    # en tête pour éviter les lenteurs/échecs intermittents d'urllib.
     targets = [
-        (app_url, app_headers, "urllib"),
         (app_url, app_headers, "syscurl"),
-        (www_url, browser_headers, "cffi"),
-        (api_url, browser_headers, "cffi"),
-        (app_url, app_headers, "cffi"),
+        (app_url, app_headers, "urllib"),
         (www_url, browser_headers, "syscurl"),
+        (www_url, browser_headers, "cffi"),
         (api_url, browser_headers, "syscurl"),
+        (api_url, browser_headers, "cffi"),
         (www_url, browser_headers, "urllib"),
         (api_url, browser_headers, "urllib"),
     ]
@@ -310,7 +311,11 @@ def sofa_fetch(path):
             file=sys.stderr,
         )
 
-    raise RuntimeError(last_error or f"Impossible de récupérer {clean_path}")
+    raise RuntimeError(
+        (last_error or f"Impossible de récupérer {clean_path}")
+        + f" | curl_cffi={'oui' if HAS_CURL_CFFI else 'non'}"
+        + f" curl_systeme={'oui' if shutil.which('curl') else 'non'}"
+    )
 
 def cache_key(path):
     return f"{CACHE_PREFIX}{path.lstrip('/')}"
