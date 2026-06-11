@@ -6709,16 +6709,18 @@
 
     @keyframes stopGlowV51 {
       0%, 100% {
+        transform: scale(1);
         filter: drop-shadow(0 0 2px rgba(255, 59, 114, 0.25));
       }
       50% {
+        transform: scale(1.18);
         filter: drop-shadow(0 0 9px rgba(255, 59, 114, 0.95)) drop-shadow(0 0 16px rgba(255, 59, 114, 0.45));
       }
     }
 
     .notice-inline-icon::before {
       animation: stopGlowV51 1.5s ease-in-out infinite !important;
-      transform: none !important;
+      transform-origin: center center !important;
     }
 
     /* — Titre Termux : même style que la pastille sous FOOTSCAN, en version rose — */
@@ -6737,6 +6739,35 @@
     .brand-ball {
       width: 68%;
       height: 68%;
+    }
+
+
+    /* Retouche v52 : FOOTSCAN unifié blanc + style pastille décliné sur les titres de section */
+
+    /* — Le grand FOOTSCAN reprend exactement la couleur de celui du haut — */
+    .home-title {
+      background-image: none;
+      -webkit-text-fill-color: currentColor;
+      color: #ffffff;
+      text-shadow: 0 18px 44px rgba(0, 0, 0, .42);
+      animation: none;
+    }
+
+    /* — Style pastille (façon kicker) décliné en cyan sur les titres de section — */
+    .auto-title,
+    .report-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 7px 13px !important;
+      border-radius: 999px;
+      border: 1px solid rgba(64, 201, 255, 0.30);
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(59, 107, 255, 0.10));
+      color: #e0f2fe;
+      font-size: 13px !important;
+      letter-spacing: 0.10em !important;
+      line-height: 1.15;
     }
 
 </style>
