@@ -7233,6 +7233,59 @@
       line-height: 1 !important;
     }
 
+
+    /* Retouche v70 : ordre événements + fluidité mobile */
+    details.clean.events-details summary.events-summary {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      gap: 8px !important;
+    }
+
+    details.clean.events-details summary.events-summary .events-summary-label {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+    }
+
+    details.clean.events-details summary.events-summary .events-count-pill {
+      order: 2 !important;
+      margin-left: auto !important;
+      margin-right: 0 !important;
+      min-width: 34px !important;
+      flex: 0 0 auto !important;
+    }
+
+    details.clean.events-details summary.events-summary::after {
+      order: 3 !important;
+      margin-left: 2px !important;
+      margin-right: 0 !important;
+      flex: 0 0 auto !important;
+    }
+
+    @media (max-width: 700px) {
+      .team-card-home {
+        background:
+          linear-gradient(165deg, rgba(56, 189, 248, 0.145), rgba(56, 189, 248, 0.038) 42%, rgba(10, 15, 36, 0.94)) !important;
+        box-shadow: 0 16px 30px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255,255,255,.05) !important;
+      }
+
+      .team-card-away {
+        background:
+          linear-gradient(165deg, rgba(251, 113, 133, 0.145), rgba(251, 113, 133, 0.04) 42%, rgba(10, 15, 36, 0.94)) !important;
+        box-shadow: 0 16px 30px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255,255,255,.05) !important;
+      }
+
+      .team-card-home .events-count-pill,
+      .team-card-away .events-count-pill {
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.045) !important;
+      }
+
+      .team-card-home details.clean.events-details summary.events-summary::after,
+      .team-card-away details.clean.events-details summary.events-summary::after {
+        text-shadow: none !important;
+      }
+    }
+
 </style>
 </head>
 
