@@ -6998,10 +6998,16 @@
     /* — En-tête du résumé : label à gauche, mode scan en haut à droite — */
     .summary-head-top {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
       gap: 10px;
       margin-bottom: 4px;
+    }
+
+    .summary-head-top .summary-label {
+      line-height: 1.15;
+      display: flex;
+      align-items: center;
     }
 
     .summary-mode {
@@ -7117,6 +7123,114 @@
     .report-count-pill::before {
       content: "🔎";
       margin-right: 6px;
+    }
+
+
+    /* Retouche v69 : teintes domicile/extérieur renforcées, flèches miroir et compteur événements près de la flèche */
+    .team-card-home {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(64, 201, 255, 0.18), transparent 34%),
+        linear-gradient(165deg, rgba(56, 189, 248, 0.18), rgba(56, 189, 248, 0.045) 42%, rgba(10, 15, 36, 0.94)) !important;
+      border-color: rgba(64, 201, 255, 0.46) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 26px rgba(64, 201, 255, 0.08) !important;
+    }
+
+    .team-card-away {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(251, 113, 133, 0.16), transparent 34%),
+        linear-gradient(165deg, rgba(251, 113, 133, 0.18), rgba(251, 113, 133, 0.048) 42%, rgba(10, 15, 36, 0.94)) !important;
+      border-color: rgba(251, 113, 133, 0.46) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 26px rgba(251, 113, 133, 0.08) !important;
+    }
+
+    .team-card-home .zone-card {
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, 0.13), rgba(59, 130, 246, 0.045)),
+        rgba(6, 13, 34, 0.96) !important;
+      border-color: rgba(64, 201, 255, 0.34) !important;
+    }
+
+    .team-card-away .zone-card {
+      background:
+        linear-gradient(135deg, rgba(251, 113, 133, 0.14), rgba(255, 59, 114, 0.045)),
+        rgba(28, 10, 28, 0.94) !important;
+      border-color: rgba(251, 113, 133, 0.36) !important;
+    }
+
+    details.clean.events-details summary.events-summary {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      gap: 9px !important;
+    }
+
+    .events-summary-label {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+    }
+
+    details.clean.events-details summary.events-summary::after {
+      order: 2 !important;
+      margin-left: auto !important;
+      margin-right: 0 !important;
+      flex: 0 0 auto !important;
+    }
+
+    details.clean.events-details summary.events-summary .events-count-pill {
+      order: 3 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      flex: 0 0 auto !important;
+      min-width: 34px !important;
+      justify-content: center !important;
+      background: rgba(13, 20, 46, 0.88) !important;
+    }
+
+    .team-card-home details.clean.events-details summary.events-summary::after {
+      color: #38bdf8 !important;
+      text-shadow: 0 0 12px rgba(56, 189, 248, .35) !important;
+    }
+
+    .team-card-home details.clean.events-details[open] summary.events-summary::after {
+      color: #ff3b72 !important;
+      text-shadow: 0 0 12px rgba(255, 59, 114, .35) !important;
+    }
+
+    .team-card-away details.clean.events-details summary.events-summary::after {
+      color: #ff3b72 !important;
+      text-shadow: 0 0 12px rgba(255, 59, 114, .35) !important;
+    }
+
+    .team-card-away details.clean.events-details[open] summary.events-summary::after {
+      color: #38bdf8 !important;
+      text-shadow: 0 0 12px rgba(56, 189, 248, .35) !important;
+    }
+
+    .team-card-home .events-count-pill {
+      border-color: rgba(64, 201, 255, 0.42) !important;
+      color: #dff4ff !important;
+      box-shadow: 0 0 14px rgba(64, 201, 255, .10), inset 0 1px 0 rgba(255,255,255,.05) !important;
+    }
+
+    .team-card-away .events-count-pill {
+      border-color: rgba(251, 113, 133, 0.44) !important;
+      color: #ffe1e8 !important;
+      box-shadow: 0 0 14px rgba(251, 113, 133, .10), inset 0 1px 0 rgba(255,255,255,.05) !important;
+    }
+
+    /* Retouche v69 : loupe du compteur rapport sur la même ligne que le texte */
+    .report-count-pill {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 7px !important;
+      text-align: center !important;
+    }
+
+    .report-count-pill::before {
+      margin-right: 0 !important;
+      flex: 0 0 auto !important;
+      line-height: 1 !important;
     }
 
 </style>
@@ -8524,7 +8638,7 @@
       `).join("");
 
       return `
-        <section class="team-card">
+        <section class="team-card ${sideClass === "side-home" ? "team-card-home" : "team-card-away"}">
           <div class="team-hero">
             <div class="side-pill ${sideClass}">${esc(side)}</div>
 
@@ -8556,10 +8670,10 @@
             <div class="match-list">${matchRows || "Aucun match trouvé."}</div>
           </div>
 
-          <details class="clean">
-            <summary>
-              Événements Trouvés
-              <span class="count-pill">${events.length}</span>
+          <details class="clean events-details">
+            <summary class="events-summary">
+              <span class="events-summary-label">Événements Trouvés</span>
+              <span class="count-pill events-count-pill">${events.length}</span>
             </summary>
 
             <div class="section">
