@@ -7350,6 +7350,7 @@
     let skipAwayValue = 0;
     let currentJobId = null;
     let pollingTimer = null;
+    let pollingErrorCount = 0;
     let lastResult = null;
     let activePreset = "Libre";
 
@@ -8068,6 +8069,7 @@
       }
 
       currentJobId = data.id;
+      pollingErrorCount = 0;
       pollJob();
     }
 
@@ -8085,6 +8087,8 @@
           throw new Error(job.error || `HTTP ${response.status}`);
         }
 
+        pollingErrorCount = 0;
+        setError("");
         setStatus(job.message || job.status || "🔎 SCAN EN COURS…", job.progress || 0);
 
         if (job.status === "done") {
@@ -8131,6 +8135,15 @@
 
         pollingTimer = setTimeout(pollJob, 850);
       } catch (error) {
+        pollingErrorCount += 1;
+
+        if (currentJobId && pollingErrorCount <= 30) {
+          setError("Connexion instable avec le serveur. Nouvelle tentative…");
+          setStatus("🔎 Récupération du résultat…", Math.min(96, 55 + pollingErrorCount));
+          pollingTimer = setTimeout(pollJob, Math.min(2500, 850 + pollingErrorCount * 120));
+          return;
+        }
+
         setError(error.message || String(error));
         setStatus("");
         finishScan();
@@ -8143,6 +8156,7 @@
         pollingTimer = null;
       }
 
+      pollingErrorCount = 0;
       $("scanBtn").disabled = false;
       $("scanBtn").textContent = "SCANNER →";
     }
