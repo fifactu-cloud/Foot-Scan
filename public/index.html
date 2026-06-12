@@ -7375,6 +7375,102 @@
       }
     }
 
+
+    /* Retouche v72 : fluidité flèches + alignement résumé/mode + bulle données web compacte */
+    .summary-head-top {
+      align-items: flex-start !important;
+    }
+
+    .summary-head-top .summary-label,
+    .summary-head-top .summary-mode {
+      min-height: 28px !important;
+      display: flex !important;
+      align-items: center !important;
+      margin-top: 0 !important;
+    }
+
+    .summary-head-top .summary-label:first-child {
+      justify-content: flex-start !important;
+    }
+
+    .summary-mode {
+      justify-content: flex-end !important;
+      align-self: flex-start !important;
+    }
+
+    .summary .data-quality-banner {
+      width: fit-content !important;
+      max-width: calc(100% - 20px) !important;
+      margin: 10px auto 12px !important;
+      padding: 9px 12px !important;
+      border-radius: 16px !important;
+      box-sizing: border-box !important;
+      text-align: center !important;
+    }
+
+    .summary .data-quality-banner.ok {
+      background: rgba(12, 36, 64, .30) !important;
+      border-color: rgba(64, 201, 255, .28) !important;
+    }
+
+    .summary .data-quality-main {
+      font-size: .72rem !important;
+      line-height: 1.18 !important;
+      white-space: nowrap !important;
+    }
+
+    .summary .data-quality-sub {
+      font-size: .66rem !important;
+      line-height: 1.26 !important;
+    }
+
+    details.clean.events-details summary.events-summary,
+    details.clean.events-details summary.events-summary:hover,
+    details.clean.events-details summary.events-summary:active {
+      transform: none !important;
+      filter: none !important;
+      transition: background-color .14s ease, border-color .14s ease, color .14s ease !important;
+      touch-action: manipulation !important;
+    }
+
+    details.clean.events-details summary.events-summary::after {
+      transform: rotate(90deg) translateZ(0) !important;
+      transform-origin: center center !important;
+      transition: transform .16s ease, color .16s ease !important;
+      will-change: transform !important;
+      backface-visibility: hidden !important;
+    }
+
+    details.clean.events-details[open] summary.events-summary::after {
+      transform: rotate(-90deg) translateZ(0) !important;
+    }
+
+    @media (max-width: 430px) {
+      .summary-head-top {
+        gap: 8px !important;
+      }
+
+      .summary-head-top .summary-label:last-child,
+      .summary-mode {
+        margin-top: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+      }
+
+      .summary .data-quality-banner {
+        margin-top: 10px !important;
+        margin-bottom: 10px !important;
+        padding: 8px 10px !important;
+        border-radius: 15px !important;
+      }
+
+      .summary .data-quality-main {
+        font-size: .68rem !important;
+        letter-spacing: .035em !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -8476,8 +8572,7 @@
       if (!quality.isPartial && issueCount <= 0) {
         return `
           <div class="data-quality-banner ok">
-            <div class="data-quality-main">✅ Données SofaScore complètes</div>
-            <div class="data-quality-sub">Aucun match sans événements récupérés.</div>
+            <div class="data-quality-main">✅ Données Web Complètes</div>
           </div>
         `;
       }
@@ -8514,13 +8609,14 @@
           </div>
 
           ${renderDominance(result)}
-          ${renderDataQualityWarning(result)}
           ${renderOverallZoneStats(result)}
 
           <div class="summary-grid">
             ${renderSummaryCell(result.home, result.rank1, result.rank2)}
             ${renderSummaryCell(result.away, result.rank1, result.rank2)}
           </div>
+
+          ${renderDataQualityWarning(result)}
         </section>
       `;
     }
