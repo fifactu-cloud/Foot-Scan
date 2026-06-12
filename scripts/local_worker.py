@@ -72,6 +72,7 @@ SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "0.5"))
 PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAGE", "17"))
 
 PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "20"))
+PAGE_LOAD_STEPS = [10, 15, 20]
 INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM", "15"))
 SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
 MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "100"))
@@ -349,9 +350,11 @@ def sofa_fetch(path, incident_mode=False):
             if status == 403 and "challenge" in (body or ""):
                 challenge_seen = True
 
-            # 404 = page absente : inutile de retenter plusieurs fois.
+            # 404 = page absente : c'est normal quand l'historique SofaScore s'arrête.
+            # On remonte l'information au scan, mais sans l'afficher comme une erreur Termux.
             if status == 404:
-                print(f"Échec définitif: {error}", file=sys.stderr)
+                if SOFA_DEBUG_NETWORK:
+                    print(f"Fin historique / ressource absente: {error}", file=sys.stderr)
                 raise RuntimeError(error)
 
             if SOFA_DEBUG_NETWORK:
@@ -444,8 +447,17 @@ def get_incidents_json(path):
     except Exception as e:
         msg = str(e)
         if "challenge" in msg or "HTTP 403" in msg:
-            print(f"Incidents ignorés (SofaScore challenge): {clean_path}", file=sys.stderr)
-            return {"incidents": [], "_footscanWarning": "SofaScore challenge"}
+            if SOFA_DEBUG_NETWORK:
+                print(f"Incidents non récupérés (SofaScore challenge): {clean_path}", file=sys.stderr)
+            return {
+                "incidents": [],
+                "_footscanIssue": {
+                    "type": "blocked",
+                    "reason": "SofaScore challenge",
+                    "path": clean_path,
+                    "message": "SofaScore a bloqué la récupération des événements de ce match.",
+                },
+            }
         raise
 
 
@@ -1296,88 +1308,127 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     )
 
     pages = []
+    stopped_history = False
 
-    for page in range(PAGES_TO_LOAD):
-        update_scan_job(
-            job_id,
-            status="running",
-            message=f"{team_name} · Page {page + 1}/{PAGES_TO_LOAD}",
-            progress=base_progress + int(progress_span * 0.10 * ((page + 1) / PAGES_TO_LOAD)),
-        )
+    def build_finished_matches():
+        by_id = {}
 
-        page_path = f"team/{analyzed_team_id}/events/last/{page}"
+        for match in pages:
+            if not isinstance(match, dict):
+                continue
 
-        try:
-            data = get_json(page_path)
-        except Exception as e:
-            error_text = str(e)
+            match_id = match.get("id")
 
-            # Web renvoie parfois 404 quand une équipe n'a plus de page historique.
-            # Ce n'est pas une vraie erreur de scan : on s'arrête simplement aux pages déjà récupérées.
-            if "HTTP 404" in error_text or "Not Found" in error_text:
-                update_scan_job(
-                    job_id,
-                    status="running",
-                    message=(
-                        f"{team_name} · Fin De L'Historique Web À La Page {page + 1}.\n"
-                        f"Pages récupérées : {page}/{PAGES_TO_LOAD}"
-                    ),
-                    progress=base_progress + int(progress_span * 0.10),
-                )
-                break
+            if not match_id:
+                continue
 
-            # Erreur réseau sur une page historique : si on a déjà des pages, on continue
-            # avec ce qu'on a au lieu de faire planter tout le scan. Si la page 0 plante,
-            # on remonte l'erreur car on n'a aucune base pour analyser l'équipe.
-            if pages:
-                update_scan_job(
-                    job_id,
-                    status="running",
-                    message=(
-                        f"{team_name} · Page {page + 1} Ignorée Après Erreur Réseau.\n"
-                        f"Pages déjà récupérées : {page}/{PAGES_TO_LOAD}"
-                    ),
-                    progress=base_progress + int(progress_span * 0.10),
-                )
-                break
+            status_type = (match.get("status") or {}).get("type")
+            home_id = (match.get("homeTeam") or {}).get("id")
+            away_id = (match.get("awayTeam") or {}).get("id")
 
-            raise
+            if status_type != "finished":
+                continue
 
-        page_events = data.get("events") if isinstance(data, dict) else data
+            if home_id != analyzed_team_id and away_id != analyzed_team_id:
+                continue
 
-        if isinstance(page_events, list) and page_events:
-            pages.extend(page_events)
-        else:
+            by_id[match_id] = match
+
+        return by_id
+
+    page_targets = [step for step in PAGE_LOAD_STEPS if step <= PAGES_TO_LOAD]
+    if PAGES_TO_LOAD not in page_targets:
+        page_targets.append(PAGES_TO_LOAD)
+
+    next_page = 0
+    by_id = {}
+
+    for target_pages in page_targets:
+        if stopped_history:
+            break
+
+        for page in range(next_page, target_pages):
             update_scan_job(
                 job_id,
                 status="running",
-                message=f"{team_name} · Page {page + 1} Vide, Arrêt De L'Historique.",
-                progress=base_progress + int(progress_span * 0.10),
+                message=f"{team_name} · Page {page + 1}/{target_pages}",
+                progress=base_progress + int(progress_span * 0.10 * ((page + 1) / max(1, target_pages))),
             )
+
+            page_path = f"team/{analyzed_team_id}/events/last/{page}"
+
+            try:
+                data = get_json(page_path)
+            except Exception as e:
+                error_text = str(e)
+
+                # Web renvoie parfois 404 quand une équipe n'a plus de page historique.
+                # Ce n'est pas une vraie erreur de scan : on s'arrête simplement aux pages déjà récupérées.
+                if "HTTP 404" in error_text or "Not Found" in error_text:
+                    update_scan_job(
+                        job_id,
+                        status="running",
+                        message=(
+                            f"{team_name} · Fin De L'Historique Web À La Page {page + 1}.\n"
+                            f"Pages récupérées : {page}/{target_pages}"
+                        ),
+                        progress=base_progress + int(progress_span * 0.10),
+                    )
+                    stopped_history = True
+                    break
+
+                # Erreur réseau sur une page historique : si on a déjà des pages, on continue
+                # avec ce qu'on a au lieu de faire planter tout le scan. Si la page 0 plante,
+                # on remonte l'erreur car on n'a aucune base pour analyser l'équipe.
+                if pages:
+                    update_scan_job(
+                        job_id,
+                        status="running",
+                        message=(
+                            f"{team_name} · Page {page + 1} Ignorée Après Erreur Réseau.\n"
+                            f"Pages déjà récupérées : {page}/{target_pages}"
+                        ),
+                        progress=base_progress + int(progress_span * 0.10),
+                    )
+                    stopped_history = True
+                    break
+
+                raise
+
+            page_events = data.get("events") if isinstance(data, dict) else data
+
+            if isinstance(page_events, list) and page_events:
+                pages.extend(page_events)
+            else:
+                update_scan_job(
+                    job_id,
+                    status="running",
+                    message=f"{team_name} · Page {page + 1} Vide, Arrêt De L'Historique.",
+                    progress=base_progress + int(progress_span * 0.10),
+                )
+                stopped_history = True
+                break
+
+        next_page = max(next_page, target_pages)
+        by_id = build_finished_matches()
+
+        # On démarre avec 10 pages. Si elles ne suffisent pas pour alimenter le scan
+        # progressif après les matchs ignorés, on étend automatiquement à 15 puis 20.
+        if len(by_id) >= skip + MAX_MATCHES_PER_TEAM:
             break
 
-    by_id = {}
-
-    for match in pages:
-        if not isinstance(match, dict):
-            continue
-
-        match_id = match.get("id")
-
-        if not match_id:
-            continue
-
-        status_type = (match.get("status") or {}).get("type")
-        home_id = (match.get("homeTeam") or {}).get("id")
-        away_id = (match.get("awayTeam") or {}).get("id")
-
-        if status_type != "finished":
-            continue
-
-        if home_id != analyzed_team_id and away_id != analyzed_team_id:
-            continue
-
-        by_id[match_id] = match
+        if target_pages < PAGES_TO_LOAD and not stopped_history:
+            next_target = next((step for step in page_targets if step > target_pages), PAGES_TO_LOAD)
+            update_scan_job(
+                job_id,
+                status="running",
+                message=(
+                    f"{team_name} · 10 Pages Insuffisantes, Extension Jusqu’à {next_target} Pages…"
+                    if target_pages == 10 else
+                    f"{team_name} · Extension Jusqu’à {next_target} Pages…"
+                ),
+                progress=base_progress + int(progress_span * 0.10),
+            )
 
     sorted_matches = sorted(
         by_id.values(),
@@ -1395,6 +1446,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 
     all_events = []
     matches_used = []
+    event_data_issues = []
     scanned_until = 0
 
     for stage_limit in stages:
@@ -1445,8 +1497,30 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                         data = future.result()
                     except Exception as e:
                         # Erreur réseau ou match incident indisponible : on ignore ce match
-                        # au lieu de faire échouer tout le scan.
-                        print(f"Match ignoré après erreur événements {match.get('id')}: {e}", file=sys.stderr)
+                        # au lieu de faire échouer tout le scan. Les 403/404 SofaScore sont
+                        # attendus sur certains matchs, donc on ne les affiche qu'en debug.
+                        err_text = str(e)
+                        expected_web_gap = (
+                            "challenge" in err_text
+                            or "HTTP 403" in err_text
+                            or "HTTP 404" in err_text
+                            or "Not Found" in err_text
+                        )
+                        if SOFA_DEBUG_NETWORK or not expected_web_gap:
+                            print(f"Match sans événements récupérés {match.get('id')}: {e}", file=sys.stderr)
+
+                        issue_type = "missing" if ("HTTP 404" in err_text or "Not Found" in err_text) else ("blocked" if ("challenge" in err_text or "HTTP 403" in err_text) else "error")
+                        issue = {
+                            "id": match.get("id"),
+                            "label": make_match_label(match),
+                            "competition": get_competition_name(match),
+                            "startTimestamp": match.get("startTimestamp") or 0,
+                            "type": issue_type,
+                            "reason": err_text,
+                            "message": "Événements non récupérés pour ce match.",
+                        }
+                        event_data_issues.append(issue)
+
                         scanned.append({
                             "idx": idx,
                             "match": match,
@@ -1457,29 +1531,52 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                                 "count": 0,
                                 "startTimestamp": match.get("startTimestamp") or 0,
                                 "competition": get_competition_name(match),
-                                "error": str(e),
+                                "eventDataStatus": issue_type,
+                                "eventDataIssue": True,
+                                "error": err_text,
                             },
                         })
                         continue
 
+                    data_issue = data.get("_footscanIssue") if isinstance(data, dict) else None
                     incidents = data.get("incidents") if isinstance(data, dict) else data
 
                     if not isinstance(incidents, list):
                         incidents = []
 
+                    if data_issue:
+                        issue = {
+                            "id": match.get("id"),
+                            "label": make_match_label(match),
+                            "competition": get_competition_name(match),
+                            "startTimestamp": match.get("startTimestamp") or 0,
+                            "type": data_issue.get("type") or "blocked",
+                            "reason": data_issue.get("reason") or data_issue.get("message") or "Événements non récupérés",
+                            "message": data_issue.get("message") or "Événements non récupérés pour ce match.",
+                        }
+                        event_data_issues.append(issue)
+
                     events = parse_incidents(incidents, match, analyzed_team_id)
+
+                    match_used = {
+                        "id": match.get("id"),
+                        "label": make_match_label(match),
+                        "count": len(events),
+                        "startTimestamp": match.get("startTimestamp") or 0,
+                        "competition": get_competition_name(match),
+                        "eventDataStatus": "ok",
+                    }
+
+                    if data_issue:
+                        match_used["eventDataStatus"] = data_issue.get("type") or "blocked"
+                        match_used["eventDataIssue"] = True
+                        match_used["error"] = data_issue.get("reason") or data_issue.get("message") or "Événements non récupérés"
 
                     scanned.append({
                         "idx": idx,
                         "match": match,
                         "events": events,
-                        "matchUsed": {
-                            "id": match.get("id"),
-                            "label": make_match_label(match),
-                            "count": len(events),
-                            "startTimestamp": match.get("startTimestamp") or 0,
-                            "competition": get_competition_name(match),
-                        },
+                        "matchUsed": match_used,
                     })
 
             scanned.sort(key=lambda item: item["idx"])
@@ -1496,16 +1593,25 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             if total_rank_quantity(all_events) >= max_needed:
                 break
 
+    issue_count = len(event_data_issues)
+    issue_note = f" · ⚠️ {issue_count} match(s) sans événements récupérés" if issue_count else ""
+
     update_scan_job(
         job_id,
         status="running",
-        message=f"{team_name} · Terminé ({len(all_events)} événements, Progression {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs).",
+        message=f"{team_name} · Terminé ({len(all_events)} événements, Progression {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs){issue_note}.",
         progress=base_progress + progress_span,
     )
+
+    if issue_count:
+        print(f"⚠️ {team_name}: {issue_count} match(s) sans événements récupérés. Résultat partiel pour cette équipe.")
 
     return {
         "events": all_events,
         "matchesUsed": matches_used,
+        "eventDataIssues": event_data_issues,
+        "eventDataIssueCount": issue_count,
+        "scanPartial": bool(issue_count),
     }
 
 
@@ -1759,6 +1865,22 @@ def process_scan_job(job_id):
             "zoneStats": zone_stats_between_ranks(away_scan["events"], effective_rank1, effective_rank2),
         }
 
+        home_issue_count = int(home.get("eventDataIssueCount") or 0)
+        away_issue_count = int(away.get("eventDataIssueCount") or 0)
+        total_issue_count = home_issue_count + away_issue_count
+        data_quality = {
+            "isPartial": total_issue_count > 0,
+            "eventDataIssueCount": total_issue_count,
+            "homeIssueCount": home_issue_count,
+            "awayIssueCount": away_issue_count,
+            "message": (
+                f"⚠️ Scan partiel : {total_issue_count} match(s) sans événements récupérés. "
+                "Les buts de ces matchs ne sont pas comptés."
+                if total_issue_count else
+                "Scan complet : aucun match sans événements récupérés."
+            ),
+        }
+
         result = {
             "match": {
                 "id": match.get("id"),
@@ -1780,6 +1902,7 @@ def process_scan_job(job_id):
             "winnerMode": winner_mode,
             "scanModeLabel": "Simultané lié: mêmes rangs, match par match / minute par minute" if simultaneous_mode else "Standard",
             "overallZoneStats": None,
+            "dataQuality": data_quality,
             "config": {
                 "pagesToLoad": PAGES_TO_LOAD,
                 "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
@@ -1803,7 +1926,10 @@ def process_scan_job(job_id):
             finishedAt=now_ts(),
         )
 
-        print(f"🔎 Scan terminé: {job_id}")
+        if data_quality["isPartial"]:
+            print(f"⚠️ Scan terminé avec données partielles: {job_id} · {data_quality['eventDataIssueCount']} match(s) sans événements récupérés")
+        else:
+            print(f"✅ Scan terminé complet: {job_id} · aucun événement ignoré")
 
     except Exception as e:
         update_scan_job(
@@ -1881,12 +2007,12 @@ def main():
 
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: 🔎 scan complet côté worker activé.")
-    print("Pages Web: jusqu’à 20 Pages, arrêt automatique si 404/Page vide.")
+    print("Pages Web: 10 Pages d’abord, extension automatique à 15 puis 20 si nécessaire.")
     print("Mode simultané lié: mêmes rangs, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Progression des rangs: curseur par job, défaut 1 par événement.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
-    print("Stabilité réseau: retry Web + incidents SofaScore 403 ignorés proprement.")
+    print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
     print("Préchargement événements: désactivé par défaut pour économiser les requêtes.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
