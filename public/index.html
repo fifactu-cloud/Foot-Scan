@@ -6245,7 +6245,7 @@
         box-shadow: 0 0 0 0 rgba(64, 201, 255, 0), 0 6px 16px rgba(0, 0, 0, .18);
       }
       50% {
-        box-shadow: 0 0 18px 2px rgba(64, 201, 255, .22), 0 6px 16px rgba(0, 0, 0, .18);
+        box-shadow: 0 0 12px 1px rgba(64, 201, 255, .20), 0 6px 16px rgba(0, 0, 0, .18);
       }
     }
 
@@ -6343,7 +6343,7 @@
         box-shadow: 0 10px 26px rgba(64, 201, 255, .16), 0 8px 22px rgba(255, 59, 114, .12);
       }
       50% {
-        box-shadow: 0 14px 40px rgba(64, 201, 255, .34), 0 12px 34px rgba(255, 59, 114, .26);
+        box-shadow: 0 12px 26px rgba(64, 201, 255, .30), 0 10px 22px rgba(255, 59, 114, .22);
       }
     }
 
@@ -7471,6 +7471,24 @@
       }
     }
 
+
+    /* Retouche v74 : logos fiables, centrage résumé, fluidité */
+    .summary-title {
+      justify-content: center !important;
+      text-align: center !important;
+    }
+
+    .logo-fb {
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .brand-logo,
+    .kicker,
+    .status-confetti {
+      transform: translateZ(0);
+    }
+
 </style>
 </head>
 
@@ -7496,7 +7514,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v73</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v74</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -7806,8 +7824,24 @@
     }
 
     function logoUrl(teamId) {
-      return `/api/logo?teamId=${encodeURIComponent(teamId)}`;
+      return `https://img.sofascore.com/api/v1/team/${encodeURIComponent(teamId)}/image`;
     }
+
+    window.__logoErr = function (img) {
+      const id = img.getAttribute("data-team-id") || "";
+      if (id && img.src.indexOf("/api/logo") === -1) {
+        img.src = `/api/logo?teamId=${encodeURIComponent(id)}`;
+        return;
+      }
+      img.style.display = "none";
+      const p = img.parentElement;
+      if (p && !p.querySelector(".logo-fb")) {
+        const s = document.createElement("span");
+        s.className = "logo-fb";
+        s.textContent = "\u26BD";
+        p.appendChild(s);
+      }
+    };
 
     function eventIcon(event) {
       return ICONS[event.type] || event.icon || "•";
@@ -8126,7 +8160,7 @@
         : `Moyenne Dominante : ${esc(formatValue(dominance.average))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`;
 
       const confColors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
-      const confetti = Array.from({ length: 26 }, (_, i) => `
+      const confetti = Array.from({ length: 16 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
 
@@ -8240,7 +8274,7 @@
 
       const renderDoneStatus = () => {
         const colors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
-        const pieces = Array.from({ length: 34 }, (_, i) => `
+        const pieces = Array.from({ length: 20 }, (_, i) => `
           <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${colors[i % colors.length]}"></span>
         `).join("");
 
@@ -8520,7 +8554,7 @@
           <div class="match-teams">
             <div class="match-team">
               <div class="logo-xl">
-                <img src="${logoUrl(match.homeTeam.id)}" alt="" />
+                <img src="${logoUrl(match.homeTeam.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${match.homeTeam.id}" onerror="__logoErr(this)" />
               </div>
               <div class="match-team-name">${esc(String(match.homeTeam.name || "").toUpperCase())}</div>
             </div>
@@ -8529,7 +8563,7 @@
 
             <div class="match-team">
               <div class="logo-xl">
-                <img src="${logoUrl(match.awayTeam.id)}" alt="" />
+                <img src="${logoUrl(match.awayTeam.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${match.awayTeam.id}" onerror="__logoErr(this)" />
               </div>
               <div class="match-team-name">${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
             </div>
@@ -8624,7 +8658,7 @@
         <div class="summary-cell">
           <div class="summary-team-row">
             <div class="logo-s">
-              <img src="${logoUrl(team.id)}" alt="" />
+              <img src="${logoUrl(team.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${team.id}" onerror="__logoErr(this)" />
             </div>
             <div class="summary-team-name">${esc(String(team.name || "").toUpperCase())}</div>
           </div>
@@ -8922,7 +8956,7 @@
 
             <div class="team-header-line">
               <div class="logo-m">
-                <img src="${logoUrl(team.id)}" alt="" />
+                <img src="${logoUrl(team.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${team.id}" onerror="__logoErr(this)" />
               </div>
 
               <div>
@@ -9617,7 +9651,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v73 chargé");
+    console.log("FOOTSCAN v74 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
