@@ -7472,6 +7472,186 @@
     }
 
 
+    /* Retouche v80 : VS rétabli, miroir away complet (matchs/événements), boîtes texte neutres */
+
+    /* — VS : un cran plus grand qu'en v78 (j'avais trop réduit) — */
+    .summary-title .vs-echo {
+      font-size: min(0.92em, 5.6vw) !important;
+      transform: translateY(-0.02em) !important;
+    }
+
+    /* — Miroir AWAY complet : lignes de match + numéros + texte passent en pourpre rose — */
+    .team-card:has(.side-pill.side-away) .match-row {
+      background:
+        linear-gradient(160deg, rgba(251, 113, 133, 0.08), rgba(168, 85, 247, 0.04) 60%, rgba(20, 11, 24, 0.96)) !important;
+      border-color: rgba(244, 114, 182, 0.22) !important;
+    }
+
+    .team-card:has(.side-pill.side-away) .match-number-badge {
+      background:
+        linear-gradient(180deg, rgba(251, 113, 133, 0.18), rgba(168, 85, 247, 0.12)), rgba(16, 10, 22, 0.98) !important;
+    }
+
+    .team-card:has(.side-pill.side-away) .match-count-mini {
+      background: linear-gradient(135deg, rgba(251, 113, 133, 0.22), rgba(192, 132, 252, 0.16)) !important;
+    }
+
+    .team-card:has(.side-pill.side-away) .match-index {
+      color: #ffe1ea !important;
+    }
+
+    /* texte d'événement (but sans passeur, minute…) : pourpre rosé doux, pas trop appuyé */
+    .team-card:has(.side-pill.side-away) :is(.row-sub, .row-title, .event-metric-code) {
+      color: #f6c9d8 !important;
+    }
+
+    .team-card:has(.side-pill.side-away) .event-metric-pill {
+      background: rgba(251, 113, 133, 0.13) !important;
+      border-color: rgba(244, 114, 182, 0.28) !important;
+    }
+
+    /* côté domicile : on s'assure que le texte reste dans un bleu doux cohérent */
+    .team-card:has(.side-pill.side-home) :is(.row-sub) {
+      color: #cfe3f5 !important;
+    }
+
+    /* — Boîtes texte sous FOOTSCAN et sous Termux : neutres, fondues dans leur panneau — */
+    .hero .hero-text {
+      border: 1px solid rgba(125, 211, 252, 0.16) !important;
+      background: rgba(12, 20, 44, 0.42) !important;
+      color: #e8f1ff !important;
+    }
+
+    .notice .notice-text {
+      border: 1px solid rgba(251, 113, 133, 0.20) !important;
+      background: rgba(40, 16, 30, 0.42) !important;
+      color: #ffe9f1 !important;
+    }
+
+    /* Retouche v80 : VS rétabli, miroir AWAY complet (cartes match + texte), 3 bulles roses unifiées */
+
+    /* — VS : revenu à une taille lisible (entre v77 et v78) — */
+    .summary-title .vs-echo {
+      font-size: min(0.9em, 5.4vw) !important;
+      max-width: 100% !important;
+      transform: translateY(-0.02em) !important;
+    }
+
+    /* — Cartes de match côté extérieur : fond + numéro + texte en pourpre rose — */
+    .team-card-away .match-row {
+      background:
+        linear-gradient(160deg, rgba(251, 113, 133, 0.10), rgba(168, 85, 247, 0.045) 60%, rgba(20, 11, 24, 0.95)) !important;
+      border-color: rgba(244, 114, 182, 0.24) !important;
+    }
+
+    .team-card-away .match-number-badge {
+      background:
+        linear-gradient(180deg, rgba(251, 113, 133, 0.20), rgba(168, 85, 247, 0.12)),
+        rgba(16, 10, 22, 0.98) !important;
+    }
+
+    .team-card-away .match-index {
+      color: #fecdd3 !important;
+    }
+
+    .team-card-away .match-count-mini {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(251, 113, 133, 0.20)) !important;
+    }
+
+    /* — Texte des événements côté extérieur : pourpre rose doux (pas trop forcé) — */
+    .team-card-away .row-title,
+    .team-card-away .row-sub,
+    .team-card-away .event-metric-code {
+      color: #f3c8d6 !important;
+    }
+
+    .team-card-away .row-sub {
+      color: #e7b9cb !important;
+    }
+
+    /* — Liseré gauche des cartes de match : assorti au camp — */
+    .team-card-home .match-row {
+      box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.45) !important;
+    }
+
+    .team-card-away .match-row {
+      box-shadow: inset 3px 0 0 rgba(251, 113, 133, 0.45) !important;
+    }
+
+    /* — Les 3 bulles d'avertissement (Termux + les 2 sous le titre) : même rose/pourpre, aligné sur le bloc hero — */
+    .panel.notice {
+      background:
+        linear-gradient(135deg, rgba(251, 113, 133, 0.13), rgba(168, 85, 247, 0.06)),
+        rgba(12, 10, 26, 0.92) !important;
+      border-color: rgba(244, 114, 182, 0.30) !important;
+    }
+
+    .notice-icon {
+      background: rgba(251, 113, 133, 0.15) !important;
+      color: #fda4af !important;
+      border-color: rgba(244, 114, 182, 0.34) !important;
+    }
+
+    /* Retouche v80 : VS rétabli, miroir extérieur complet (matchs/events/texte), 3 notices homogènes, toggle simultané visible */
+
+    /* — VS : on annule le rétrécissement de v78, retour à une taille lisible — */
+    .summary-title .vs-echo {
+      font-size: 0.9em !important;
+      max-width: 100% !important;
+      transform: translateY(-0.02em) !important;
+      letter-spacing: -0.02em !important;
+    }
+
+    /* — Extérieur : tout ce qui restait bleu (events, labels, badges, compteurs) en pourpre rose — */
+    .team-card-away :is(.events-summary, .section, .rank-card) {
+      background: linear-gradient(160deg, rgba(251, 113, 133, 0.11), rgba(168, 85, 247, 0.05) 55%, rgba(28, 12, 26, 0.86)) !important;
+      border-color: rgba(244, 114, 182, 0.26) !important;
+    }
+
+    .team-card-away :is(.count-pill, .match-count-mini) {
+      background: linear-gradient(135deg, rgba(251, 113, 133, 0.20), rgba(168, 85, 247, 0.14)) !important;
+      border-color: rgba(244, 114, 182, 0.30) !important;
+      color: #ffd9e1 !important;
+    }
+
+    /* Pastille d'événement (code + valeur) côté extérieur */
+    .team-card-away .event-metric-pill {
+      background: linear-gradient(135deg, rgba(251, 113, 133, 0.16), rgba(168, 85, 247, 0.10)) !important;
+      border-color: rgba(244, 114, 182, 0.28) !important;
+    }
+
+    .team-card-away :is(.event-metric-code, .section-title, .events-summary-label) {
+      color: #fecdd3 !important;
+    }
+
+    /* Texte descriptif des événements (row-sub) côté extérieur : léger glissement rose */
+    .team-card-away .row-sub {
+      color: #e7c4d2 !important;
+    }
+
+    .team-card-away .match-team-name {
+      color: #f3cdd8 !important;
+    }
+
+    /* — Les 3 notices (Termux + hero) : même rose franc, légèrement plus rouge que violet — */
+    .panel.notice {
+      background:
+        linear-gradient(135deg, rgba(251, 113, 133, 0.16), rgba(244, 63, 110, 0.10)),
+        rgba(20, 9, 18, 0.93) !important;
+      border-color: rgba(251, 113, 133, 0.34) !important;
+    }
+
+    .notice-icon {
+      background: rgba(251, 113, 133, 0.17) !important;
+      color: #fda4af !important;
+      border-color: rgba(251, 113, 133, 0.38) !important;
+    }
+
+    /* — Réafficher l'option Calcul Simultané (les autres restent masqués) — */
+    .mode-toggle[for="simultaneousMode"] {
+      display: grid !important;
+    }
+
     /* Retouche v78 : extérieur en pourpre rose (#fb7185), miroir complet des accents, VS recentré */
 
     /* — VS : recentré et borné à la largeur du bloc — */
@@ -7756,7 +7936,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v79</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v80</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -9893,7 +10073,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v79 chargé");
+    console.log("FOOTSCAN v80 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
