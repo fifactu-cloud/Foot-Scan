@@ -8280,7 +8280,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v94</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v95</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -10438,6 +10438,48 @@
       animation-delay: 0s !important;
     }
 
+
+    /* === v95 : zone halos neutralisés par camp, VS taille juste, animations boutons unifiées === */
+
+    /* --- 1. Le ::before de la zone-card (halos radiaux bleu+rose) suit le camp --- */
+    .team-card-home .zone-card::before {
+      background:
+        radial-gradient(circle at top right, rgba(56,189,248,.10), transparent 38%),
+        radial-gradient(circle at bottom left, rgba(56,189,248,.05), transparent 44%) !important;
+      opacity: .7 !important;
+    }
+    .team-card-away .zone-card::before {
+      background:
+        radial-gradient(circle at top right, rgba(251,113,133,.10), transparent 38%),
+        radial-gradient(circle at bottom left, rgba(251,113,133,.05), transparent 44%) !important;
+      opacity: .7 !important;
+    }
+
+    /* --- 2. VVVSSS : taille juste (un peu plus grand que l'origine, pas énorme) --- */
+    .summary-title .vs-echo,
+    .vs-echo {
+      font-size: 1.45em !important;
+      max-width: 100% !important;
+      letter-spacing: -0.02em !important;
+    }
+
+    /* --- 3. ANIMATIONS BOUTONS : tous sur la MÊME (mobileButtonGlow 3.6s, délai 0) --- */
+    .scan-btn,
+    .auto-apply-btn,
+    .report-btn.primary,
+    .preset-btn.active,
+    .skip-grid button.active,
+    .calc-mode-thumb {
+      animation: mobileButtonGlow 3.6s ease infinite !important;
+      animation-delay: 0s !important;
+      background-size: 180% 180% !important;
+    }
+    /* le bouton scanner gardait un derbySweep + scanGlow désynchronisé : on neutralise le sweep,
+       on garde juste un léger glow de pulsation en plus, mais calé sur la même horloge */
+    .scan-btn {
+      animation: mobileButtonGlow 3.6s ease infinite !important;
+    }
+
 </style>
 </head>
 <body>
@@ -10586,7 +10628,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v94 chargé");
+    console.log("FOOTSCAN v95 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
