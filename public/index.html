@@ -7472,6 +7472,16 @@
     }
 
 
+    /* Retouche v75 : bases presets 41.75, centrage VS, confettis réajustés */
+    .summary-title {
+      flex-wrap: wrap !important;
+    }
+
+    .summary-title .vs-echo {
+      flex-basis: 100% !important;
+      justify-content: center !important;
+    }
+
     /* Retouche v74 : logos fiables, centrage résumé, fluidité */
     .summary-title {
       justify-content: center !important;
@@ -7514,7 +7524,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v74</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v75</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -7996,8 +8006,8 @@
       const advancement = "1";
       const changes = isFriendly ? "13" : "7";
 
-      $("autoBaseNumber").value = "31.3125";
-      $("autoBaseRange").value = "31.3125";
+      $("autoBaseNumber").value = "41.75";
+      $("autoBaseRange").value = "41.75";
 
       $("autoAdvanceNumber").value = advancement;
       $("autoAdvanceRange").value = advancement;
@@ -8160,7 +8170,7 @@
         : `Moyenne Dominante : ${esc(formatValue(dominance.average))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`;
 
       const confColors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
-      const confetti = Array.from({ length: 16 }, (_, i) => `
+      const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
 
@@ -8274,7 +8284,7 @@
 
       const renderDoneStatus = () => {
         const colors = ["#40c9ff", "#ff3b72", "#22c55e", "#facc15", "#ffffff"];
-        const pieces = Array.from({ length: 20 }, (_, i) => `
+        const pieces = Array.from({ length: 26 }, (_, i) => `
           <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${colors[i % colors.length]}"></span>
         `).join("");
 
@@ -9651,7 +9661,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v74 chargé");
+    console.log("FOOTSCAN v75 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
