@@ -7856,9 +7856,9 @@
       border-color: rgba(251, 113, 133, 0.26) !important;
     }
 
-    /* — VVVVVVVSSSSSSS agrandi — */
+    /* — VVVVVVVSSSSSSS (taille gérée en couche finale v94) — */
     .summary-title .vs-echo {
-      font-size: 1.12em !important;
+      /* font-size retiré */
       max-width: 100% !important;
       transform: translateY(-0.02em) !important;
       letter-spacing: -0.02em !important;
@@ -7892,9 +7892,9 @@
 
     /* Retouche v78 : extérieur en pourpre rose (#fb7185), miroir complet des accents, VS recentré */
 
-    /* — VS : recentré et borné à la largeur du bloc — */
+    /* — VS (taille gérée en couche finale v94) — */
     .summary-title .vs-echo {
-      font-size: min(0.86em, 4.8vw) !important;
+      /* font-size retiré */
       max-width: 100% !important;
       transform: translateX(-1.5%) translateY(-0.02em) !important;
     }
@@ -7998,9 +7998,9 @@
 
     /* Retouche v77 : VS étendu, tons domicile/extérieur renforcés, dégradés harmonisés, en-tête en badges */
 
-    /* — VVVVVVVVVSSSSSSSSS : plus large, rampe d'opacité recalée sur 18 lettres — */
+    /* — VVVVVVVVVSSSSSSSSS (taille gérée en couche finale v94) — */
     .vs-echo {
-      font-size: 0.92em !important;
+      /* font-size retiré */
       letter-spacing: -0.03em;
     }
 
@@ -8280,7 +8280,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v93</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v94</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -10418,6 +10418,26 @@
       border-color: rgba(140,170,225,.22) !important;
     }
 
+
+    /* === v94 : VS taille définitive (prioritaire, dernier bloc) + coordination animation boutons === */
+    .summary-title .vs-echo,
+    .vs-echo {
+      font-size: 1.85em !important;
+      max-width: 100% !important;
+      letter-spacing: -0.02em !important;
+    }
+
+    /* Synchroniser l'animation de dégradé de TOUS les boutons (même phase) */
+    .scan-btn, .auto-apply-btn, .report-btn.primary,
+    .preset-btn.active, .skip-grid button.active,
+    .calc-mode-thumb {
+      animation-name: mobileButtonGlow !important;
+      animation-duration: 3.6s !important;
+      animation-timing-function: ease !important;
+      animation-iteration-count: infinite !important;
+      animation-delay: 0s !important;
+    }
+
 </style>
 </head>
 <body>
@@ -10566,7 +10586,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v93 chargé");
+    console.log("FOOTSCAN v94 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
