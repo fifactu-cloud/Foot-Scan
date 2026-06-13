@@ -8548,6 +8548,216 @@
     .vs-box.s-neu .vsb-s, .vs-divider.s-neu .vsb-s, .vs-echo.s-neu .ve-s { color: #8aa0c8 !important; text-shadow: 0 0 10px rgba(138, 160, 200, .22) !important; }
     .vs-box, .vs-divider { overflow: visible !important; }
 
+
+
+    /* Retouche v102 : rendu après scan — 6V/6S centré, tons positifs/négatifs symétriques, VS complet */
+    :root {
+      --fs-v102-blue: #38bdf8;
+      --fs-v102-blue-strong: rgba(56, 189, 248, .42);
+      --fs-v102-blue-soft: rgba(56, 189, 248, .115);
+      --fs-v102-blue-faint: rgba(56, 189, 248, .052);
+      --fs-v102-rose: #fb7185;
+      --fs-v102-rose-strong: rgba(251, 113, 133, .42);
+      --fs-v102-rose-soft: rgba(251, 113, 133, .115);
+      --fs-v102-rose-faint: rgba(251, 113, 133, .052);
+      --fs-v102-neutral: #8aa0c8;
+    }
+
+    /* Liserés principaux : retour du dégradé bleu → rose, sauf le bloc Termux qui reste pourpre. */
+    body :is(.panel:not(.notice), .summary, .report-panel) {
+      position: relative;
+    }
+
+    body :is(.panel:not(.notice), .summary, .report-panel)::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 18px;
+      right: 18px;
+      height: 2.5px;
+      border-radius: 0 0 999px 999px;
+      pointer-events: none;
+      z-index: 3;
+      background: linear-gradient(90deg, transparent, rgba(56,189,248,.62), rgba(251,113,133,.58), transparent) !important;
+    }
+
+    body .panel.notice::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 18px;
+      right: 18px;
+      height: 2.5px;
+      border-radius: 0 0 999px 999px;
+      pointer-events: none;
+      z-index: 3;
+      background: linear-gradient(90deg, transparent, rgba(251,113,133,.68), rgba(168,85,247,.42), transparent) !important;
+    }
+
+    /* Le grand VS du résumé : 6 V + 6 S, jamais collé aux bords, centré en ligne dédiée. */
+    body .result-shell .summary-title {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 7px !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow: visible !important;
+      text-align: center !important;
+      line-height: .98 !important;
+      padding: 0 12px !important;
+      margin: 12px auto 0 !important;
+    }
+
+    body .result-shell .summary-title .vs-echo,
+    body .result-shell .vs-echo {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: min(100%, 340px) !important;
+      max-width: calc(100vw - 72px) !important;
+      overflow: visible !important;
+      white-space: nowrap !important;
+      padding: 0 .44em !important;
+      margin: 0 auto !important;
+      font-size: clamp(36px, 10.8vw, 54px) !important;
+      line-height: .82 !important;
+      letter-spacing: -0.118em !important;
+      transform: none !important;
+      opacity: .96 !important;
+    }
+
+    body .result-shell .vs-echo i {
+      display: inline-block !important;
+      margin: 0 !important;
+      font-style: italic !important;
+      -webkit-text-stroke: 0 !important;
+      text-rendering: geometricPrecision;
+    }
+
+    @media (max-width: 430px) {
+      body .result-shell .summary-title {
+        gap: 6px !important;
+        padding: 0 10px !important;
+      }
+      body .result-shell .summary-title .vs-echo,
+      body .result-shell .vs-echo {
+        width: min(100%, 306px) !important;
+        max-width: calc(100vw - 84px) !important;
+        font-size: clamp(31px, 10.2vw, 44px) !important;
+        letter-spacing: -0.123em !important;
+        padding: 0 .48em !important;
+      }
+    }
+
+    /* Tous les VS : V = domicile, S = extérieur, couleur selon la performance réelle du camp. */
+    body :is(.vs-box, .vs-divider) {
+      overflow: visible !important;
+    }
+
+    body :is(.vs-box, .vs-divider, .vs-echo).v-pos .vsb-v,
+    body .vs-echo.v-pos .ve-v { color: var(--fs-v102-blue) !important; text-shadow: 0 0 14px rgba(56,189,248,.40) !important; }
+    body :is(.vs-box, .vs-divider, .vs-echo).v-neg .vsb-v,
+    body .vs-echo.v-neg .ve-v { color: var(--fs-v102-rose) !important; text-shadow: 0 0 14px rgba(251,113,133,.38) !important; }
+    body :is(.vs-box, .vs-divider, .vs-echo).v-neu .vsb-v,
+    body .vs-echo.v-neu .ve-v { color: var(--fs-v102-neutral) !important; text-shadow: 0 0 10px rgba(138,160,200,.26) !important; }
+
+    body :is(.vs-box, .vs-divider, .vs-echo).s-pos .vsb-s,
+    body .vs-echo.s-pos .ve-s { color: var(--fs-v102-blue) !important; text-shadow: 0 0 14px rgba(56,189,248,.40) !important; }
+    body :is(.vs-box, .vs-divider, .vs-echo).s-neg .vsb-s,
+    body .vs-echo.s-neg .ve-s { color: var(--fs-v102-rose) !important; text-shadow: 0 0 14px rgba(251,113,133,.38) !important; }
+    body :is(.vs-box, .vs-divider, .vs-echo).s-neu .vsb-s,
+    body .vs-echo.s-neu .ve-s { color: var(--fs-v102-neutral) !important; text-shadow: 0 0 10px rgba(138,160,200,.26) !important; }
+
+    body .vs-box .vsb-v, body .vs-divider .vsb-v, body .vs-echo .ve-v { color: var(--fs-v102-blue); }
+    body .vs-box .vsb-s, body .vs-divider .vsb-s, body .vs-echo .ve-s { color: var(--fs-v102-rose); }
+
+    /* Système de ton final : le bloc entier dépend de la moyenne de l'équipe, pas du côté domicile/extérieur. */
+    body .result-shell .team-card.team-card-pos,
+    body .result-shell .summary-grid .summary-cell.cell-pos {
+      background:
+        radial-gradient(circle at 13% 5%, rgba(56,189,248,.18), transparent 34%),
+        linear-gradient(155deg, var(--fs-v102-blue-soft), rgba(12,18,42,.94) 48%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(56,189,248,.36) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 22px rgba(56,189,248,.075) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg,
+    body .result-shell .summary-grid .summary-cell.cell-neg {
+      background:
+        radial-gradient(circle at 13% 5%, rgba(251,113,133,.17), transparent 34%),
+        linear-gradient(155deg, var(--fs-v102-rose-soft), rgba(27,15,38,.94) 48%, rgba(10,8,24,.96)) !important;
+      border-color: rgba(251,113,133,.36) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 22px rgba(251,113,133,.072) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral,
+    body .result-shell .summary-grid .summary-cell.cell-neutral {
+      background:
+        radial-gradient(circle at 13% 5%, rgba(140,170,225,.12), transparent 34%),
+        linear-gradient(155deg, rgba(140,170,225,.065), rgba(12,18,42,.94) 50%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(140,170,225,.26) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      background: linear-gradient(90deg, transparent, rgba(56,189,248,.70), transparent) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      background: linear-gradient(90deg, transparent, rgba(251,113,133,.70), transparent) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      background: linear-gradient(90deg, transparent, rgba(140,170,225,.55), transparent) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-pos, .summary-cell.cell-pos) :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
+      background: linear-gradient(160deg, var(--fs-v102-blue-faint), rgba(10,16,38,.88)) !important;
+      border-color: rgba(56,189,248,.22) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neg, .summary-cell.cell-neg) :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
+      background: linear-gradient(160deg, var(--fs-v102-rose-faint), rgba(20,12,32,.88)) !important;
+      border-color: rgba(251,113,133,.22) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neutral, .summary-cell.cell-neutral) :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
+      background: linear-gradient(160deg, rgba(140,170,225,.04), rgba(12,17,40,.88)) !important;
+      border-color: rgba(140,170,225,.17) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-pos, .summary-cell.cell-pos) :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge,.side-pill) {
+      background: linear-gradient(135deg, rgba(56,189,248,.17), rgba(37,99,235,.09)) !important;
+      border-color: rgba(56,189,248,.30) !important;
+      color: #e8f8ff !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neg, .summary-cell.cell-neg) :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge,.side-pill) {
+      background: linear-gradient(135deg, rgba(251,113,133,.17), rgba(168,85,247,.09)) !important;
+      border-color: rgba(251,113,133,.30) !important;
+      color: #ffe7ee !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-pos, .summary-cell.cell-pos) :is(.team-meta,.row-sub,.stat-kicker,.stat-subtitle,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) {
+      color: #b7d8f3 !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neg, .summary-cell.cell-neg) :is(.team-meta,.row-sub,.stat-kicker,.stat-subtitle,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) {
+      color: #f0becd !important;
+    }
+
+    body .result-shell .team-card .team-name,
+    body .result-shell .summary-team-name,
+    body .result-shell .team-card :is(.row-title,.section-title,.rank-label,.stat-title,.events-summary-label) {
+      color: #ffffff !important;
+    }
+
+    body .result-shell .positive { color: #40c9ff !important; }
+    body .result-shell .negative { color: #fb7185 !important; }
 </style>
 </head>
 
@@ -9740,7 +9950,7 @@
               <div class="summary-label">Résumé rapide</div>
               <div class="summary-label summary-mode">Mode scan : ${result.simultaneousMode ? "Simultané" : "Séparé"}</div>
             </div>
-            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 7 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 7 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
           </div>
 
           ${renderDominance(result)}
@@ -9757,7 +9967,9 @@
     }
 
     function teamAvg(team) {
-      const v = [team?.r1?.value, team?.r2?.value].filter((x) => typeof x === "number");
+      const v = [team?.r1?.value, team?.r2?.value]
+        .map((x) => Number(x))
+        .filter((x) => Number.isFinite(x));
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
     }
 
@@ -9770,7 +9982,9 @@
     }
 
     function renderSummaryCell(team, rank1, rank2) {
-      const vals = [team.r1?.value, team.r2?.value].filter((v) => typeof v === "number");
+      const vals = [team.r1?.value, team.r2?.value]
+        .map((v) => Number(v))
+        .filter((v) => Number.isFinite(v));
       const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
       const cellTone = avg > 0 ? "cell-pos" : (avg < 0 ? "cell-neg" : "cell-neutral");
       return `
@@ -10022,7 +10236,9 @@
       const matchesUsed = team.matchesUsed || [];
       const sideClass = side === "Domicile" ? "side-home" : "side-away";
       const teamIssueCount = Number(team.eventDataIssueCount || 0);
-      const _perfVals = [team.r1?.value, team.r2?.value].filter((v) => typeof v === "number");
+      const _perfVals = [team.r1?.value, team.r2?.value]
+        .map((v) => Number(v))
+        .filter((v) => Number.isFinite(v));
       const _perfAvg = _perfVals.length ? _perfVals.reduce((a, b) => a + b, 0) / _perfVals.length : 0;
       const perfToneClass = _perfAvg > 0 ? "team-card-pos" : (_perfAvg < 0 ? "team-card-neg" : "team-card-neutral");
 
