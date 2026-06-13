@@ -7762,6 +7762,7 @@
       z-index: 0;
     }
     .calc-mode-slider.sim .calc-mode-thumb {
+      transform: none !important;
       background: linear-gradient(135deg,#fb7185,#b91c6b) !important;
       box-shadow: 0 6px 18px rgba(251,113,133,.30) !important;
     }
@@ -7814,11 +7815,7 @@
       z-index: 0;
     }
 
-    .calc-mode-slider.sim .calc-mode-thumb {
-      transform: translateX(100%);
-      background: linear-gradient(135deg, #fb7185, #b91c6b) !important;
-      box-shadow: 0 8px 20px rgba(251, 113, 133, 0.30) !important;
-    }
+    /* (ancienne règle .sim translateX retirée en v91 — la bulle est pilotée par JS) */
 
     .calc-mode-opt {
       position: relative;
@@ -8243,6 +8240,7 @@
       z-index: 0;
     }
     .calc-mode-slider.sim .calc-mode-thumb {
+      transform: none !important;
       background: linear-gradient(135deg,#fb7185,#b91c6b) !important;
       box-shadow: 0 6px 18px rgba(251,113,133,.30) !important;
     }
@@ -8282,7 +8280,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v90</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v91</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -10466,7 +10464,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v90 chargé");
+    console.log("FOOTSCAN v91 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
