@@ -7524,7 +7524,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v75</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v76</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -7905,7 +7905,7 @@
 
       const adjustedBase = base;
 
-      const marginUnit = 1.5;
+      const marginUnit = 2;
       const marginFinal = marginUnit * changes;
 
       const lowBeforeCards = adjustedBase - marginFinal;
@@ -7973,7 +7973,7 @@
       return (
         `Base : ${formatRank(calc.base)} · ` +
         `${modeText} · ` +
-        `Marge : 1.5 × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
+        `Marge : ${calc.marginUnit} × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
         `Rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
       );
     }
@@ -9661,7 +9661,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v75 chargé");
+    console.log("FOOTSCAN v76 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
