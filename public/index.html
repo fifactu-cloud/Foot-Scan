@@ -7652,74 +7652,155 @@
       border-color: rgba(251, 113, 133, 0.38) !important;
     }
 
-    /* Retouche v83 : titre match analysé centré, VS plus grand, bleu domicile adouci */
+    /* Retouche v85 : labels par camp, titres blancs, tons réduits, VS en ligne, bordures intelligentes */
 
-    /* — Bloc de statut (Scan terminé / message en haut) : tout centré — */
-    .status-box,
-    .status-box .status-head,
-    .status-box .status-message,
-    .status-done-title {
-      text-align: center !important;
-    }
-
-    .status-box .status-head,
-    .status-box .status-message {
-      justify-content: center !important;
-      align-items: center !important;
-    }
-
-    /* — Bloc MATCH ANALYSÉ (hero après scan) : tout centré — */
+    /* — Bloc MATCH ANALYSÉ : tout centré, VS sur une seule ligne (V bleu / S rose) — */
     .match-hero {
       text-align: center !important;
       justify-items: center !important;
     }
-
-    .match-hero .kicker {
-      margin-left: auto !important;
-      margin-right: auto !important;
-    }
-
+    .match-hero .kicker,
     .match-hero .hero-text {
-      text-align: center !important;
       margin-left: auto !important;
       margin-right: auto !important;
+      text-align: center !important;
     }
 
-    /* — Résumé rapide : titre du match bien centré — */
+    /* VS du hero + séparateur : afficher V et S côte à côte, colorés */
+    .vs-box,
+    .vs-divider {
+      display: inline-flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 0 !important;
+    }
+    .vs-box .vsb-v,
+    .vs-divider .vsb-v {
+      color: #38bdf8 !important;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+    }
+    .vs-box .vsb-s,
+    .vs-divider .vsb-s {
+      color: #fb7185 !important;
+      text-shadow: 0 0 12px rgba(251, 113, 133, 0.28);
+    }
+
+    /* — Statut "Scan terminé" + résumé : centrés — */
+    .status-box, .status-box .status-head, .status-box .status-message, .status-done-title,
     .summary-title {
       text-align: center !important;
       justify-content: center !important;
     }
 
-    /* — VS du bloc match analysé + séparateur : V bleu, S rose-pourpre — */
-    .vs-box .vsb-v,
-    .vs-divider .vsb-v {
-      color: #38bdf8 !important;
-      text-shadow: 0 0 12px rgba(56, 189, 248, 0.30);
-    }
-
-    .vs-box .vsb-s,
-    .vs-divider .vsb-s {
-      color: #fb7185 !important;
-      text-shadow: 0 0 12px rgba(251, 113, 133, 0.30);
-    }
-
-    /* — VS encore un peu plus grand — */
+    /* — VVVSSS du résumé — */
     .summary-title .vs-echo {
       font-size: 1.24em !important;
+      max-width: 100% !important;
+      letter-spacing: -0.02em !important;
     }
 
-    /* — Bleu domicile adouci pour rester dans l'esprit du site (parité avec l'extérieur) — */
-    .team-card:has(.side-pill.side-home) {
+    /* === TITRES EN BLANC, LABELS SECONDAIRES PAR CAMP === */
+    /* Les TITRES restent blancs des deux côtés (noms, titres de match, "Zone des rangs") */
+    .team-card .team-name,
+    .team-card .match-team-name,
+    .team-card .row-title,
+    .team-card .section-title,
+    .team-card .stat-number,
+    .team-card .rank-value {
+      color: #ffffff !important;
+    }
+
+    /* DOMICILE : tout le secondaire (labels, métas, sous-textes) en bleu doux */
+    .team-card-home :is(.rank-label, .team-meta, .row-sub, .camp-badge, .events-summary-label,
+      .match-index, .stat-kicker, .stat-subtitle, .stat-badge, .dominance-label,
+      .event-metric-code, .summary-label, .count-pill, .match-count-mini) {
+      color: #a9c9ec !important;
+    }
+
+    /* EXTÉRIEUR : le même secondaire en rose-pourpre doux */
+    .team-card-away :is(.rank-label, .team-meta, .row-sub, .camp-badge, .events-summary-label,
+      .match-index, .stat-kicker, .stat-subtitle, .stat-badge, .dominance-label,
+      .event-metric-code, .summary-label, .count-pill, .match-count-mini) {
+      color: #e6b8c8 !important;
+    }
+
+    /* "PERFORMANCE RANG ..." : suit le camp (était bleu partout) */
+    .team-card-home .rank-label { color: #a9c9ec !important; }
+    .team-card-away .rank-label { color: #e6b8c8 !important; }
+
+    /* Pastilles internes teintées par camp */
+    .team-card-home :is(.count-pill, .match-count-mini, .camp-badge) {
+      background: linear-gradient(135deg, rgba(56,189,248,.12), rgba(37,99,235,.07)) !important;
+      border-color: rgba(56,189,248,.22) !important;
+    }
+    .team-card-away :is(.count-pill, .match-count-mini, .camp-badge) {
+      background: linear-gradient(135deg, rgba(251,113,133,.12), rgba(168,85,247,.07)) !important;
+      border-color: rgba(244,114,182,.22) !important;
+    }
+    .team-card-away .event-metric-pill {
+      background: linear-gradient(135deg, rgba(251,113,133,.09), rgba(168,85,247,.045)) !important;
+      border-color: rgba(244,114,182,.18) !important;
+    }
+
+    /* === TONS DE FOND ENCORE RÉDUITS (harmonisation max) === */
+    .team-card:has(.side-pill.side-home), .team-card-home {
       background:
-        linear-gradient(180deg, rgba(56, 189, 248, 0.055), rgba(56, 189, 248, 0.012) 50%, transparent),
-        rgba(10, 15, 36, 0.92) !important;
-      border-color: rgba(56, 189, 248, 0.18) !important;
+        linear-gradient(180deg, rgba(56,189,248,.040), rgba(56,189,248,.010) 50%, transparent),
+        rgba(11,16,38,.92) !important;
+      border-color: rgba(56,189,248,.15) !important;
+    }
+    .team-card:has(.side-pill.side-away), .team-card-away {
+      background:
+        linear-gradient(180deg, rgba(251,113,133,.040), rgba(251,113,133,.010) 50%, transparent),
+        rgba(15,12,32,.92) !important;
+      border-color: rgba(244,114,182,.15) !important;
+    }
+    .team-card-home :is(.rank-card, .events-summary, .section, .match-row) {
+      background: linear-gradient(160deg, rgba(56,189,248,.035), rgba(12,18,40,.86)) !important;
+      border-color: rgba(56,189,248,.11) !important;
+    }
+    .team-card-away :is(.rank-card, .events-summary, .section, .match-row) {
+      background: linear-gradient(160deg, rgba(251,113,133,.035), rgba(20,13,28,.86)) !important;
+      border-color: rgba(244,114,182,.11) !important;
     }
 
-    .team-card:has(.side-pill.side-home) :is(.rank-card, .events-summary, .section) {
-      background: linear-gradient(160deg, rgba(56, 189, 248, 0.05), rgba(12, 18, 40, 0.85)) !important;
-      border-color: rgba(56, 189, 248, 0.14) !important;
+    /* === BORDURES : en HAUT pour les sections centrées, sur le CÔTÉ pour le texte aligné à gauche === */
+    /* Cartes d'équipe : accent en haut (le bloc est une grande section) */
+    .team-card-home, .team-card-away { position: relative; }
+    .team-card-home::before, .team-card-away::before {
+      content: ""; position: absolute; top: 0; left: 18px; right: 18px; height: 3px;
+      border-radius: 0 0 999px 999px; pointer-events: none;
+    }
+    .team-card-home::before { background: linear-gradient(90deg, transparent, rgba(56,189,248,.55), transparent); }
+    .team-card-away::before { background: linear-gradient(90deg, transparent, rgba(251,113,133,.55), transparent); }
+
+    /* Lignes de match & d'événement (texte aligné à gauche) : accent sur le CÔTÉ */
+    .team-card-home .match-row,
+    .team-card-home .event-rich-row { box-shadow: inset 3px 0 0 rgba(56,189,248,.38) !important; }
+    .team-card-away .match-row,
+    .team-card-away .event-rich-row { box-shadow: inset 3px 0 0 rgba(251,113,133,.38) !important; }
+    .event-rich-row { border-radius: 12px; overflow: hidden; }
+
+    /* Notice Termux : centrée → accent en HAUT (et non plus sur le côté), rouge atténué */
+    .panel.notice {
+      box-shadow: inset 0 3px 0 rgba(251,113,133,.40) !important;
+      background:
+        linear-gradient(135deg, rgba(251,113,133,.07), rgba(244,63,110,.035)),
+        rgba(13,11,24,.92) !important;
+      border-color: rgba(251,113,133,.20) !important;
+    }
+    .notice-icon {
+      background: rgba(251,113,133,.10) !important;
+      color: #fda4af !important;
+      border-color: rgba(251,113,133,.24) !important;
+    }
+    /* Texte sous le titre Termux : centré */
+    .panel.notice .notice-text { text-align: center !important; }
+
+    /* Panneaux à titre centré (calcul guidé, rapport) : accent en HAUT */
+    .report-panel, section.panel.panel-pad:not(.notice) {
+      box-shadow: inset 0 3px 0 rgba(56,189,248,.20);
     }
 
     /* Retouche v82 : notice rouge atténuée, slider 2 modes, VS agrandi, rebords, derniers bleus */
@@ -7761,18 +7842,25 @@
 
     .calc-mode-slider.sim .calc-mode-thumb {
       transform: translateX(100%);
+      background: linear-gradient(135deg, #fb7185, #b91c6b) !important;
+      box-shadow: 0 8px 20px rgba(251, 113, 133, 0.30) !important;
     }
 
     .calc-mode-opt {
       position: relative;
       z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       background: transparent !important;
       border: 0 !important;
       box-shadow: none !important;
+      margin: 0 !important;
       padding: 11px 8px;
-      font-size: 12.5px;
-      font-weight: 700;
-      letter-spacing: 0.01em;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      line-height: 1;
       color: #aebfe0;
       cursor: pointer;
       transition: color .26s ease;
@@ -7781,10 +7869,6 @@
 
     .calc-mode-opt.is-active {
       color: #ffffff;
-    }
-
-    .calc-mode-opt:active {
-      transform: scale(.97);
     }
 
     /* — Notice "Émulateur Termux" : rouge conservé mais atténué (moins de contraste avec le site) — */
@@ -8132,7 +8216,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v83</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v85</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -8219,8 +8303,8 @@
 
             <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de calcul">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">Calcul Séparé</button>
-              <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">Calcul Simultané</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">CALCUL SÉPARÉ</button>
+              <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">CALCUL SIMULTANÉ</button>
             </div>
 
             <div class="auto-result">
@@ -10294,7 +10378,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v83 chargé");
+    console.log("FOOTSCAN v85 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
