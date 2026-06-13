@@ -8226,38 +8226,31 @@
       box-shadow: inset 3px 0 0 rgba(140,170,225,.30) !important;
     }
 
-    /* --- 3. SLIDER : largeurs asymétriques fixes (CSS pur, fiable) --- */
+    /* --- 3. SLIDER : bulle pilotée par JS (mesure réelle), robuste --- */
     .calc-mode-slider {
       position: relative; display: flex; align-items: stretch; gap: 0;
       margin: 12px 0 4px; padding: 4px; border-radius: 999px;
       border: 1px solid rgba(140,170,225,.24); background: rgba(22,32,74,.55);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.05); overflow: hidden; min-height: 48px;
     }
-    /* Séparé ≈ 44%, Simultané ≈ 56% (le texte est plus long) */
-    .calc-mode-opt[data-mode="separate"]    { flex: 0 0 44%; }
-    .calc-mode-opt[data-mode="simultaneous"]{ flex: 0 0 56%; }
     .calc-mode-thumb {
-      position: absolute; top: 4px; bottom: 4px; left: 4px;
-      width: calc(44% - 6px);
+      position: absolute; top: 4px; bottom: 4px;
+      left: var(--thumb-left, 4px);
+      width: var(--thumb-width, 44%);
       border-radius: 999px; background: linear-gradient(135deg,#38bdf8,#2563eb); background-size: 180% 180%;
       box-shadow: 0 6px 18px rgba(56,189,248,.30); animation: mobileButtonGlow 3.6s ease infinite;
-      transition: transform .32s cubic-bezier(.34,1.4,.5,1), width .32s cubic-bezier(.34,1.4,.5,1), background .3s ease;
+      transition: left .32s cubic-bezier(.34,1.4,.5,1), width .32s cubic-bezier(.34,1.4,.5,1), background .3s ease;
       z-index: 0;
     }
     .calc-mode-slider.sim .calc-mode-thumb {
-      width: calc(56% - 6px);
-      left: auto;
-      right: 4px;
       background: linear-gradient(135deg,#fb7185,#b91c6b) !important;
       box-shadow: 0 6px 18px rgba(251,113,133,.30) !important;
     }
-    /* en mode simultané, on anime via right plutôt que transform */
-    .calc-mode-slider.sim .calc-mode-thumb { transition: left .32s, width .32s cubic-bezier(.34,1.4,.5,1), background .3s ease; }
     .calc-mode-opt {
-      position: relative; z-index: 1;
+      position: relative; z-index: 1; flex: 1 1 auto;
       display: flex; align-items: center; justify-content: center;
       background: transparent !important; border: 0 !important; box-shadow: none !important;
-      margin: 0 !important; padding: 0 10px !important; min-height: 40px;
+      margin: 0 !important; padding: 0 14px !important; min-height: 40px;
       font-size: 11.5px; font-weight: 800; letter-spacing: .03em; line-height: 1;
       color: #aebfe0; cursor: pointer; transition: color .26s ease; white-space: nowrap;
       transform: none !important;
@@ -8289,7 +8282,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v88</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v89</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -8714,11 +8707,23 @@
       const box = document.getElementById("simultaneousMode");
       if (!slider || !box) return;
       const opts = slider.querySelectorAll(".calc-mode-opt");
+      const positionThumb = () => {
+        const active = slider.querySelector(".calc-mode-opt.is-active");
+        if (!active) return;
+        // offsetLeft est relatif au conteneur ; le thumb est en position absolue
+        // dans ce même conteneur, donc on peut réutiliser ces valeurs directement.
+        slider.style.setProperty("--thumb-left", active.offsetLeft + "px");
+        slider.style.setProperty("--thumb-width", active.offsetWidth + "px");
+      };
       const sync = () => {
         const sim = Boolean(box.checked);
         slider.classList.toggle("sim", sim);
         opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "simultaneous") === sim));
+        requestAnimationFrame(positionThumb);
       };
+      window.addEventListener("resize", () => requestAnimationFrame(positionThumb));
+      setTimeout(positionThumb, 80);
+      setTimeout(positionThumb, 350);
       opts.forEach((o) => o.addEventListener("click", () => {
         box.checked = (o.dataset.mode === "simultaneous");
         box.dispatchEvent(new Event("change", { bubbles: true }));
@@ -10454,7 +10459,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v88 chargé");
+    console.log("FOOTSCAN v89 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
