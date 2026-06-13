@@ -7483,8 +7483,8 @@
     /* — Miroir AWAY complet : lignes de match + numéros + texte passent en pourpre rose — */
     .team-card:has(.side-pill.side-away) .match-row {
       background:
-        linear-gradient(160deg, rgba(251, 113, 133, 0.08), rgba(168, 85, 247, 0.04) 60%, rgba(20, 11, 24, 0.96)) !important;
-      border-color: rgba(244, 114, 182, 0.22) !important;
+        linear-gradient(160deg, rgba(251, 113, 133, 0.05), rgba(18, 12, 24, 0.96)) !important;
+      border-color: rgba(244, 114, 182, 0.14) !important;
     }
 
     .team-card:has(.side-pill.side-away) .match-number-badge {
@@ -7540,8 +7540,8 @@
     /* — Cartes de match côté extérieur : fond + numéro + texte en pourpre rose — */
     .team-card-away .match-row {
       background:
-        linear-gradient(160deg, rgba(251, 113, 133, 0.10), rgba(168, 85, 247, 0.045) 60%, rgba(20, 11, 24, 0.95)) !important;
-      border-color: rgba(244, 114, 182, 0.24) !important;
+        linear-gradient(160deg, rgba(251, 113, 133, 0.05), rgba(18, 12, 24, 0.95)) !important;
+      border-color: rgba(244, 114, 182, 0.14) !important;
     }
 
     .team-card-away .match-number-badge {
@@ -7604,8 +7604,8 @@
 
     /* — Extérieur : tout ce qui restait bleu (events, labels, badges, compteurs) en pourpre rose — */
     .team-card-away :is(.events-summary, .section, .rank-card) {
-      background: linear-gradient(160deg, rgba(251, 113, 133, 0.11), rgba(168, 85, 247, 0.05) 55%, rgba(28, 12, 26, 0.86)) !important;
-      border-color: rgba(244, 114, 182, 0.26) !important;
+      background: linear-gradient(160deg, rgba(251, 113, 133, 0.06), rgba(22, 14, 28, 0.86)) !important;
+      border-color: rgba(244, 114, 182, 0.16) !important;
     }
 
     .team-card-away :is(.count-pill, .match-count-mini) {
@@ -7621,17 +7621,22 @@
     }
 
     .team-card-away :is(.event-metric-code, .section-title, .events-summary-label) {
-      color: #fecdd3 !important;
+      color: #f6d6de !important;
+    }
+
+    /* Badges de camp côté extérieur : du bleu clair (#bfdbfe) vers un rose doux */
+    .team-card-away .camp-badge {
+      color: #f3c9d5 !important;
+      border-color: rgba(244, 114, 182, 0.28) !important;
+      background: linear-gradient(135deg, rgba(251,113,133,.14), rgba(168,85,247,.08)) !important;
     }
 
     /* Texte descriptif des événements (row-sub) côté extérieur : léger glissement rose */
     .team-card-away .row-sub {
-      color: #e7c4d2 !important;
+      color: #dcc6d2 !important;
     }
 
-    .team-card-away .match-team-name {
-      color: #f3cdd8 !important;
-    }
+
 
     /* — Les 3 notices (Termux + hero) : même rose franc, légèrement plus rouge que violet — */
     .panel.notice {
@@ -7647,9 +7652,49 @@
       border-color: rgba(251, 113, 133, 0.38) !important;
     }
 
-    /* — Réafficher l'option Calcul Simultané (les autres restent masqués) — */
+    /* — Réafficher l'option Calcul Simultané sous forme de bouton cliquable — */
     .mode-toggle[for="simultaneousMode"] {
-      display: grid !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 10px !important;
+      width: 100% !important;
+      margin-top: 10px !important;
+      padding: 12px 14px !important;
+      border-radius: 16px !important;
+      cursor: pointer !important;
+      border: 1px solid rgba(56, 189, 248, 0.28) !important;
+      background: rgba(22, 32, 74, 0.55) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+      transition: background .3s ease, border-color .3s ease, box-shadow .3s ease, transform .16s cubic-bezier(.34,1.56,.64,1) !important;
+    }
+
+    .mode-toggle[for="simultaneousMode"] span {
+      font-size: 12.5px !important;
+      line-height: 1.3 !important;
+      color: #dbe7ff !important;
+    }
+
+    .mode-toggle[for="simultaneousMode"]:active {
+      transform: scale(.985) !important;
+    }
+
+    /* État ACTIVÉ : même dégradé bleu + même respiration que "Appliquer les rangs" */
+    .mode-toggle[for="simultaneousMode"]:has(#simultaneousMode:checked) {
+      border-color: rgba(56, 189, 248, 0.5) !important;
+      background: linear-gradient(135deg, #38bdf8, #2563eb) !important;
+      background-size: 180% 180% !important;
+      animation: mobileButtonGlow 3.6s ease infinite !important;
+      box-shadow: 0 14px 30px rgba(56, 189, 248, 0.22) !important;
+    }
+
+    .mode-toggle[for="simultaneousMode"]:has(#simultaneousMode:checked) span {
+      color: #ffffff !important;
+      font-weight: 700 !important;
+    }
+
+    /* La case elle-même reste l'interrupteur stylé existant */
+    .mode-toggle[for="simultaneousMode"] input {
+      flex: 0 0 auto !important;
     }
 
     /* Retouche v78 : extérieur en pourpre rose (#fb7185), miroir complet des accents, VS recentré */
@@ -7664,17 +7709,16 @@
     /* — Tons par camp : francs mais pas extrêmes — */
     .team-card:has(.side-pill.side-home) {
       background:
-        linear-gradient(180deg, rgba(56, 189, 248, 0.16), rgba(56, 189, 248, 0.04) 48%, rgba(56, 189, 248, 0.02)),
-        rgba(8, 14, 34, 0.94) !important;
-      border-color: rgba(56, 189, 248, 0.38) !important;
+        linear-gradient(180deg, rgba(56, 189, 248, 0.07), rgba(56, 189, 248, 0.015) 50%, transparent),
+        rgba(10, 15, 36, 0.92) !important;
+      border-color: rgba(56, 189, 248, 0.22) !important;
     }
 
     .team-card:has(.side-pill.side-away) {
       background:
-        linear-gradient(180deg, rgba(251, 113, 133, 0.15), rgba(168, 85, 247, 0.06) 48%, rgba(192, 132, 252, 0.02)),
-        rgba(19, 10, 30, 0.94) !important;
-      border-color: rgba(244, 114, 182, 0.38) !important;
-      box-shadow: inset 0 1px 0 rgba(253, 164, 175, 0.14), 0 18px 40px rgba(10, 2, 16, 0.45) !important;
+        linear-gradient(180deg, rgba(251, 113, 133, 0.07), rgba(251, 113, 133, 0.015) 50%, transparent),
+        rgba(13, 12, 30, 0.92) !important;
+      border-color: rgba(244, 114, 182, 0.22) !important;
     }
 
     /* — Liseré athlétique en haut de chaque carte — */
@@ -7696,17 +7740,17 @@
     }
 
     .team-card:has(.side-pill.side-home)::before {
-      background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.75), transparent);
+      background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.5), transparent);
     }
 
     .team-card:has(.side-pill.side-away)::before {
-      background: linear-gradient(90deg, transparent, rgba(251, 113, 133, 0.75), transparent);
+      background: linear-gradient(90deg, transparent, rgba(251, 113, 133, 0.5), transparent);
     }
 
     /* — Miroir complet : tout ce qui est bleu chez domicile devient pourpre rose chez extérieur — */
     .team-card:has(.side-pill.side-away) :is(.rank-card, .events-summary, .section) {
-      background: linear-gradient(160deg, rgba(251, 113, 133, 0.11), rgba(168, 85, 247, 0.05) 55%, rgba(28, 12, 26, 0.85)) !important;
-      border-color: rgba(244, 114, 182, 0.26) !important;
+      background: linear-gradient(160deg, rgba(251, 113, 133, 0.06), rgba(22, 14, 28, 0.85)) !important;
+      border-color: rgba(244, 114, 182, 0.16) !important;
     }
 
     .team-card:has(.side-pill.side-away) .match-index {
@@ -7805,8 +7849,8 @@
 
     /* — Blocs internes assortis au côté (fini le bleu chez l'extérieur) — */
     .team-card:has(.side-pill.side-home) :is(.rank-card, .events-summary, .section) {
-      background: linear-gradient(160deg, rgba(56, 189, 248, 0.13), rgba(12, 20, 44, 0.85)) !important;
-      border-color: rgba(56, 189, 248, 0.26) !important;
+      background: linear-gradient(160deg, rgba(56, 189, 248, 0.06), rgba(12, 18, 40, 0.85)) !important;
+      border-color: rgba(56, 189, 248, 0.16) !important;
     }
 
     .team-card:has(.side-pill.side-away) :is(.rank-card, .events-summary, .section) {
@@ -7936,7 +7980,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v80</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v81</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -10073,7 +10117,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v80 chargé");
+    console.log("FOOTSCAN v81 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
