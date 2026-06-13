@@ -8282,7 +8282,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v89</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v90</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -8710,10 +8710,17 @@
       const positionThumb = () => {
         const active = slider.querySelector(".calc-mode-opt.is-active");
         if (!active) return;
-        // offsetLeft est relatif au conteneur ; le thumb est en position absolue
-        // dans ce même conteneur, donc on peut réutiliser ces valeurs directement.
-        slider.style.setProperty("--thumb-left", active.offsetLeft + "px");
-        slider.style.setProperty("--thumb-width", active.offsetWidth + "px");
+        const pad = 4;            // padding du conteneur
+        const inset = 2;          // marge de sécurité de chaque côté de la bulle
+        const sliderW = slider.clientWidth;
+        let left = active.offsetLeft + inset;
+        let width = active.offsetWidth - inset * 2;
+        // borne stricte : la bulle ne peut jamais sortir du conteneur
+        const maxRight = sliderW - pad;
+        if (left < pad) left = pad;
+        if (left + width > maxRight) width = maxRight - left;
+        slider.style.setProperty("--thumb-left", left + "px");
+        slider.style.setProperty("--thumb-width", width + "px");
       };
       const sync = () => {
         const sim = Boolean(box.checked);
@@ -10459,7 +10466,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v89 chargé");
+    console.log("FOOTSCAN v90 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
