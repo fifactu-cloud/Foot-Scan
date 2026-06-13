@@ -7472,6 +7472,131 @@
     }
 
 
+    /* Retouche v77 : VS étendu, tons domicile/extérieur renforcés, dégradés harmonisés, en-tête en badges */
+
+    /* — VVVVVVVVVSSSSSSSSS : plus large, rampe d'opacité recalée sur 18 lettres — */
+    .vs-echo {
+      font-size: 0.92em !important;
+      letter-spacing: -0.03em;
+    }
+
+    .vs-echo i:nth-child(1) { opacity: 0.06; }
+    .vs-echo i:nth-child(2) { opacity: 0.11; }
+    .vs-echo i:nth-child(3) { opacity: 0.18; }
+    .vs-echo i:nth-child(4) { opacity: 0.28; }
+    .vs-echo i:nth-child(5) { opacity: 0.42; }
+    .vs-echo i:nth-child(6) { opacity: 0.58; }
+    .vs-echo i:nth-child(7) { opacity: 0.74; }
+    .vs-echo i:nth-child(8) { opacity: 0.88; }
+    .vs-echo i:nth-child(9) { opacity: 1; }
+    .vs-echo i:nth-child(10) { opacity: 1; }
+    .vs-echo i:nth-child(11) { opacity: 0.88; }
+    .vs-echo i:nth-child(12) { opacity: 0.74; }
+    .vs-echo i:nth-child(13) { opacity: 0.58; }
+    .vs-echo i:nth-child(14) { opacity: 0.42; }
+    .vs-echo i:nth-child(15) { opacity: 0.28; }
+    .vs-echo i:nth-child(16) { opacity: 0.18; }
+    .vs-echo i:nth-child(17) { opacity: 0.11; }
+    .vs-echo i:nth-child(18) { opacity: 0.06; }
+
+    /* — Cartes équipe : identité de côté nettement plus marquée — */
+    .team-card:has(.side-pill.side-home) {
+      background:
+        linear-gradient(180deg, rgba(56, 189, 248, 0.20), rgba(56, 189, 248, 0.05) 46%, rgba(56, 189, 248, 0.02)),
+        rgba(8, 14, 34, 0.94) !important;
+      border-color: rgba(56, 189, 248, 0.45) !important;
+      box-shadow: inset 0 1px 0 rgba(125, 211, 252, 0.16), 0 18px 40px rgba(2, 6, 18, 0.45) !important;
+    }
+
+    .team-card:has(.side-pill.side-away) {
+      background:
+        linear-gradient(180deg, rgba(251, 113, 133, 0.20), rgba(251, 113, 133, 0.05) 46%, rgba(251, 113, 133, 0.02)),
+        rgba(14, 8, 18, 0.94) !important;
+      border-color: rgba(251, 113, 133, 0.45) !important;
+      box-shadow: inset 0 1px 0 rgba(253, 164, 175, 0.16), 0 18px 40px rgba(12, 2, 8, 0.45) !important;
+    }
+
+    /* — Blocs internes assortis au côté (fini le bleu chez l'extérieur) — */
+    .team-card:has(.side-pill.side-home) :is(.rank-card, .events-summary, .section) {
+      background: linear-gradient(160deg, rgba(56, 189, 248, 0.13), rgba(12, 20, 44, 0.85)) !important;
+      border-color: rgba(56, 189, 248, 0.26) !important;
+    }
+
+    .team-card:has(.side-pill.side-away) :is(.rank-card, .events-summary, .section) {
+      background: linear-gradient(160deg, rgba(251, 113, 133, 0.13), rgba(34, 12, 22, 0.85)) !important;
+      border-color: rgba(251, 113, 133, 0.26) !important;
+    }
+
+    .team-card:has(.side-pill.side-away) .count-pill {
+      background: rgba(251, 113, 133, 0.14) !important;
+      border-color: rgba(251, 113, 133, 0.32) !important;
+      color: #ffd9e1 !important;
+    }
+
+    /* — Cellules du résumé : même renfort, blocs internes compris — */
+    .summary-grid .summary-cell:first-child {
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.17), rgba(10, 15, 36, 0.65) 60%) !important;
+      border-color: rgba(56, 189, 248, 0.40) !important;
+    }
+
+    .summary-grid .summary-cell:last-child {
+      background: linear-gradient(180deg, rgba(251, 113, 133, 0.17), rgba(22, 10, 18, 0.65) 60%) !important;
+      border-color: rgba(251, 113, 133, 0.40) !important;
+    }
+
+    .summary-grid .summary-cell:first-child .mini-badge {
+      background: rgba(56, 189, 248, 0.14) !important;
+      border-color: rgba(56, 189, 248, 0.30) !important;
+    }
+
+    .summary-grid .summary-cell:last-child .mini-badge {
+      background: rgba(251, 113, 133, 0.14) !important;
+      border-color: rgba(251, 113, 133, 0.30) !important;
+    }
+
+    /* — Bloc Résumé : teinte scindée, bleu côté domicile, rose côté extérieur — */
+    .summary {
+      background:
+        linear-gradient(90deg, rgba(56, 189, 248, 0.11), rgba(56, 189, 248, 0) 40%),
+        linear-gradient(270deg, rgba(251, 113, 133, 0.11), rgba(251, 113, 133, 0) 40%),
+        rgba(9, 14, 33, 0.94) !important;
+      border-color: rgba(134, 203, 255, 0.26) !important;
+    }
+
+    /* — En-tête du résumé : trio de badges harmonisés et centrés — */
+    .summary-head-top {
+      justify-content: center !important;
+      align-items: center !important;
+      gap: 8px !important;
+      flex-wrap: wrap !important;
+    }
+
+    .summary-head-top .summary-label,
+    .summary-head-top .summary-label:first-child,
+    .summary-head-top .summary-mode,
+    .summary-mode {
+      justify-content: center !important;
+      align-self: auto !important;
+      margin: 0 !important;
+      min-height: 0 !important;
+      padding: 6px 12px !important;
+      border-radius: 999px !important;
+      border: 1px solid rgba(134, 203, 255, 0.30) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(59, 107, 255, 0.08)) !important;
+      color: #dff2ff !important;
+      font-size: 10.5px !important;
+      letter-spacing: 0.10em !important;
+      line-height: 1.15 !important;
+    }
+
+    .summary .data-quality-banner,
+    .summary .data-quality-banner.ok {
+      border-radius: 999px !important;
+      border: 1px solid rgba(110, 231, 183, 0.32) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.10), rgba(34, 197, 94, 0.12)) !important;
+      margin: 9px auto 12px !important;
+    }
+
     /* Retouche v75 : bases presets 41.75, centrage VS, confettis réajustés */
     .summary-title {
       flex-wrap: wrap !important;
@@ -7524,7 +7649,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v76</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v77</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -8647,7 +8772,7 @@
               <div class="summary-label">Résumé rapide</div>
               <div class="summary-label summary-mode">Mode scan : ${esc(result.scanModeLabel || (result.simultaneousMode ? "Simultané match par match / minute par minute" : "Standard"))}</div>
             </div>
-            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo" aria-label="VS">${Array.from({ length: 7 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 7 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo" aria-label="VS">${Array.from({ length: 9 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 9 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
           </div>
 
           ${renderDominance(result)}
@@ -9661,7 +9786,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v76 chargé");
+    console.log("FOOTSCAN v77 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
