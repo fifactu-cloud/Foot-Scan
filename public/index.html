@@ -8838,58 +8838,238 @@
     }
 
 
-    /* Retouche v104 : liserés dégradés centre -> extrémités
-       Centre rose/magenta, retour bleu vers les côtés.
-       Le bloc Termux/notice garde son liseré pourpre dédié. */
+    /* Retouche v105 : liserés centre -> extrémités plus subtils
+       Transition plus douce, moins saturée, sans toucher au bloc Termux/notice. */
     body :is(.panel:not(.notice), .summary, .report-panel)::after {
+      opacity: .72 !important;
       background: linear-gradient(90deg,
-        rgba(56,189,248,.22) 0%,
-        rgba(56,189,248,.66) 14%,
-        rgba(124,92,255,.48) 36%,
-        rgba(251,113,133,.72) 50%,
-        rgba(124,92,255,.48) 64%,
-        rgba(56,189,248,.66) 86%,
-        rgba(56,189,248,.22) 100%
+        rgba(56,189,248,.18) 0%,
+        rgba(56,189,248,.26) 22%,
+        rgba(124,92,255,.22) 39%,
+        rgba(251,113,133,.32) 50%,
+        rgba(124,92,255,.22) 61%,
+        rgba(56,189,248,.26) 78%,
+        rgba(56,189,248,.18) 100%
       ) !important;
     }
 
     body .result-shell .team-card::before,
     body .result-shell .summary-grid .summary-cell::before {
+      opacity: .70 !important;
       background: linear-gradient(90deg,
-        rgba(56,189,248,.16) 0%,
-        rgba(56,189,248,.50) 18%,
-        rgba(251,113,133,.54) 50%,
-        rgba(56,189,248,.50) 82%,
-        rgba(56,189,248,.16) 100%
+        rgba(56,189,248,.13) 0%,
+        rgba(56,189,248,.22) 24%,
+        rgba(124,92,255,.18) 40%,
+        rgba(251,113,133,.28) 50%,
+        rgba(124,92,255,.18) 60%,
+        rgba(56,189,248,.22) 76%,
+        rgba(56,189,248,.13) 100%
       ) !important;
     }
 
     body .result-shell .team-card.team-card-pos::before,
     body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      opacity: .72 !important;
       background: linear-gradient(90deg,
-        rgba(56,189,248,.18) 0%,
-        rgba(56,189,248,.72) 50%,
-        rgba(56,189,248,.18) 100%
+        rgba(56,189,248,.12) 0%,
+        rgba(56,189,248,.24) 34%,
+        rgba(56,189,248,.34) 50%,
+        rgba(56,189,248,.24) 66%,
+        rgba(56,189,248,.12) 100%
       ) !important;
     }
 
     body .result-shell .team-card.team-card-neg::before,
     body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      opacity: .72 !important;
       background: linear-gradient(90deg,
-        rgba(251,113,133,.18) 0%,
-        rgba(251,113,133,.72) 50%,
-        rgba(251,113,133,.18) 100%
+        rgba(251,113,133,.12) 0%,
+        rgba(251,113,133,.24) 34%,
+        rgba(251,113,133,.34) 50%,
+        rgba(251,113,133,.24) 66%,
+        rgba(251,113,133,.12) 100%
       ) !important;
     }
 
     body .result-shell .team-card.team-card-neutral::before,
     body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      opacity: .70 !important;
       background: linear-gradient(90deg,
-        rgba(140,170,225,.14) 0%,
-        rgba(140,170,225,.58) 50%,
-        rgba(140,170,225,.14) 100%
+        rgba(140,170,225,.10) 0%,
+        rgba(140,170,225,.22) 40%,
+        rgba(140,170,225,.28) 50%,
+        rgba(140,170,225,.22) 60%,
+        rgba(140,170,225,.10) 100%
       ) !important;
     }
+
+
+    /* Retouche v106 : bordures plus discrètes + Résumé rapide selon performance réelle */
+    :root {
+      --fs-edge-blue-soft: rgba(56, 189, 248, .16);
+      --fs-edge-blue-mid: rgba(56, 189, 248, .23);
+      --fs-edge-pink-soft: rgba(251, 113, 133, .15);
+      --fs-edge-pink-mid: rgba(251, 113, 133, .22);
+      --fs-edge-neutral: rgba(140, 170, 225, .15);
+    }
+
+    /* Adoucit les liserés restants pour éviter l'effet barre de couleur. */
+    body :is(.topbar, .hero, .panel:not(.notice), .report-panel, .summary, .bar-box, .auto-box, .auto-control)::after,
+    body .result-shell :is(.team-card, .summary-grid .summary-cell)::before {
+      height: 2px !important;
+      left: 24px !important;
+      right: 24px !important;
+      opacity: .46 !important;
+      filter: none !important;
+      box-shadow: none !important;
+      background: linear-gradient(90deg,
+        rgba(56,189,248,.07) 0%,
+        rgba(56,189,248,.14) 24%,
+        rgba(124,92,255,.13) 40%,
+        rgba(251,113,133,.17) 50%,
+        rgba(124,92,255,.13) 60%,
+        rgba(56,189,248,.14) 76%,
+        rgba(56,189,248,.07) 100%
+      ) !important;
+    }
+
+    body .panel.notice::after {
+      height: 2px !important;
+      left: 24px !important;
+      right: 24px !important;
+      opacity: .54 !important;
+      background: linear-gradient(90deg,
+        rgba(251,113,133,.06) 0%,
+        rgba(251,113,133,.18) 28%,
+        rgba(244,114,182,.26) 50%,
+        rgba(251,113,133,.18) 72%,
+        rgba(251,113,133,.06) 100%
+      ) !important;
+      box-shadow: none !important;
+    }
+
+    body :is(.report-panel, section.panel.panel-pad:not(.notice), .summary-grid .summary-cell.cell-pos, .summary-grid .summary-cell.cell-neg, .summary-grid .summary-cell.cell-neutral) {
+      box-shadow: inset 0 1px 0 rgba(140,170,225,.12), var(--shadow) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-pos, .summary-grid .summary-cell.cell-pos)::before {
+      opacity: .48 !important;
+      background: linear-gradient(90deg,
+        rgba(56,189,248,.06) 0%,
+        rgba(56,189,248,.15) 30%,
+        rgba(56,189,248,.22) 50%,
+        rgba(56,189,248,.15) 70%,
+        rgba(56,189,248,.06) 100%
+      ) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neg, .summary-grid .summary-cell.cell-neg)::before {
+      opacity: .48 !important;
+      background: linear-gradient(90deg,
+        rgba(251,113,133,.06) 0%,
+        rgba(251,113,133,.15) 30%,
+        rgba(251,113,133,.22) 50%,
+        rgba(251,113,133,.15) 70%,
+        rgba(251,113,133,.06) 100%
+      ) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neutral, .summary-grid .summary-cell.cell-neutral)::before {
+      opacity: .42 !important;
+      background: linear-gradient(90deg,
+        rgba(140,170,225,.05) 0%,
+        rgba(140,170,225,.12) 34%,
+        rgba(140,170,225,.18) 50%,
+        rgba(140,170,225,.12) 66%,
+        rgba(140,170,225,.05) 100%
+      ) !important;
+    }
+
+    /* Résumé rapide : les cartes et leurs bulles suivent la performance réelle, pas le côté domicile/extérieur. */
+    body .result-shell .summary-grid .summary-cell.cell-pos {
+      background:
+        radial-gradient(circle at 12% 0%, rgba(56,189,248,.14), transparent 34%),
+        linear-gradient(160deg, rgba(56,189,248,.105), rgba(11,17,40,.92) 48%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(56,189,248,.26) !important;
+      box-shadow: inset 0 1px 0 rgba(56,189,248,.24) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neg {
+      background:
+        radial-gradient(circle at 12% 0%, rgba(251,113,133,.13), transparent 34%),
+        linear-gradient(160deg, rgba(251,113,133,.102), rgba(26,14,36,.92) 48%, rgba(10,8,24,.96)) !important;
+      border-color: rgba(251,113,133,.26) !important;
+      box-shadow: inset 0 1px 0 rgba(251,113,133,.23) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neutral {
+      background:
+        radial-gradient(circle at 12% 0%, rgba(140,170,225,.10), transparent 34%),
+        linear-gradient(160deg, rgba(140,170,225,.055), rgba(12,18,42,.92) 52%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(140,170,225,.20) !important;
+      box-shadow: inset 0 1px 0 rgba(140,170,225,.18) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-pos .mini-badge {
+      background: linear-gradient(160deg, rgba(56,189,248,.115), rgba(10,16,38,.88)) !important;
+      border-color: rgba(56,189,248,.24) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.045) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neg .mini-badge {
+      background: linear-gradient(160deg, rgba(251,113,133,.112), rgba(22,12,32,.88)) !important;
+      border-color: rgba(251,113,133,.24) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.045) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neutral .mini-badge {
+      background: linear-gradient(160deg, rgba(140,170,225,.07), rgba(12,17,40,.88)) !important;
+      border-color: rgba(140,170,225,.18) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-pos :is(.summary-team-name, .mini-badge span) { color: #f7fbff !important; }
+    body .result-shell .summary-grid .summary-cell.cell-neg :is(.summary-team-name, .mini-badge span) { color: #fff7fa !important; }
+
+    /* Bordures internes restantes : même identité, mais moins marquées. */
+    body :is(.mini-badge, .rank-card, .zone-card, .stat-card, .match-row, .event-rich-row, .events-summary, .data-quality-banner, .side-pill, .count-pill, .camp-badge, .event-metric-pill, .stat-badge, .summary-label) {
+      border-width: 1px !important;
+    }
+
+    body .result-shell .team-card.team-card-pos :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
+      border-color: rgba(56,189,248,.18) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
+      border-color: rgba(251,113,133,.18) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
+      border-color: rgba(140,170,225,.14) !important;
+    }
+
+    body .team-card :is(.match-row, .event-rich-row) {
+      box-shadow: inset 2px 0 0 rgba(140,170,225,.16) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos :is(.match-row, .event-rich-row) {
+      box-shadow: inset 2px 0 0 rgba(56,189,248,.22) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg :is(.match-row, .event-rich-row) {
+      box-shadow: inset 2px 0 0 rgba(251,113,133,.22) !important;
+    }
+
+    @media (max-width: 700px) {
+      body :is(.topbar, .hero, .panel:not(.notice), .report-panel, .summary, .bar-box, .auto-box, .auto-control)::after,
+      body .result-shell :is(.team-card, .summary-grid .summary-cell)::before,
+      body .panel.notice::after {
+        height: 1.5px !important;
+        left: 22px !important;
+        right: 22px !important;
+      }
+    }
+
 </style>
 </head>
 
