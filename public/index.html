@@ -7671,7 +7671,7 @@
     .summary-title { text-align: center !important; justify-content: center !important; }
 
     /* — VVVSSS agrandi — */
-    .summary-title .vs-echo { font-size: 1.34em !important; max-width: 100% !important; letter-spacing: -0.02em !important; }
+    .summary-title .vs-echo { font-size: 1.6em !important; max-width: 100% !important; letter-spacing: -0.02em !important; }
 
     /* === VALEURS : positive bleu, négative rose (rétabli) === */
     .positive { color: #40c9ff !important; }
@@ -8280,7 +8280,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v91</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v93</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -9445,7 +9445,7 @@
           <div class="summary-head">
             <div class="summary-head-top">
               <div class="summary-label">Résumé rapide</div>
-              <div class="summary-label summary-mode">Mode scan : ${esc(result.scanModeLabel || (result.simultaneousMode ? "Simultané match par match / minute par minute" : "Standard"))}</div>
+              <div class="summary-label summary-mode">Mode scan : ${result.simultaneousMode ? "Simultané" : "Séparé"}</div>
             </div>
             <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo" aria-label="VS">${Array.from({ length: 9 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 9 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
           </div>
@@ -10316,7 +10316,109 @@
       }
     }
 
-  </style>
+  
+    /* === v92 : correctif titre/secondaire des deux côtés === */
+    /* Le titre de match (.row-title) reste BLANC partout, domicile comme extérieur */
+    .team-card-home .row-title,
+    .team-card-away .row-title,
+    .team-card .row-title { color: #ffffff !important; }
+
+    /* Le secondaire suit le ton du camp : bleu chez domicile, pourpre chez extérieur */
+    .team-card-home :is(.row-sub, .rank-label, .team-meta, .events-summary-label,
+      .match-index, .stat-kicker, .stat-subtitle, .dominance-label,
+      .event-metric-code, .summary-label, .camp-badge) {
+      color: #a9c9ec !important;
+    }
+    .team-card-away :is(.row-sub, .rank-label, .team-meta, .events-summary-label,
+      .match-index, .stat-kicker, .stat-subtitle, .dominance-label,
+      .event-metric-code, .summary-label, .camp-badge) {
+      color: #e6b8c8 !important;
+    }
+    /* Noms d'équipe et titres de section : blancs des deux côtés */
+    .team-card-home :is(.team-name, .match-team-name, .section-title),
+    .team-card-away :is(.team-name, .match-team-name, .section-title) {
+      color: #ffffff !important;
+    }
+    /* valeurs : positive bleu / négative pourpre (inchangé) */
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }
+
+
+    /* === v93 : nettoyage final — textes bleus extérieur → pourpre, zone des rangs harmonisée, bordures résumé par perf === */
+
+    /* --- 1. Tout texte secondaire bleu côté extérieur → pourpre rose --- */
+    .team-card-away :is(.row-sub, .rank-label, .team-meta, .events-summary-label,
+      .match-index, .stat-kicker, .stat-subtitle, .stat-title, .stat-badge, .mode-detail,
+      .dominance-label, .event-metric-code, .summary-label, .camp-badge, .zone-sub, .stat-origin) {
+      color: #e6b8c8 !important;
+    }
+    .team-card-home :is(.row-sub, .rank-label, .team-meta, .events-summary-label,
+      .match-index, .stat-kicker, .stat-subtitle, .stat-title, .stat-badge, .mode-detail,
+      .dominance-label, .event-metric-code, .summary-label, .zone-sub, .stat-origin) {
+      color: #a9c9ec !important;
+    }
+    /* titres blancs des deux côtés */
+    .team-card-home :is(.row-title, .team-name, .match-team-name, .section-title, .stat-number),
+    .team-card-away :is(.row-title, .team-name, .match-team-name, .section-title, .stat-number) {
+      color: #ffffff !important;
+    }
+    /* la valeur "Moyenne" de la zone suit positif/négatif, pas le camp */
+    .team-card .zone-card .positive, .team-card .stat-number.positive { color: #40c9ff !important; }
+    .team-card .zone-card .negative, .team-card .stat-number.negative { color: #fb7185 !important; }
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }
+
+    /* --- 2. ZONE DES RANGS : fond très discret, dans le ton du camp (fini le rouge+bleu criard) --- */
+    .team-card-home .zone-card {
+      background: linear-gradient(160deg, rgba(56,189,248,.05), rgba(12,18,40,.9)) !important;
+      border-color: rgba(56,189,248,.16) !important;
+    }
+    .team-card-away .zone-card {
+      background: linear-gradient(160deg, rgba(251,113,133,.05), rgba(22,14,30,.9)) !important;
+      border-color: rgba(244,114,182,.16) !important;
+    }
+    /* sous-cartes internes de la zone : encore plus neutres */
+    .team-card-home .zone-card .stat-card {
+      background: linear-gradient(160deg, rgba(56,189,248,.04), rgba(14,20,42,.85)) !important;
+      border-color: rgba(56,189,248,.12) !important;
+    }
+    .team-card-away .zone-card .stat-card {
+      background: linear-gradient(160deg, rgba(251,113,133,.04), rgba(24,15,30,.85)) !important;
+      border-color: rgba(244,114,182,.12) !important;
+    }
+    .team-card-away .zone-card .stat-badge {
+      background: rgba(251,113,133,.12) !important;
+      border-color: rgba(244,114,182,.24) !important;
+      color: #e6b8c8 !important;
+    }
+    .team-card-home .zone-card .stat-badge {
+      background: rgba(56,189,248,.12) !important;
+      border-color: rgba(56,189,248,.24) !important;
+      color: #a9c9ec !important;
+    }
+
+    /* --- 3. Cellules du RÉSUMÉ : la bordure suit la performance (pos=bleu / neg=pourpre), peu importe le côté --- */
+    .summary-grid .summary-cell.cell-pos {
+      border-color: rgba(64,201,255,.42) !important;
+      box-shadow: inset 0 2.5px 0 rgba(64,201,255,.5) !important;
+      background: linear-gradient(180deg, rgba(64,201,255,.08), rgba(10,15,36,.6) 60%) !important;
+    }
+    .summary-grid .summary-cell.cell-neg {
+      border-color: rgba(251,113,133,.42) !important;
+      box-shadow: inset 0 2.5px 0 rgba(251,113,133,.5) !important;
+      background: linear-gradient(180deg, rgba(251,113,133,.08), rgba(20,11,24,.6) 60%) !important;
+    }
+    .summary-grid .summary-cell.cell-neutral {
+      border-color: rgba(140,170,225,.30) !important;
+      box-shadow: inset 0 2.5px 0 rgba(140,170,225,.4) !important;
+    }
+    /* mini-badge dans la cellule : neutre, ne contredit plus la bordure */
+    .summary-grid .summary-cell .mini-badge {
+      background: rgba(140,170,225,.12) !important;
+      border-color: rgba(140,170,225,.22) !important;
+    }
+
+</style>
 </head>
 <body>
   <pre>${esc(text)}</pre>
@@ -10464,7 +10566,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v91 chargé");
+    console.log("FOOTSCAN v93 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
