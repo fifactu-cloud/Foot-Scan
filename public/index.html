@@ -8758,6 +8758,138 @@
 
     body .result-shell .positive { color: #40c9ff !important; }
     body .result-shell .negative { color: #fb7185 !important; }
+
+
+    /* v103 mobile scroll polish : fond continu + fluidité légère */
+    html {
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(64, 201, 255, .16), transparent 34%),
+        radial-gradient(circle at 88% 100%, rgba(251, 113, 133, .12), transparent 40%),
+        linear-gradient(180deg, #050816 0%, #071023 46%, #050816 100%) !important;
+      background-color: #050816 !important;
+    }
+
+    body {
+      min-height: 100svh;
+      background-color: transparent !important;
+      overscroll-behavior-y: contain;
+    }
+
+    @supports (height: 100dvh) {
+      body { min-height: 100dvh; }
+    }
+
+    @media (max-width: 700px) {
+      html {
+        scroll-behavior: auto;
+        background-attachment: scroll !important;
+      }
+
+      body {
+        background: transparent !important;
+      }
+
+      body::before {
+        inset: 0 !important;
+        background:
+          radial-gradient(circle at 16% 0%, rgba(64, 201, 255, .12), transparent 34%),
+          radial-gradient(circle at 88% 100%, rgba(251, 113, 133, .10), transparent 42%),
+          linear-gradient(180deg, rgba(5, 8, 22, .96), rgba(7, 16, 35, .92) 50%, rgba(5, 8, 22, .96)) !important;
+        opacity: 1 !important;
+        animation: none !important;
+        transform: none !important;
+        filter: none !important;
+      }
+
+      body::after {
+        animation: none !important;
+        filter: none !important;
+        opacity: .34 !important;
+      }
+
+      .app {
+        padding-bottom: calc(132px + env(safe-area-inset-bottom)) !important;
+      }
+
+      .panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .report-panel,
+      .auto-box,
+      .auto-control {
+        backface-visibility: hidden;
+        transform: translateZ(0);
+      }
+    }
+
+    @supports (animation-timeline: view()) {
+      @media (max-width: 700px) {
+        .panel,
+        .summary,
+        .team-card,
+        .bar-box,
+        .report-panel {
+          animation: none !important;
+          animation-timeline: auto !important;
+        }
+      }
+    }
+
+
+    /* Retouche v104 : liserés dégradés centre -> extrémités
+       Centre rose/magenta, retour bleu vers les côtés.
+       Le bloc Termux/notice garde son liseré pourpre dédié. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after {
+      background: linear-gradient(90deg,
+        rgba(56,189,248,.22) 0%,
+        rgba(56,189,248,.66) 14%,
+        rgba(124,92,255,.48) 36%,
+        rgba(251,113,133,.72) 50%,
+        rgba(124,92,255,.48) 64%,
+        rgba(56,189,248,.66) 86%,
+        rgba(56,189,248,.22) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card::before,
+    body .result-shell .summary-grid .summary-cell::before {
+      background: linear-gradient(90deg,
+        rgba(56,189,248,.16) 0%,
+        rgba(56,189,248,.50) 18%,
+        rgba(251,113,133,.54) 50%,
+        rgba(56,189,248,.50) 82%,
+        rgba(56,189,248,.16) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      background: linear-gradient(90deg,
+        rgba(56,189,248,.18) 0%,
+        rgba(56,189,248,.72) 50%,
+        rgba(56,189,248,.18) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      background: linear-gradient(90deg,
+        rgba(251,113,133,.18) 0%,
+        rgba(251,113,133,.72) 50%,
+        rgba(251,113,133,.18) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      background: linear-gradient(90deg,
+        rgba(140,170,225,.14) 0%,
+        rgba(140,170,225,.58) 50%,
+        rgba(140,170,225,.14) 100%
+      ) !important;
+    }
 </style>
 </head>
 
