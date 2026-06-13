@@ -7652,50 +7652,202 @@
       border-color: rgba(251, 113, 133, 0.38) !important;
     }
 
-    /* — Réafficher l'option Calcul Simultané sous forme de bouton cliquable — */
-    .mode-toggle[for="simultaneousMode"] {
-      display: flex !important;
+    /* Retouche v83 : titre match analysé centré, VS plus grand, bleu domicile adouci */
+
+    /* — Bloc de statut (Scan terminé / message en haut) : tout centré — */
+    .status-box,
+    .status-box .status-head,
+    .status-box .status-message,
+    .status-done-title {
+      text-align: center !important;
+    }
+
+    .status-box .status-head,
+    .status-box .status-message {
+      justify-content: center !important;
       align-items: center !important;
-      gap: 10px !important;
-      width: 100% !important;
-      margin-top: 10px !important;
-      padding: 12px 14px !important;
-      border-radius: 16px !important;
-      cursor: pointer !important;
-      border: 1px solid rgba(56, 189, 248, 0.28) !important;
-      background: rgba(22, 32, 74, 0.55) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
-      transition: background .3s ease, border-color .3s ease, box-shadow .3s ease, transform .16s cubic-bezier(.34,1.56,.64,1) !important;
     }
 
-    .mode-toggle[for="simultaneousMode"] span {
-      font-size: 12.5px !important;
-      line-height: 1.3 !important;
-      color: #dbe7ff !important;
+    /* — Bloc MATCH ANALYSÉ (hero après scan) : tout centré — */
+    .match-hero {
+      text-align: center !important;
+      justify-items: center !important;
     }
 
-    .mode-toggle[for="simultaneousMode"]:active {
-      transform: scale(.985) !important;
+    .match-hero .kicker {
+      margin-left: auto !important;
+      margin-right: auto !important;
     }
 
-    /* État ACTIVÉ : même dégradé bleu + même respiration que "Appliquer les rangs" */
-    .mode-toggle[for="simultaneousMode"]:has(#simultaneousMode:checked) {
-      border-color: rgba(56, 189, 248, 0.5) !important;
-      background: linear-gradient(135deg, #38bdf8, #2563eb) !important;
-      background-size: 180% 180% !important;
-      animation: mobileButtonGlow 3.6s ease infinite !important;
-      box-shadow: 0 14px 30px rgba(56, 189, 248, 0.22) !important;
+    .match-hero .hero-text {
+      text-align: center !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
     }
 
-    .mode-toggle[for="simultaneousMode"]:has(#simultaneousMode:checked) span {
-      color: #ffffff !important;
-      font-weight: 700 !important;
+    /* — Résumé rapide : titre du match bien centré — */
+    .summary-title {
+      text-align: center !important;
+      justify-content: center !important;
     }
 
-    /* La case elle-même reste l'interrupteur stylé existant */
-    .mode-toggle[for="simultaneousMode"] input {
-      flex: 0 0 auto !important;
+    /* — VS du bloc match analysé + séparateur : V bleu, S rose-pourpre — */
+    .vs-box .vsb-v,
+    .vs-divider .vsb-v {
+      color: #38bdf8 !important;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.30);
     }
+
+    .vs-box .vsb-s,
+    .vs-divider .vsb-s {
+      color: #fb7185 !important;
+      text-shadow: 0 0 12px rgba(251, 113, 133, 0.30);
+    }
+
+    /* — VS encore un peu plus grand — */
+    .summary-title .vs-echo {
+      font-size: 1.24em !important;
+    }
+
+    /* — Bleu domicile adouci pour rester dans l'esprit du site (parité avec l'extérieur) — */
+    .team-card:has(.side-pill.side-home) {
+      background:
+        linear-gradient(180deg, rgba(56, 189, 248, 0.055), rgba(56, 189, 248, 0.012) 50%, transparent),
+        rgba(10, 15, 36, 0.92) !important;
+      border-color: rgba(56, 189, 248, 0.18) !important;
+    }
+
+    .team-card:has(.side-pill.side-home) :is(.rank-card, .events-summary, .section) {
+      background: linear-gradient(160deg, rgba(56, 189, 248, 0.05), rgba(12, 18, 40, 0.85)) !important;
+      border-color: rgba(56, 189, 248, 0.14) !important;
+    }
+
+    /* Retouche v82 : notice rouge atténuée, slider 2 modes, VS agrandi, rebords, derniers bleus */
+
+    /* — On masque l'ancienne case à cocher : le slider la pilote — */
+    .mode-toggle[for="simultaneousMode"] {
+      display: none !important;
+    }
+
+    /* — Slider à 2 positions : Calcul Séparé | Calcul Simultané — */
+    .calc-mode-slider {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      margin: 12px 0 4px;
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.26);
+      background: rgba(22, 32, 74, 0.55);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+    }
+
+    .calc-mode-thumb {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: 4px;
+      width: calc(50% - 4px);
+      border-radius: 999px;
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+      background-size: 180% 180%;
+      box-shadow: 0 8px 20px rgba(56, 189, 248, 0.28);
+      animation: mobileButtonGlow 3.6s ease infinite;
+      transition: transform .32s cubic-bezier(.34, 1.4, .5, 1);
+      z-index: 0;
+    }
+
+    .calc-mode-slider.sim .calc-mode-thumb {
+      transform: translateX(100%);
+    }
+
+    .calc-mode-opt {
+      position: relative;
+      z-index: 1;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      padding: 11px 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: #aebfe0;
+      cursor: pointer;
+      transition: color .26s ease;
+      white-space: nowrap;
+    }
+
+    .calc-mode-opt.is-active {
+      color: #ffffff;
+    }
+
+    .calc-mode-opt:active {
+      transform: scale(.97);
+    }
+
+    /* — Notice "Émulateur Termux" : rouge conservé mais atténué (moins de contraste avec le site) — */
+    .panel.notice {
+      background:
+        linear-gradient(135deg, rgba(251, 113, 133, 0.08), rgba(244, 63, 110, 0.04)),
+        rgba(13, 11, 24, 0.92) !important;
+      border-color: rgba(251, 113, 133, 0.22) !important;
+    }
+
+    .notice-icon {
+      background: rgba(251, 113, 133, 0.11) !important;
+      color: #fda4af !important;
+      border-color: rgba(251, 113, 133, 0.26) !important;
+    }
+
+    /* — VVVVVVVSSSSSSS agrandi — */
+    .summary-title .vs-echo {
+      font-size: 1.12em !important;
+      max-width: 100% !important;
+      transform: translateY(-0.02em) !important;
+      letter-spacing: -0.02em !important;
+    }
+
+    /* — Derniers textes bleus côté extérieur → rose TRÈS doux (subtil) — */
+    .team-card-away :is(.row-sub, .camp-badge, .event-metric-code, .section-title, .events-summary-label, .match-index, .row-title) {
+      color: #e3cdd6 !important;
+    }
+
+    .team-card-away .camp-badge {
+      border-color: rgba(244, 114, 182, 0.22) !important;
+      background: linear-gradient(135deg, rgba(251,113,133,.10), rgba(168,85,247,.05)) !important;
+    }
+
+    .team-card-away .event-metric-pill {
+      background: linear-gradient(135deg, rgba(251, 113, 133, 0.10), rgba(168, 85, 247, 0.05)) !important;
+      border-color: rgba(244, 114, 182, 0.20) !important;
+    }
+
+    /* — REBORDS : liseré gauche sur les événements (comme les matchs), par camp — */
+    .team-card-home .event-rich-row {
+      box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.40) !important;
+    }
+
+    .team-card-away .event-rich-row {
+      box-shadow: inset 3px 0 0 rgba(251, 113, 133, 0.40) !important;
+    }
+
+    .event-rich-row {
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    /* — Rebords discrets ailleurs sur le site (accent cyan) — */
+    .panel.notice {
+      box-shadow: inset 3px 0 0 rgba(251, 113, 133, 0.34) !important;
+    }
+
+    .report-panel,
+    section.panel.panel-pad:not(.notice) {
+      box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.22);
+    }
+
 
     /* Retouche v78 : extérieur en pourpre rose (#fb7185), miroir complet des accents, VS recentré */
 
@@ -7980,7 +8132,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v81</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v83</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -8063,6 +8215,12 @@
                 </div>
                 <input id="autoChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
               </div>
+            </div>
+
+            <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de calcul">
+              <span class="calc-mode-thumb" aria-hidden="true"></span>
+              <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">Calcul Séparé</button>
+              <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">Calcul Simultané</button>
             </div>
 
             <div class="auto-result">
@@ -8392,6 +8550,25 @@
 
     function getAutoValues() {
       return readCalculatorValues("auto");
+    }
+
+    function setupCalcModeSlider() {
+      const slider = document.getElementById("calcModeSlider");
+      const box = document.getElementById("simultaneousMode");
+      if (!slider || !box) return;
+      const opts = slider.querySelectorAll(".calc-mode-opt");
+      const sync = () => {
+        const sim = Boolean(box.checked);
+        slider.classList.toggle("sim", sim);
+        opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "simultaneous") === sim));
+      };
+      opts.forEach((o) => o.addEventListener("click", () => {
+        box.checked = (o.dataset.mode === "simultaneous");
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+        sync();
+        if (typeof navigator.vibrate === "function") navigator.vibrate(8);
+      }));
+      sync();
     }
 
     function isSimultaneousMode() {
@@ -9025,7 +9202,7 @@
               <div class="match-team-name">${esc(String(match.homeTeam.name || "").toUpperCase())}</div>
             </div>
 
-            <div class="vs-box">VS</div>
+            <div class="vs-box"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
 
             <div class="match-team">
               <div class="logo-xl">
@@ -9050,7 +9227,7 @@
       $("result").innerHTML = `
         ${renderSummary(result)}
         ${renderTeam(result.home, "Domicile", result.rank1, result.rank2)}
-        <div class="vs-divider">VS</div>
+        <div class="vs-divider"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
         ${renderTeam(result.away, "Extérieur", result.rank1, result.rank2)}
       `;
     }
@@ -10117,7 +10294,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v81 chargé");
+    console.log("FOOTSCAN v83 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
@@ -10142,6 +10319,7 @@
       }
     }, { passive: true });
 
+setupCalcModeSlider();
     initMobileNavigationEffects();
     updateReportCount();
     updateAutoCalculator();
