@@ -8904,169 +8904,189 @@
     }
 
 
-    /* Retouche v106 : bordures plus discrètes + Résumé rapide selon performance réelle */
+    /* Retouche v108 : bordures plus subtiles + résumé par performance réelle
+       Base v105 stable. Corrections ciblées uniquement, sans retirer les éléments existants. */
     :root {
-      --fs-edge-blue-soft: rgba(56, 189, 248, .16);
-      --fs-edge-blue-mid: rgba(56, 189, 248, .23);
-      --fs-edge-pink-soft: rgba(251, 113, 133, .15);
-      --fs-edge-pink-mid: rgba(251, 113, 133, .22);
-      --fs-edge-neutral: rgba(140, 170, 225, .15);
+      --fs-v108-blue: #40c9ff;
+      --fs-v108-blue-soft: rgba(64, 201, 255, .15);
+      --fs-v108-blue-border: rgba(64, 201, 255, .24);
+      --fs-v108-rose: #fb7185;
+      --fs-v108-rose-soft: rgba(251, 113, 133, .15);
+      --fs-v108-rose-border: rgba(251, 113, 133, .24);
+      --fs-v108-neutral-border: rgba(150, 170, 215, .18);
+      --fs-v108-glass: rgba(7, 12, 31, .82);
     }
 
-    /* Adoucit les liserés restants pour éviter l'effet barre de couleur. */
-    body :is(.topbar, .hero, .panel:not(.notice), .report-panel, .summary, .bar-box, .auto-box, .auto-control)::after,
-    body .result-shell :is(.team-card, .summary-grid .summary-cell)::before {
+    /* Bordures principales : on garde le liseré, mais on retire l'effet "barre" trop marqué. */
+    body :is(.hero, .panel:not(.notice), .summary, .team-card, .bar-box, .report-panel, .auto-box) {
+      border-color: rgba(150, 178, 230, .145) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.045) !important;
+    }
+
+    body :is(.panel:not(.notice), .summary, .report-panel, section.panel.panel-pad:not(.notice))::after,
+    body .topbar::after {
       height: 2px !important;
       left: 24px !important;
       right: 24px !important;
       opacity: .46 !important;
-      filter: none !important;
-      box-shadow: none !important;
+      filter: saturate(.82) blur(.12px) !important;
       background: linear-gradient(90deg,
-        rgba(56,189,248,.07) 0%,
-        rgba(56,189,248,.14) 24%,
-        rgba(124,92,255,.13) 40%,
-        rgba(251,113,133,.17) 50%,
-        rgba(124,92,255,.13) 60%,
-        rgba(56,189,248,.14) 76%,
-        rgba(56,189,248,.07) 100%
+        transparent 0%,
+        rgba(64,201,255,.12) 14%,
+        rgba(64,201,255,.20) 31%,
+        rgba(150,120,255,.17) 43%,
+        rgba(251,113,133,.22) 50%,
+        rgba(150,120,255,.17) 57%,
+        rgba(64,201,255,.20) 69%,
+        rgba(64,201,255,.12) 86%,
+        transparent 100%
       ) !important;
+      box-shadow: none !important;
     }
 
+    /* Termux conserve son identité pourpre, mais sans barre dure. */
     body .panel.notice::after {
       height: 2px !important;
       left: 24px !important;
       right: 24px !important;
-      opacity: .54 !important;
-      background: linear-gradient(90deg,
-        rgba(251,113,133,.06) 0%,
-        rgba(251,113,133,.18) 28%,
-        rgba(244,114,182,.26) 50%,
-        rgba(251,113,133,.18) 72%,
-        rgba(251,113,133,.06) 100%
-      ) !important;
+      opacity: .48 !important;
+      filter: saturate(.85) blur(.12px) !important;
+      background: linear-gradient(90deg, transparent, rgba(251,113,133,.26), rgba(244,114,182,.22), rgba(251,113,133,.26), transparent) !important;
       box-shadow: none !important;
     }
 
-    body :is(.report-panel, section.panel.panel-pad:not(.notice), .summary-grid .summary-cell.cell-pos, .summary-grid .summary-cell.cell-neg, .summary-grid .summary-cell.cell-neutral) {
-      box-shadow: inset 0 1px 0 rgba(140,170,225,.12), var(--shadow) !important;
+    /* Bordures internes globales : plus douces, moins saturées. */
+    body :is(.auto-control, .auto-result-card, .per-team-card, .per-team-mini, .stat-card, .summary-cell, .rank-card, .bar-card, .mini-badge, .match-row, .event-row, .zone-card, .mode-toggle, .preset-box) {
+      border-color: rgba(150, 178, 230, .12) !important;
     }
 
-    body .result-shell :is(.team-card.team-card-pos, .summary-grid .summary-cell.cell-pos)::before {
-      opacity: .48 !important;
-      background: linear-gradient(90deg,
-        rgba(56,189,248,.06) 0%,
-        rgba(56,189,248,.15) 30%,
-        rgba(56,189,248,.22) 50%,
-        rgba(56,189,248,.15) 70%,
-        rgba(56,189,248,.06) 100%
-      ) !important;
-    }
-
-    body .result-shell :is(.team-card.team-card-neg, .summary-grid .summary-cell.cell-neg)::before {
-      opacity: .48 !important;
-      background: linear-gradient(90deg,
-        rgba(251,113,133,.06) 0%,
-        rgba(251,113,133,.15) 30%,
-        rgba(251,113,133,.22) 50%,
-        rgba(251,113,133,.15) 70%,
-        rgba(251,113,133,.06) 100%
-      ) !important;
-    }
-
-    body .result-shell :is(.team-card.team-card-neutral, .summary-grid .summary-cell.cell-neutral)::before {
+    body .result-shell :is(.team-card, .summary-cell)::before {
+      height: 2px !important;
+      left: 24px !important;
+      right: 24px !important;
       opacity: .42 !important;
-      background: linear-gradient(90deg,
-        rgba(140,170,225,.05) 0%,
-        rgba(140,170,225,.12) 34%,
-        rgba(140,170,225,.18) 50%,
-        rgba(140,170,225,.12) 66%,
-        rgba(140,170,225,.05) 100%
-      ) !important;
+      filter: saturate(.86) blur(.10px) !important;
+      box-shadow: none !important;
     }
 
-    /* Résumé rapide : les cartes et leurs bulles suivent la performance réelle, pas le côté domicile/extérieur. */
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      background: linear-gradient(90deg, transparent, rgba(64,201,255,.16), rgba(64,201,255,.26), rgba(64,201,255,.16), transparent) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      background: linear-gradient(90deg, transparent, rgba(251,113,133,.15), rgba(251,113,133,.25), rgba(251,113,133,.15), transparent) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      background: linear-gradient(90deg, transparent, rgba(150,170,215,.12), rgba(150,170,215,.20), rgba(150,170,215,.12), transparent) !important;
+    }
+
+    /* Les lignes matchs/événements gardent un repère, mais très discret. */
+    body .result-shell .team-card .match-row,
+    body .result-shell .team-card .event-rich-row {
+      box-shadow: inset 2px 0 0 rgba(150,170,215,.18) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos .match-row,
+    body .result-shell .team-card.team-card-pos .event-rich-row {
+      box-shadow: inset 2px 0 0 rgba(64,201,255,.24) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg .match-row,
+    body .result-shell .team-card.team-card-neg .event-rich-row {
+      box-shadow: inset 2px 0 0 rgba(251,113,133,.23) !important;
+    }
+
+    /* Résumé rapide : chaque carte équipe suit sa performance réelle, pas son côté domicile/extérieur. */
     body .result-shell .summary-grid .summary-cell.cell-pos {
       background:
-        radial-gradient(circle at 12% 0%, rgba(56,189,248,.14), transparent 34%),
-        linear-gradient(160deg, rgba(56,189,248,.105), rgba(11,17,40,.92) 48%, rgba(7,10,26,.96)) !important;
-      border-color: rgba(56,189,248,.26) !important;
-      box-shadow: inset 0 1px 0 rgba(56,189,248,.24) !important;
+        radial-gradient(circle at 12% 4%, rgba(64,201,255,.15), transparent 34%),
+        linear-gradient(155deg, rgba(64,201,255,.085), rgba(10,16,38,.90) 55%, rgba(7,10,26,.94)) !important;
+      border-color: var(--fs-v108-blue-border) !important;
+      box-shadow: inset 0 1px 0 rgba(64,201,255,.18) !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-neg {
       background:
-        radial-gradient(circle at 12% 0%, rgba(251,113,133,.13), transparent 34%),
-        linear-gradient(160deg, rgba(251,113,133,.102), rgba(26,14,36,.92) 48%, rgba(10,8,24,.96)) !important;
-      border-color: rgba(251,113,133,.26) !important;
-      box-shadow: inset 0 1px 0 rgba(251,113,133,.23) !important;
+        radial-gradient(circle at 12% 4%, rgba(251,113,133,.14), transparent 34%),
+        linear-gradient(155deg, rgba(251,113,133,.08), rgba(20,12,32,.90) 55%, rgba(9,8,23,.94)) !important;
+      border-color: var(--fs-v108-rose-border) !important;
+      box-shadow: inset 0 1px 0 rgba(251,113,133,.17) !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-neutral {
       background:
-        radial-gradient(circle at 12% 0%, rgba(140,170,225,.10), transparent 34%),
-        linear-gradient(160deg, rgba(140,170,225,.055), rgba(12,18,42,.92) 52%, rgba(7,10,26,.96)) !important;
-      border-color: rgba(140,170,225,.20) !important;
-      box-shadow: inset 0 1px 0 rgba(140,170,225,.18) !important;
+        radial-gradient(circle at 12% 4%, rgba(150,170,215,.10), transparent 34%),
+        linear-gradient(155deg, rgba(150,170,215,.045), rgba(12,17,40,.90) 55%, rgba(7,10,26,.94)) !important;
+      border-color: var(--fs-v108-neutral-border) !important;
+      box-shadow: inset 0 1px 0 rgba(150,170,215,.13) !important;
     }
 
+    /* Bulles internes du Résumé rapide : Suisse positive = bleu, équipe négative = pourpre. */
     body .result-shell .summary-grid .summary-cell.cell-pos .mini-badge {
-      background: linear-gradient(160deg, rgba(56,189,248,.115), rgba(10,16,38,.88)) !important;
-      border-color: rgba(56,189,248,.24) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.045) !important;
+      background: linear-gradient(135deg, rgba(64,201,255,.135), rgba(37,99,235,.07)) !important;
+      border-color: rgba(64,201,255,.22) !important;
+      color: #e9f8ff !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-neg .mini-badge {
-      background: linear-gradient(160deg, rgba(251,113,133,.112), rgba(22,12,32,.88)) !important;
-      border-color: rgba(251,113,133,.24) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.045) !important;
+      background: linear-gradient(135deg, rgba(251,113,133,.13), rgba(168,85,247,.07)) !important;
+      border-color: rgba(251,113,133,.22) !important;
+      color: #ffe9ef !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-neutral .mini-badge {
-      background: linear-gradient(160deg, rgba(140,170,225,.07), rgba(12,17,40,.88)) !important;
-      border-color: rgba(140,170,225,.18) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+      background: linear-gradient(135deg, rgba(150,170,215,.10), rgba(150,170,215,.045)) !important;
+      border-color: rgba(150,170,215,.18) !important;
+      color: #e9eefc !important;
     }
 
-    body .result-shell .summary-grid .summary-cell.cell-pos :is(.summary-team-name, .mini-badge span) { color: #f7fbff !important; }
-    body .result-shell .summary-grid .summary-cell.cell-neg :is(.summary-team-name, .mini-badge span) { color: #fff7fa !important; }
-
-    /* Bordures internes restantes : même identité, mais moins marquées. */
-    body :is(.mini-badge, .rank-card, .zone-card, .stat-card, .match-row, .event-rich-row, .events-summary, .data-quality-banner, .side-pill, .count-pill, .camp-badge, .event-metric-pill, .stat-badge, .summary-label) {
-      border-width: 1px !important;
+    body .result-shell .summary-grid .summary-cell.cell-pos .logo-s {
+      box-shadow: 0 0 0 1px rgba(64,201,255,.26), 0 6px 14px rgba(64,201,255,.10) !important;
+      border-color: rgba(64,201,255,.20) !important;
     }
 
-    body .result-shell .team-card.team-card-pos :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
-      border-color: rgba(56,189,248,.18) !important;
+    body .result-shell .summary-grid .summary-cell.cell-neg .logo-s {
+      box-shadow: 0 0 0 1px rgba(251,113,133,.25), 0 6px 14px rgba(251,113,133,.09) !important;
+      border-color: rgba(251,113,133,.20) !important;
     }
 
-    body .result-shell .team-card.team-card-neg :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
-      border-color: rgba(251,113,133,.18) !important;
+    body .result-shell .summary-grid .summary-cell.cell-pos .summary-team-name,
+    body .result-shell .summary-grid .summary-cell.cell-neg .summary-team-name,
+    body .result-shell .summary-grid .summary-cell.cell-neutral .summary-team-name {
+      color: #ffffff !important;
     }
 
-    body .result-shell .team-card.team-card-neutral :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
-      border-color: rgba(140,170,225,.14) !important;
-    }
+    /* Les valeurs gardent leur logique : positif bleu, négatif rose. */
+    body .result-shell .summary-grid .summary-cell .positive { color: var(--fs-v108-blue) !important; }
+    body .result-shell .summary-grid .summary-cell .negative { color: var(--fs-v108-rose) !important; }
 
-    body .team-card :is(.match-row, .event-rich-row) {
-      box-shadow: inset 2px 0 0 rgba(140,170,225,.16) !important;
-    }
-
-    body .result-shell .team-card.team-card-pos :is(.match-row, .event-rich-row) {
-      box-shadow: inset 2px 0 0 rgba(56,189,248,.22) !important;
-    }
-
-    body .result-shell .team-card.team-card-neg :is(.match-row, .event-rich-row) {
-      box-shadow: inset 2px 0 0 rgba(251,113,133,.22) !important;
+    /* Le fond du Résumé reste équilibré : plus de côté droit forcé en rose. */
+    body .result-shell .summary {
+      background:
+        radial-gradient(circle at 12% 0%, rgba(64,201,255,.13), transparent 34%),
+        radial-gradient(circle at 88% 0%, rgba(251,113,133,.10), transparent 36%),
+        linear-gradient(155deg, rgba(64,201,255,.055), rgba(251,113,133,.035) 54%, rgba(7,10,26,.94)),
+        rgba(9,14,33,.94) !important;
+      border-color: rgba(150,178,230,.15) !important;
     }
 
     @media (max-width: 700px) {
-      body :is(.topbar, .hero, .panel:not(.notice), .report-panel, .summary, .bar-box, .auto-box, .auto-control)::after,
-      body .result-shell :is(.team-card, .summary-grid .summary-cell)::before,
+      body :is(.panel:not(.notice), .summary, .report-panel, section.panel.panel-pad:not(.notice))::after,
+      body .topbar::after,
       body .panel.notice::after {
-        height: 1.5px !important;
-        left: 22px !important;
-        right: 22px !important;
+        left: 18px !important;
+        right: 18px !important;
+        opacity: .42 !important;
+      }
+
+      body .result-shell :is(.team-card, .summary-cell)::before {
+        left: 20px !important;
+        right: 20px !important;
+        opacity: .38 !important;
       }
     }
 
