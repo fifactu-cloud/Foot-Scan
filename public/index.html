@@ -9368,6 +9368,92 @@
       }
     }
 
+
+    /* Retouche v112 : dégradés inversés + Termux stable au chargement
+       - Dégradés généraux : pourpre aux extrémités, bleu au centre, pourpre aux extrémités.
+       - Notice Termux : plus de flash rose/pourpre au chargement, liseré statique et cohérent.
+       - Les bordures positives/négatives post-scan restent dans leur ton dédié. */
+    :root {
+      --fs-v112-purple-edge: rgba(168, 85, 247, .24);
+      --fs-v112-purple-mid: rgba(168, 85, 247, .30);
+      --fs-v112-blue-center: rgba(64, 201, 255, .34);
+      --fs-v112-blue-center-soft: rgba(64, 201, 255, .24);
+    }
+
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
+    body .topbar::after {
+      opacity: .66 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(168,85,247,.045) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v112-purple-edge) 0%,
+        var(--fs-v112-purple-mid) 18%,
+        var(--fs-v112-blue-center-soft) 36%,
+        var(--fs-v112-blue-center) 50%,
+        var(--fs-v112-blue-center-soft) 64%,
+        var(--fs-v112-purple-mid) 82%,
+        var(--fs-v112-purple-edge) 100%
+      ) !important;
+    }
+
+    /* Grandes bordures générales : une base violette/bleue douce, sans alternance clair/sombre. */
+    body :is(.hero, .panel:not(.notice), .summary, .report-panel, .auto-box, .bar-box) {
+      border-color: rgba(120, 139, 220, .25) !important;
+    }
+
+    /* Termux : neutralise le flash de chargement sur la carte et stabilise le liseré. */
+    body .panel.notice {
+      animation: none !important;
+      border-color: rgba(168, 85, 247, .25) !important;
+      box-shadow: inset 0 2px 0 rgba(168, 85, 247, .24), var(--shadow) !important;
+    }
+
+    body .panel.notice::after {
+      height: 2px !important;
+      left: 18px !important;
+      right: 18px !important;
+      opacity: .66 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.035), 0 0 8px rgba(168,85,247,.04) !important;
+      background: linear-gradient(90deg,
+        rgba(168,85,247,.22) 0%,
+        rgba(168,85,247,.29) 22%,
+        rgba(64,201,255,.24) 50%,
+        rgba(168,85,247,.29) 78%,
+        rgba(168,85,247,.22) 100%
+      ) !important;
+    }
+
+    body .notice-title {
+      border: 1px solid transparent !important;
+      background:
+        linear-gradient(rgba(38, 16, 43, .92), rgba(38, 16, 43, .92)) padding-box,
+        linear-gradient(90deg,
+          rgba(168,85,247,.28) 0%,
+          rgba(168,85,247,.34) 22%,
+          rgba(64,201,255,.26) 50%,
+          rgba(168,85,247,.34) 78%,
+          rgba(168,85,247,.28) 100%
+        ) border-box !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.045) !important;
+      transition: none !important;
+    }
+
+    body .notice-text {
+      border-color: rgba(168,85,247,.22) !important;
+      background: rgba(30, 12, 34, .54) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035) !important;
+      transition: none !important;
+    }
+
+    @media (max-width: 700px) {
+      body :is(.panel:not(.notice), .summary, .report-panel)::after,
+      body .topbar::after,
+      body .panel.notice::after {
+        opacity: .64 !important;
+      }
+    }
+
 </style>
 </head>
 
