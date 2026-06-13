@@ -9454,6 +9454,142 @@
       }
     }
 
+
+
+    /* Retouche v113 : corrections ciblées Termux + bordures
+       - suppression de la bulle ajoutée autour de 🛑 ; l'emoji reste seul avec une lueur rouge discrète ;
+       - suppression du flash clair/sombre au chargement de la carte Termux ;
+       - Termux passe en rose/pourpre/rouge, pas violet ;
+       - bordures générales : pourpre aux extrémités, bleu au centre, transition régulière. */
+    :root {
+      --fs-v113-blue-center: rgba(64, 201, 255, .34);
+      --fs-v113-blue-center-soft: rgba(64, 201, 255, .22);
+      --fs-v113-purple-edge: rgba(164, 85, 235, .23);
+      --fs-v113-purple-edge-soft: rgba(164, 85, 235, .15);
+      --fs-v113-termux-edge: rgba(159, 18, 57, .22);
+      --fs-v113-termux-mid: rgba(244, 63, 94, .38);
+      --fs-v113-termux-soft: rgba(251, 113, 133, .16);
+    }
+
+    /* Liserés généraux : ordre demandé, mais sans alternance inégale. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
+    body .topbar::after {
+      opacity: .68 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v113-purple-edge-soft) 0%,
+        var(--fs-v113-purple-edge) 18%,
+        var(--fs-v113-blue-center-soft) 38%,
+        var(--fs-v113-blue-center) 50%,
+        var(--fs-v113-blue-center-soft) 62%,
+        var(--fs-v113-purple-edge) 82%,
+        var(--fs-v113-purple-edge-soft) 100%
+      ) !important;
+    }
+
+    /* Carte Termux : pas de flash au chargement, pas d'animation d'entrée, pas de transition couleur. */
+    body .panel.notice,
+    body .panel.notice.fx-card,
+    body .panel.notice.fx-card.is-visible {
+      opacity: 1 !important;
+      transform: none !important;
+      animation: none !important;
+      transition: none !important;
+      will-change: auto !important;
+      background:
+        linear-gradient(135deg, rgba(42, 10, 31, .94), rgba(17, 8, 27, .96)) !important;
+      border-color: rgba(244, 63, 94, .24) !important;
+      box-shadow: inset 0 2px 0 rgba(244, 63, 94, .24), var(--shadow) !important;
+    }
+
+    body .panel.notice::after {
+      height: 2px !important;
+      left: 18px !important;
+      right: 18px !important;
+      opacity: .70 !important;
+      filter: none !important;
+      box-shadow: 0 0 9px rgba(244,63,94,.08) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v113-termux-edge) 0%,
+        rgba(225, 29, 72, .30) 24%,
+        var(--fs-v113-termux-mid) 50%,
+        rgba(225, 29, 72, .30) 76%,
+        var(--fs-v113-termux-edge) 100%
+      ) !important;
+      transition: none !important;
+    }
+
+    body .panel.notice .notice-title {
+      border: 1px solid transparent !important;
+      background:
+        linear-gradient(rgba(45, 12, 34, .94), rgba(45, 12, 34, .94)) padding-box,
+        linear-gradient(90deg,
+          rgba(159,18,57,.25) 0%,
+          rgba(225,29,72,.34) 24%,
+          rgba(251,113,133,.40) 50%,
+          rgba(225,29,72,.34) 76%,
+          rgba(159,18,57,.25) 100%
+        ) border-box !important;
+      color: #fff4f7 !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+      transition: none !important;
+    }
+
+    body .panel.notice .notice-text {
+      border-color: rgba(244,63,94,.23) !important;
+      background: rgba(42, 10, 31, .56) !important;
+      color: #fff0f4 !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035) !important;
+      transition: none !important;
+    }
+
+    /* 🛑 : pas de bulle ajoutée autour. L'emoji reste seul, avec une lueur rouge discrète et fixe. */
+    body .panel.notice .notice-inline-icon,
+    body .panel.notice .notice-inline-icon.fx-card,
+    body .panel.notice .notice-inline-icon.is-visible {
+      width: auto !important;
+      height: auto !important;
+      min-width: 0 !important;
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      margin: 0 4px 0 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      animation: none !important;
+      transform: none !important;
+      opacity: 1 !important;
+      font-size: 1.08em !important;
+      line-height: 1 !important;
+      filter: drop-shadow(0 0 5px rgba(244,63,94,.46)) !important;
+      transition: none !important;
+    }
+
+    body .panel.notice .notice-inline-icon::before,
+    body .panel.notice .notice-inline-icon::after {
+      content: none !important;
+      display: none !important;
+      animation: none !important;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    @media (max-width: 700px) {
+      body :is(.panel:not(.notice), .summary, .report-panel)::after,
+      body .topbar::after {
+        opacity: .66 !important;
+      }
+
+      body .panel.notice::after {
+        opacity: .70 !important;
+      }
+    }
+
 </style>
 </head>
 
