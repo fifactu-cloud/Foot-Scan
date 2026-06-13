@@ -9242,6 +9242,132 @@
       border-color: rgba(150,170,215,.22) !important;
     }
 
+
+
+    /* Retouche v111 : bordures plus homogènes
+       - Termux : liseré pourpre uniforme (pas rose -> pourpre)
+       - Sections générales : bleu aux extrémités, pourpre au centre, transition régulière
+       - Sections positives/négatives : ton propre, sans alternance clair/sombre */
+    :root {
+      --fs-v111-blue: rgba(64, 201, 255, .34);
+      --fs-v111-blue-soft: rgba(64, 201, 255, .19);
+      --fs-v111-purple: rgba(168, 85, 247, .34);
+      --fs-v111-purple-soft: rgba(168, 85, 247, .18);
+      --fs-v111-rose-purple: rgba(216, 91, 176, .31);
+      --fs-v111-neutral: rgba(126, 156, 214, .22);
+    }
+
+    /* Liserés principaux : 3 points seulement, transition douce et régulière. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
+    body .topbar::after {
+      height: 2px !important;
+      opacity: .68 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(168,85,247,.04) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v111-blue-soft) 0%,
+        var(--fs-v111-blue) 18%,
+        var(--fs-v111-purple) 50%,
+        var(--fs-v111-blue) 82%,
+        var(--fs-v111-blue-soft) 100%
+      ) !important;
+    }
+
+    /* Contours des grandes sections : base sobre bleutée, pas de patchwork. */
+    body :is(.hero, .panel:not(.notice), .summary, .report-panel, .auto-box, .bar-box) {
+      border-color: rgba(93, 138, 205, .25) !important;
+    }
+
+    /* Termux : pourpre uniforme, sans changement rose/pourpre qui ressemble à un bug. */
+    body .panel.notice {
+      border-color: rgba(168, 85, 247, .24) !important;
+      box-shadow: inset 0 3px 0 rgba(168, 85, 247, .30), var(--shadow) !important;
+    }
+
+    body .panel.notice::after {
+      height: 2px !important;
+      left: 18px !important;
+      right: 18px !important;
+      opacity: .72 !important;
+      filter: none !important;
+      box-shadow: 0 0 10px rgba(168,85,247,.08) !important;
+      background: linear-gradient(90deg,
+        rgba(168,85,247,.20) 0%,
+        rgba(168,85,247,.34) 50%,
+        rgba(168,85,247,.20) 100%
+      ) !important;
+    }
+
+    body .notice-title,
+    body .notice-text {
+      border-color: rgba(168, 85, 247, .22) !important;
+    }
+
+    body .notice-inline-icon,
+    body .notice-icon {
+      border-color: rgba(168, 85, 247, .30) !important;
+      box-shadow: 0 0 0 1px rgba(168,85,247,.08), 0 0 14px rgba(168,85,247,.10) !important;
+    }
+
+    /* Cartes post-scan positives : bleu régulier. */
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      opacity: .66 !important;
+      background: linear-gradient(90deg,
+        rgba(64,201,255,.17) 0%,
+        rgba(64,201,255,.37) 50%,
+        rgba(64,201,255,.17) 100%
+      ) !important;
+      box-shadow: 0 0 9px rgba(64,201,255,.07) !important;
+    }
+
+    /* Cartes post-scan négatives : pourpre/rose régulier, sans bleu clair autour. */
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      opacity: .66 !important;
+      background: linear-gradient(90deg,
+        rgba(216,91,176,.16) 0%,
+        rgba(216,91,176,.34) 50%,
+        rgba(216,91,176,.16) 100%
+      ) !important;
+      box-shadow: 0 0 9px rgba(216,91,176,.065) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      opacity: .60 !important;
+      background: linear-gradient(90deg,
+        rgba(126,156,214,.13) 0%,
+        rgba(126,156,214,.25) 50%,
+        rgba(126,156,214,.13) 100%
+      ) !important;
+      box-shadow: none !important;
+    }
+
+    /* Bordures internes dans Résumé rapide : cohérentes avec le niveau réel de l'équipe. */
+    body .result-shell .summary-grid .summary-cell.cell-pos :is(.mini-badge, .rank-card, .zone-card, .section, .stat-card),
+    body .result-shell .team-card.team-card-pos :is(.rank-card, .zone-card, .section, .stat-card) {
+      border-color: rgba(64,201,255,.29) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neg :is(.mini-badge, .rank-card, .zone-card, .section, .stat-card),
+    body .result-shell .team-card.team-card-neg :is(.rank-card, .zone-card, .section, .stat-card) {
+      border-color: rgba(216,91,176,.28) !important;
+    }
+
+    @media (max-width: 700px) {
+      body :is(.panel:not(.notice), .summary, .report-panel)::after,
+      body .topbar::after {
+        opacity: .64 !important;
+        left: 18px !important;
+        right: 18px !important;
+      }
+
+      body .panel.notice::after {
+        opacity: .70 !important;
+      }
+    }
+
 </style>
 </head>
 
