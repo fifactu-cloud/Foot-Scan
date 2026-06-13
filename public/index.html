@@ -8904,189 +8904,178 @@
     }
 
 
-    /* Retouche v108 : bordures plus subtiles + résumé par performance réelle
-       Base v105 stable. Corrections ciblées uniquement, sans retirer les éléments existants. */
+    /* Retouche v109 : bordures visibles mais plus fondues + Résumé rapide par performance réelle
+       Base stable v105/v107. Correction ciblée sans toucher au scroll, aux logos, ni à la logique. */
     :root {
-      --fs-v108-blue: #40c9ff;
-      --fs-v108-blue-soft: rgba(64, 201, 255, .15);
-      --fs-v108-blue-border: rgba(64, 201, 255, .24);
-      --fs-v108-rose: #fb7185;
-      --fs-v108-rose-soft: rgba(251, 113, 133, .15);
-      --fs-v108-rose-border: rgba(251, 113, 133, .24);
-      --fs-v108-neutral-border: rgba(150, 170, 215, .18);
-      --fs-v108-glass: rgba(7, 12, 31, .82);
+      --fs-v109-blue: #40c9ff;
+      --fs-v109-blue-edge: rgba(64, 201, 255, .34);
+      --fs-v109-blue-soft: rgba(64, 201, 255, .145);
+      --fs-v109-rose: #fb7185;
+      --fs-v109-rose-edge: rgba(251, 113, 133, .34);
+      --fs-v109-rose-soft: rgba(251, 113, 133, .145);
+      --fs-v109-violet-soft: rgba(124, 92, 255, .18);
+      --fs-v109-neutral-edge: rgba(150, 170, 215, .26);
     }
 
-    /* Bordures principales : on garde le liseré, mais on retire l'effet "barre" trop marqué. */
-    body :is(.hero, .panel:not(.notice), .summary, .team-card, .bar-box, .report-panel, .auto-box) {
-      border-color: rgba(150, 178, 230, .145) !important;
-      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.045) !important;
-    }
-
-    body :is(.panel:not(.notice), .summary, .report-panel, section.panel.panel-pad:not(.notice))::after,
+    /* Liserés généraux : visibles, mais sans effet barre dure. Notice/Termux exclu. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
     body .topbar::after {
       height: 2px !important;
-      left: 24px !important;
-      right: 24px !important;
-      opacity: .46 !important;
-      filter: saturate(.82) blur(.12px) !important;
+      left: 22px !important;
+      right: 22px !important;
+      opacity: .62 !important;
+      filter: saturate(.86) blur(.22px) !important;
+      box-shadow: 0 0 10px rgba(64,201,255,.08), 0 0 12px rgba(251,113,133,.055) !important;
       background: linear-gradient(90deg,
         transparent 0%,
-        rgba(64,201,255,.12) 14%,
-        rgba(64,201,255,.20) 31%,
-        rgba(150,120,255,.17) 43%,
-        rgba(251,113,133,.22) 50%,
-        rgba(150,120,255,.17) 57%,
-        rgba(64,201,255,.20) 69%,
-        rgba(64,201,255,.12) 86%,
+        rgba(64,201,255,.10) 8%,
+        rgba(64,201,255,.24) 24%,
+        rgba(124,92,255,.22) 40%,
+        rgba(251,113,133,.32) 50%,
+        rgba(124,92,255,.22) 60%,
+        rgba(64,201,255,.24) 76%,
+        rgba(64,201,255,.10) 92%,
         transparent 100%
       ) !important;
-      box-shadow: none !important;
     }
 
-    /* Termux conserve son identité pourpre, mais sans barre dure. */
-    body .panel.notice::after {
+    /* Contours des grands blocs : un peu plus lisibles que v108, mais pas saturés. */
+    body :is(.hero, .panel:not(.notice), .summary, .report-panel, .auto-box, .bar-box) {
+      border-color: rgba(118, 158, 220, .225) !important;
+    }
+
+    /* Cartes post-scan : liseré haut visible mais fondu. */
+    body .result-shell .team-card::before,
+    body .result-shell .summary-grid .summary-cell::before {
       height: 2px !important;
-      left: 24px !important;
-      right: 24px !important;
-      opacity: .48 !important;
-      filter: saturate(.85) blur(.12px) !important;
-      background: linear-gradient(90deg, transparent, rgba(251,113,133,.26), rgba(244,114,182,.22), rgba(251,113,133,.26), transparent) !important;
-      box-shadow: none !important;
-    }
-
-    /* Bordures internes globales : plus douces, moins saturées. */
-    body :is(.auto-control, .auto-result-card, .per-team-card, .per-team-mini, .stat-card, .summary-cell, .rank-card, .bar-card, .mini-badge, .match-row, .event-row, .zone-card, .mode-toggle, .preset-box) {
-      border-color: rgba(150, 178, 230, .12) !important;
-    }
-
-    body .result-shell :is(.team-card, .summary-cell)::before {
-      height: 2px !important;
-      left: 24px !important;
-      right: 24px !important;
-      opacity: .42 !important;
-      filter: saturate(.86) blur(.10px) !important;
-      box-shadow: none !important;
+      left: 20px !important;
+      right: 20px !important;
+      opacity: .58 !important;
+      filter: saturate(.9) blur(.18px) !important;
+      box-shadow: 0 0 10px rgba(64,201,255,.06), 0 0 10px rgba(251,113,133,.045) !important;
     }
 
     body .result-shell .team-card.team-card-pos::before,
     body .result-shell .summary-grid .summary-cell.cell-pos::before {
-      background: linear-gradient(90deg, transparent, rgba(64,201,255,.16), rgba(64,201,255,.26), rgba(64,201,255,.16), transparent) !important;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(64,201,255,.16) 12%,
+        rgba(64,201,255,.34) 38%,
+        rgba(64,201,255,.46) 50%,
+        rgba(64,201,255,.34) 62%,
+        rgba(64,201,255,.16) 88%,
+        transparent 100%
+      ) !important;
     }
 
     body .result-shell .team-card.team-card-neg::before,
     body .result-shell .summary-grid .summary-cell.cell-neg::before {
-      background: linear-gradient(90deg, transparent, rgba(251,113,133,.15), rgba(251,113,133,.25), rgba(251,113,133,.15), transparent) !important;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(251,113,133,.15) 12%,
+        rgba(251,113,133,.33) 38%,
+        rgba(251,113,133,.45) 50%,
+        rgba(251,113,133,.33) 62%,
+        rgba(251,113,133,.15) 88%,
+        transparent 100%
+      ) !important;
     }
 
     body .result-shell .team-card.team-card-neutral::before,
     body .result-shell .summary-grid .summary-cell.cell-neutral::before {
-      background: linear-gradient(90deg, transparent, rgba(150,170,215,.12), rgba(150,170,215,.20), rgba(150,170,215,.12), transparent) !important;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(150,170,215,.12) 12%,
+        rgba(150,170,215,.25) 38%,
+        rgba(150,170,215,.34) 50%,
+        rgba(150,170,215,.25) 62%,
+        rgba(150,170,215,.12) 88%,
+        transparent 100%
+      ) !important;
     }
 
-    /* Les lignes matchs/événements gardent un repère, mais très discret. */
-    body .result-shell .team-card .match-row,
-    body .result-shell .team-card .event-rich-row {
-      box-shadow: inset 2px 0 0 rgba(150,170,215,.18) !important;
+    /* Les bordures internes gardent un repère visible sans devenir des néons. */
+    body .result-shell .team-card.team-card-pos :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card),
+    body .result-shell .summary-grid .summary-cell.cell-pos .mini-badge {
+      border-color: rgba(64,201,255,.28) !important;
     }
 
-    body .result-shell .team-card.team-card-pos .match-row,
-    body .result-shell .team-card.team-card-pos .event-rich-row {
-      box-shadow: inset 2px 0 0 rgba(64,201,255,.24) !important;
+    body .result-shell .team-card.team-card-neg :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card),
+    body .result-shell .summary-grid .summary-cell.cell-neg .mini-badge {
+      border-color: rgba(251,113,133,.28) !important;
     }
 
-    body .result-shell .team-card.team-card-neg .match-row,
-    body .result-shell .team-card.team-card-neg .event-rich-row {
-      box-shadow: inset 2px 0 0 rgba(251,113,133,.23) !important;
+    body .result-shell .team-card.team-card-neutral :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card),
+    body .result-shell .summary-grid .summary-cell.cell-neutral .mini-badge {
+      border-color: rgba(150,170,215,.22) !important;
     }
 
-    /* Résumé rapide : chaque carte équipe suit sa performance réelle, pas son côté domicile/extérieur. */
+    /* Résumé rapide : chaque bloc équipe suit la performance réelle, pas le côté domicile/extérieur. */
     body .result-shell .summary-grid .summary-cell.cell-pos {
       background:
-        radial-gradient(circle at 12% 4%, rgba(64,201,255,.15), transparent 34%),
-        linear-gradient(155deg, rgba(64,201,255,.085), rgba(10,16,38,.90) 55%, rgba(7,10,26,.94)) !important;
-      border-color: var(--fs-v108-blue-border) !important;
-      box-shadow: inset 0 1px 0 rgba(64,201,255,.18) !important;
+        radial-gradient(circle at 12% 5%, rgba(64,201,255,.18), transparent 35%),
+        linear-gradient(155deg, rgba(64,201,255,.095), rgba(12,18,42,.94) 54%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(64,201,255,.36) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 18px rgba(64,201,255,.06) !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-neg {
       background:
-        radial-gradient(circle at 12% 4%, rgba(251,113,133,.14), transparent 34%),
-        linear-gradient(155deg, rgba(251,113,133,.08), rgba(20,12,32,.90) 55%, rgba(9,8,23,.94)) !important;
-      border-color: var(--fs-v108-rose-border) !important;
-      box-shadow: inset 0 1px 0 rgba(251,113,133,.17) !important;
+        radial-gradient(circle at 12% 5%, rgba(251,113,133,.17), transparent 35%),
+        linear-gradient(155deg, rgba(251,113,133,.09), rgba(24,13,36,.94) 54%, rgba(9,8,24,.96)) !important;
+      border-color: rgba(251,113,133,.36) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 18px rgba(251,113,133,.055) !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-neutral {
       background:
-        radial-gradient(circle at 12% 4%, rgba(150,170,215,.10), transparent 34%),
-        linear-gradient(155deg, rgba(150,170,215,.045), rgba(12,17,40,.90) 55%, rgba(7,10,26,.94)) !important;
-      border-color: var(--fs-v108-neutral-border) !important;
-      box-shadow: inset 0 1px 0 rgba(150,170,215,.13) !important;
+        radial-gradient(circle at 12% 5%, rgba(150,170,215,.12), transparent 35%),
+        linear-gradient(155deg, rgba(150,170,215,.06), rgba(12,18,42,.94) 54%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(150,170,215,.28) !important;
     }
 
-    /* Bulles internes du Résumé rapide : Suisse positive = bleu, équipe négative = pourpre. */
+    /* Bulles du Résumé rapide : corrige notamment une équipe extérieure positive qui restait pourpre. */
     body .result-shell .summary-grid .summary-cell.cell-pos .mini-badge {
-      background: linear-gradient(135deg, rgba(64,201,255,.135), rgba(37,99,235,.07)) !important;
-      border-color: rgba(64,201,255,.22) !important;
-      color: #e9f8ff !important;
+      background: linear-gradient(135deg, rgba(64,201,255,.155), rgba(37,99,235,.075)) !important;
+      color: #ecfbff !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-neg .mini-badge {
-      background: linear-gradient(135deg, rgba(251,113,133,.13), rgba(168,85,247,.07)) !important;
-      border-color: rgba(251,113,133,.22) !important;
-      color: #ffe9ef !important;
+      background: linear-gradient(135deg, rgba(251,113,133,.15), rgba(168,85,247,.075)) !important;
+      color: #ffeaf0 !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-neutral .mini-badge {
-      background: linear-gradient(135deg, rgba(150,170,215,.10), rgba(150,170,215,.045)) !important;
-      border-color: rgba(150,170,215,.18) !important;
-      color: #e9eefc !important;
+      background: linear-gradient(135deg, rgba(150,170,215,.105), rgba(150,170,215,.045)) !important;
+      color: #edf2ff !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-pos .logo-s {
+      border-color: rgba(64,201,255,.25) !important;
       box-shadow: 0 0 0 1px rgba(64,201,255,.26), 0 6px 14px rgba(64,201,255,.10) !important;
-      border-color: rgba(64,201,255,.20) !important;
     }
 
     body .result-shell .summary-grid .summary-cell.cell-neg .logo-s {
+      border-color: rgba(251,113,133,.24) !important;
       box-shadow: 0 0 0 1px rgba(251,113,133,.25), 0 6px 14px rgba(251,113,133,.09) !important;
-      border-color: rgba(251,113,133,.20) !important;
-    }
-
-    body .result-shell .summary-grid .summary-cell.cell-pos .summary-team-name,
-    body .result-shell .summary-grid .summary-cell.cell-neg .summary-team-name,
-    body .result-shell .summary-grid .summary-cell.cell-neutral .summary-team-name {
-      color: #ffffff !important;
-    }
-
-    /* Les valeurs gardent leur logique : positif bleu, négatif rose. */
-    body .result-shell .summary-grid .summary-cell .positive { color: var(--fs-v108-blue) !important; }
-    body .result-shell .summary-grid .summary-cell .negative { color: var(--fs-v108-rose) !important; }
-
-    /* Le fond du Résumé reste équilibré : plus de côté droit forcé en rose. */
-    body .result-shell .summary {
-      background:
-        radial-gradient(circle at 12% 0%, rgba(64,201,255,.13), transparent 34%),
-        radial-gradient(circle at 88% 0%, rgba(251,113,133,.10), transparent 36%),
-        linear-gradient(155deg, rgba(64,201,255,.055), rgba(251,113,133,.035) 54%, rgba(7,10,26,.94)),
-        rgba(9,14,33,.94) !important;
-      border-color: rgba(150,178,230,.15) !important;
     }
 
     @media (max-width: 700px) {
-      body :is(.panel:not(.notice), .summary, .report-panel, section.panel.panel-pad:not(.notice))::after,
-      body .topbar::after,
-      body .panel.notice::after {
+      body :is(.panel:not(.notice), .summary, .report-panel)::after,
+      body .topbar::after {
         left: 18px !important;
         right: 18px !important;
-        opacity: .42 !important;
+        opacity: .58 !important;
+        filter: saturate(.84) blur(.20px) !important;
       }
 
-      body .result-shell :is(.team-card, .summary-cell)::before {
-        left: 20px !important;
-        right: 20px !important;
-        opacity: .38 !important;
+      body .result-shell .team-card::before,
+      body .result-shell .summary-grid .summary-cell::before {
+        left: 18px !important;
+        right: 18px !important;
+        opacity: .54 !important;
       }
     }
 
