@@ -8420,6 +8420,163 @@
     }
 
 
+
+    /* ============================================================
+       v97 — RÈGLE FINALE DE COULEUR (source unique de vérité)
+       Placée en dernier dans le CSS de page = priorité absolue
+       ============================================================ */
+
+    /* --- BLANC des deux côtés : titres de match, noms, titres de section, labels de rang, titre zone --- */
+    .team-card-home .row-title, .team-card-away .row-title,
+    .team-card-home .team-name, .team-card-away .team-name,
+    .team-card-home .match-team-name, .team-card-away .match-team-name,
+    .team-card-home .section-title, .team-card-away .section-title,
+    .team-card-home .rank-label, .team-card-away .rank-label,
+    .team-card-home .stat-title, .team-card-away .stat-title {
+      color: #ffffff !important;
+    }
+
+    /* --- SECONDAIRE qui suit le camp (bleu doux domicile / pourpre doux extérieur) --- */
+    /* détail "#27 · Cumul...", sous-titre zone "Rangs 27.75 à...", compétition, métas, badges */
+    .team-card-home :is(.row-sub, .team-meta, .stat-subtitle, .stat-kicker, .events-summary-label,
+      .match-index, .dominance-label, .event-metric-code, .summary-label, .camp-badge, .mode-detail, .stat-origin) {
+      color: #a9c9ec !important;
+    }
+    .team-card-away :is(.row-sub, .team-meta, .stat-subtitle, .stat-kicker, .events-summary-label,
+      .match-index, .dominance-label, .event-metric-code, .summary-label, .camp-badge, .mode-detail, .stat-origin) {
+      color: #e6b8c8 !important;
+    }
+
+    /* --- VALEURS : barème positif/négatif (priorité maximale) --- */
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }
+
+    /* --- VVVSSS : plus petit, centré, sans débordement --- */
+    .summary-title { overflow: hidden !important; }
+    .summary-title .vs-echo, .vs-echo {
+      font-size: 1.15em !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      justify-content: center !important;
+      text-align: center !important;
+      letter-spacing: -0.04em !important;
+      transform: none !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+
+    /* --- RÉSUMÉ : bordure HAUTE selon la performance de l'équipe (bleu=positif / pourpre=négatif),
+           on neutralise toute coloration par position (1ère/2ème cellule) --- */
+    .summary-grid .summary-cell:first-child,
+    .summary-grid .summary-cell:last-child {
+      box-shadow: none !important;
+    }
+    .summary-grid .summary-cell.cell-pos {
+      border-color: rgba(64,201,255,.42) !important;
+      box-shadow: inset 0 3px 0 rgba(64,201,255,.55) !important;
+    }
+    .summary-grid .summary-cell.cell-neg {
+      border-color: rgba(251,113,133,.42) !important;
+      box-shadow: inset 0 3px 0 rgba(251,113,133,.55) !important;
+    }
+    .summary-grid .summary-cell.cell-neutral {
+      border-color: rgba(140,170,225,.30) !important;
+      box-shadow: inset 0 3px 0 rgba(140,170,225,.42) !important;
+    }
+
+
+    /* ============================================================
+       v98 — TON BASÉ SUR LA PERFORMANCE (positif=bleu / négatif=pourpre)
+       Remplace la logique domicile/extérieur. Source unique de vérité.
+       ============================================================ */
+
+    /* --- FOND DES CARTES selon la perf (et non plus home/away) --- */
+    .team-card.team-card-pos {
+      background:
+        linear-gradient(180deg, rgba(56,189,248,.05), rgba(56,189,248,.012) 50%, transparent),
+        rgba(11,16,38,.92) !important;
+      border-color: rgba(56,189,248,.18) !important;
+    }
+    .team-card.team-card-neg {
+      background:
+        linear-gradient(180deg, rgba(251,113,133,.05), rgba(251,113,133,.012) 50%, transparent),
+        rgba(15,12,32,.92) !important;
+      border-color: rgba(244,114,182,.18) !important;
+    }
+    .team-card.team-card-neutral {
+      background:
+        linear-gradient(180deg, rgba(140,170,225,.04), transparent 55%),
+        rgba(12,17,38,.92) !important;
+      border-color: rgba(140,170,225,.16) !important;
+    }
+    /* sous-blocs internes : suivent aussi la perf */
+    .team-card-pos :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card) {
+      background: linear-gradient(160deg, rgba(56,189,248,.035), rgba(12,18,40,.86)) !important;
+      border-color: rgba(56,189,248,.12) !important;
+    }
+    .team-card-neg :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card) {
+      background: linear-gradient(160deg, rgba(251,113,133,.035), rgba(20,13,28,.86)) !important;
+      border-color: rgba(244,114,182,.12) !important;
+    }
+    /* halos zone-card par perf */
+    .team-card-pos .zone-card::before {
+      background: radial-gradient(circle at top right, rgba(56,189,248,.10), transparent 38%), radial-gradient(circle at bottom left, rgba(56,189,248,.05), transparent 44%) !important;
+      opacity: .7 !important;
+    }
+    .team-card-neg .zone-card::before {
+      background: radial-gradient(circle at top right, rgba(251,113,133,.10), transparent 38%), radial-gradient(circle at bottom left, rgba(251,113,133,.05), transparent 44%) !important;
+      opacity: .7 !important;
+    }
+    /* bordure HAUTE des cartes selon la perf */
+    .team-card-pos::before { background: linear-gradient(90deg, transparent, rgba(56,189,248,.55), transparent) !important; }
+    .team-card-neg::before { background: linear-gradient(90deg, transparent, rgba(251,113,133,.55), transparent) !important; }
+    /* liseré latéral des lignes selon la perf */
+    .team-card-pos .match-row, .team-card-pos .event-rich-row { box-shadow: inset 3px 0 0 rgba(56,189,248,.38) !important; }
+    .team-card-neg .match-row, .team-card-neg .event-rich-row { box-shadow: inset 3px 0 0 rgba(251,113,133,.38) !important; }
+    /* pastilles internes */
+    .team-card-pos :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) {
+      background: linear-gradient(135deg, rgba(56,189,248,.13), rgba(37,99,235,.07)) !important;
+      border-color: rgba(56,189,248,.22) !important;
+    }
+    .team-card-neg :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) {
+      background: linear-gradient(135deg, rgba(251,113,133,.13), rgba(168,85,247,.07)) !important;
+      border-color: rgba(244,114,182,.22) !important;
+    }
+    /* halo du logo + pastille de côté selon perf */
+    .team-card-pos .logo-m { box-shadow: 0 0 0 2px rgba(56,189,248,.32), 0 6px 16px rgba(56,189,248,.16) !important; }
+    .team-card-neg .logo-m { box-shadow: 0 0 0 2px rgba(244,114,182,.32), 0 6px 16px rgba(251,113,133,.16) !important; }
+
+    /* --- TITRES + SOUS-TITRES : BLANC partout --- */
+    .team-card :is(.row-title, .team-name, .match-team-name, .section-title,
+      .rank-label, .stat-title, .stat-subtitle, .dominance-label, .events-summary-label) {
+      color: #ffffff !important;
+    }
+    /* --- TEXTES DE DÉTAIL : suivent le ton de perf --- */
+    .team-card-pos :is(.row-sub, .team-meta, .stat-kicker, .match-index,
+      .event-metric-code, .summary-label, .camp-badge, .mode-detail, .stat-origin) {
+      color: #a9c9ec !important;
+    }
+    .team-card-neg :is(.row-sub, .team-meta, .stat-kicker, .match-index,
+      .event-metric-code, .summary-label, .camp-badge, .mode-detail, .stat-origin) {
+      color: #e6b8c8 !important;
+    }
+    .team-card-neutral :is(.row-sub, .team-meta, .stat-kicker, .match-index,
+      .event-metric-code, .summary-label, .camp-badge, .mode-detail, .stat-origin) {
+      color: #aebbd6 !important;
+    }
+    /* valeurs : barème */
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }
+
+    /* --- VS (tous) : bleu côté positif, pourpre côté négatif --- */
+    /* VVVSSS : V = équipe home, S = équipe away, teintés selon leur perf */
+    .vs-echo.v-pos .ve-v { color: #38bdf8 !important; }
+    .vs-echo.v-neg .ve-v { color: #fb7185 !important; }
+    .vs-echo.v-neu .ve-v { color: #8aa0c8 !important; }
+    .vs-echo.s-pos .ve-s { color: #38bdf8 !important; }
+    .vs-echo.s-neg .ve-s { color: #fb7185 !important; }
+    .vs-echo.s-neu .ve-s { color: #8aa0c8 !important; }
+
 </style>
 </head>
 
@@ -8445,7 +8602,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v96</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v98</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -9612,7 +9769,7 @@
               <div class="summary-label">Résumé rapide</div>
               <div class="summary-label summary-mode">Mode scan : ${result.simultaneousMode ? "Simultané" : "Séparé"}</div>
             </div>
-            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo" aria-label="VS">${Array.from({ length: 9 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 9 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 9 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 9 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
           </div>
 
           ${renderDominance(result)}
@@ -9626,6 +9783,19 @@
           ${renderDataQualityWarning(result)}
         </section>
       `;
+    }
+
+    function teamAvg(team) {
+      const v = [team?.r1?.value, team?.r2?.value].filter((x) => typeof x === "number");
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+    }
+
+    function vsEchoToneClass(result) {
+      const h = teamAvg(result?.home);
+      const a = teamAvg(result?.away);
+      const hcl = h > 0 ? "v-pos" : (h < 0 ? "v-neg" : "v-neu");
+      const acl = a > 0 ? "s-pos" : (a < 0 ? "s-neg" : "s-neu");
+      return hcl + " " + acl;
     }
 
     function renderSummaryCell(team, rank1, rank2) {
@@ -9881,6 +10051,9 @@
       const matchesUsed = team.matchesUsed || [];
       const sideClass = side === "Domicile" ? "side-home" : "side-away";
       const teamIssueCount = Number(team.eventDataIssueCount || 0);
+      const _perfVals = [team.r1?.value, team.r2?.value].filter((v) => typeof v === "number");
+      const _perfAvg = _perfVals.length ? _perfVals.reduce((a, b) => a + b, 0) / _perfVals.length : 0;
+      const perfToneClass = _perfAvg > 0 ? "team-card-pos" : (_perfAvg < 0 ? "team-card-neg" : "team-card-neutral");
 
       const eventRows = events.map((event, index) => {
         const campClass = sideCampClass(event);
@@ -9928,7 +10101,7 @@
       }).join("");
 
       return `
-        <section class="team-card ${sideClass === "side-home" ? "team-card-home" : "team-card-away"}">
+        <section class="team-card ${sideClass === "side-home" ? "team-card-home" : "team-card-away"} ${perfToneClass}">
           <div class="team-hero">
             <div class="side-pill ${sideClass}">${esc(side)}</div>
 
@@ -10630,7 +10803,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v96 chargé");
+    console.log("FOOTSCAN v98 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
