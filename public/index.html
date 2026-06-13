@@ -7746,28 +7746,30 @@
     .panel.notice .notice-text { text-align: center !important; }
     .report-panel, section.panel.panel-pad:not(.notice) { box-shadow: inset 0 3px 0 rgba(56,189,248,.22); }
 
-    /* === SLIDER 2 MODES : centrage parfait, pas d'élévation === */
+    /* === SLIDER 2 MODES : bulle qui épouse l'option active === */
     .calc-mode-slider {
-      position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+      position: relative; display: flex; align-items: stretch; gap: 0;
       margin: 12px 0 4px; padding: 4px; border-radius: 999px;
       border: 1px solid rgba(134,170,230,.24); background: rgba(22,32,74,.55);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.05); overflow: hidden; min-height: 48px;
     }
     .calc-mode-thumb {
-      position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px);
+      position: absolute; top: 4px; bottom: 4px;
+      left: var(--thumb-left, 4px); width: var(--thumb-width, calc(50% - 8px));
       border-radius: 999px; background: linear-gradient(135deg,#38bdf8,#2563eb); background-size: 180% 180%;
       box-shadow: 0 6px 18px rgba(56,189,248,.30); animation: mobileButtonGlow 3.6s ease infinite;
-      transition: transform .32s cubic-bezier(.34,1.4,.5,1), background .3s ease; z-index: 0;
+      transition: left .32s cubic-bezier(.34,1.4,.5,1), width .32s cubic-bezier(.34,1.4,.5,1), background .3s ease;
+      z-index: 0;
     }
     .calc-mode-slider.sim .calc-mode-thumb {
-      transform: translateX(100%);
       background: linear-gradient(135deg,#fb7185,#b91c6b) !important;
       box-shadow: 0 6px 18px rgba(251,113,133,.30) !important;
     }
     .calc-mode-opt {
-      position: relative; z-index: 1; display: flex; align-items: center; justify-content: center;
+      position: relative; z-index: 1; flex: 1 1 auto;
+      display: flex; align-items: center; justify-content: center;
       background: transparent !important; border: 0 !important; box-shadow: none !important;
-      margin: 0 !important; padding: 0 8px !important; height: 100%; min-height: 40px;
+      margin: 0 !important; padding: 12px 14px !important;
       font-size: 12px; font-weight: 800; letter-spacing: .04em; line-height: 1;
       color: #aebfe0; cursor: pointer; transition: color .26s ease; white-space: nowrap;
       transform: none !important;
@@ -7881,28 +7883,14 @@
     }
 
     /* — REBORDS : liseré gauche sur les événements (comme les matchs), par camp — */
-    .team-card-home .event-rich-row {
-      box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.40) !important;
-    }
-
-    .team-card-away .event-rich-row {
-      box-shadow: inset 3px 0 0 rgba(251, 113, 133, 0.40) !important;
-    }
+    /* (event-rich-row : rebord géré en v86) */
 
     .event-rich-row {
       border-radius: 12px;
       overflow: hidden;
     }
 
-    /* — Rebords discrets ailleurs sur le site (accent cyan) — */
-    .panel.notice {
-      box-shadow: inset 3px 0 0 rgba(251, 113, 133, 0.34) !important;
-    }
-
-    .report-panel,
-    section.panel.panel-pad:not(.notice) {
-      box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.22);
-    }
+    /* — (rebords latéraux v82 retirés : remplacés par des bordures EN HAUT en v86) — */
 
 
     /* Retouche v78 : extérieur en pourpre rose (#fb7185), miroir complet des accents, VS recentré */
@@ -8188,7 +8176,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v86</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v87</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -8613,11 +8601,22 @@
       const box = document.getElementById("simultaneousMode");
       if (!slider || !box) return;
       const opts = slider.querySelectorAll(".calc-mode-opt");
+      const positionThumb = () => {
+        const active = slider.querySelector(".calc-mode-opt.is-active");
+        if (!active) return;
+        slider.style.setProperty("--thumb-left", active.offsetLeft + "px");
+        slider.style.setProperty("--thumb-width", active.offsetWidth + "px");
+      };
       const sync = () => {
         const sim = Boolean(box.checked);
         slider.classList.toggle("sim", sim);
         opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "simultaneous") === sim));
+        positionThumb();
       };
+      window.addEventListener("resize", positionThumb);
+      // recalage après rendu des polices
+      setTimeout(positionThumb, 60);
+      setTimeout(positionThumb, 300);
       opts.forEach((o) => o.addEventListener("click", () => {
         box.checked = (o.dataset.mode === "simultaneous");
         box.dispatchEvent(new Event("change", { bubbles: true }));
@@ -10353,7 +10352,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v86 chargé");
+    console.log("FOOTSCAN v87 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
