@@ -9079,6 +9079,169 @@
       }
     }
 
+
+    /* Retouche v110 : stabilité scroll mobile + bordures plus cohérentes
+       Objectif : éviter les flashs/blocs blancs au défilement, sans supprimer l'identité visuelle.
+       Les liserés restent visibles, mais avec une transition continue pour éviter l'effet clair/sombre. */
+    :root {
+      --fs-v110-bg: #050816;
+      --fs-v110-bg2: #071023;
+      --fs-v110-blue-border: rgba(64, 201, 255, .36);
+      --fs-v110-blue-border-soft: rgba(64, 201, 255, .20);
+      --fs-v110-rose-border: rgba(251, 113, 133, .34);
+      --fs-v110-rose-border-soft: rgba(251, 113, 133, .19);
+      --fs-v110-violet-border: rgba(134, 109, 255, .27);
+      --fs-v110-neutral-border: rgba(150, 170, 215, .26);
+    }
+
+    /* Fond réel sur html + body : évite les zones blanches pendant le scroll Firefox/Android. */
+    html,
+    body {
+      background-color: var(--fs-v110-bg) !important;
+    }
+
+    @media (max-width: 700px) {
+      html,
+      body {
+        min-height: 100% !important;
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23ffffff' fill-opacity='0.022'/%3E%3C/svg%3E"),
+          radial-gradient(circle at 16% 0%, rgba(64, 201, 255, .13), transparent 34%),
+          radial-gradient(circle at 92% 8%, rgba(251, 113, 133, .105), transparent 37%),
+          linear-gradient(180deg, var(--fs-v110-bg) 0%, var(--fs-v110-bg2) 46%, var(--fs-v110-bg) 100%) !important;
+        background-attachment: scroll !important;
+        overflow-x: hidden !important;
+      }
+
+      body {
+        overscroll-behavior-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Les pseudo-fonds fixed/animés sont les plus suspects pour les flashs blancs au scroll mobile. */
+      body::before,
+      body::after {
+        display: none !important;
+        content: none !important;
+        animation: none !important;
+        transform: none !important;
+        filter: none !important;
+      }
+
+      /* Moins de calques forcés = moins de trous de rendu lors du chargement/défilement. */
+      .panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .report-panel,
+      .auto-box,
+      .auto-control,
+      .hero {
+        transform: none !important;
+        backface-visibility: visible !important;
+        will-change: auto !important;
+        contain: none !important;
+      }
+
+      .topbar {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        background: rgba(6, 10, 28, .96) !important;
+      }
+    }
+
+    /* Liserés généraux : dégradé continu, pas de zones transparentes qui donnent un effet de trou. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
+    body .topbar::after {
+      height: 2px !important;
+      opacity: .64 !important;
+      filter: none !important;
+      box-shadow: 0 0 9px rgba(64,201,255,.06), 0 0 9px rgba(251,113,133,.05) !important;
+      background: linear-gradient(90deg,
+        rgba(64,201,255,.23) 0%,
+        rgba(91,119,220,.26) 32%,
+        rgba(212,98,178,.29) 50%,
+        rgba(91,119,220,.26) 68%,
+        rgba(64,201,255,.23) 100%
+      ) !important;
+    }
+
+    body :is(.hero, .panel:not(.notice), .summary, .report-panel, .auto-box, .bar-box) {
+      border-color: rgba(108, 150, 216, .24) !important;
+    }
+
+    /* Bordures internes : lisibles, mais une seule famille de tons pour éviter l'effet patchwork. */
+    body :is(.auto-body, .preset-box, .auto-control, .auto-formula, .mode-toggle, .rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card, .mini-badge) {
+      border-color: rgba(120, 156, 220, .20) !important;
+    }
+
+    /* Cartes post-scan : liseré haut continu, pas transparent aux extrémités. */
+    body .result-shell .team-card::before,
+    body .result-shell .summary-grid .summary-cell::before {
+      height: 2px !important;
+      left: 18px !important;
+      right: 18px !important;
+      opacity: .62 !important;
+      filter: none !important;
+      box-shadow: 0 0 10px rgba(64,201,255,.055) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      background: linear-gradient(90deg,
+        var(--fs-v110-blue-border-soft) 0%,
+        var(--fs-v110-blue-border) 50%,
+        var(--fs-v110-blue-border-soft) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      background: linear-gradient(90deg,
+        var(--fs-v110-rose-border-soft) 0%,
+        var(--fs-v110-rose-border) 50%,
+        var(--fs-v110-rose-border-soft) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      background: linear-gradient(90deg,
+        rgba(150,170,215,.14) 0%,
+        var(--fs-v110-neutral-border) 50%,
+        rgba(150,170,215,.14) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos,
+    body .result-shell .summary-grid .summary-cell.cell-pos {
+      border-color: rgba(64,201,255,.34) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.05), 0 0 18px rgba(64,201,255,.055) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg,
+    body .result-shell .summary-grid .summary-cell.cell-neg {
+      border-color: rgba(251,113,133,.32) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.05), 0 0 18px rgba(251,113,133,.05) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-pos .mini-badge {
+      background: linear-gradient(150deg, rgba(64,201,255,.13), rgba(20,32,64,.86)) !important;
+      border-color: rgba(64,201,255,.29) !important;
+      color: #eefbff !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neg .mini-badge {
+      background: linear-gradient(150deg, rgba(251,113,133,.13), rgba(42,18,42,.84)) !important;
+      border-color: rgba(251,113,133,.28) !important;
+      color: #ffeaf0 !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neutral .mini-badge {
+      background: linear-gradient(150deg, rgba(150,170,215,.09), rgba(18,26,52,.86)) !important;
+      border-color: rgba(150,170,215,.22) !important;
+    }
+
 </style>
 </head>
 
