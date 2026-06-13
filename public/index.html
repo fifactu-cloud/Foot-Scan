@@ -8485,97 +8485,111 @@
     }
 
 
+
+
     /* ============================================================
-       v98 — TON BASÉ SUR LA PERFORMANCE (positif=bleu / négatif=pourpre)
-       Remplace la logique domicile/extérieur. Source unique de vérité.
+       v99 — SYSTÈME DE TON UNIQUE (refait à zéro, basé sur la perf)
+       Spécificité renforcée (body + double classe) pour battre les :has()
+       positif = bleu / négatif = pourpre / neutre = gris-bleu
        ============================================================ */
 
-    /* --- FOND DES CARTES selon la perf (et non plus home/away) --- */
-    .team-card.team-card-pos {
+    /* ===== FOND + BORDURE DES CARTES ===== */
+    body .team-card.team-card-pos {
       background:
-        linear-gradient(180deg, rgba(56,189,248,.05), rgba(56,189,248,.012) 50%, transparent),
-        rgba(11,16,38,.92) !important;
-      border-color: rgba(56,189,248,.18) !important;
+        linear-gradient(180deg, rgba(56,189,248,.06), rgba(56,189,248,.015) 50%, transparent),
+        rgba(11,16,38,.93) !important;
+      border-color: rgba(56,189,248,.20) !important;
     }
-    .team-card.team-card-neg {
+    body .team-card.team-card-neg {
       background:
-        linear-gradient(180deg, rgba(251,113,133,.05), rgba(251,113,133,.012) 50%, transparent),
-        rgba(15,12,32,.92) !important;
-      border-color: rgba(244,114,182,.18) !important;
+        linear-gradient(180deg, rgba(251,113,133,.06), rgba(251,113,133,.015) 50%, transparent),
+        rgba(16,12,30,.93) !important;
+      border-color: rgba(244,114,182,.20) !important;
     }
-    .team-card.team-card-neutral {
-      background:
-        linear-gradient(180deg, rgba(140,170,225,.04), transparent 55%),
-        rgba(12,17,38,.92) !important;
+    body .team-card.team-card-neutral {
+      background: linear-gradient(180deg, rgba(140,170,225,.04), transparent 55%), rgba(12,17,38,.92) !important;
       border-color: rgba(140,170,225,.16) !important;
     }
-    /* sous-blocs internes : suivent aussi la perf */
-    .team-card-pos :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card) {
-      background: linear-gradient(160deg, rgba(56,189,248,.035), rgba(12,18,40,.86)) !important;
-      border-color: rgba(56,189,248,.12) !important;
-    }
-    .team-card-neg :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card) {
-      background: linear-gradient(160deg, rgba(251,113,133,.035), rgba(20,13,28,.86)) !important;
-      border-color: rgba(244,114,182,.12) !important;
-    }
-    /* halos zone-card par perf */
-    .team-card-pos .zone-card::before {
-      background: radial-gradient(circle at top right, rgba(56,189,248,.10), transparent 38%), radial-gradient(circle at bottom left, rgba(56,189,248,.05), transparent 44%) !important;
-      opacity: .7 !important;
-    }
-    .team-card-neg .zone-card::before {
-      background: radial-gradient(circle at top right, rgba(251,113,133,.10), transparent 38%), radial-gradient(circle at bottom left, rgba(251,113,133,.05), transparent 44%) !important;
-      opacity: .7 !important;
-    }
-    /* bordure HAUTE des cartes selon la perf */
-    .team-card-pos::before { background: linear-gradient(90deg, transparent, rgba(56,189,248,.55), transparent) !important; }
-    .team-card-neg::before { background: linear-gradient(90deg, transparent, rgba(251,113,133,.55), transparent) !important; }
-    /* liseré latéral des lignes selon la perf */
-    .team-card-pos .match-row, .team-card-pos .event-rich-row { box-shadow: inset 3px 0 0 rgba(56,189,248,.38) !important; }
-    .team-card-neg .match-row, .team-card-neg .event-rich-row { box-shadow: inset 3px 0 0 rgba(251,113,133,.38) !important; }
-    /* pastilles internes */
-    .team-card-pos :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) {
-      background: linear-gradient(135deg, rgba(56,189,248,.13), rgba(37,99,235,.07)) !important;
-      border-color: rgba(56,189,248,.22) !important;
-    }
-    .team-card-neg :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) {
-      background: linear-gradient(135deg, rgba(251,113,133,.13), rgba(168,85,247,.07)) !important;
-      border-color: rgba(244,114,182,.22) !important;
-    }
-    /* halo du logo + pastille de côté selon perf */
-    .team-card-pos .logo-m { box-shadow: 0 0 0 2px rgba(56,189,248,.32), 0 6px 16px rgba(56,189,248,.16) !important; }
-    .team-card-neg .logo-m { box-shadow: 0 0 0 2px rgba(244,114,182,.32), 0 6px 16px rgba(251,113,133,.16) !important; }
 
-    /* --- TITRES + SOUS-TITRES : BLANC partout --- */
-    .team-card :is(.row-title, .team-name, .match-team-name, .section-title,
-      .rank-label, .stat-title, .stat-subtitle, .dominance-label, .events-summary-label) {
+    /* ===== SOUS-BLOCS INTERNES ===== */
+    body .team-card-pos :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card,.summary-cell) {
+      background: linear-gradient(160deg, rgba(56,189,248,.04), rgba(12,18,40,.86)) !important;
+      border-color: rgba(56,189,248,.13) !important;
+    }
+    body .team-card-neg :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card,.summary-cell) {
+      background: linear-gradient(160deg, rgba(251,113,133,.04), rgba(20,13,28,.86)) !important;
+      border-color: rgba(244,114,182,.13) !important;
+    }
+    body .team-card-neutral :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card) {
+      background: linear-gradient(160deg, rgba(140,170,225,.03), rgba(14,19,42,.86)) !important;
+      border-color: rgba(140,170,225,.11) !important;
+    }
+
+    /* ===== HALOS DE LA ZONE-CARD (::before) ===== */
+    body .team-card-pos .zone-card::before {
+      background: radial-gradient(circle at top right, rgba(56,189,248,.09), transparent 40%), radial-gradient(circle at bottom left, rgba(56,189,248,.045), transparent 46%) !important; opacity:.65 !important;
+    }
+    body .team-card-neg .zone-card::before {
+      background: radial-gradient(circle at top right, rgba(251,113,133,.09), transparent 40%), radial-gradient(circle at bottom left, rgba(251,113,133,.045), transparent 46%) !important; opacity:.65 !important;
+    }
+
+    /* ===== BORDURE HAUTE DES CARTES ===== */
+    body .team-card-pos::before { background: linear-gradient(90deg, transparent, rgba(56,189,248,.55), transparent) !important; }
+    body .team-card-neg::before { background: linear-gradient(90deg, transparent, rgba(251,113,133,.55), transparent) !important; }
+    body .team-card-neutral::before { background: linear-gradient(90deg, transparent, rgba(140,170,225,.45), transparent) !important; }
+
+    /* ===== LISERÉ LATÉRAL DES LIGNES (match/événement) ===== */
+    body .team-card-pos .match-row, body .team-card-pos .event-rich-row { box-shadow: inset 3px 0 0 rgba(56,189,248,.40) !important; }
+    body .team-card-neg .match-row, body .team-card-neg .event-rich-row { box-shadow: inset 3px 0 0 rgba(251,113,133,.40) !important; }
+    body .team-card-neutral .match-row, body .team-card-neutral .event-rich-row { box-shadow: inset 3px 0 0 rgba(140,170,225,.34) !important; }
+
+    /* ===== PASTILLES INTERNES ===== */
+    body .team-card-pos :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) {
+      background: linear-gradient(135deg, rgba(56,189,248,.14), rgba(37,99,235,.08)) !important; border-color: rgba(56,189,248,.24) !important;
+    }
+    body .team-card-neg :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) {
+      background: linear-gradient(135deg, rgba(251,113,133,.14), rgba(168,85,247,.08)) !important; border-color: rgba(244,114,182,.24) !important;
+    }
+    body .team-card-neutral :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) {
+      background: linear-gradient(135deg, rgba(140,170,225,.12), rgba(140,170,225,.06)) !important; border-color: rgba(140,170,225,.22) !important;
+    }
+
+    /* ===== HALO DU LOGO ===== */
+    body .team-card-pos .logo-m { box-shadow: 0 0 0 2px rgba(56,189,248,.32), 0 6px 16px rgba(56,189,248,.16) !important; }
+    body .team-card-neg .logo-m { box-shadow: 0 0 0 2px rgba(244,114,182,.32), 0 6px 16px rgba(251,113,133,.16) !important; }
+
+    /* ===== TEXTES : titres + sous-titres BLANCS, détails suivent le ton ===== */
+    body .team-card :is(.row-title,.team-name,.match-team-name,.section-title,.rank-label,.stat-title,.stat-subtitle,.dominance-label,.events-summary-label) {
       color: #ffffff !important;
     }
-    /* --- TEXTES DE DÉTAIL : suivent le ton de perf --- */
-    .team-card-pos :is(.row-sub, .team-meta, .stat-kicker, .match-index,
-      .event-metric-code, .summary-label, .camp-badge, .mode-detail, .stat-origin) {
-      color: #a9c9ec !important;
-    }
-    .team-card-neg :is(.row-sub, .team-meta, .stat-kicker, .match-index,
-      .event-metric-code, .summary-label, .camp-badge, .mode-detail, .stat-origin) {
-      color: #e6b8c8 !important;
-    }
-    .team-card-neutral :is(.row-sub, .team-meta, .stat-kicker, .match-index,
-      .event-metric-code, .summary-label, .camp-badge, .mode-detail, .stat-origin) {
-      color: #aebbd6 !important;
-    }
-    /* valeurs : barème */
+    body .team-card-pos :is(.row-sub,.team-meta,.stat-kicker,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) { color: #a9c9ec !important; }
+    body .team-card-neg :is(.row-sub,.team-meta,.stat-kicker,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) { color: #e6b8c8 !important; }
+    body .team-card-neutral :is(.row-sub,.team-meta,.stat-kicker,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) { color: #aebbd6 !important; }
     .positive { color: #40c9ff !important; }
     .negative { color: #fb7185 !important; }
 
-    /* --- VS (tous) : bleu côté positif, pourpre côté négatif --- */
-    /* VVVSSS : V = équipe home, S = équipe away, teintés selon leur perf */
-    .vs-echo.v-pos .ve-v { color: #38bdf8 !important; }
-    .vs-echo.v-neg .ve-v { color: #fb7185 !important; }
-    .vs-echo.v-neu .ve-v { color: #8aa0c8 !important; }
-    .vs-echo.s-pos .ve-s { color: #38bdf8 !important; }
-    .vs-echo.s-neg .ve-s { color: #fb7185 !important; }
-    .vs-echo.s-neu .ve-s { color: #8aa0c8 !important; }
+    /* ===== VS — tous synchronisés sur la perf (V=home, S=away) ===== */
+    .vs-echo.v-pos .ve-v, .vs-box.v-pos .vsb-v, .vs-divider.v-pos .vsb-v { color: #38bdf8 !important; }
+    .vs-echo.v-neg .ve-v, .vs-box.v-neg .vsb-v, .vs-divider.v-neg .vsb-v { color: #fb7185 !important; }
+    .vs-echo.v-neu .ve-v, .vs-box.v-neu .vsb-v, .vs-divider.v-neu .vsb-v { color: #8aa0c8 !important; }
+    .vs-echo.s-pos .ve-s, .vs-box.s-pos .vsb-s, .vs-divider.s-pos .vsb-s { color: #38bdf8 !important; }
+    .vs-echo.s-neg .ve-s, .vs-box.s-neg .vsb-s, .vs-divider.s-neg .vsb-s { color: #fb7185 !important; }
+    .vs-echo.s-neu .ve-s, .vs-box.s-neu .vsb-s, .vs-divider.s-neu .vsb-s { color: #8aa0c8 !important; }
+
+    /* ===== VVVSSS : propre, sans bords visibles, centré, rampe douce ===== */
+    .summary-title { overflow: visible !important; }
+    .summary-title .vs-echo, .vs-echo {
+      font-size: 1.15em !important;
+      display: inline-flex !important;
+      justify-content: center !important;
+      width: auto !important;
+      max-width: 96% !important;
+      margin: 0 auto !important;
+      letter-spacing: -0.06em !important;
+      transform: none !important;
+      overflow: hidden !important;
+    }
+    .vs-echo i { -webkit-text-stroke: 0 !important; }
 
 </style>
 </head>
@@ -8602,7 +8616,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v98</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v99</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -9716,7 +9730,7 @@
       $("result").innerHTML = `
         ${renderSummary(result)}
         ${renderTeam(result.home, "Domicile", result.rank1, result.rank2)}
-        <div class="vs-divider"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
+        <div class="vs-divider ${vsEchoToneClass(result)}"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
         ${renderTeam(result.away, "Extérieur", result.rank1, result.rank2)}
       `;
     }
@@ -10803,7 +10817,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v98 chargé");
+    console.log("FOOTSCAN v99 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
