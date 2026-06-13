@@ -8327,6 +8327,227 @@
     .summary-grid .summary-cell.cell-neg { border-color: rgba(251,113,133,.42) !important; box-shadow: inset 0 3px 0 rgba(251,113,133,.55) !important; }
     .summary-grid .summary-cell.cell-neutral { border-color: rgba(140,170,225,.30) !important; box-shadow: inset 0 3px 0 rgba(140,170,225,.42) !important; }
 
+
+
+    /* Retouche v101 : harmonisation finale après scan — VS non coupé + tons performance propres */
+    :root {
+      --fs-pos-blue: #38bdf8;
+      --fs-pos-blue-soft: rgba(56, 189, 248, .18);
+      --fs-neg-rose: #fb7185;
+      --fs-neg-rose-soft: rgba(251, 113, 133, .18);
+      --fs-neutral-soft: rgba(140, 170, 225, .16);
+    }
+
+    /* Le VVVSSS ne doit jamais être coupé sur mobile. */
+    .result-shell .summary-title {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-wrap: wrap !important;
+      gap: .14rem .36rem !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow: visible !important;
+      text-align: center !important;
+      line-height: 1.15 !important;
+      word-break: normal !important;
+    }
+
+    .result-shell .summary-title .vs-echo,
+    .result-shell .vs-echo {
+      display: inline-flex !important;
+      align-items: baseline !important;
+      justify-content: center !important;
+      flex: 0 0 auto !important;
+      width: auto !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      overflow: visible !important;
+      white-space: nowrap !important;
+      margin: 0 !important;
+      padding: 0 .06rem !important;
+      font-size: clamp(.86rem, 3.85vw, 1.15rem) !important;
+      letter-spacing: -0.07em !important;
+      line-height: 1 !important;
+      transform: none !important;
+    }
+
+    .result-shell .vs-echo i {
+      display: inline-block !important;
+      margin-left: -0.06em !important;
+      font-style: italic !important;
+      -webkit-text-stroke: 0 !important;
+    }
+
+    .result-shell .vs-echo i:first-child { margin-left: 0 !important; }
+
+    @media (max-width: 430px) {
+      .result-shell .summary-title {
+        gap: .10rem .24rem !important;
+      }
+
+      .result-shell .summary-title .vs-echo,
+      .result-shell .vs-echo {
+        font-size: clamp(.76rem, 3.35vw, 1rem) !important;
+        letter-spacing: -0.085em !important;
+      }
+    }
+
+    /* Tous les VS suivent le ton : V = domicile, S = extérieur. */
+    .result-shell .vs-box,
+    .result-shell .vs-divider {
+      overflow: visible !important;
+    }
+
+    .result-shell .vs-echo.v-pos .ve-v,
+    .result-shell .vs-box.v-pos .vsb-v,
+    .result-shell .vs-divider.v-pos .vsb-v {
+      color: var(--fs-pos-blue) !important;
+      text-shadow: 0 0 13px rgba(56, 189, 248, .38) !important;
+    }
+
+    .result-shell .vs-echo.v-neg .ve-v,
+    .result-shell .vs-box.v-neg .vsb-v,
+    .result-shell .vs-divider.v-neg .vsb-v {
+      color: var(--fs-neg-rose) !important;
+      text-shadow: 0 0 13px rgba(251, 113, 133, .36) !important;
+    }
+
+    .result-shell .vs-echo.v-neu .ve-v,
+    .result-shell .vs-box.v-neu .vsb-v,
+    .result-shell .vs-divider.v-neu .vsb-v {
+      color: #8aa0c8 !important;
+      text-shadow: 0 0 10px rgba(138, 160, 200, .22) !important;
+    }
+
+    .result-shell .vs-echo.s-pos .ve-s,
+    .result-shell .vs-box.s-pos .vsb-s,
+    .result-shell .vs-divider.s-pos .vsb-s {
+      color: var(--fs-pos-blue) !important;
+      text-shadow: 0 0 13px rgba(56, 189, 248, .38) !important;
+    }
+
+    .result-shell .vs-echo.s-neg .ve-s,
+    .result-shell .vs-box.s-neg .vsb-s,
+    .result-shell .vs-divider.s-neg .vsb-s {
+      color: var(--fs-neg-rose) !important;
+      text-shadow: 0 0 13px rgba(251, 113, 133, .36) !important;
+    }
+
+    .result-shell .vs-echo.s-neu .ve-s,
+    .result-shell .vs-box.s-neu .vsb-s,
+    .result-shell .vs-divider.s-neu .vsb-s {
+      color: #8aa0c8 !important;
+      text-shadow: 0 0 10px rgba(138, 160, 200, .22) !important;
+    }
+
+    /* Le bloc équipe entier suit la performance : bleu si positif, pourpre-rose si négatif. */
+    .result-shell .team-card.team-card-pos {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(56, 189, 248, .18), transparent 34%),
+        linear-gradient(165deg, rgba(56, 189, 248, .12), rgba(15, 23, 48, .94) 52%, rgba(8, 12, 30, .96)) !important;
+      border-color: rgba(56, 189, 248, .34) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 24px rgba(56, 189, 248, .08) !important;
+    }
+
+    .result-shell .team-card.team-card-neg {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(251, 113, 133, .16), transparent 34%),
+        linear-gradient(165deg, rgba(251, 113, 133, .105), rgba(27, 15, 39, .94) 52%, rgba(12, 10, 28, .96)) !important;
+      border-color: rgba(251, 113, 133, .32) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 24px rgba(251, 113, 133, .075) !important;
+    }
+
+    .result-shell .team-card.team-card-neutral {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(140, 170, 225, .12), transparent 34%),
+        linear-gradient(165deg, rgba(140, 170, 225, .07), rgba(13, 18, 42, .94) 55%, rgba(8, 12, 30, .96)) !important;
+      border-color: rgba(140, 170, 225, .24) !important;
+    }
+
+    .result-shell .team-card-pos :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary) {
+      background: linear-gradient(160deg, rgba(56, 189, 248, .075), rgba(10, 16, 38, .88)) !important;
+      border-color: rgba(56, 189, 248, .21) !important;
+    }
+
+    .result-shell .team-card-neg :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary) {
+      background: linear-gradient(160deg, rgba(251, 113, 133, .07), rgba(20, 12, 32, .88)) !important;
+      border-color: rgba(251, 113, 133, .20) !important;
+    }
+
+    .result-shell .team-card-neutral :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary) {
+      background: linear-gradient(160deg, rgba(140, 170, 225, .055), rgba(12, 17, 40, .88)) !important;
+      border-color: rgba(140, 170, 225, .16) !important;
+    }
+
+    .result-shell .team-card-pos :is(.side-pill, .count-pill, .match-count-mini, .camp-badge, .event-metric-pill, .stat-badge) {
+      background: linear-gradient(135deg, rgba(56, 189, 248, .18), rgba(37, 99, 235, .09)) !important;
+      border-color: rgba(56, 189, 248, .30) !important;
+      color: #e6f8ff !important;
+    }
+
+    .result-shell .team-card-neg :is(.side-pill, .count-pill, .match-count-mini, .camp-badge, .event-metric-pill, .stat-badge) {
+      background: linear-gradient(135deg, rgba(251, 113, 133, .17), rgba(168, 85, 247, .09)) !important;
+      border-color: rgba(251, 113, 133, .30) !important;
+      color: #ffe8ee !important;
+    }
+
+    .result-shell .team-card-neutral :is(.side-pill, .count-pill, .match-count-mini, .camp-badge, .event-metric-pill, .stat-badge) {
+      background: linear-gradient(135deg, rgba(140, 170, 225, .14), rgba(140, 170, 225, .07)) !important;
+      border-color: rgba(140, 170, 225, .24) !important;
+      color: #e9eefc !important;
+    }
+
+    .result-shell .team-card-pos .zone-card::before {
+      background: radial-gradient(circle at top right, rgba(56,189,248,.12), transparent 42%), radial-gradient(circle at bottom left, rgba(56,189,248,.06), transparent 46%) !important;
+      opacity: .75 !important;
+    }
+
+    .result-shell .team-card-neg .zone-card::before {
+      background: radial-gradient(circle at top right, rgba(251,113,133,.12), transparent 42%), radial-gradient(circle at bottom left, rgba(251,113,133,.06), transparent 46%) !important;
+      opacity: .75 !important;
+    }
+
+    .result-shell .team-card-pos .logo-m {
+      box-shadow: 0 0 0 2px rgba(56,189,248,.36), 0 8px 18px rgba(56,189,248,.15) !important;
+    }
+
+    .result-shell .team-card-neg .logo-m {
+      box-shadow: 0 0 0 2px rgba(251,113,133,.35), 0 8px 18px rgba(251,113,133,.13) !important;
+    }
+
+    /* Résumé : mêmes tons que les cartes, sans mélange sale. */
+    .result-shell .summary-grid .summary-cell.cell-pos {
+      background: linear-gradient(160deg, rgba(56, 189, 248, .105), rgba(10, 16, 38, .88)) !important;
+      border-color: rgba(56, 189, 248, .32) !important;
+      box-shadow: inset 0 3px 0 rgba(56,189,248,.48) !important;
+    }
+
+    .result-shell .summary-grid .summary-cell.cell-neg {
+      background: linear-gradient(160deg, rgba(251, 113, 133, .095), rgba(20, 12, 32, .88)) !important;
+      border-color: rgba(251, 113, 133, .32) !important;
+      box-shadow: inset 0 3px 0 rgba(251,113,133,.46) !important;
+    }
+
+    .result-shell .summary-grid .summary-cell.cell-neutral {
+      background: linear-gradient(160deg, rgba(140, 170, 225, .07), rgba(12, 17, 40, .88)) !important;
+      border-color: rgba(140, 170, 225, .22) !important;
+      box-shadow: inset 0 3px 0 rgba(140,170,225,.34) !important;
+    }
+
+    .result-shell .positive { color: var(--fs-pos-blue) !important; }
+    .result-shell .negative { color: var(--fs-neg-rose) !important; }
+
+
+    /* Même règle pour le VS du bloc match analysé, qui est en dehors de result-shell. */
+    .vs-box.v-pos .vsb-v, .vs-divider.v-pos .vsb-v, .vs-echo.v-pos .ve-v { color: var(--fs-pos-blue) !important; text-shadow: 0 0 13px rgba(56, 189, 248, .38) !important; }
+    .vs-box.v-neg .vsb-v, .vs-divider.v-neg .vsb-v, .vs-echo.v-neg .ve-v { color: var(--fs-neg-rose) !important; text-shadow: 0 0 13px rgba(251, 113, 133, .36) !important; }
+    .vs-box.v-neu .vsb-v, .vs-divider.v-neu .vsb-v, .vs-echo.v-neu .ve-v { color: #8aa0c8 !important; text-shadow: 0 0 10px rgba(138, 160, 200, .22) !important; }
+    .vs-box.s-pos .vsb-s, .vs-divider.s-pos .vsb-s, .vs-echo.s-pos .ve-s { color: var(--fs-pos-blue) !important; text-shadow: 0 0 13px rgba(56, 189, 248, .38) !important; }
+    .vs-box.s-neg .vsb-s, .vs-divider.s-neg .vsb-s, .vs-echo.s-neg .ve-s { color: var(--fs-neg-rose) !important; text-shadow: 0 0 13px rgba(251, 113, 133, .36) !important; }
+    .vs-box.s-neu .vsb-s, .vs-divider.s-neu .vsb-s, .vs-echo.s-neu .ve-s { color: #8aa0c8 !important; text-shadow: 0 0 10px rgba(138, 160, 200, .22) !important; }
+    .vs-box, .vs-divider { overflow: visible !important; }
+
 </style>
 </head>
 
@@ -9427,7 +9648,7 @@
       $("scanBtn").textContent = "SCANNER →";
     }
 
-    function updateHero(match) {
+    function updateHero(match, result = null) {
       if (!match?.homeTeam || !match?.awayTeam) return;
 
       $("hero").innerHTML = `
@@ -9441,7 +9662,7 @@
               <div class="match-team-name">${esc(String(match.homeTeam.name || "").toUpperCase())}</div>
             </div>
 
-            <div class="vs-box"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
+            <div class="vs-box ${result ? vsEchoToneClass(result) : ""}"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
 
             <div class="match-team">
               <div class="logo-xl">
@@ -9461,7 +9682,7 @@
     function renderResult(result) {
       if (!result) return;
 
-      updateHero(result.match);
+      updateHero(result.match, result);
 
       $("result").innerHTML = `
         ${renderSummary(result)}
@@ -9519,7 +9740,7 @@
               <div class="summary-label">Résumé rapide</div>
               <div class="summary-label summary-mode">Mode scan : ${result.simultaneousMode ? "Simultané" : "Séparé"}</div>
             </div>
-            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 9 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 9 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 7 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 7 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
           </div>
 
           ${renderDominance(result)}
