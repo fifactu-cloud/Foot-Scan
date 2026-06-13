@@ -11904,9 +11904,10 @@ setupCalcModeSlider();
   </script>
 
 <script>
-  /* v118 : gestion clavier mobile sans bande blanche/noire.
-     On ne crée plus de faux bloc sous la page ; on garde seulement le champ visible
-     quand le viewport mobile se réduit avec le clavier. */
+  /* v119 : garde le correctif clavier sans repositionnement forcé.
+     v118 supprimait la bande blanche/noire, mais scrollIntoView() provoquait un retour
+     automatique à une ancienne position pendant le scroll clavier ouvert. Ici on se limite
+     à stabiliser le fond et l'état clavier : aucun scroll programmatique. */
   (() => {
     const body = document.body;
     const root = document.documentElement;
@@ -11915,7 +11916,7 @@ setupCalcModeSlider();
     const isEditable = (el) => el && el.matches && el.matches('input, textarea, select, [contenteditable="true"]');
     const vv = window.visualViewport || null;
     let raf = null;
-    let timer = null;
+    let blurTimer = null;
 
     const syncVars = () => {
       if (vv) {
@@ -11925,39 +11926,23 @@ setupCalcModeSlider();
       body.classList.toggle('keyboard-focus', isMobile() && isEditable(document.activeElement));
     };
 
-    const keepFocusedFieldVisible = () => {
-      const el = document.activeElement;
-      if (!isMobile() || !isEditable(el)) return;
-
-      const rect = el.getBoundingClientRect();
-      const viewHeight = vv ? vv.height : window.innerHeight;
-      const topLimit = 82;
-      const bottomLimit = Math.max(118, viewHeight * 0.22);
-
-      if (rect.top < topLimit || rect.bottom > viewHeight - bottomLimit) {
-        el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
-      }
-    };
-
     const sync = () => {
       if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        syncVars();
-        clearTimeout(timer);
-        timer = setTimeout(keepFocusedFieldVisible, 55);
-      });
+      raf = requestAnimationFrame(syncVars);
     };
 
-    document.addEventListener('focusin', sync, true);
+    document.addEventListener('focusin', () => {
+      clearTimeout(blurTimer);
+      sync();
+    }, true);
     document.addEventListener('focusout', () => {
-      clearTimeout(timer);
-      timer = setTimeout(sync, 90);
+      clearTimeout(blurTimer);
+      blurTimer = setTimeout(sync, 90);
     }, true);
     window.addEventListener('resize', sync, { passive: true });
     window.addEventListener('orientationchange', sync, { passive: true });
     if (vv) {
       vv.addEventListener('resize', sync, { passive: true });
-      vv.addEventListener('scroll', sync, { passive: true });
     }
     sync();
   })();
