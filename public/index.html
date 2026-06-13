@@ -9590,6 +9590,305 @@
       }
     }
 
+
+    /* Retouche v114 : fond stable quand le clavier mobile est ouvert
+       Corrige le grand bloc blanc Firefox/Android pendant le scroll avec un input focus.
+       Fond fixe minimal, sans animation ni modification des animations existantes. */
+    @media (max-width: 700px) {
+      html,
+      body {
+        background-color: #050816 !important;
+        min-height: 100% !important;
+      }
+
+      body.keyboard-focus,
+      body:focus-within {
+        background-color: #050816 !important;
+        min-height: calc(var(--fs-vvh, 100vh) + 260px) !important;
+        isolation: isolate !important;
+      }
+
+      body.keyboard-focus::before,
+      body:focus-within::before {
+        content: "" !important;
+        display: block !important;
+        position: fixed !important;
+        inset: -45vh 0 -45vh 0 !important;
+        z-index: -1 !important;
+        pointer-events: none !important;
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23ffffff' fill-opacity='0.022'/%3E%3C/svg%3E"),
+          linear-gradient(180deg, #050816 0%, #071023 48%, #050816 100%) !important;
+        animation: none !important;
+        transform: none !important;
+        filter: none !important;
+        opacity: 1 !important;
+      }
+    }
+
+
+    /* Retouche v115 : amélioration PC uniquement
+       Mobile conservé intact : toutes les règles sont limitées aux écrans larges. */
+    @media (min-width: 1024px) {
+      html {
+        overflow-y: scroll;
+        scrollbar-gutter: stable both-edges;
+      }
+
+      body {
+        min-width: 0;
+        background-attachment: fixed;
+      }
+
+      .topbar {
+        padding: calc(14px + env(safe-area-inset-top)) 28px 14px;
+      }
+
+      .topbar-inner,
+      .app {
+        width: min(1180px, calc(100vw - 72px)) !important;
+        max-width: 1180px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .topbar-inner {
+        min-height: 62px;
+      }
+
+      .brand-logo {
+        width: 54px;
+        height: 54px;
+        border-radius: 16px;
+      }
+
+      .brand-title {
+        font-size: 28px;
+      }
+
+      .worker-pill {
+        padding: 12px 18px;
+        border-radius: 16px;
+      }
+
+      .app {
+        padding: 28px 0 130px !important;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 26px;
+        align-items: stretch;
+      }
+
+      .app > .hero,
+      .app > .panel.notice {
+        width: 100% !important;
+        margin: 0 !important;
+        min-height: 310px;
+        display: flex;
+        align-items: stretch;
+      }
+
+      .app > .hero {
+        grid-column: 1;
+      }
+
+      .app > .panel.notice {
+        grid-column: 2;
+      }
+
+      .hero-inner,
+      .app > .panel.notice > div {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .hero-inner {
+        padding: 30px;
+      }
+
+      .home-title {
+        font-size: clamp(62px, 6.4vw, 86px);
+      }
+
+      .hero-text {
+        max-width: 760px;
+      }
+
+      .notice-title,
+      .notice-text {
+        width: min(100%, 760px);
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .notice-title {
+        justify-content: center;
+        white-space: nowrap;
+      }
+
+      .notice-text {
+        text-align: center;
+      }
+
+      .app > .panel:not(.notice),
+      .app > .report-panel,
+      .app > .result-shell,
+      .app > .bar-box {
+        grid-column: 1 / -1;
+        justify-self: center;
+        width: min(1060px, 100%) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .app > .result-shell {
+        width: min(1120px, 100%) !important;
+      }
+
+      .panel-pad {
+        padding: 28px;
+      }
+
+      .panel:not(.notice) > .form-grid {
+        max-width: 980px;
+        margin-left: auto;
+        margin-right: auto;
+        gap: 22px;
+      }
+
+      .form-grid > div,
+      .auto-box,
+      .auto-body,
+      .auto-result,
+      .two {
+        width: 100%;
+      }
+
+      .auto-head {
+        padding: 22px 26px;
+      }
+
+      .auto-title {
+        text-align: center;
+      }
+
+      .auto-body {
+        padding: 26px;
+        gap: 20px;
+      }
+
+      .preset-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .auto-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 16px;
+      }
+
+      .auto-control {
+        min-height: 148px;
+      }
+
+      .two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .skip-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .scan-btn,
+      .status-box,
+      .error-box {
+        width: min(760px, 100%);
+        justify-self: center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .scan-btn {
+        min-height: 70px;
+      }
+
+      .report-head,
+      .report-body {
+        padding-left: 28px;
+        padding-right: 28px;
+      }
+
+      .report-title {
+        text-align: center;
+      }
+
+      .report-buttons {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .report-btn.primary,
+      .report-btn.red {
+        grid-column: 1 / -1;
+        width: min(760px, 100%);
+        justify-self: center;
+      }
+
+      .report-hint {
+        max-width: 760px;
+        margin-left: auto;
+        margin-right: auto;
+        text-align: center;
+      }
+
+      .result-shell {
+        gap: 24px;
+      }
+
+      .result-shell .summary,
+      .result-shell .team-card,
+      .result-shell .bar-box {
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .summary-head {
+        align-items: center;
+      }
+
+      .summary-title {
+        text-align: center;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 18px;
+      }
+
+      .team-card .rank-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .stat-grid,
+      .bar-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .bar-box {
+        margin-top: 0;
+      }
+
+      details.clean[open] > .section,
+      .events-details[open] > .section {
+        contain: content;
+      }
+    }
+
 </style>
 </head>
 
@@ -11853,5 +12152,32 @@ setupCalcModeSlider();
     updateAutoCalculator();
     updateRangeGradientFill();
   </script>
+
+<script>
+  /* v114 : aide mobile Firefox/Android pendant le clavier ouvert.
+     Ne change pas la logique FOOTSCAN : uniquement la hauteur de fond visuel. */
+  (() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const setVisualHeight = () => {
+      const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      root.style.setProperty('--fs-vvh', `${Math.max(320, Math.round(h))}px`);
+    };
+    const isEditable = (el) => el && el.matches && el.matches('input, textarea, select, [contenteditable="true"]');
+    const syncKeyboardClass = () => {
+      body.classList.toggle('keyboard-focus', isEditable(document.activeElement));
+      setVisualHeight();
+    };
+    setVisualHeight();
+    window.addEventListener('resize', setVisualHeight, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', setVisualHeight, { passive: true });
+      window.visualViewport.addEventListener('scroll', setVisualHeight, { passive: true });
+    }
+    document.addEventListener('focusin', syncKeyboardClass, true);
+    document.addEventListener('focusout', () => setTimeout(syncKeyboardClass, 80), true);
+  })();
+</script>
+
 </body>
 </html>
