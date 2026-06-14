@@ -1,2081 +1,11952 @@
-import os
-import sys
-import json
-import time
-import re
-import math
-import urllib.request
-import urllib.error
-import shutil
-import subprocess
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="theme-color" content="#060817" />
+  <title>FOOTSCAN</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800;900&display=swap" rel="stylesheet" />
 
-# Optionnel : curl_cffi imite l'empreinte TLS de Chrome et contourne
-# le 403 "challenge" anti-bot de SofaScore. Installation dans Termux :
-#     pip install curl_cffi
-try:
-    from curl_cffi import requests as cffi_requests
-    HAS_CURL_CFFI = True
-except Exception:
-    cffi_requests = None
-    HAS_CURL_CFFI = False
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-
-def load_local_env():
-    """Charge un fichier .env local si présent (utile dans Termux).
-
-    Les variables déjà exportées dans le shell restent prioritaires.
-    Format supporté: NOM=valeur, avec guillemets optionnels.
-    """
-    candidates = [
-        os.path.join(os.getcwd(), ".env"),
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
-    ]
-
-    for env_path in candidates:
-        if not os.path.exists(env_path):
-            continue
-
-        try:
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-                    key, value = line.split("=", 1)
-                    key = key.strip()
-                    value = value.strip().strip('"').strip("'")
-                    if key and key not in os.environ:
-                        os.environ[key] = value
-        except Exception as e:
-            print(f"Attention: impossible de lire {env_path}: {e}", file=sys.stderr)
-
-
-load_local_env()
-
-
-RAW_QUEUE_KEY = "sofa:queue"
-RAW_PREFETCH_QUEUE_KEY = "sofa:prefetch_queue"
-SCAN_QUEUE_KEY = "footscan:scan:queue"
-
-CACHE_PREFIX = "sofa:cache:"
-ERROR_PREFIX = "sofa:error:"
-REQUEST_PREFIX = "sofa:req:"
-LOCK_PREFIX = "sofa:lock:"
-PREFETCH_LOCK_PREFIX = "sofa:prefetch_lock:"
-SCAN_JOB_PREFIX = "footscan:scan:job:"
-
-CACHE_TTL_SECONDS = int(os.environ.get("SOFA_CACHE_TTL_SECONDS", "86400"))
-ERROR_TTL_SECONDS = int(os.environ.get("SOFA_ERROR_TTL_SECONDS", "60"))
-SCAN_JOB_TTL_SECONDS = int(os.environ.get("SCAN_JOB_TTL_SECONDS", "86400"))
-SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "0.5"))
-PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAGE", "17"))
-
-PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "20"))
-PAGE_LOAD_STEPS = [10, 15, 20]
-INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM", "15"))
-SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
-MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "100"))
-INCIDENT_BATCH_SIZE = int(os.environ.get("FOOTSCAN_INCIDENT_BATCH_SIZE", "2"))
-INCIDENT_MAX_WORKERS = int(os.environ.get("FOOTSCAN_INCIDENT_MAX_WORKERS", "6"))
-SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "2"))
-SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.4"))
-SOFA_FETCH_TIMEOUT_SECONDS = int(os.environ.get("SOFA_FETCH_TIMEOUT_SECONDS", "12"))
-SOFA_DEBUG_NETWORK = os.environ.get("SOFA_DEBUG_NETWORK", "0").strip().lower() in ("1", "true", "oui", "yes")
-FOOTSCAN_ALLOW_PARTIAL = os.environ.get("FOOTSCAN_ALLOW_PARTIAL", "0").strip().lower() in ("1", "true", "oui", "yes")
-FOOTSCAN_STRICT_DATA = not FOOTSCAN_ALLOW_PARTIAL
-SOFA_INCIDENT_TIMEOUT_SECONDS = int(os.environ.get("SOFA_INCIDENT_TIMEOUT_SECONDS", "8"))
-SOFA_INCIDENT_RETRIES = int(os.environ.get("SOFA_INCIDENT_RETRIES", "1"))
-PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
-DEFAULT_RANK_EVENT_STEP = 1.0
-CURRENT_RANK_EVENT_STEP = DEFAULT_RANK_EVENT_STEP
-CURRENT_RANK_ADVANCEMENT_MODE = "fixed"
-
-
-def configure_rank_advancement(step=None, mode=None):
-    """Configure l'avancement des rangs pour le job en cours.
-
-    mode="fixed" : chaque événement avance de CURRENT_RANK_EVENT_STEP.
-    mode="performance" : chaque événement avance selon sa valeur absolue de performance.
-    """
-    global CURRENT_RANK_EVENT_STEP, CURRENT_RANK_ADVANCEMENT_MODE
-
-    try:
-        parsed_step = float(step) if step is not None else DEFAULT_RANK_EVENT_STEP
-    except Exception:
-        parsed_step = DEFAULT_RANK_EVENT_STEP
-
-    if not math.isfinite(parsed_step) or parsed_step <= 0:
-        parsed_step = DEFAULT_RANK_EVENT_STEP
-
-    CURRENT_RANK_EVENT_STEP = parsed_step
-    CURRENT_RANK_ADVANCEMENT_MODE = "performance" if mode == "performance" else "fixed"
-
-
-def rank_advancement_label():
-    if CURRENT_RANK_ADVANCEMENT_MODE == "performance":
-        return "valeur de performance"
-    return f"{CURRENT_RANK_EVENT_STEP:.4f} par événement"
-
-GOAL_WITH_PASSER_VALUE = 1.0
-GOAL_WITHOUT_PASSER_VALUE = 2 / 3
-GOAL_ERROR_VALUE = 1 / 3
-
-POSITIVE_VALUES = {
-    "goalWithAssist": GOAL_WITH_PASSER_VALUE,
-    "goal": GOAL_WITHOUT_PASSER_VALUE,
-}
-
-NEGATIVE_VALUES_FOR_TEAM = {
-    "ownGoal": -GOAL_ERROR_VALUE,
-}
-
-CARD_VALUES_FOR_TEAM = {
-    "yellow": -0.25,
-    "secondYellow": -0.5,
-    "red": -1,
-    "redFromSecondYellow": -1.5,
-}
-
-LABELS = {
-    "goal": "But Sans Passeur",
-    "goalWithAssist": "But Avec Passeur",
-    "goalNoAssistError": "CSC / Erreur",
-    "assist": "Passe décisive",
-    "yellow": "Jaune",
-    "secondYellow": "Deuxième jaune",
-    "red": "Rouge direct",
-    "redFromSecondYellow": "Rouge via 2e jaune",
-    "ownGoal": "CSC / Erreur",
-}
-
-
-def env(name):
-    value = os.environ.get(name)
-
-    if not value:
-        raise RuntimeError(f"Variable d'environnement manquante: {name}")
-
-    return value
-
-
-UPSTASH_URL = env("UPSTASH_REDIS_REST_URL")
-UPSTASH_TOKEN = env("UPSTASH_REDIS_REST_TOKEN")
-
-
-def redis_cmd(*cmd):
-    req = urllib.request.Request(
-        UPSTASH_URL,
-        data=json.dumps(list(cmd)).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {UPSTASH_TOKEN}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Upstash HTTP {e.code}: {raw[:300]}")
-
-    data = json.loads(raw)
-
-    if data.get("error"):
-        raise RuntimeError(f"Upstash error: {data['error']}")
-
-    return data.get("result")
-
-
-def read_url(url, headers, impersonate=False, timeout=None):
-    # Si curl_cffi est dispo, on imite l'empreinte TLS de Chrome :
-    # c'est ce qui contourne le 403 "challenge" (anti-bot) de SofaScore.
-    if impersonate and HAS_CURL_CFFI:
-        try:
-            resp = cffi_requests.get(url, headers=headers, timeout=timeout or SOFA_FETCH_TIMEOUT_SECONDS, impersonate="chrome")
-            return resp.status_code, resp.text
-        except Exception as e:
-            return 0, str(e)
-
-    req = urllib.request.Request(url, headers=headers, method="GET")
-
-    try:
-        with urllib.request.urlopen(req, timeout=timeout or SOFA_FETCH_TIMEOUT_SECONDS) as resp:
-            status = resp.status
-            body = resp.read().decode("utf-8", errors="replace")
-            return status, body
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        return e.code, body
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        # Erreurs réseau Termux / mobile : on remonte une erreur spéciale.
-        # sofa_fetch fera les retry avant d'abandonner.
-        return 0, str(e)
-
-
-def read_url_syscurl(url, headers, timeout=None):
-    """Transport de secours via le binaire curl de Termux (pkg install curl).
-
-    Son empreinte TLS differe de celle de Python : il passe parfois
-    la ou urllib est bloque."""
-    if not shutil.which("curl"):
-        return 0, "curl absent (pkg install curl)"
-
-    t = int(timeout or SOFA_FETCH_TIMEOUT_SECONDS)
-    cmd = ["curl", "-sS", "-L", "--http1.1", "--compressed", "--connect-timeout", str(max(3, min(10, t))), "--max-time", str(max(5, t)),
-           "-w", "\n%{http_code}", url]
-    for k, v in headers.items():
-        cmd += ["-H", f"{k}: {v}"]
-
-    try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=max(8, int(timeout or SOFA_FETCH_TIMEOUT_SECONDS) + 5))
-        raw = out.stdout
-        if "\n" not in raw:
-            return 0, (out.stderr or "reponse curl vide").strip()
-        body, _, code = raw.rpartition("\n")
-        return int(code or 0), body
-    except Exception as e:
-        return 0, str(e)
-
-
-def validate_json(status, body, path, source):
-    if status != 200:
-        return None, f"{source}: HTTP {status} sur {path}: {body[:300]}"
-
-    text = body.strip()
-
-    if not text:
-        return None, f"{source}: réponse vide sur {path}"
-
-    if text.startswith("<"):
-        return None, f"{source}: HTML reçu au lieu de JSON sur {path}: {text[:300]}"
-
-    try:
-        data = json.loads(text)
-    except Exception:
-        return None, f"{source}: JSON invalide sur {path}: {text[:300]}"
-
-    if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        return None, f"{source}: erreur Web sur {path}: {data['error']}"
-
-    return body, None
-
-
-def sofa_fetch(path, incident_mode=False):
-    clean_path = path.lstrip("/")
-    incident_mode = incident_mode or bool(re.match(r"^event/\d+/incidents$", clean_path))
-
-    app_url = f"https://api.sofascore.app/api/v1/{clean_path}"
-    www_url = f"https://www.sofascore.com/api/v1/{clean_path}"
-    api_url = f"https://api.sofascore.com/api/v1/{clean_path}"
-
-    # L'app Android n'envoie NI Referer NI Origin : les envoyer sur l'hôte
-    # .app paraît suspect. On imite donc l'app sur .app, le navigateur sur .com.
-    app_headers = {
-        "User-Agent": "okhttp/4.12.0",
-        "Accept": "application/json",
-        "Accept-Language": "fr-FR,fr;q=0.9",
-        "Accept-Encoding": "identity",
-        "Cache-Control": "no-cache",
+  <style>
+    * {
+      box-sizing: border-box;
     }
 
-    browser_headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Linux; Android 14; SM-S918B) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Mobile Safari/537.36"
-        ),
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-        "Referer": "https://www.sofascore.com/",
-        "Origin": "https://www.sofascore.com",
-        "Cache-Control": "no-cache",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Dest": "empty",
-        "X-Requested-With": "XMLHttpRequest",
+    :root {
+      --bg: #070707;
+      --panel: #111111;
+      --card: #171717;
+      --card-2: #202020;
+      --line: rgba(255, 255, 255, 0.12);
+      --text: #f5f5f5;
+      --muted: #9ca3af;
+      --soft: #d4d4d8;
+      --red: #fb7185;
+      --green: #22c55e;
+      --yellow: #facc15;
+      --blue: #38bdf8;
+      --shadow: 0 22px 55px rgba(0, 0, 0, 0.42);
     }
 
-    # (url, headers, transport) — du plus prometteur au plus désespéré.
-    # Pour les incidents, on évite les longues boucles urllib: si SofaScore
-    # renvoie un challenge 403, le match sera ignoré proprement par le scan.
-    if incident_mode:
-        targets = [
-            (www_url, browser_headers, "cffi"),
-            (api_url, browser_headers, "cffi"),
-            (app_url, app_headers, "syscurl"),
-            (www_url, browser_headers, "syscurl"),
-            (api_url, browser_headers, "syscurl"),
-            (app_url, app_headers, "urllib"),
-        ]
-        retries = max(1, SOFA_INCIDENT_RETRIES)
-        timeout = SOFA_INCIDENT_TIMEOUT_SECONDS
-    else:
-        targets = [
-            # curl_cffi d'abord quand il est disponible : moins de faux messages
-            # "réponse vide" au démarrage Termux, et meilleure empreinte navigateur.
-            (www_url, browser_headers, "cffi"),
-            (api_url, browser_headers, "cffi"),
-            (app_url, app_headers, "urllib"),
-            (www_url, browser_headers, "syscurl"),
-            (api_url, browser_headers, "syscurl"),
-            (app_url, app_headers, "syscurl"),
-            (www_url, browser_headers, "urllib"),
-            (api_url, browser_headers, "urllib"),
-        ]
-        retries = SOFA_FETCH_RETRIES
-        timeout = SOFA_FETCH_TIMEOUT_SECONDS
-
-    last_error = None
-    challenge_seen = False
-
-    for attempt in range(1, retries + 1):
-        for url, headers, transport in targets:
-            if transport == "cffi":
-                if not HAS_CURL_CFFI:
-                    continue
-                status, body = read_url(url, headers, impersonate=True, timeout=timeout)
-            elif transport == "syscurl":
-                status, body = read_url_syscurl(url, headers, timeout=timeout)
-            else:
-                status, body = read_url(url, headers, timeout=timeout)
-
-            valid_body, error = validate_json(status, body, clean_path, f"{url} [{transport}]")
-
-            if valid_body is not None:
-                return valid_body
-
-            last_error = error
-
-            if status == 403 and "challenge" in (body or ""):
-                challenge_seen = True
-
-            # 404 = page absente : c'est normal quand l'historique SofaScore s'arrête.
-            # On remonte l'information au scan, mais sans l'afficher comme une erreur Termux.
-            if status == 404:
-                if SOFA_DEBUG_NETWORK:
-                    print(f"Fin historique / ressource absente: {error}", file=sys.stderr)
-                raise RuntimeError(error)
-
-            if SOFA_DEBUG_NETWORK:
-                print(f"Échec tentative {attempt}/{retries}: {error}", file=sys.stderr)
-
-        if attempt < retries:
-            time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
-
-    if challenge_seen and not HAS_CURL_CFFI:
-        print(
-            "ASTUCE : SofaScore bloque l'empreinte TLS de Python (403 challenge).\n"
-            "Deux solutions, de la plus simple à la plus robuste :\n"
-            "  1. Dans Termux : pkg install curl   (active le transport curl)\n"
-            "  2. Ubuntu via proot-distro pour utiliser curl_cffi :\n"
-            "       pkg install proot-distro\n"
-            "       proot-distro install ubuntu\n"
-            "       proot-distro login ubuntu\n"
-            "       apt update && apt install -y python3-pip\n"
-            "       pip3 install curl_cffi\n"
-            "       puis relancer le worker depuis Ubuntu.",
-            file=sys.stderr,
-        )
-
-    raise RuntimeError(
-        (last_error or f"Impossible de récupérer {clean_path}")
-        + f" | curl_cffi={'oui' if HAS_CURL_CFFI else 'non'}"
-        + f" curl_systeme={'oui' if shutil.which('curl') else 'non'}"
-    )
-
-def cache_key(path):
-    return f"{CACHE_PREFIX}{path.lstrip('/')}"
-
-
-def error_key(path):
-    return f"{ERROR_PREFIX}{path.lstrip('/')}"
-
-
-def get_cached_body(path):
-    return redis_cmd("GET", cache_key(path))
-
-
-def is_cached(path):
-    return bool(get_cached_body(path))
-
-
-def set_cache(path, body):
-    redis_cmd("SET", cache_key(path), body, "EX", str(CACHE_TTL_SECONDS))
-
-
-def set_error(path, error_message):
-    payload = {
-        "error": error_message,
-        "path": path,
-        "source": "local_worker",
+    html,
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Google Sans", "Roboto", "Arial", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
 
-    redis_cmd("SET", error_key(path), json.dumps(payload), "EX", str(ERROR_TTL_SECONDS))
-
-
-def get_json(path):
-    clean_path = path.lstrip("/")
-    cached = get_cached_body(clean_path)
-
-    if cached:
-        return json.loads(cached)
-
-    body = sofa_fetch(clean_path)
-    set_cache(clean_path, body)
-    maybe_enqueue_incidents_from_team_page(clean_path, body)
-    return json.loads(body)
-
-
-def get_incidents_json(path):
-    """Récupère les incidents de manière déterministe.
-
-    Par défaut, si les événements d'un match ne sont pas récupérables
-    (ex: 403 challenge SofaScore), le scan échoue au lieu de produire
-    un résultat partiel qui peut changer d'un lancement à l'autre.
-
-    Pour retrouver l'ancien comportement permissif, lancer le worker avec :
-        FOOTSCAN_ALLOW_PARTIAL=1 python scripts/local_worker.py
-    """
-    clean_path = path.lstrip("/")
-    cached = get_cached_body(clean_path)
+    body {
+      min-height: 100vh;
+      background:
+        linear-gradient(135deg, rgba(239, 68, 68, 0.16), transparent 32%),
+        linear-gradient(225deg, rgba(56, 189, 248, 0.10), transparent 28%),
+        linear-gradient(180deg, #080808, #050505);
+    }
 
-    if cached:
-        return json.loads(cached)
-
-    try:
-        body = sofa_fetch(clean_path, incident_mode=True)
-        set_cache(clean_path, body)
-        return json.loads(body)
-    except Exception as e:
-        msg = str(e)
-        if "challenge" in msg or "HTTP 403" in msg:
-            if SOFA_DEBUG_NETWORK:
-                print(f"Incidents non récupérés (SofaScore challenge): {clean_path}", file=sys.stderr)
-            if FOOTSCAN_STRICT_DATA:
-                raise RuntimeError(
-                    "Scan stoppé pour éviter un résultat variable : "
-                    f"événements Web non récupérés pour {clean_path} (SofaScore challenge). "
-                    "Relance plus tard ou lance le worker avec FOOTSCAN_ALLOW_PARTIAL=1 "
-                    "si tu acceptes un résultat partiel."
-                )
-            return {
-                "incidents": [],
-                "_footscanIssue": {
-                    "type": "blocked",
-                    "reason": "SofaScore challenge",
-                    "path": clean_path,
-                    "message": "SofaScore a bloqué la récupération des événements de ce match.",
-                },
-            }
-        raise
+    button,
+    input {
+      font: inherit;
+    }
 
+    .app,
+    .panel,
+    .auto-box,
+    .per-team-box,
+    .per-team-card,
+    .auto-control,
+    .team-calc-grid,
+    .auto-formula,
+    .mode-toggle,
+    .report-panel,
+    .summary,
+    .team-card {
+      min-width: 0;
+      max-width: 100%;
+    }
 
-def extract_events_from_body(body):
-    try:
-        data = json.loads(body)
-    except Exception:
-        return []
+    button {
+      cursor: pointer;
+    }
 
-    if isinstance(data, dict):
-        events = data.get("events", [])
-    elif isinstance(data, list):
-        events = data
-    else:
-        events = []
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+      background: rgba(7, 7, 7, 0.90);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--line);
+    }
 
-    if not isinstance(events, list):
-        return []
+    .topbar-inner,
+    .app {
+      width: min(920px, 100%);
+      margin: 0 auto;
+    }
 
-    return events
+    .topbar-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
 
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+    }
 
-def enqueue_prefetch(path):
-    clean_path = path.lstrip("/")
-    lock_key = f"{PREFETCH_LOCK_PREFIX}{clean_path}"
+    .brand-logo {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #fb7185, #7f1d1d);
+      color: #fff;
+      font-size: 20px;
+      font-weight: 1000;
+      letter-spacing: -0.08em;
+      box-shadow: 0 12px 26px rgba(239, 68, 68, 0.25);
+      flex: 0 0 auto;
+    }
 
-    if is_cached(clean_path):
-        return False
+    .brand-title {
+      font-size: 22px;
+      font-weight: 1000;
+      letter-spacing: -0.06em;
+      line-height: 1;
+      white-space: nowrap;
+    }
 
-    lock_result = redis_cmd(
-        "SET",
-        lock_key,
-        "1",
-        "EX",
-        "600",
-        "NX",
-    )
+    .brand-title span {
+      color: var(--red);
+    }
 
-    if lock_result == "OK":
-        redis_cmd("LPUSH", RAW_PREFETCH_QUEUE_KEY, clean_path)
-        return True
+    .brand-subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
 
-    return False
+    .worker-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      background: rgba(34, 197, 94, 0.09);
+      color: #bbf7d0;
+      font-size: 11px;
+      font-weight: 1000;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
 
+    .worker-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.13);
+    }
 
-def maybe_enqueue_incidents_from_team_page(path, body):
-    if not PREFETCH_ENABLED:
-        return
+    .app {
+      padding: 14px 14px 90px;
+    }
 
-    clean_path = path.lstrip("/")
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box {
+      border: 1px solid var(--line);
+      background: rgba(17, 17, 17, 0.93);
+      box-shadow: var(--shadow);
+      border-radius: 18px;
+      overflow: hidden;
+    }
 
-    if not re.match(r"^team/\d+/events/last/\d+$", clean_path):
-        return
+    .hero {
+      margin-top: 12px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
+        rgba(17, 17, 17, 0.90);
+    }
 
-    events = extract_events_from_body(body)
-    finished = []
+    .hero-inner,
+    .panel-pad {
+      padding: 16px;
+    }
 
-    for match in events:
-        if not isinstance(match, dict):
-            continue
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      background: rgba(239, 68, 68, 0.09);
+      color: #fecaca;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 1000;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
 
-        if (match.get("status") or {}).get("type") != "finished":
-            continue
+    .home-title {
+      margin: 0;
+      font-size: clamp(40px, 11vw, 72px);
+      line-height: 0.9;
+      letter-spacing: -0.1em;
+      font-weight: 1000;
+    }
 
-        match_id = match.get("id")
+    .home-title span {
+      color: var(--red);
+    }
 
-        if not match_id:
-            continue
+    .hero-text,
+    .notice-text,
+    .small-text {
+      color: var(--soft);
+      font-size: 13px;
+      line-height: 1.45;
+    }
 
-        start_timestamp = match.get("startTimestamp") or 0
+    .hero-text {
+      margin: 11px 0 0;
+      max-width: 680px;
+    }
 
-        finished.append({
-            "id": match_id,
-            "startTimestamp": start_timestamp,
-        })
+    .match-hero {
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
 
-    finished.sort(key=lambda x: x["startTimestamp"], reverse=True)
+    .match-teams {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+    }
 
-    count = 0
+    .match-team {
+      display: grid;
+      gap: 9px;
+      place-items: center;
+      text-align: center;
+      min-width: 0;
+    }
 
-    for match in finished[:PREFETCH_MAX_MATCHES_PER_PAGE]:
-        incident_path = f"event/{match['id']}/incidents"
+    .logo-xl,
+    .logo-m,
+    .logo-s {
+      display: grid;
+      place-items: center;
+      background: #151515;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      overflow: hidden;
+    }
 
-        if enqueue_prefetch(incident_path):
-            count += 1
+    .logo-xl {
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
+    }
 
-    if count:
-        print(f"Préchargement événements ajouté: {count} match(s) depuis {clean_path}")
+    .logo-xl img {
+      width: 58px;
+      height: 58px;
+      object-fit: contain;
+    }
 
+    .logo-m {
+      width: 60px;
+      height: 60px;
+      border-radius: 14px;
+      flex: 0 0 auto;
+    }
 
-def now_ts():
-    return int(time.time())
+    .logo-m img {
+      width: 49px;
+      height: 49px;
+      object-fit: contain;
+    }
 
+    .logo-s {
+      width: 37px;
+      height: 37px;
+      border-radius: 10px;
+      flex: 0 0 auto;
+    }
 
-def update_scan_job(job_id, **fields):
-    key = f"{SCAN_JOB_PREFIX}{job_id}"
-    raw = redis_cmd("GET", key)
+    .logo-s img {
+      width: 30px;
+      height: 30px;
+      object-fit: contain;
+    }
 
-    if raw:
-        job = json.loads(raw)
-    else:
-        job = {"id": job_id}
+    .match-team-name {
+      max-width: 150px;
+      font-size: 14px;
+      font-weight: 950;
+      line-height: 1.16;
+      overflow-wrap: anywhere;
+    }
 
-    job.update(fields)
-    job["updatedAt"] = now_ts()
+    .vs-box {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: #151515;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-weight: 1000;
+    }
 
-    redis_cmd("SET", key, json.dumps(job, ensure_ascii=False), "EX", str(SCAN_JOB_TTL_SECONDS))
-    return job
+    .panel,
+    .report-panel,
+    .bar-box {
+      margin-top: 12px;
+    }
 
+    .notice {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      background:
+        linear-gradient(135deg, rgba(250, 204, 21, 0.10), rgba(239, 68, 68, 0.04)),
+        rgba(17, 17, 17, 0.92);
+    }
 
-def format_date(timestamp):
-    if not timestamp:
-        return ""
+    .notice-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: rgba(250, 204, 21, 0.12);
+      color: var(--yellow);
+      border: 1px solid rgba(250, 204, 21, 0.22);
+      flex: 0 0 auto;
+      font-size: 19px;
+    }
 
-    return time.strftime("%d.%m.%y", time.localtime(int(timestamp)))
+    .notice-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
 
+    .notice-inline-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: inline-grid;
+      place-items: center;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.32);
+      box-shadow: 0 0 0 rgba(239, 68, 68, 0.0);
+      flex: 0 0 40px;
+      animation: stopPulse 1.15s ease-in-out infinite;
+    }
 
-def get_competition_name(match):
-    tournament = match.get("tournament") or {}
-    unique_from_tournament = tournament.get("uniqueTournament") or {}
-    unique = match.get("uniqueTournament") or {}
-    season = match.get("season") or {}
+    @keyframes stopPulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 rgba(239, 68, 68, 0.0);
+        border-color: rgba(239, 68, 68, 0.30);
+      }
+      50% {
+        transform: scale(1.06);
+        box-shadow: 0 0 22px rgba(239, 68, 68, 0.34);
+        border-color: rgba(239, 68, 68, 0.78);
+      }
+    }
 
-    return (
-        unique_from_tournament.get("name") or
-        unique.get("name") or
-        tournament.get("name") or
-        season.get("name") or
-        ""
-    )
+    code {
+      color: #fef3c7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+    }
 
+    .form-grid {
+      display: grid;
+      gap: 12px;
+    }
 
-def make_match_label(match):
-    date = format_date(match.get("startTimestamp"))
-    competition = get_competition_name(match)
-    prefix = " · ".join([x for x in [date, competition] if x])
+    .two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
 
-    home = (match.get("homeTeam") or {}).get("name") or "?"
-    away = (match.get("awayTeam") or {}).get("name") or "?"
-    home_score = (match.get("homeScore") or {}).get("current", "-")
-    away_score = (match.get("awayScore") or {}).get("current", "-")
-    teams = f"{home} {home_score}-{away_score} {away}"
+    .auto-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
 
-    return f"{prefix} · {teams}" if prefix else teams
+    @media (max-width: 920px) {
+      .auto-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
 
+    @media (max-width: 560px) {
+      .two,
+      .auto-grid {
+        grid-template-columns: 1fr;
+      }
 
-def incident_belongs_to_analyzed_team(incident, match, analyzed_team_id):
-    home_team = match.get("homeTeam") or {}
-    team_is_home = home_team.get("id") == analyzed_team_id
+      .brand-subtitle {
+        display: none;
+      }
+    }
 
-    if isinstance(incident.get("isHome"), bool):
-        return incident.get("isHome") == team_is_home
+    label,
+    .auto-control-title,
+    .tiny-label {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
 
-    direct_team_id = (
-        (incident.get("team") or {}).get("id") or
-        (incident.get("playerTeam") or {}).get("id") or
-        ((incident.get("player") or {}).get("team") or {}).get("id")
-    )
+    label {
+      margin-bottom: 7px;
+    }
 
-    if direct_team_id:
-        return direct_team_id == analyzed_team_id
+    input {
+      width: 100%;
+      padding: 14px 13px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #090909;
+      color: var(--text);
+      outline: none;
+      font-size: 16px;
+    }
 
-    return True
+    input:focus {
+      border-color: rgba(239, 68, 68, 0.70);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.13);
+    }
 
+    input[type="range"] {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      accent-color: var(--red);
+      width: 100%;
+      min-width: 0;
+    }
 
-def is_own_goal_incident(incident):
-    cls = str(incident.get("incidentClass") or "").lower()
+    .skip-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 7px;
+    }
 
-    return (
-        incident.get("isOwnGoal") is True or
-        incident.get("ownGoal") is True or
-        cls in {"owngoal", "own_goal", "own goal"} or
-        "own" in cls
-    )
+    .skip-grid button {
+      min-height: 42px;
+      border-radius: 11px;
+      border: 1px solid var(--line);
+      background: #090909;
+      color: var(--muted);
+      font-weight: 1000;
+    }
 
+    .skip-grid button.active {
+      color: #fff;
+      border-color: rgba(239, 68, 68, 0.95);
+      background: linear-gradient(135deg, #fb7185, #9f1956);
+      box-shadow: 0 12px 24px rgba(239, 68, 68, 0.18);
+    }
 
-def own_goal_committed_by_analyzed_team(incident, match, analyzed_team_id):
-    player = incident.get("player") or {}
+    .auto-box {
+      border-radius: 16px;
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      background:
+        linear-gradient(135deg, rgba(56, 189, 248, 0.10), rgba(34, 197, 94, 0.045)),
+        #101010;
+      overflow: hidden;
+    }
 
-    # Pour un CSC, Web peut comptabiliser le but pour l'équipe bénéficiaire.
-    # Dans notre méthode, on veut toujours attribuer l'événement au joueur/club
-    # qui marque contre son camp. On privilégie donc l'équipe du joueur.
-    player_team_id = (
-        ((incident.get("playerTeam") or {}).get("id")) or
-        ((player.get("team") or {}).get("id"))
-    )
+    .auto-head {
+      padding: 13px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
 
-    if player_team_id:
-        return player_team_id == analyzed_team_id
+    .auto-title {
+      font-size: 18px;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+    }
 
-    # Repli: si Web place isHome du côté bénéficiaire du but,
-    # l'équipe qui marque contre son camp est l'autre côté.
-    if isinstance(incident.get("isHome"), bool):
-        home_team = match.get("homeTeam") or {}
-        analyzed_is_home = home_team.get("id") == analyzed_team_id
-        own_goal_team_is_home = not incident.get("isHome")
-        return own_goal_team_is_home == analyzed_is_home
+    .auto-sub {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
 
-    return incident_belongs_to_analyzed_team(incident, match, analyzed_team_id)
+    .auto-badge {
+      padding: 7px 9px;
+      border-radius: 10px;
+      background: rgba(56, 189, 248, 0.10);
+      border: 1px solid rgba(56, 189, 248, 0.20);
+      color: #bae6fd;
+      font-size: 11px;
+      font-weight: 1000;
+      white-space: nowrap;
+    }
 
+    .auto-body {
+      padding: 13px;
+      display: grid;
+      gap: 12px;
+    }
 
-def signed_attack_value(kind, is_for_analyzed_team):
-    base = POSITIVE_VALUES.get(kind, 0)
-    return base if is_for_analyzed_team else -base
+    .preset-box {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(250, 204, 21, 0.20);
+      background:
+        linear-gradient(135deg, rgba(250, 204, 21, 0.08), rgba(56, 189, 248, 0.045)),
+        rgba(0, 0, 0, 0.18);
+    }
 
+    .preset-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 1000;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
 
-def signed_card_value(kind, is_for_analyzed_team):
-    base = CARD_VALUES_FOR_TEAM.get(kind, 0)
-    return base if is_for_analyzed_team else -base
+    .preset-hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
 
+    .preset-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
 
-def signed_own_goal_value(is_for_analyzed_team):
-    base = NEGATIVE_VALUES_FOR_TEAM["ownGoal"]
-    return base if is_for_analyzed_team else -base
+    @media (max-width: 520px) {
+      .preset-actions { grid-template-columns: 1fr; }
+    }
 
+    .preset-btn {
+      min-height: 46px;
+      border-radius: 13px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.055);
+      color: var(--soft);
+      font-weight: 1000;
+      letter-spacing: -0.02em;
+      display: grid;
+      gap: 3px;
+      place-items: center;
+      text-align: center;
+    }
 
-def parse_incidents(incidents, match, analyzed_team_id):
-    """Récupère uniquement les buts.
+    .preset-btn small {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+    }
 
-    Depuis cette version, les cartons et les passes décisives seules ne sont
-    plus parcourus. Les seuls événements conservés sont :
-    - But Avec Passeur = performance 1
-    - But Sans Passeur = 2/3 de performance 1
-    - CSC / Erreur adverse = 1/3 de performance 1
-
-    Le 1/3 d'un But Sans Passeur est classé dans la catégorie CSC / Erreur :
-    il compte comme une erreur de l'équipe qui encaisse.
-    """
-    events = []
-    match_label = make_match_label(match)
-    match_id = match.get("id")
-
-    for inc in incidents:
-        if not isinstance(inc, dict):
-            continue
-
-        if inc.get("incidentType") != "goal":
-            continue
-
-        minute = inc.get("time")
-        added = inc.get("addedTime") or 0
-
-        if minute is None or minute < 1 or minute > 90:
-            continue
-
-        minute_label = f"{minute}+{added}'" if added else f"{minute}'"
-        is_for_team = incident_belongs_to_analyzed_team(inc, match, analyzed_team_id)
-        camp_label = "Équipe analysée" if is_for_team else "Adversaire"
-        side = "team" if is_for_team else "opponent"
-
-        player = inc.get("player") or {}
-        scorer = player.get("name") or "—"
-
-        if is_own_goal_incident(inc):
-            is_for_team = own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
-            camp_label = "Équipe analysée" if is_for_team else "Adversaire"
-            side = "team" if is_for_team else "opponent"
-
-            events.append({
-                "type": "ownGoal",
-                "value": signed_own_goal_value(is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
-                "detail": f"{camp_label} · CSC / Erreur · {scorer}",
-                "icon": "🥅",
-            })
-            continue
+    .preset-btn.official {
+      border-color: rgba(56, 189, 248, 0.24);
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(37, 99, 235, 0.08));
+      color: #dbeafe;
+    }
 
-        assist1 = inc.get("assist1") or None
-        assister = assist1.get("name") if isinstance(assist1, dict) else None
+    .preset-btn.friendly {
+      border-color: rgba(250, 204, 21, 0.24);
+      background: linear-gradient(135deg, rgba(250, 204, 21, 0.12), rgba(251, 146, 60, 0.07));
+      color: #fef3c7;
+    }
 
-        if assister:
-            events.append({
-                "type": "goalWithAssist",
-                "value": signed_attack_value("goalWithAssist", is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
-                "detail": f"{camp_label} · But Avec Passeur · {scorer} — passe : {assister}",
-                "icon": "⚽",
-            })
-        else:
-            # Un But Sans Passeur est volontairement découpé en deux événements :
-            # 1) le but de l'équipe qui marque = 2/3 de performance 1 ;
-            # 2) l'erreur de l'équipe qui encaisse = 1/3 de performance 1.
-            # L'ordre est important : but d'abord, erreur ensuite.
-            events.append({
-                "type": "goal",
-                "value": signed_attack_value("goal", is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
-                "detail": f"{camp_label} · But Sans Passeur · {scorer}",
-                "icon": "⚽",
-                "subOrder": 0,
-            })
+    .preset-btn.active {
+      border-color: rgba(34, 197, 94, 0.70);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(56, 189, 248, 0.13));
+      color: #bbf7d0;
+      box-shadow: 0 12px 24px rgba(34, 197, 94, 0.10);
+    }
 
-            error_is_for_team = not is_for_team
-            error_camp_label = "Équipe analysée" if error_is_for_team else "Adversaire"
-            error_side = "team" if error_is_for_team else "opponent"
+    .auto-control {
+      display: grid;
+      gap: 8px;
+    }
 
-            events.append({
-                "type": "ownGoal",
-                "value": signed_own_goal_value(error_is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": error_side,
-                "detail": f"{error_camp_label} · CSC / Erreur sur But Sans Passeur · {scorer}",
-                "icon": "🥅",
-                "subOrder": 1,
-            })
+    .auto-control-top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(68px, 82px);
+      align-items: center;
+      gap: 8px;
+    }
 
-    def sort_key(ev):
-        time_value = ev.get("minute", 0) + (ev.get("added", 0) or 0) / 100
-        order = {
-            "goalWithAssist": 0,
-            "goal": 0,
-            "ownGoal": 1,
-            "goalNoAssistError": 1,
-        }.get(ev.get("type"), 9)
-        return (-time_value, ev.get("subOrder", order), order)
+    .auto-number {
+      width: 82px;
+      max-width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      text-align: center;
+      font-weight: 1000;
+    }
 
-    events.sort(key=sort_key)
-    return events
+    .auto-result {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
 
+    .auto-result-card {
+      padding: 12px;
+      border-radius: 13px;
+      background: #171717;
+      border: 1px solid var(--line);
+    }
 
-def event_rank_quantity(event):
-    """Quantité qui fait avancer le rang.
+    .auto-result-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
 
-    Mode fixe : chaque événement avance de la valeur choisie dans le curseur
-    Avancement / Progression.
+    .auto-result-value {
+      font-size: 30px;
+      font-weight: 1000;
+      letter-spacing: -0.06em;
+      line-height: 1;
+      color: var(--green);
+    }
 
-    Mode performance : chaque événement avance selon sa performance absolue :
-    - But Avec Passeur : 1
-    - But Sans Passeur : 2/3
-    - CSC / Erreur : 1/3
+    .auto-formula {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.42;
+      padding: 11px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.20);
+      border: 1px solid var(--line);
+    }
 
-    Les valeurs négatives avancent aussi en positif, car le rang représente
-    une distance parcourue dans la liste d'événements.
-    """
-    if not isinstance(event, dict):
-        return 0.0
 
-    try:
-        value = float(event.get("value", 0))
-    except Exception:
-        return 0.0
+    .mode-toggle {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 13px;
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      background: rgba(56, 189, 248, 0.08);
+      color: var(--soft);
+      font-size: 13px;
+      font-weight: 1000;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
 
-    if not math.isfinite(value):
-        return 0.0
+    .mode-toggle input {
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      accent-color: var(--blue);
+      flex: 0 0 auto;
+    }
 
-    if CURRENT_RANK_ADVANCEMENT_MODE == "performance":
-        return abs(value)
+    .mode-toggle span {
+      min-width: 0;
+      display: block;
+    }
 
-    return CURRENT_RANK_EVENT_STEP
+    .per-team-box {
+      display: none;
+      padding: 12px;
+      border-radius: 15px;
+      border: 1px solid rgba(34, 197, 94, 0.20);
+      background: rgba(34, 197, 94, 0.055);
+      gap: 12px;
+    }
 
+    .per-team-box.active {
+      display: grid;
+    }
 
-def total_rank_quantity(events):
-    return sum(event_rank_quantity(event) for event in (events or []))
+    .per-team-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
 
+    .per-team-card {
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #121212;
+      display: grid;
+      gap: 11px;
+    }
 
-def annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank):
-    source = dict(event)
-    source["rankIndex"] = event_index + 1
-    source["rankQuantity"] = event_rank_quantity(event)
-    source["cumulativeStart"] = cumulative_start
-    source["cumulativeEnd"] = cumulative_end
-    source["rankTarget"] = float(target_rank)
-    source["weight"] = 1
-    source["rankMode"] = "quantity"
-    return source
+    .per-team-title {
+      font-size: 15px;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+    }
 
+    .team-calc-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
 
-def value_at_rank(events, rank):
-    """Performance exacte au rang demandé.
+    .team-calc-grid .auto-control:last-child {
+      grid-column: 1 / -1;
+    }
 
-    En mode fixe, on garde l'interpolation exacte entre les événements :
-    le rang demandé est converti en position exacte dans la liste.
+    .per-team-results {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
 
-    En mode performance, l'avancement varie selon l'événement. On cherche
-    donc l'événement dont la zone de cumul contient exactement le rang demandé.
-    """
-    mode = CURRENT_RANK_ADVANCEMENT_MODE
+    .per-team-mini {
+      padding: 11px;
+      border-radius: 12px;
+      background: #171717;
+      border: 1px solid var(--line);
+    }
 
-    if rank is None or rank <= 0:
-        return {"value": None, "sources": [], "rankMode": "quantity_exact", "eventStepMode": mode}
+    .per-team-mini-title {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
 
-    try:
-        target_rank = float(rank)
-    except Exception:
-        return {"value": None, "sources": [], "rankMode": "quantity_exact", "eventStepMode": mode}
+    .per-team-mini-value {
+      color: var(--green);
+      font-size: 18px;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+    }
 
-    if target_rank <= 0:
-        return {"value": None, "sources": [], "rankMode": "quantity_exact", "eventStepMode": mode}
+    @media (max-width: 720px) {
+      .per-team-grid,
+      .per-team-results,
+      .team-calc-grid {
+        grid-template-columns: 1fr;
+      }
 
-    clean_events = [event for event in (events or []) if event_rank_quantity(event) > 0]
+      .per-team-card {
+        padding: 10px;
+        overflow: hidden;
+      }
 
-    if not clean_events:
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) 76px;
+      }
+
+      .auto-number {
+        width: 76px;
+      }
+    }
+
+    .auto-apply-btn,
+    .scan-btn,
+    .report-btn {
+      border-radius: 13px;
+      border: 0;
+      color: #fff;
+      font-weight: 1000;
+    }
+
+    .auto-apply-btn {
+      width: 100%;
+      min-height: 48px;
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+      font-size: 15px;
+      box-shadow: 0 14px 30px rgba(56, 189, 248, 0.18);
+      white-space: normal;
+      overflow-wrap: anywhere;
+      padding: 10px 12px;
+    }
+
+    .scan-btn {
+      width: 100%;
+      min-height: 60px;
+      background: linear-gradient(135deg, #fb7185, #b91c1c 58%, #7f1d1d);
+      font-size: 20px;
+      letter-spacing: -0.03em;
+      box-shadow: 0 18px 36px rgba(239, 68, 68, 0.25);
+    }
+
+    .scan-btn:disabled {
+      background: linear-gradient(135deg, #3f3f46, #27272a);
+      color: #a1a1aa;
+      box-shadow: none;
+    }
+
+    .status-box,
+    .error-box {
+      display: none;
+      margin-top: 12px;
+      border-radius: 13px;
+      padding: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 13px;
+      line-height: 1.45;
+      border: 1px solid;
+    }
+
+    .status-box {
+      color: #fef3c7;
+      background: rgba(120, 53, 15, 0.25);
+      border-color: rgba(250, 204, 21, 0.24);
+    }
+
+    .error-box {
+      color: #fecaca;
+      background: rgba(127, 29, 29, 0.28);
+      border-color: rgba(239, 68, 68, 0.27);
+    }
+
+    .progress-track {
+      margin-top: 12px;
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.10);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--red), var(--yellow));
+      transition: width 240ms ease;
+    }
+
+    .report-head,
+    .summary-head,
+    .team-hero {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(255, 255, 255, 0.02));
+    }
+
+    .report-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .report-title {
+      font-size: 18px;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+    }
+
+    .report-count,
+    .report-hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .report-body {
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .report-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+
+    @media (max-width: 520px) {
+      .report-buttons {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .report-btn {
+      min-height: 44px;
+      border: 1px solid var(--line);
+      background: #171717;
+    }
+
+    .report-btn.primary {
+      background: linear-gradient(135deg, #22c55e, #15803d);
+      border-color: rgba(34, 197, 94, 0.65);
+    }
+
+    .report-btn.red {
+      background: rgba(239, 68, 68, 0.10);
+      border-color: rgba(239, 68, 68, 0.25);
+      color: #fecaca;
+    }
+
+    .result-shell {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .summary-label,
+    .rank-label,
+    .section-title,
+    .dominance-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .summary-title {
+      font-size: 23px;
+      font-weight: 1000;
+      letter-spacing: -0.06em;
+      line-height: 1.05;
+      margin-top: 7px;
+    }
+
+    .dominance-box {
+      margin: 12px 14px;
+      padding: 13px;
+      border-radius: 14px;
+      border: 1px solid rgba(34, 197, 94, 0.22);
+      background:
+        linear-gradient(135deg, rgba(34, 197, 94, 0.11), rgba(56, 189, 248, 0.05)),
+        #141414;
+      display: grid;
+      gap: 7px;
+    }
+
+    .dominance-team {
+      color: var(--green);
+      font-size: 24px;
+      font-weight: 1000;
+      letter-spacing: -0.06em;
+      line-height: 1.05;
+      overflow-wrap: anywhere;
+    }
+
+    .dominance-meta {
+      color: var(--soft);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .focus-box,
+    .collective-box,
+    .zone-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .focus-box::before,
+    .collective-box::before,
+    .zone-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at top right, rgba(34, 197, 94, 0.16), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(56, 189, 248, 0.08), transparent 42%);
+      opacity: 0.9;
+    }
+
+    .focus-box > *,
+    .collective-box > *,
+    .zone-card > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .collective-box {
+      margin: 12px 14px;
+      padding: 15px;
+      border-radius: 18px;
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      background:
+        linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(34, 197, 94, 0.07)),
+        #111827;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 45px rgba(0,0,0,0.28);
+    }
+
+    .stat-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .stat-title {
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 1000;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+    }
+
+    .stat-subtitle {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .stat-badge {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: var(--soft);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    @media (max-width: 620px) {
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stat-card {
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.20);
+      border: 1px solid rgba(255,255,255,0.11);
+    }
+
+    .stat-card.wide {
+      grid-column: 1 / -1;
+    }
+
+    .stat-kicker {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    .stat-number {
+      font-size: 33px;
+      font-weight: 1000;
+      line-height: 1;
+      letter-spacing: -0.07em;
+    }
+
+    .mode-stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .mode-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px;
+      border-radius: 13px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.09);
+    }
+
+    .mode-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      display: grid;
+      place-items: center;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.11);
+      font-size: 18px;
+    }
+
+    .mode-main {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 950;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .mode-detail {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .zone-card {
+      margin: 0;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02)),
+        #111111;
+    }
+
+    .team-card .zone-card {
+      margin: 14px;
+    }
+
+    .summary-grid,
+    .rank-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--line);
+    }
+
+    @media (max-width: 520px) {
+      .summary-grid,
+      .rank-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .summary-cell,
+    .rank-card {
+      background: #111111;
+      padding: 14px;
+    }
+
+    .summary-team-row,
+    .team-header-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .summary-team-name {
+      min-width: 0;
+      font-weight: 1000;
+      line-height: 1.12;
+      overflow-wrap: anywhere;
+    }
+
+    .mini-values {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .mini-badge {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 11px;
+      border-radius: 10px;
+      background: #181818;
+      border: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 1000;
+    }
+
+    .side-pill {
+      display: inline-flex;
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      background: rgba(239, 68, 68, 0.09);
+      color: #fecaca;
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .team-header-line {
+      margin-top: 12px;
+      gap: 12px;
+    }
+
+    .team-name {
+      font-size: clamp(25px, 7vw, 40px);
+      font-weight: 1000;
+      letter-spacing: -0.08em;
+      line-height: 0.98;
+      overflow-wrap: anywhere;
+    }
+
+    .team-meta {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.32;
+    }
+
+    .rank-grid.one {
+      grid-template-columns: 1fr;
+    }
+
+    .rank-label {
+      color: #fca5a5;
+      margin-bottom: 9px;
+    }
+
+    .rank-value {
+      font-size: 50px;
+      font-weight: 1000;
+      letter-spacing: -0.085em;
+      line-height: 1;
+    }
+
+    .positive {
+      color: var(--green);
+    }
+
+    .negative {
+      color: #fb7185;
+    }
+
+    .neutral {
+      color: var(--text);
+    }
+
+    .source-list {
+      margin-top: 13px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      gap: 10px;
+    }
+
+    .source-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 9px;
+      align-items: start;
+      color: var(--soft);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .event-icon {
+      min-width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: #181818;
+      border: 1px solid var(--line);
+      font-size: 15px;
+      padding: 0 4px;
+      white-space: nowrap;
+    }
+
+    .source-small,
+    .row-sub {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.36;
+      overflow-wrap: anywhere;
+    }
+
+    .section {
+      padding: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 11px;
+    }
+
+    .count-pill {
+      padding: 6px 9px;
+      border-radius: 9px;
+      background: #181818;
+      border: 1px solid var(--line);
+      color: var(--soft);
+      font-size: 11px;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .match-list,
+    .event-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .match-row,
+    .event-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: start;
+      padding: 11px;
+      border-radius: 12px;
+      background: #171717;
+      border: 1px solid var(--line);
+    }
+
+    .row-number {
+      min-width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: #222222;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 1000;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .row-main {
+      min-width: 0;
+    }
+
+    .row-title {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 950;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .row-score {
+      font-weight: 1000;
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: nowrap;
+      padding-top: 7px;
+    }
+
+    .camp-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 1000;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      margin-right: 6px;
+      vertical-align: 1px;
+    }
+
+    .camp-team {
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      color: #bbf7d0;
+    }
+
+    .camp-opponent {
+      background: rgba(239, 68, 68, 0.11);
+      border: 1px solid rgba(239, 68, 68, 0.24);
+      color: #fecaca;
+    }
+
+    details.clean {
+      border-top: 1px solid var(--line);
+    }
+
+    details.clean summary,
+    .bar-box summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 14px;
+      color: var(--soft);
+      font-weight: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    details.clean summary::-webkit-details-marker,
+    .bar-box summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .bar-box summary {
+      color: var(--text);
+      font-size: 18px;
+      letter-spacing: -0.04em;
+    }
+
+    .bar-grid {
+      padding: 0 14px 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    @media (max-width: 520px) {
+      .bar-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .bar-card {
+      border-radius: 13px;
+      padding: 13px;
+      background: #171717;
+      border: 1px solid var(--line);
+    }
+
+    .bar-card-title {
+      color: var(--soft);
+      font-size: 13px;
+      font-weight: 1000;
+      margin-bottom: 10px;
+    }
+
+    .bar-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.75;
+    }
+
+    @media (max-width: 520px) {
+      .auto-formula {
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .mode-toggle {
+        font-size: 12px;
+        letter-spacing: 0.03em;
+      }
+
+      .auto-result-value {
+        font-size: 26px;
+      }
+    }
+
+    .vs-divider {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 1000;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin: 2px 0;
+    }
+
+    /* Derby blue/red refresh: plus appli foot, plus vivant, sans vert dominant */
+    :root {
+      --bg: #060817;
+      --panel: #0b1024;
+      --card: #101936;
+      --card-2: #16224a;
+      --line: rgba(255, 255, 255, 0.14);
+      --muted: #a9b6d3;
+      --soft: #dbe7ff;
+      --red: #fb7185;
+      --green: #40c9ff;
+      --yellow: #ffd166;
+      --blue: #38bdf8;
+      --shadow: 0 24px 70px rgba(2, 6, 23, 0.56);
+    }
+
+    @keyframes crowdGlow {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: .84; }
+      50% { transform: translate3d(-10px, 8px, 0) scale(1.04); opacity: 1; }
+    }
+
+    @keyframes derbySweep {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(12px) scale(.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { box-shadow: 0 0 0 5px rgba(56, 189, 248, 0.12), 0 0 20px rgba(56,189,248,.32); }
+      50% { box-shadow: 0 0 0 8px rgba(251, 113, 133, 0.10), 0 0 26px rgba(251,113,133,.28); }
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: #050816;
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -18%;
+      pointer-events: none;
+      z-index: -1;
+      background:
+        linear-gradient(110deg, transparent 0 46%, rgba(255,255,255,.018) 47% 48%, transparent 49% 100%);
+      opacity: .45;
+      animation: crowdGlow 8s ease-in-out infinite;
+    }
+
+    .topbar {
+      background: rgba(6, 10, 28, 0.78);
+      border-bottom: 1px solid rgba(56, 189, 248, 0.24);
+      box-shadow: 0 12px 34px rgba(0,0,0,.24);
+    }
+
+    .topbar::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: linear-gradient(90deg, #38bdf8, #ffffff, #fb7185, #38bdf8);
+      background-size: 240% 100%;
+      animation: derbySweep 5s ease infinite;
+      opacity: .74;
+    }
+
+    .brand-logo {
+      border-radius: 17px;
+      background:
+        linear-gradient(135deg, #38bdf8 0%, #2563eb 42%, #fb7185 100%);
+      box-shadow: 0 14px 34px rgba(56, 189, 248, 0.22), 0 10px 30px rgba(251, 113, 133, 0.18);
+      text-shadow: 0 1px 8px rgba(0,0,0,.55);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .brand-logo::after {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border: 1px solid rgba(255,255,255,.28);
+      border-radius: 12px;
+    }
+
+    .brand-title span,
+    .home-title span { color: #40c9ff; }
+
+    .worker-pill {
+      border-color: rgba(56, 189, 248, 0.28);
+      background: linear-gradient(135deg, rgba(56,189,248,.13), rgba(251,113,133,.08));
+      color: #dbeafe;
+    }
+
+    .worker-dot {
+      background: linear-gradient(135deg, #38bdf8, #fb7185);
+      animation: pulseDot 2.6s ease-in-out infinite;
+    }
+
+    .hero,
+    .panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .report-panel {
+      border-radius: 26px;
+      border-color: rgba(255, 255, 255, 0.15);
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+        rgba(10, 15, 36, 0.90);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055);
+      animation: cardIn .42s ease both;
+    }
+
+    .hero {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(56,189,248,.25), transparent 34%),
+        radial-gradient(circle at 92% 12%, rgba(251,113,133,.22), transparent 32%),
+        linear-gradient(135deg, rgba(56,189,248,.18), rgba(79,70,229,.11) 42%, rgba(251,113,133,.16)),
+        rgba(10, 15, 36, 0.94);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, transparent 0 47%, rgba(255,255,255,.08) 47% 48%, transparent 48% 100%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 28px);
+      opacity: .52;
+    }
+
+    @keyframes heroBallRoll {
+      0% {
+        left: -58px;
+        transform: rotate(0deg);
+        opacity: .06;
+      }
+      12% {
+        opacity: .13;
+      }
+      50% {
+        left: calc(100% - 62px);
+        transform: rotate(560deg);
+        opacity: .16;
+      }
+      88% {
+        opacity: .13;
+      }
+      100% {
+        left: -58px;
+        transform: rotate(1120deg);
+        opacity: .06;
+      }
+    }
+
+    .hero::after {
+      content: "⚽";
+      position: absolute;
+      left: -58px;
+      top: 12px;
+      font-size: 58px;
+      opacity: .14;
+      filter: drop-shadow(0 14px 30px rgba(0,0,0,.35));
+      animation: heroBallRoll 12s cubic-bezier(.45,.03,.55,.97) infinite;
+      will-change: left, transform, opacity;
+    }
+
+    .hero-inner { position: relative; z-index: 1; }
+
+    .kicker,
+    .side-pill,
+    .auto-badge,
+    .count-pill,
+    .camp-badge {
+      border-radius: 999px;
+    }
+
+    .kicker {
+      border-color: rgba(56, 189, 248, 0.32);
+      background: linear-gradient(135deg, rgba(56,189,248,.15), rgba(251,113,133,.10));
+      color: #e0f2fe;
+    }
+
+    .home-title,
+    .summary-title,
+    .team-name {
+      letter-spacing: -0.075em;
+      text-shadow: 0 18px 44px rgba(0,0,0,.42);
+    }
+
+    .notice {
+      background:
+        linear-gradient(135deg, rgba(56,189,248,.12), rgba(251,113,133,.08)),
+        rgba(10,15,36,.88);
+    }
+
+    .notice-icon {
+      background: linear-gradient(135deg, rgba(56,189,248,.18), rgba(251,113,133,.13));
+      border-color: rgba(56,189,248,.26);
+      color: #bfdbfe;
+    }
+
+    input,
+    .auto-number {
+      border-radius: 16px;
+      background: rgba(5, 10, 28, 0.86);
+      border-color: rgba(255,255,255,.14);
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+
+    input:focus {
+      border-color: rgba(56, 189, 248, 0.78);
+      box-shadow: 0 0 0 3px rgba(56,189,248,.13), 0 0 0 6px rgba(251,113,133,.055);
+      transform: translateY(-1px);
+    }
+
+    input[type="range"] {
+      accent-color: #38bdf8;
+    }
+
+    .auto-box {
+      border-radius: 26px;
+      border-color: rgba(56, 189, 248, 0.30);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(56,189,248,.22), transparent 34%),
+        radial-gradient(circle at 100% 15%, rgba(251,113,133,.18), transparent 34%),
+        #0b1024;
+    }
+
+    .auto-head,
+    .report-head,
+    .summary-head,
+    .team-hero {
+      background:
+        linear-gradient(135deg, rgba(56,189,248,.14), rgba(251,113,133,.12));
+    }
+
+    .auto-title::before { content: "🏟️ "; }
+
+    .auto-badge {
+      background: linear-gradient(135deg, rgba(56,189,248,.18), rgba(251,113,133,.12));
+      border-color: rgba(56,189,248,.28);
+      color: #e0f2fe;
+    }
+
+    .preset-box {
+      border-color: rgba(251, 113, 133, 0.24);
+      background:
+        linear-gradient(135deg, rgba(56,189,248,.10), rgba(251,113,133,.10)),
+        rgba(0,0,0,.18);
+    }
+
+    .auto-grid { grid-template-columns: repeat(3, 1fr); }
+
+    @media (max-width: 820px) {
+      .auto-grid { grid-template-columns: 1fr; }
+    }
+
+    .auto-control {
+      padding: 12px;
+      border-radius: 19px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.11);
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .auto-control:focus-within,
+    .auto-control:hover {
+      transform: translateY(-2px);
+      border-color: rgba(56,189,248,.32);
+      background: rgba(56,189,248,.065);
+    }
+
+    .auto-control-title { color: #bfdbfe; }
+
+    .auto-result-card,
+    .per-team-mini,
+    .stat-card,
+    .mini-badge,
+    .match-row,
+    .event-row,
+    .bar-card,
+    .rank-card,
+    .summary-cell,
+    .zone-card,
+    .per-team-card {
+      background: linear-gradient(160deg, rgba(56,189,248,.075), rgba(251,113,133,.045)), rgba(6, 10, 28, .70);
+      border-color: rgba(255,255,255,.13);
+    }
+
+    .auto-result-value,
+    .per-team-mini-value,
+    .dominance-team {
+      color: #40c9ff;
+      text-shadow: 0 8px 26px rgba(56, 189, 248, 0.18);
+    }
+
+    .auto-formula {
+      background: rgba(5, 10, 28, .54);
+      border-color: rgba(56,189,248,.17);
+    }
+
+    .mode-toggle,
+    .per-team-box,
+    .collective-box,
+    .dominance-box {
+      border-color: rgba(56,189,248,.24);
+      background: linear-gradient(135deg, rgba(56,189,248,.10), rgba(251,113,133,.07));
+    }
+
+    .focus-box::before,
+    .collective-box::before,
+    .zone-card::before {
+      background:
+        radial-gradient(circle at top right, rgba(56,189,248,.18), transparent 36%),
+        radial-gradient(circle at bottom left, rgba(251,113,133,.12), transparent 42%);
+    }
+
+    .scan-btn,
+    .auto-apply-btn,
+    .report-btn.primary,
+    .preset-btn.active,
+    .skip-grid button.active {
+      background: linear-gradient(135deg, #38bdf8 0%, #2563eb 42%, #fb7185 100%);
+      background-size: 180% 180%;
+      animation: derbySweep 5.5s ease infinite;
+      box-shadow: 0 18px 42px rgba(56, 189, 248, 0.20), 0 14px 34px rgba(251, 113, 133, 0.18);
+    }
+
+    .scan-btn {
+      border-radius: 20px;
+      font-size: 21px;
+    }
+
+    .scan-btn::before { content: "⚽ "; }
+
+    .scan-btn:disabled {
+      animation: none;
+      background: linear-gradient(135deg, #334155, #1e293b);
+      color: #cbd5e1;
+      box-shadow: none;
+    }
+
+    button,
+    .preset-btn,
+    .report-btn,
+    .scan-btn,
+    .auto-apply-btn,
+    .skip-grid button,
+    details.clean summary,
+    .bar-box summary {
+      transition: transform .17s ease, filter .17s ease, border-color .17s ease, box-shadow .17s ease, background .17s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:hover,
+    .preset-btn:hover,
+    .report-btn:hover,
+    .scan-btn:hover,
+    .auto-apply-btn:hover,
+    .skip-grid button:hover,
+    details.clean summary:hover,
+    .bar-box summary:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.08);
+      border-color: rgba(56,189,248,.34);
+    }
+
+    button:active,
+    .preset-btn:active,
+    .report-btn:active,
+    .scan-btn:active,
+    .auto-apply-btn:active,
+    .skip-grid button:active {
+      transform: translateY(1px) scale(.985);
+      filter: brightness(.96);
+    }
+
+    .preset-btn.official {
+      background: linear-gradient(135deg, rgba(56,189,248,.18), rgba(37,99,235,.11));
+      border-color: rgba(56,189,248,.30);
+      color: #dbeafe;
+    }
+
+    .preset-btn.friendly {
+      background: linear-gradient(135deg, rgba(251,113,133,.16), rgba(56,189,248,.09));
+      border-color: rgba(251,113,133,.28);
+      color: #ffe4e6;
+    }
+
+    .report-btn.primary {
+      border-color: rgba(56,189,248,.38);
+    }
+
+    .report-btn.red {
+      background: rgba(251,113,133,.12);
+      border-color: rgba(251,113,133,.28);
+      color: #ffe4e6;
+    }
+
+    .progress-fill {
+      background: linear-gradient(90deg, #38bdf8, #ffffff, #fb7185);
+      background-size: 220% 100%;
+      animation: derbySweep 2.4s linear infinite;
+    }
+
+    .rank-label { color: #93c5fd; }
+    .positive { color: #40c9ff; }
+    .negative { color: #fb7185; }
+
+    .camp-team {
+      background: rgba(56,189,248,.13);
+      border-color: rgba(56,189,248,.28);
+      color: #dbeafe;
+    }
+
+    .camp-opponent {
+      background: rgba(251,113,133,.12);
+      border-color: rgba(251,113,133,.26);
+      color: #ffe4e6;
+    }
+
+    .row-number,
+    .event-icon,
+    .vs-box {
+      background: linear-gradient(135deg, rgba(56,189,248,.10), rgba(251,113,133,.08));
+      border-color: rgba(255,255,255,.14);
+    }
+
+    .logo-xl,
+    .logo-m,
+    .logo-s {
+      background: rgba(5, 10, 28, .70);
+      border-color: rgba(255,255,255,.18);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+    }
+
+    .bar-box summary::after,
+    details.clean summary::after {
+      content: "›";
+      color: #38bdf8;
+      font-size: 24px;
+      line-height: 1;
+      transform: rotate(90deg);
+      transition: transform .2s ease, color .2s ease;
+    }
+
+    .bar-box[open] summary::after,
+    details.clean[open] summary::after {
+      transform: rotate(-90deg);
+      color: #fb7185;
+    }
+
+    .status-box {
+      color: #dbeafe;
+      background: rgba(30, 64, 175, 0.22);
+      border-color: rgba(56, 189, 248, 0.28);
+    }
+
+    .error-box {
+      color: #ffe4e6;
+      background: rgba(127, 29, 29, 0.30);
+      border-color: rgba(251, 113, 133, 0.31);
+    }
+
+
+
+    /* Mobile derby v2 : priorité téléphone, rendu plus appli match */
+    @keyframes tapFlash {
+      0% { box-shadow: 0 0 0 0 rgba(56,189,248,.0); }
+      50% { box-shadow: 0 0 0 6px rgba(56,189,248,.10), 0 0 22px rgba(251,113,133,.16); }
+      100% { box-shadow: 0 0 0 0 rgba(56,189,248,.0); }
+    }
+
+    @media (max-width: 700px) {
+      html {
+        scroll-padding-top: 76px;
+      }
+
+      body {
+        background-attachment: scroll;
+        background-size: 160% 160%;
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        left: -35%;
+        right: -35%;
+        top: 70px;
+        height: 150px;
+        z-index: -1;
+        pointer-events: none;
+        background:
+          linear-gradient(100deg, transparent 0 38%, rgba(56,189,248,.06) 39% 41%, transparent 42% 58%, rgba(251,113,133,.06) 59% 61%, transparent 62% 100%);
+        opacity: .55;
+        transform: rotate(-7deg);
+        filter: blur(.2px);
+      }
+
+      .topbar {
+        padding: calc(8px + env(safe-area-inset-top)) 10px 8px;
+        border-bottom-color: rgba(255,255,255,.16);
+      }
+
+      .topbar-inner {
+        width: 100%;
+        gap: 8px;
+      }
+
+      .brand {
+        gap: 9px;
+      }
+
+      .brand-logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 15px;
+        font-size: 18px;
+      }
+
+      .brand-title {
+        font-size: 20px;
+      }
+
+      .worker-pill {
+        padding: 8px 10px;
+        border-radius: 999px;
+        font-size: 0;
+        gap: 6px;
+      }
+
+      .worker-pill::after {
+        content: "LIVE";
+        font-size: 10px;
+        letter-spacing: .12em;
+      }
+
+      .worker-dot {
+        width: 8px;
+        height: 8px;
+      }
+
+      .app {
+        padding: 10px 10px calc(96px + env(safe-area-inset-bottom));
+      }
+
+      .hero,
+      .panel,
+      .report-panel,
+      .summary,
+      .team-card,
+      .bar-box {
+        border-radius: 24px;
+        box-shadow: 0 18px 46px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.06);
+      }
+
+      .hero-inner,
+      .panel-pad,
+      .match-hero,
+      .report-body,
+      .section {
+        padding: 14px;
+      }
+
+      .kicker {
+        font-size: 9px;
+        padding: 7px 9px;
+        border-radius: 999px;
+        margin-bottom: 11px;
+      }
+
+      .home-title {
+        font-size: clamp(43px, 14.5vw, 61px);
+        line-height: .9;
+        letter-spacing: -.105em;
+      }
+
+      .hero-text,
+      .notice-text,
+      .small-text {
+        font-size: 12.5px;
+      }
+
+      .match-teams {
+        grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);
+        gap: 8px;
+      }
+
+      .match-team {
+        gap: 7px;
+        padding: 10px 6px;
+        border-radius: 18px;
+        background: rgba(255,255,255,.045);
+        border: 1px solid rgba(255,255,255,.10);
+      }
+
+      .logo-xl {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+      }
+
+      .logo-xl img {
+        width: 47px;
+        height: 47px;
+      }
+
+      .vs-box {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        font-size: 12px;
+      }
+
+      .match-team-name {
+        max-width: 112px;
+        font-size: 12.5px;
+      }
+
+      .two,
+      .auto-grid,
+      .team-calc-grid,
+      .per-team-grid,
+      .bar-grid,
+      .summary-grid,
+      .rank-grid {
+        grid-template-columns: 1fr !important;
+      }
+
+      input {
+        min-height: 48px;
+        border-radius: 16px;
+        padding: 13px 12px;
+        background: rgba(5,10,28,.86);
+      }
+
+      input[type="range"] {
+        min-height: 34px;
+      }
+
+      .skip-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .skip-grid button {
+        min-height: 40px;
+        border-radius: 13px;
+        font-size: 13px;
+      }
+
+      .auto-box,
+      .auto-result-card,
+      .auto-control,
+      .preset-box,
+      .mode-toggle,
+      .zone-card,
+      .bar-card {
+        border-radius: 20px;
+      }
+
+      .auto-head,
+      .report-head,
+      .summary-head,
+      .team-hero {
+        padding: 12px 14px;
+      }
+
+      .auto-grid {
+        gap: 9px;
+      }
+
+      .auto-control {
+        padding: 11px;
+        background: linear-gradient(135deg, rgba(56,189,248,.07), rgba(251,113,133,.04)), rgba(255,255,255,.04);
+      }
+
+      .auto-result-value,
+      .rank-value {
+        font-size: clamp(30px, 12vw, 46px);
+      }
+
+      .scan-btn {
+        min-height: 58px;
+        width: 100%;
+        border-radius: 20px;
+        font-size: 19px;
+        letter-spacing: -.02em;
+      }
+
+      .scan-btn:active,
+      .auto-apply-btn:active,
+      .report-btn:active,
+      .preset-btn:active,
+      .skip-grid button:active {
+        animation: tapFlash .34s ease;
+      }
+
+      .report-buttons {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px;
+      }
+
+      .report-btn {
+        min-height: 46px;
+        border-radius: 15px;
+        padding: 11px 9px;
+        font-size: 12px;
+      }
+
+      .report-btn.primary,
+      #clearReportBtn {
+        grid-column: 1 / -1;
+      }
+
+      .summary-cell,
+      .rank-card,
+      .per-team-mini,
+      .stat-card,
+      .mini-badge,
+      .bar-card {
+        border-radius: 18px;
+      }
+
+      .team-header-line {
+        align-items: flex-start;
+      }
+
+      .team-name,
+      .summary-title {
+        font-size: clamp(24px, 7.5vw, 34px);
+        line-height: .98;
+      }
+
+      .team-meta {
+        font-size: 11.5px;
+      }
+
+      .match-list,
+      .event-list,
+      .source-list {
+        gap: 8px;
+      }
+
+      .match-row,
+      .event-row {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        padding: 11px;
+        border-radius: 18px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .match-row > :last-child,
+      .event-row > :last-child {
+        grid-column: 2;
+        justify-self: start;
+      }
+
+      .event-row::before,
+      .match-row::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 10px;
+        bottom: 10px;
+        width: 3px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #38bdf8, #fb7185);
+        opacity: .75;
+      }
+
+      .event-icon,
+      .row-number {
+        border-radius: 13px;
+      }
+
+      .bar-box summary {
+        min-height: 52px;
+        display: flex;
+        align-items: center;
+      }
+
+      .bar-line {
+        align-items: flex-start;
+        font-size: 12.5px;
+        line-height: 1.55;
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(255,255,255,.06);
+      }
+
+      .bar-line:last-child {
+        border-bottom: 0;
+      }
+    }
+
+    @supports (animation-timeline: view()) {
+      @media (max-width: 700px) {
+        .panel,
+        .summary,
+        .team-card,
+        .bar-box,
+        .report-panel {
+          animation: cardIn linear both;
+          animation-timeline: view();
+          animation-range: entry 0% cover 22%;
+        }
+      }
+    }
+
+
+
+    /* Mobile Derby v3 : dimensions corrigées + animations visibles au scroll */
+    @keyframes mobileStadiumMove {
+      0% { transform: translate3d(-4%, 0, 0) rotate(-7deg); opacity: .42; }
+      50% { transform: translate3d(4%, 9px, 0) rotate(-7deg); opacity: .72; }
+      100% { transform: translate3d(-4%, 0, 0) rotate(-7deg); opacity: .42; }
+    }
+
+    @keyframes mobileLogoFloat {
+      0%, 100% { transform: translateY(0) rotate(-1deg); }
+      50% { transform: translateY(-2px) rotate(1deg); }
+    }
+
+    @keyframes mobileButtonGlow {
+      0% { background-position: 0% 50%; filter: brightness(1); }
+      50% { background-position: 100% 50%; filter: brightness(1.12); }
+      100% { background-position: 0% 50%; filter: brightness(1); }
+    }
+
+    @keyframes mobileLineRun {
+      0% { transform: translateX(-120%); opacity: 0; }
+      20%, 75% { opacity: .65; }
+      100% { transform: translateX(120%); opacity: 0; }
+    }
+
+
+    @keyframes cupBallRoll {
+      0% { transform: translate3d(22px, 0, 0) rotate(0deg); }
+      48% { transform: translate3d(-18px, 2px, 0) rotate(-178deg); }
+      100% { transform: translate3d(22px, 0, 0) rotate(-360deg); }
+    }
+
+    @keyframes cupBallShadow {
+      0%, 100% { transform: translateX(20px) scaleX(.82); opacity: .30; }
+      48% { transform: translateX(-18px) scaleX(1); opacity: .42; }
+    }
+
+    @keyframes ballTrailSweep {
+      0% { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+      22%, 66% { opacity: .55; }
+      100% { transform: translateX(150%) skewX(-18deg); opacity: 0; }
+    }
+
+    .rolling-cup-ball {
+      position: absolute;
+      right: 22px;
+      bottom: 18px;
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      z-index: 1;
+      pointer-events: none;
+      opacity: .86;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,.98) 0 19%, transparent 20%),
+        conic-gradient(from -18deg, #2f7dff 0 17%, #ffffff 17% 26%, #22c55e 26% 35%, #ffffff 35% 49%, #ef1f4f 49% 65%, #ffffff 65% 78%, #10b981 78% 87%, #ffffff 87% 100%);
+      box-shadow:
+        inset -9px -12px 18px rgba(2, 6, 23, .25),
+        inset 7px 8px 14px rgba(255,255,255,.42),
+        0 16px 28px rgba(0,0,0,.28);
+      animation: cupBallRoll 5.2s ease-in-out infinite;
+    }
+
+    .rolling-cup-ball::before {
+      content: "26";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 28px;
+      height: 28px;
+      transform: translate(-50%, -50%);
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      background: linear-gradient(135deg, rgba(59,130,246,.92), rgba(14,165,233,.72));
+      color: #fff;
+      font-size: 13px;
+      font-weight: 1000;
+      letter-spacing: -.1em;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.45);
+    }
+
+    .rolling-cup-ball::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: -13px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(0,0,0,.52);
+      filter: blur(4px);
+      animation: cupBallShadow 5.2s ease-in-out infinite;
+    }
+
+    .hero::before,
+    .auto-box::before,
+    .scan-btn::before {
+      will-change: transform, opacity;
+    }
+
+    .hero::before {
+      animation: ballTrailSweep 6.8s ease-in-out infinite;
+    }
+
+    .event-icon {
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,.16), transparent 24%),
+        linear-gradient(135deg, rgba(56,189,248,.18), rgba(251,113,133,.13));
+    }
+
+    html,
+    body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    .fx-card {
+      opacity: 1;
+      transform: none;
+    }
+
+    @media (max-width: 700px) {
+      html,
+      body {
+        max-width: 100vw;
+        overflow-x: clip;
+      }
+
+      body::before {
+        animation: crowdGlow 7s ease-in-out infinite;
+      }
+
+      body::after {
+        animation: mobileStadiumMove 4.8s ease-in-out infinite;
+      }
+
+      .topbar {
+        overflow: hidden;
+      }
+
+      .topbar-inner,
+      .app,
+      .hero,
+      .panel,
+      .report-panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .auto-box,
+      .auto-body,
+      .preset-box,
+      .preset-actions,
+      .preset-btn,
+      .auto-control,
+      .auto-formula,
+      .mode-toggle,
+      .per-team-box,
+      .team-calc-grid,
+      .auto-result,
+      .report-buttons,
+      .match-row,
+      .event-row {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      .app {
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+      }
+
+      .brand-logo {
+        animation: mobileLogoFloat 2.8s ease-in-out infinite;
+      }
+
+      .auto-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .auto-badge {
+        justify-self: start;
+        max-width: 100%;
+      }
+
+      .auto-title,
+      .preset-title,
+      .preset-hint,
+      .preset-btn,
+      .preset-btn small,
+      .auto-formula,
+      .mode-toggle,
+      .report-title,
+      .report-hint,
+      .row-title,
+      .row-sub,
+      .source-small {
+        overflow-wrap: anywhere;
+        word-break: normal;
+      }
+
+      .preset-title {
+        letter-spacing: .12em;
+      }
+
+      .preset-hint {
+        font-size: 11.5px;
+        line-height: 1.42;
+      }
+
+      .preset-btn {
+        min-height: 58px;
+        padding: 11px 10px;
+        line-height: 1.08;
+      }
+
+      .preset-btn small {
+        display: block;
+        font-size: 10.5px;
+        line-height: 1.25;
+        letter-spacing: .015em;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) minmax(74px, 86px);
+        gap: 8px;
+      }
+
+      .auto-number {
+        width: 86px;
+        min-width: 0;
+        padding-left: 6px;
+        padding-right: 6px;
+        font-size: 13px;
+      }
+
+      .auto-result {
+        grid-template-columns: 1fr;
+      }
+
+      .scan-btn,
+      .auto-apply-btn,
+      .report-btn.primary,
+      .preset-btn.active,
+      .skip-grid button.active {
+        animation: mobileButtonGlow 3.6s ease infinite;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .scan-btn::after,
+      .auto-apply-btn::after,
+      .preset-btn.active::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 58%;
+        pointer-events: none;
+        background: linear-gradient(100deg, transparent, rgba(255,255,255,.22), transparent);
+        animation: mobileLineRun 2.9s ease-in-out infinite;
+      }
+
+      .panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .report-panel,
+      .hero {
+        contain: paint;
+      }
+
+      .fx-card {
+        opacity: 0;
+        transform: translateY(18px) scale(.985);
+        transition: opacity .46s ease, transform .46s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease;
+      }
+
+      .fx-card.is-visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .fx-card.is-visible:nth-of-type(2n) {
+        transition-delay: .04s;
+      }
+
+      input[type="range"] {
+        min-width: 0;
+        width: 100%;
+      }
+
+
+      .rolling-cup-ball {
+        width: 46px;
+        height: 46px;
+        right: 12px;
+        bottom: 12px;
+        opacity: .72;
+        animation-duration: 4.6s;
+      }
+
+      .rolling-cup-ball::before {
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        font-size: 10px;
+      }
+
+      .match-ball {
+        bottom: auto;
+        top: 12px;
+      }
+
+      .notice {
+        border-color: rgba(250, 204, 21, .28);
+        box-shadow: 0 16px 44px rgba(250, 204, 21, .06), inset 0 1px 0 rgba(255,255,255,.06);
+      }
+
+      .notice-icon {
+        animation: tapFlash 2.8s ease-in-out infinite;
+      }
+
+      .scan-btn {
+        background-size: 220% 100%;
+      }
+    }
+
+
+
+    /* Retouches ciblées : bouton Scanner, bloc de scan et fin de scan */
+    @keyframes scanButtonBallRoll {
+      0% { transform: translateY(-50%) translateX(0) rotate(0deg) scale(1); opacity: 1; }
+      18% { transform: translateY(-52%) translateX(28px) rotate(110deg) scale(1.08); opacity: 1; }
+      78% { opacity: 1; }
+      100% { transform: translateY(-50%) translateX(min(54vw, 260px)) rotate(900deg) scale(.86); opacity: 0; }
+    }
+
+    @keyframes statusSoftIn {
+      0% { opacity: 0; transform: translateY(-8px) scale(.985); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes statusDoneBoxEnter {
+      0% { opacity: .55; transform: translateY(8px) scale(.985); filter: brightness(.9); }
+      100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
+    }
+
+    @keyframes statusDoneTitleEnter {
+      0% { opacity: 0; transform: translateY(10px) scale(.92); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes scanPulseDot {
+      0%, 100% { transform: scale(.78); opacity: .68; }
+      50% { transform: scale(1.12); opacity: 1; }
+    }
+
+    @keyframes scanProgressGlow {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 220% 50%; }
+    }
+
+    @keyframes statusDoneGlow {
+      0%, 100% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.02); filter: brightness(1.14); }
+    }
+
+    @keyframes statusConfettiLoop {
+      0% { transform: translate3d(0, -20px, 0) rotate(0deg); opacity: 0; }
+      10% { opacity: .96; }
+      88% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 126px, 0) rotate(var(--r, 540deg)); opacity: 0; }
+    }
+
+    @keyframes finishFxFade {
+      0% { opacity: 0; }
+      8%, 82% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes pageConfettiFall {
+      0% { transform: translate3d(0, -24px, 0) rotate(0deg); opacity: 0; }
+      8% { opacity: .95; }
+      100% { transform: translate3d(var(--x, 0px), 112vh, 0) rotate(var(--r, 720deg)); opacity: 0; }
+    }
+
+    @keyframes pageFireworkBurst {
+      0% { transform: translate3d(0, 0, 0) scale(.3); opacity: 0; }
+      14% { opacity: 1; }
+      100% { transform: translate3d(var(--x, 0px), var(--y, 0px), 0) scale(1); opacity: 0; }
+    }
+
+    .scan-btn {
+      position: relative;
+      overflow: hidden;
+      transform: translateZ(0);
+      transition: color .28s ease, text-shadow .28s ease, filter .28s ease, transform .22s ease;
+    }
+
+    .scan-btn::before {
+      content: "⚽️";
+      display: inline-block;
+      margin-right: 10px;
+      width: auto;
+      height: auto;
+      border-radius: 0;
+      background: none !important;
+      box-shadow: none !important;
+      color: initial;
+      font-size: 22px;
+      line-height: 1;
+      vertical-align: -3px;
+      transform-origin: center;
+      text-shadow: none;
+    }
+
+    .scan-btn.scan-kick {
+      color: rgba(255,255,255,.08) !important;
+      text-shadow: none !important;
+      filter: brightness(1.08) saturate(1.08);
+      pointer-events: none;
+    }
+
+    .scan-btn.scan-kick::before {
+      position: absolute;
+      left: calc(50% - 98px);
+      top: 50%;
+      margin-right: 0;
+      z-index: 2;
+      color: initial;
+      will-change: transform, opacity;
+      animation: scanButtonBallRoll .96s cubic-bezier(.16,.86,.26,1) forwards;
+    }
+
+    .status-box {
+      position: relative;
+      overflow: hidden;
+      padding: 10px 12px;
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(56,189,248,.16), transparent 32%),
+        linear-gradient(135deg, rgba(56,189,248,.12), rgba(251,113,133,.07)),
+        rgba(5,10,28,.70);
+      border-color: rgba(56,189,248,.30);
+      box-shadow: 0 12px 26px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.06);
+      animation: statusSoftIn .32s ease both;
+      transform-origin: top center;
+    }
+
+    .status-head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .status-pulse {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #38bdf8, #fb7185);
+      box-shadow: 0 0 0 5px rgba(56,189,248,.09), 0 0 16px rgba(251,113,133,.18);
+      animation: scanPulseDot 1.15s ease-in-out infinite;
+    }
+
+    .status-message {
+      color: #e0f2fe;
+      font-size: 12.5px;
+      font-weight: 850;
+      line-height: 1.28;
+      min-width: 0;
+    }
+
+    .status-percent {
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 1000;
+      padding: 5px 7px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.13);
+    }
+
+    .status-box .progress-track {
+      height: 8px;
+      margin-top: 9px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: inset 0 1px 5px rgba(0,0,0,.24);
+    }
+
+    .status-box .progress-fill {
+      background: linear-gradient(90deg, #38bdf8, #22c55e, #ffffff, #fb7185, #38bdf8);
+      background-size: 220% 100%;
+      animation: scanProgressGlow 1.65s linear infinite;
+      box-shadow: 0 0 16px rgba(56,189,248,.30);
+    }
+
+    .status-box.status-done {
+      min-height: 78px;
+      display: grid !important;
+      place-items: center;
+      padding: 14px;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(56,189,248,.28), transparent 35%),
+        radial-gradient(circle at 85% 100%, rgba(251,113,133,.22), transparent 38%),
+        linear-gradient(135deg, rgba(56,189,248,.16), rgba(251,113,133,.12)),
+        rgba(5,10,28,.86);
+      border-color: rgba(56,189,248,.38);
+      animation: statusDoneBoxEnter .52s cubic-bezier(.16,.84,.28,1) both;
+    }
+
+    .status-done-title {
+      position: relative;
+      z-index: 2;
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 1000;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      text-align: center;
+      text-shadow: 0 10px 24px rgba(0,0,0,.42), 0 0 18px rgba(56,189,248,.26);
+      animation: statusDoneTitleEnter .48s cubic-bezier(.18,.86,.24,1) both, statusDoneGlow 1.8s ease-in-out .48s infinite;
+    }
+
+    .status-confetti {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .status-confetti-piece {
+      position: absolute;
+      top: -14px;
+      left: var(--left, 50%);
+      width: 6px;
+      height: 11px;
+      border-radius: 3px;
+      background: var(--c, #38bdf8);
+      opacity: .92;
+      animation: statusConfettiLoop var(--dur, 2200ms) linear infinite;
+      animation-delay: var(--delay, 0ms);
+    }
+
+    .finish-fx {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      overflow: hidden;
+      animation: finishFxFade 5.8s linear forwards;
+    }
+
+    .confetti-piece {
+      position: absolute;
+      top: -22px;
+      left: var(--left, 50%);
+      width: 7px;
+      height: 13px;
+      border-radius: 3px;
+      background: var(--c, #38bdf8);
+      box-shadow: 0 0 10px rgba(255,255,255,.12);
+      animation: pageConfettiFall var(--d, 3600ms) cubic-bezier(.18,.72,.26,1) forwards;
+      animation-delay: var(--delay, 0ms);
+      opacity: .95;
+    }
+
+    .firework-dot {
+      position: absolute;
+      left: var(--left, 50%);
+      top: var(--top, 24%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--c, #38bdf8);
+      box-shadow: 0 0 14px var(--c, #38bdf8);
+      animation: pageFireworkBurst 920ms ease-out forwards;
+    }
+
+    @media (max-width: 520px) {
+      .team-card .rank-grid {
+        gap: 10px;
+        padding: 10px;
+        background: transparent;
+      }
+
+      .team-card .rank-card {
+        border: 1px solid rgba(255,255,255,.13);
+        border-radius: 20px;
+        overflow: hidden;
+      }
+    }
+
+    .auto-sub {
+      display: none;
+    }
+
+    .summary,
+    .team-card {
+      isolation: isolate;
+    }
+
+    .summary-head,
+    .team-hero {
+      border-top-left-radius: inherit;
+      border-top-right-radius: inherit;
+      overflow: hidden;
+    }
+
+    @media (max-width: 520px) {
+      .summary-grid {
+        gap: 10px;
+        padding: 10px;
+        background: transparent;
+      }
+
+      .summary-cell {
+        border: 1px solid rgba(255,255,255,.13);
+        border-radius: 20px;
+        overflow: hidden;
+      }
+    }
+
+
+
+    /* Harmonisation générale v6 : typo, espacements, alignements */
+    :root {
+      --title-size: clamp(17px, 4.4vw, 20px);
+      --text-size: clamp(12.5px, 3.35vw, 14px);
+      --label-size: 10px;
+      --compact-gap: 10px;
+      --content-pad: clamp(13px, 3.8vw, 16px);
+    }
+
+    .app {
+      display: grid;
+      gap: 12px;
+      padding-top: 12px;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .auto-box {
+      border-radius: 24px;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .bar-box {
+      margin-top: 0;
+    }
+
+    .hero-inner,
+    .panel-pad,
+    .match-hero,
+    .report-head,
+    .summary-head,
+    .team-hero,
+    .report-body,
+    .section,
+    .auto-head,
+    .auto-body {
+      padding: var(--content-pad);
+    }
+
+    .brand-title {
+      font-size: clamp(21px, 5.8vw, 26px);
+      letter-spacing: -0.052em;
+    }
+
+    .home-title {
+      font-size: clamp(42px, 11.6vw, 70px);
+      letter-spacing: -0.088em;
+      line-height: .92;
+    }
+
+    .hero-text,
+    .notice-text,
+    .small-text,
+    .mode-toggle,
+    .auto-formula,
+    .report-hint,
+    .dominance-meta,
+    .team-meta,
+    .row-title,
+    .row-sub,
+    .source-small {
+      font-size: var(--text-size);
+      line-height: 1.48;
+    }
+
+    .kicker {
+      font-size: 10px;
+      letter-spacing: .12em;
+      line-height: 1.15;
+      padding: 7px 11px;
+      margin-bottom: 12px;
+    }
+
+    .notice-title,
+    .auto-title,
+    .report-title,
+    .bar-box summary {
+      font-size: var(--title-size);
+      line-height: 1.12;
+      letter-spacing: -0.018em;
+      font-weight: 1000;
+      text-transform: uppercase;
+    }
+
+    .notice-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 7px;
+    }
+
+    .notice-title span:last-child,
+    .auto-title,
+    .report-title,
+    .bar-box summary {
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+
+    .notice-inline-icon {
+      width: 34px;
+      height: 34px;
+      flex-basis: 34px;
+      border-radius: 11px;
+      font-size: 18px;
+    }
+
+    label,
+    .auto-control-title,
+    .tiny-label,
+    .summary-label,
+    .rank-label,
+    .section-title,
+    .dominance-label,
+    .stat-kicker,
+    .auto-result-label,
+    .per-team-mini-title {
+      font-size: var(--label-size);
+      letter-spacing: .12em;
+      line-height: 1.25;
+    }
+
+    .form-grid,
+    .auto-body,
+    .preset-box,
+    .per-team-box,
+    .report-body,
+    .result-shell,
+    .match-list,
+    .event-list,
+    .source-list {
+      gap: 12px;
+    }
+
+    .auto-head,
+    .report-head,
+    .stat-header {
+      align-items: center;
+    }
+
+    .auto-title::before {
+      margin-right: 2px;
+    }
+
+    .preset-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 11px;
+      letter-spacing: .085em;
+      line-height: 1.2;
+    }
+
+    .preset-title span,
+    #activePresetLabel {
+      white-space: nowrap;
+    }
+
+    #activePresetLabel {
+      text-align: right;
+      color: #dbeafe;
+    }
+
+    .preset-actions,
+    .report-buttons {
+      gap: 10px;
+    }
+
+    .preset-btn {
+      min-height: 56px;
+      padding: 12px 11px;
+      font-size: 15px;
+      line-height: 1.12;
+      border-radius: 17px;
+    }
+
+    .preset-btn small {
+      margin-top: 3px;
+      font-size: 10.5px;
+      line-height: 1.25;
+      letter-spacing: .015em;
+    }
+
+    .auto-control,
+    .auto-result-card,
+    .per-team-card,
+    .per-team-mini,
+    .stat-card,
+    .summary-cell,
+    .rank-card,
+    .bar-card,
+    .mini-badge,
+    .match-row,
+    .event-row {
+      border-radius: 18px;
+    }
+
+    .auto-control {
+      gap: 10px;
+      padding: 12px;
+    }
+
+    .auto-control-top {
+      gap: 10px;
+    }
+
+    .auto-number {
+      font-size: 14px;
+    }
+
+    input {
+      font-size: 15.5px;
+      line-height: 1.2;
+    }
+
+    .skip-grid {
+      gap: 8px;
+    }
+
+    .skip-grid button {
+      min-height: 44px;
+      font-size: 14px;
+      border-radius: 14px;
+    }
+
+    .scan-btn {
+      min-height: 60px;
+      font-size: clamp(19px, 5vw, 22px);
+      letter-spacing: -0.018em;
+      border-radius: 20px;
+    }
+
+    .status-box {
+      margin-top: 12px;
+    }
+
+    .status-message {
+      font-size: 12.5px;
+      line-height: 1.35;
+    }
+
+    .status-done-title {
+      font-size: clamp(24px, 6vw, 30px);
+      letter-spacing: -0.035em;
+    }
+
+    .report-count {
+      margin-top: 3px;
+      color: #c7d2fe;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .report-btn,
+    .auto-apply-btn {
+      min-height: 48px;
+      font-size: 13px;
+      line-height: 1.2;
+      border-radius: 16px;
+      padding: 11px 10px;
+    }
+
+    .summary-title,
+    .team-name {
+      letter-spacing: -0.058em;
+      line-height: 1;
+    }
+
+    .summary-title {
+      font-size: clamp(28px, 7.6vw, 42px);
+    }
+
+    .summary-label,
+    .section-title,
+    .rank-label,
+    .dominance-label {
+      color: #b8c6e6;
+    }
+
+    .dominance-box,
+    .collective-box,
+    .team-card .zone-card {
+      margin: 12px var(--content-pad);
+    }
+
+    .mini-badge,
+    .match-row,
+    .event-row,
+    .bar-line {
+      line-height: 1.35;
+    }
+
+    details.clean summary,
+    .bar-box summary {
+      min-height: 54px;
+      padding: var(--content-pad);
+    }
+
+    .bar-grid {
+      padding: 0 var(--content-pad) var(--content-pad);
+      gap: 12px;
+    }
+
+    @media (max-width: 700px) {
+      :root {
+        --content-pad: 14px;
+        --title-size: 18px;
+        --text-size: 12.75px;
+      }
+
+      .app {
+        gap: 12px;
+        padding-left: max(11px, env(safe-area-inset-left));
+        padding-right: max(11px, env(safe-area-inset-right));
+      }
+
+      .hero,
+      .panel,
+      .report-panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .auto-box {
+        border-radius: 23px;
+      }
+
+      .kicker {
+        max-width: 100%;
+        font-size: 9.5px;
+        letter-spacing: .105em;
+      }
+
+      .home-title {
+        font-size: clamp(44px, 13.4vw, 58px);
+        letter-spacing: -0.09em;
+      }
+
+      .hero-text,
+      .notice-text {
+        line-height: 1.52;
+      }
+
+      .notice-title {
+        gap: 9px;
+      }
+
+      .notice-inline-icon {
+        width: 32px;
+        height: 32px;
+        flex-basis: 32px;
+        border-radius: 10px;
+      }
+
+      .auto-head,
+      .report-head {
+        gap: 8px;
+      }
+
+      .auto-title,
+      .report-title,
+      .bar-box summary,
+      .notice-title span:last-child {
+        letter-spacing: -0.01em;
+      }
+
+      .preset-title {
+        font-size: 10.5px;
+        letter-spacing: .07em;
+        gap: 8px;
+      }
+
+      .preset-btn {
+        min-height: 54px;
+        font-size: 14.5px;
+        padding: 11px 9px;
+      }
+
+      .preset-btn small {
+        font-size: 10px;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) 82px;
+      }
+
+      .auto-number {
+        width: 82px;
+        font-size: 13px;
+      }
+
+      .skip-grid {
+        gap: 7px;
+      }
+
+      .skip-grid button {
+        min-height: 42px;
+        font-size: 13.5px;
+      }
+
+      .scan-btn {
+        min-height: 59px;
+        font-size: 20px;
+      }
+
+      .report-buttons {
+        grid-template-columns: 1fr 1fr !important;
+      }
+
+      .report-btn {
+        font-size: 12.5px;
+        min-height: 47px;
+      }
+
+      .summary-title {
+        font-size: clamp(29px, 8.6vw, 38px);
+      }
+
+      .team-name {
+        font-size: clamp(28px, 8.2vw, 38px);
+      }
+
+      .team-card .rank-grid,
+      .summary-grid {
+        gap: 10px;
+        padding: 10px;
+      }
+
+      .rank-card,
+      .summary-cell {
+        border-radius: 19px;
+      }
+
+      .bar-box summary {
+        font-size: 18px;
+      }
+    }
+
+    @media (max-width: 380px) {
+      :root {
+        --title-size: 17px;
+        --text-size: 12.25px;
+      }
+
+      .brand-title {
+        font-size: 19px;
+      }
+
+      .preset-title {
+        letter-spacing: .05em;
+      }
+
+      .preset-btn {
+        font-size: 14px;
+      }
+
+      .report-btn {
+        font-size: 12px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+
+    /* Harmonisation v7 : FOOTSCAN, couleurs et boutons */
+    :root {
+      --bg: #050816;
+      --panel: #0a1026;
+      --card: #101833;
+      --card-2: #182450;
+      --blue: #40c9ff;
+      --red: #fb7185;
+      --soft: #e4ecff;
+      --muted: #adbad8;
+    }
+
+    .brand-title,
+    .home-title {
+      text-transform: uppercase;
+    }
+
+    .brand-title {
+      letter-spacing: -0.036em;
+      font-weight: 1000;
+    }
+
+    .home-title {
+      letter-spacing: -0.064em;
+    }
+
+    .brand-title span,
+    .home-title span {
+      color: #40c9ff;
+      text-shadow: 0 0 22px rgba(64, 201, 255, .32);
+    }
+
+    .auto-title {
+      white-space: nowrap;
+      font-size: clamp(16px, 4.1vw, 19px);
+      letter-spacing: -0.012em;
+    }
+
+    .notice-title,
+    .report-title,
+    .bar-box summary {
+      letter-spacing: -0.012em;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .auto-box {
+      border-color: rgba(134, 203, 255, 0.16);
+    }
+
+    .scan-btn,
+    .auto-apply-btn,
+    .report-btn,
+    .preset-btn,
+    .skip-grid button {
+      font-weight: 950;
+      letter-spacing: -0.006em;
+    }
+
+    .scan-btn,
+    .auto-apply-btn,
+    .report-btn.primary,
+    .preset-btn.active,
+    .skip-grid button.active {
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #fb7185 100%);
+      background-size: 190% 190%;
+      box-shadow: 0 16px 34px rgba(64, 201, 255, .18), 0 12px 28px rgba(251, 113, 133, .14);
+    }
+
+    .scan-btn {
+      min-height: 59px;
+      font-size: clamp(19px, 5vw, 21px);
+      border-radius: 21px;
+    }
+
+    .auto-apply-btn {
+      font-size: clamp(13px, 3.7vw, 15px);
+      letter-spacing: 0;
+    }
+
+    .preset-btn {
+      font-size: clamp(14px, 3.8vw, 15.5px);
+    }
+
+    .preset-btn small {
+      font-size: clamp(9.5px, 2.9vw, 10.5px);
+    }
+
+    .report-btn {
+      font-size: clamp(12px, 3.3vw, 13px);
+      text-transform: none;
+    }
+
+    .skip-grid button {
+      font-size: clamp(13px, 3.7vw, 14.5px);
+    }
+
+    .auto-control-title,
+    label,
+    .tiny-label,
+    .summary-label,
+    .rank-label,
+    .section-title,
+    .dominance-label {
+      letter-spacing: .11em;
+    }
+
+    @media (max-width: 430px) {
+      .auto-title {
+        font-size: clamp(15px, 4.25vw, 17px);
+      }
+
+      .brand-title {
+        font-size: clamp(20px, 5.8vw, 24px);
+        letter-spacing: -0.03em;
+      }
+
+      .home-title {
+        letter-spacing: -0.058em;
+      }
+    }
+
+
+    /* Finitions v8 : effets plus doux et fondus plus fluides */
+    @keyframes scanButtonBallRollV8 {
+      0% { transform: translateY(-50%) translateX(0) rotate(0deg) scale(1); opacity: 0; filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+      8% { opacity: 1; }
+      22% { transform: translateY(-57%) translateX(38px) rotate(150deg) scale(1.08); opacity: 1; filter: drop-shadow(0 10px 14px rgba(0,0,0,.28)); }
+      58% { transform: translateY(-50%) translateX(min(38vw, 180px)) rotate(620deg) scale(1); opacity: 1; }
+      82% { opacity: .92; }
+      100% { transform: translateY(-50%) translateX(min(58vw, 292px)) rotate(1080deg) scale(.72); opacity: 0; filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+    }
+
+    @keyframes scanButtonKickV8 {
+      0% { transform: translateZ(0) scale(1); background-position: 0% 50%; }
+      24% { transform: translateZ(0) scale(.985); background-position: 35% 50%; }
+      62% { transform: translateZ(0) scale(1.012); background-position: 78% 50%; }
+      100% { transform: translateZ(0) scale(1); background-position: 100% 50%; }
+    }
+
+    @keyframes statusFadeOutV8 {
+      0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+      100% { opacity: 0; transform: translateY(6px) scale(.986); filter: blur(2px); }
+    }
+
+    @keyframes statusSoftInV8 {
+      0% { opacity: 0; transform: translateY(-6px) scale(.99); filter: blur(1px); }
+      100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    }
+
+    @keyframes doneTitleFloatV8 {
+      0%, 100% { transform: translateY(0) scale(1); text-shadow: 0 10px 24px rgba(0,0,0,.42), 0 0 18px rgba(64,201,255,.24); }
+      50% { transform: translateY(-1px) scale(1.018); text-shadow: 0 14px 28px rgba(0,0,0,.38), 0 0 26px rgba(64,201,255,.38); }
+    }
+
+    @keyframes statusConfettiLoopV8 {
+      0% { transform: translate3d(0, -24px, 0) rotate(0deg) scale(.92); opacity: 0; }
+      9% { opacity: .98; }
+      88% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 136px, 0) rotate(var(--r, 540deg)) scale(1); opacity: 0; }
+    }
+
+    @keyframes finishFxFadeV8 {
+      0% { opacity: 0; }
+      7%, 88% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes pageConfettiFallV8 {
+      0% { transform: translate3d(0, -8vh, 0) rotate(0deg) scale(.94); opacity: 0; }
+      10% { opacity: .92; }
+      86% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 114vh, 0) rotate(var(--r, 720deg)) scale(1); opacity: 0; }
+    }
+
+    @keyframes pageFireworkBurstV8 {
+      0% { transform: translate3d(0, 0, 0) scale(.18); opacity: 0; filter: blur(.5px); }
+      18% { opacity: 1; }
+      100% { transform: translate3d(var(--x, 0px), var(--y, 0px), 0) scale(1); opacity: 0; filter: blur(0); }
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .auto-box,
+    .preset-btn,
+    .skip-grid button,
+    .report-btn,
+    .auto-apply-btn,
+    input {
+      transition:
+        border-color .26s ease,
+        background-color .26s ease,
+        box-shadow .26s ease,
+        transform .22s ease,
+        opacity .22s ease;
+    }
+
+    .scan-btn {
+      transition:
+        color .32s ease,
+        text-shadow .32s ease,
+        filter .32s ease,
+        transform .24s ease,
+        box-shadow .32s ease;
+      will-change: transform, filter;
+    }
+
+    .scan-btn.scan-kick {
+      animation: scanButtonKickV8 1.14s cubic-bezier(.2,.78,.22,1) both;
+      color: rgba(255,255,255,.035) !important;
+      text-shadow: none !important;
+      filter: brightness(1.09) saturate(1.1);
+    }
+
+    .scan-btn.scan-kick::before {
+      animation: scanButtonBallRollV8 1.14s cubic-bezier(.16,.84,.18,1) forwards;
+    }
+
+    .status-box {
+      animation: statusSoftInV8 .38s cubic-bezier(.2,.76,.22,1) both;
+      will-change: opacity, transform, filter;
+    }
+
+    .status-box.status-fade-out {
+      animation: statusFadeOutV8 .18s ease both;
+    }
+
+    .status-box.status-done {
+      min-height: 84px;
+      animation: statusSoftInV8 .46s cubic-bezier(.16,.84,.22,1) both;
+    }
+
+    .status-done-title {
+      animation: statusSoftInV8 .42s cubic-bezier(.18,.86,.24,1) both, doneTitleFloatV8 2.2s ease-in-out .44s infinite;
+    }
+
+    .status-confetti-piece {
+      animation-name: statusConfettiLoopV8;
+      animation-timing-function: linear;
+    }
+
+    .finish-fx {
+      animation: finishFxFadeV8 12s ease forwards;
+    }
+
+    .finish-fx::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 18% 22%, rgba(64,201,255,.11), transparent 28%),
+        radial-gradient(circle at 82% 18%, rgba(251,113,133,.10), transparent 30%);
+      opacity: .9;
+    }
+
+    .confetti-piece {
+      animation-name: pageConfettiFallV8;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+
+    .firework-dot {
+      animation: pageFireworkBurstV8 1100ms cubic-bezier(.12,.74,.24,1) forwards;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .preset-btn:hover,
+      .skip-grid button:hover,
+      .report-btn:hover,
+      .auto-apply-btn:hover,
+      .scan-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        filter: brightness(1.04);
+      }
+    }
+
+  
+
+    /* Finitions v9 : bloc scan compact, libellés en majuscule et logo plus équilibré */
+    .brand {
+      gap: 9px;
+    }
+
+    .brand-logo {
+      width: 39px;
+      height: 39px;
+      border-radius: 12px;
+      font-size: 15px;
+      letter-spacing: -0.045em;
+      background:
+        radial-gradient(circle at 30% 24%, rgba(255,255,255,.34), transparent 24%),
+        linear-gradient(135deg, #38bdf8 0%, #2657ff 46%, #fb7185 100%);
+      box-shadow: 0 12px 24px rgba(56,189,248,.16), 0 10px 22px rgba(251,113,133,.13), inset 0 1px 0 rgba(255,255,255,.24);
+    }
+
+    .brand-title {
+      font-size: clamp(18px, 4.5vw, 21px);
+      letter-spacing: -0.032em;
+      line-height: .96;
+      background: linear-gradient(90deg, #ffffff 0%, #dbeafe 38%, #93c5fd 64%, #ffffff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: none;
+    }
+
+    .brand-subtitle {
+      margin-top: 3px;
+      font-size: 9px;
+      letter-spacing: .135em;
+    }
+
+    .home-title {
+      font-size: clamp(38px, 10.2vw, 62px);
+      letter-spacing: -0.066em;
+      line-height: .94;
+      background: linear-gradient(90deg, #ffffff 0%, #dbeafe 35%, #60a5fa 62%, #ff9ab2 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 18px 42px rgba(0,0,0,.36);
+    }
+
+    .brand-title span,
+    .home-title span {
+      color: inherit;
+      text-shadow: none;
+    }
+
+    .scan-btn {
+      min-height: 56px;
+      border-radius: 19px;
+      font-size: clamp(18px, 4.7vw, 20px);
+      letter-spacing: .055em;
+      text-transform: uppercase;
+    }
+
+    .scan-btn::before {
+      content: "⚽️";
+      margin-right: 7px;
+      letter-spacing: 0;
+    }
+
+    .scan-btn.scan-kick {
+      letter-spacing: .055em;
+    }
+
+    .status-box {
+      margin-top: 9px;
+      padding: 8px 10px;
+      border-radius: 14px;
+      font-size: 12px;
+      line-height: 1.28;
+      background:
+        radial-gradient(circle at 14% 0%, rgba(56,189,248,.13), transparent 34%),
+        linear-gradient(135deg, rgba(56,189,248,.10), rgba(251,113,133,.055)),
+        rgba(5,10,28,.72);
+      box-shadow: 0 10px 22px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.055);
+    }
+
+    .status-head {
+      gap: 7px;
+    }
+
+    .status-pulse {
+      width: 8px;
+      height: 8px;
+      box-shadow: 0 0 0 4px rgba(56,189,248,.08), 0 0 14px rgba(251,113,133,.16);
+    }
+
+    .status-message {
+      font-size: 11.7px;
+      line-height: 1.24;
+      font-weight: 850;
+    }
+
+    .status-percent {
+      font-size: 10.3px;
+      padding: 3px 6px;
+      min-width: 38px;
+      text-align: center;
+    }
+
+    .status-box .progress-track,
+    .progress-track {
+      height: 6px;
+      margin-top: 7px;
+      border-radius: 999px;
+    }
+
+    .status-box.status-done {
+      min-height: 62px;
+      padding: 10px 12px;
+      border-radius: 15px;
+      background:
+        radial-gradient(circle at 17% 0%, rgba(56,189,248,.24), transparent 36%),
+        radial-gradient(circle at 85% 100%, rgba(251,113,133,.18), transparent 40%),
+        linear-gradient(135deg, rgba(56,189,248,.13), rgba(251,113,133,.10)),
+        rgba(5,10,28,.88);
+    }
+
+    .status-done-title {
+      font-size: clamp(18px, 5vw, 24px);
+      letter-spacing: .055em;
+      text-transform: uppercase;
+      line-height: 1.05;
+    }
+
+    .status-confetti {
+      border-radius: 15px;
+    }
+
+    @media (max-width: 430px) {
+      .brand-logo {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+      }
+
+      .brand-title {
+        font-size: clamp(17px, 5vw, 19px);
+        letter-spacing: -0.025em;
+      }
+
+      .brand-subtitle {
+        font-size: 8px;
+        letter-spacing: .12em;
+      }
+
+      .home-title {
+        font-size: clamp(36px, 11.2vw, 49px);
+        letter-spacing: -0.058em;
+      }
+
+      .scan-btn {
+        min-height: 53px;
+        border-radius: 17px;
+        font-size: clamp(17px, 5vw, 19px);
+      }
+
+      .status-box {
+        margin-top: 8px;
+        padding: 8px 9px;
+      }
+
+      .status-box.status-done {
+        min-height: 58px;
+        padding: 9px 10px;
+      }
+
+      .status-done-title {
+        font-size: clamp(18px, 5.6vw, 22px);
+        letter-spacing: .045em;
+      }
+    }
+
+
+    /* Finition v10 : bloc de progression compact uniquement pendant le scan */
+    .status-box:not(.status-done) {
+      margin-top: 7px;
+      padding: 6px 8px;
+      border-radius: 12px;
+      max-width: min(100%, 560px);
+    }
+
+    .status-box:not(.status-done) .status-head {
+      gap: 6px;
+      align-items: center;
+    }
+
+    .status-box:not(.status-done) .status-pulse {
+      width: 7px;
+      height: 7px;
+      box-shadow: 0 0 0 3px rgba(56,189,248,.075), 0 0 11px rgba(251,113,133,.14);
+    }
+
+    .status-box:not(.status-done) .status-message {
+      font-size: 10.8px;
+      line-height: 1.18;
+      font-weight: 850;
+      letter-spacing: .006em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .status-box:not(.status-done) .status-percent {
+      font-size: 9.5px;
+      padding: 2px 5px;
+      min-width: 34px;
+      border-radius: 999px;
+    }
+
+    .status-box:not(.status-done) .progress-track {
+      height: 4px;
+      margin-top: 5px;
+    }
+
+    @media (max-width: 430px) {
+      .status-box:not(.status-done) {
+        margin-top: 6px;
+        padding: 5px 7px;
+        border-radius: 11px;
+      }
+
+      .status-box:not(.status-done) .status-message {
+        font-size: 10.4px;
+        line-height: 1.15;
+      }
+
+      .status-box:not(.status-done) .status-percent {
+        font-size: 9px;
+        min-width: 32px;
+        padding: 2px 5px;
+      }
+
+      .status-box:not(.status-done) .progress-track {
+        height: 4px;
+        margin-top: 4px;
+      }
+    }
+
+
+    /* Finition v11 : cohérence bloc scan + identité FOOTSCAN */
+    .brand-title,
+    .home-title {
+      background: linear-gradient(90deg, #fb7185 0%, #fb7185 46%, #ff86a4 64%, #fff2f6 80%, #40c9ff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      text-shadow: none;
+      filter: drop-shadow(0 10px 24px rgba(251, 113, 133, .18));
+    }
+
+    .brand-title {
+      font-size: clamp(17px, 4.15vw, 20px);
+      letter-spacing: -0.024em;
+      line-height: .96;
+    }
+
+    .home-title {
+      font-size: clamp(38px, 10vw, 60px);
+      letter-spacing: -0.058em;
+      line-height: .94;
+      filter: drop-shadow(0 18px 38px rgba(251, 113, 133, .20));
+    }
+
+    .status-box {
+      margin-top: 8px;
+      padding: 10px 12px;
+      min-height: 66px;
+      border-radius: 16px;
+      font-size: 12px;
+      line-height: 1.26;
+      background:
+        radial-gradient(circle at 16% 0%, rgba(64, 201, 255, .20), transparent 34%),
+        radial-gradient(circle at 88% 100%, rgba(251, 113, 133, .14), transparent 40%),
+        linear-gradient(135deg, rgba(64, 201, 255, .11), rgba(251, 113, 133, .075)),
+        rgba(5, 10, 28, .82);
+      border-color: rgba(64, 201, 255, .32);
+      box-shadow: 0 12px 26px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.06);
+      transition: min-height .26s ease, padding .26s ease, background .28s ease, border-color .28s ease, opacity .24s ease, transform .24s ease;
+    }
+
+    .status-box:not(.status-done) {
+      max-width: 100%;
+      min-height: 66px;
+      padding: 10px 12px;
+      border-radius: 16px;
+    }
+
+    .status-box:not(.status-done) .status-head {
+      min-height: 32px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .status-box:not(.status-done) .status-pulse {
+      width: 8px;
+      height: 8px;
+      box-shadow: 0 0 0 4px rgba(64, 201, 255, .08), 0 0 14px rgba(251, 113, 133, .16);
+    }
+
+    .status-box:not(.status-done) .status-message {
+      font-size: 11.4px;
+      line-height: 1.22;
+      font-weight: 850;
+      letter-spacing: .004em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .status-box:not(.status-done) .status-percent {
+      font-size: 10px;
+      padding: 3px 6px;
+      min-width: 36px;
+      text-align: center;
+    }
+
+    .status-box .progress-track,
+    .status-box:not(.status-done) .progress-track {
+      height: 5px;
+      margin-top: 7px;
+      border-radius: 999px;
+    }
+
+    .status-box.status-done {
+      min-height: 66px;
+      padding: 10px 12px;
+      border-radius: 16px;
+      display: grid !important;
+      place-items: center;
+      background:
+        radial-gradient(circle at 16% 0%, rgba(64, 201, 255, .24), transparent 34%),
+        radial-gradient(circle at 88% 100%, rgba(251, 113, 133, .18), transparent 40%),
+        linear-gradient(135deg, rgba(64, 201, 255, .12), rgba(251, 113, 133, .09)),
+        rgba(5, 10, 28, .86);
+    }
+
+    .status-done-title {
+      font-size: clamp(18px, 5vw, 22px);
+      letter-spacing: .065em;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .status-confetti {
+      border-radius: inherit;
+    }
+
+    @media (max-width: 430px) {
+      .brand-title {
+        font-size: clamp(16px, 4.8vw, 18px);
+      }
+
+      .home-title {
+        font-size: clamp(36px, 10.8vw, 48px);
+        letter-spacing: -0.052em;
+      }
+
+      .status-box,
+      .status-box:not(.status-done),
+      .status-box.status-done {
+        min-height: 60px;
+        padding: 9px 10px;
+        border-radius: 15px;
+      }
+
+      .status-box:not(.status-done) .status-message {
+        font-size: 10.8px;
+        line-height: 1.18;
+      }
+
+      .status-box:not(.status-done) .status-percent {
+        font-size: 9.5px;
+        min-width: 34px;
+      }
+
+      .status-box .progress-track,
+      .status-box:not(.status-done) .progress-track {
+        height: 4px;
+        margin-top: 6px;
+      }
+
+      .status-done-title {
+        font-size: clamp(18px, 5.5vw, 21px);
+      }
+    }
+
+
+    /* Retouche v14 : même fondu FOOTSCAN en haut et en hero */
+    .brand-title,
+    .home-title {
+      background: linear-gradient(92deg, #ffffff 0%, #dff4ff 18%, #7dd3fc 38%, #8b5cf6 66%, #f472b6 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      text-shadow: none;
+    }
+
+    .brand-title {
+      filter: drop-shadow(0 8px 20px rgba(59, 130, 246, .16)) drop-shadow(0 8px 18px rgba(236, 72, 153, .10));
+    }
+
+    .home-title {
+      filter: drop-shadow(0 16px 34px rgba(59, 130, 246, .14)) drop-shadow(0 18px 36px rgba(236, 72, 153, .12));
+    }
+
+    .brand-title span,
+    .home-title span {
+      -webkit-text-fill-color: inherit !important;
+      color: inherit !important;
+      text-shadow: none !important;
+    }
+
+
+    /* Retouche v21 : v14 uniquement, jauge plus douce + boule mauve/rose sans agrandir */
+    :root {
+      --scan-btn-gradient-v21: linear-gradient(135deg, #40c9ff 0%, #4f73ff 46%, #ef5b99 100%);
+    }
+
+    input[type="range"] {
+      --fill: 50%;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 999px;
+      background:
+        var(--scan-btn-gradient-v21) 0 / var(--fill) 100% no-repeat,
+        linear-gradient(90deg, rgba(255,255,255,.34), rgba(255,255,255,.24));
+      box-shadow: inset 0 1px 2px rgba(255,255,255,.14), inset 0 -1px 2px rgba(0,0,0,.22);
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255,255,255,.34), rgba(255,255,255,.24));
+      box-shadow: inset 0 1px 2px rgba(255,255,255,.14), inset 0 -1px 2px rgba(0,0,0,.22);
+    }
+
+    input[type="range"]::-moz-range-progress {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--scan-btn-gradient-v21);
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      margin-top: -5px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.9);
+      background: linear-gradient(135deg, #c77dff 0%, #d26ce0 54%, #ea7fb2 100%);
+      box-shadow: 0 3px 10px rgba(168, 85, 247, .16);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.9);
+      background: linear-gradient(135deg, #c77dff 0%, #d26ce0 54%, #ea7fb2 100%);
+      box-shadow: 0 3px 10px rgba(168, 85, 247, .16);
+    }
+
+    /* Bloc de scan : version plus lisible et alignée sur SCAN TERMINÉ */
+    .status-box:not(.status-done) {
+      min-height: 66px;
+      padding: 10px 12px;
+      display: grid;
+      align-content: center;
+      gap: 8px;
+    }
+
+    .status-box:not(.status-done) .status-head {
+      min-height: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .status-box:not(.status-done) .status-pulse,
+    .status-box:not(.status-done) .status-message {
+      display: none;
+    }
+
+    .status-box:not(.status-done) .status-loading-label {
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #eaf4ff;
+      opacity: .95;
+      white-space: nowrap;
+    }
+
+    .status-box:not(.status-done) .status-percent {
+      font-size: 16px;
+      font-weight: 1000;
+      line-height: 1;
+      min-width: 48px;
+      padding: 0;
+      color: #ffffff;
+      background: none;
+      border: 0;
+      box-shadow: none;
+    }
+
+    .status-box .progress-track,
+    .status-box:not(.status-done) .progress-track {
+      height: 6px;
+      margin-top: 0;
+      border-radius: 999px;
+      background: rgba(255,255,255,.13);
+      overflow: hidden;
+    }
+
+    .status-box .progress-fill,
+    .status-box:not(.status-done) .progress-fill {
+      background: var(--scan-btn-gradient-v21);
+    }
+
+    @media (max-width: 430px) {
+      .status-box:not(.status-done) .status-loading-label {
+        font-size: 10.4px;
+        letter-spacing: .11em;
+      }
+      .status-box:not(.status-done) .status-percent {
+        font-size: 14px;
+        min-width: 42px;
+      }
+    }
+
+
+    /* Retouche v22 : bloc de scan plein format, rangs visibles, même taille que le bloc final */
+    .status-box,
+    .status-box.status-done,
+    .status-box:not(.status-done) {
+      min-height: 74px;
+      border-radius: 16px;
+      padding: 10px 12px;
+    }
+
+    .status-box {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-box:not(.status-done) {
+      display: block;
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .08), rgba(251, 113, 133, .06)),
+        rgba(5, 10, 28, .86);
+      border-color: rgba(64, 201, 255, .26);
+    }
+
+    .status-progress-bg {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #fb7185 100%);
+      opacity: .18;
+      transition: width .34s ease;
+      pointer-events: none;
+    }
+
+    .status-progress-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 7px;
+    }
+
+    .status-box:not(.status-done) .status-head {
+      min-height: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .status-box:not(.status-done) .status-pulse,
+    .status-box:not(.status-done) .status-message,
+    .status-box:not(.status-done) .status-percent {
+      display: none;
+    }
+
+    .status-box:not(.status-done) .status-ranks {
+      font-size: 11px;
+      line-height: 1.1;
+      font-weight: 950;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.92);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 68%;
+    }
+
+    .status-box:not(.status-done) .status-loading-label {
+      font-size: 10.6px;
+      line-height: 1;
+      font-weight: 950;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.88);
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .status-box:not(.status-done) .status-big-percent {
+      position: absolute;
+      inset: 50% 0 auto 0;
+      transform: translateY(-50%);
+      text-align: center;
+      font-size: clamp(24px, 7vw, 30px);
+      font-weight: 1000;
+      letter-spacing: -.04em;
+      color: rgba(255,255,255,.22);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .status-box .progress-track,
+    .status-box:not(.status-done) .progress-track {
+      height: 6px;
+      margin-top: auto;
+      border-radius: 999px;
+      background: rgba(255,255,255,.14);
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    .status-box .progress-fill,
+    .status-box:not(.status-done) .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #fb7185 100%);
+      transition: width .34s ease;
+    }
+
+    .status-box.status-done {
+      min-height: 74px;
+      padding: 10px 12px;
+      display: grid !important;
+      place-items: center;
+    }
+
+    .status-done-title {
+      font-size: clamp(19px, 5.2vw, 23px);
+      letter-spacing: .08em;
+    }
+
+    @media (max-width: 430px) {
+      .status-box,
+      .status-box.status-done,
+      .status-box:not(.status-done) {
+        min-height: 72px;
+        padding: 9px 10px;
+      }
+
+      .status-box:not(.status-done) .status-ranks {
+        font-size: 10.2px;
+        max-width: 62%;
+      }
+
+      .status-box:not(.status-done) .status-loading-label {
+        font-size: 9.6px;
+      }
+
+      .status-box:not(.status-done) .status-big-percent {
+        font-size: clamp(22px, 8vw, 27px);
+      }
+
+      .status-box .progress-track,
+      .status-box:not(.status-done) .progress-track {
+        height: 5px;
+      }
+    }
+
+
+    /* Retouche v23 : bloc de scan plus fluide sur mobile */
+    .status-box,
+    .status-box.status-loading,
+    .status-box.status-selection,
+    .status-box.status-done {
+      min-height: 74px !important;
+      height: 74px;
+      border-radius: 16px;
+      padding: 10px 12px;
+      overflow: hidden;
+      transition: opacity .22s ease, transform .22s ease, background .22s ease, border-color .22s ease, box-shadow .22s ease;
+      animation: none !important;
+    }
+
+    .status-box.status-loading,
+    .status-box.status-selection {
+      display: block;
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .08), rgba(251, 113, 133, .06)),
+        rgba(5, 10, 28, .86);
+      border-color: rgba(64, 201, 255, .26);
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #fb7185 100%);
+      opacity: .18;
+      transition: width .36s ease;
+      pointer-events: none;
+    }
+
+    .status-box.status-loading .status-progress-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      position: absolute;
+      inset: 50% 0 auto 0;
+      transform: translateY(-56%);
+      text-align: center;
+      font-size: clamp(26px, 7vw, 31px);
+      font-weight: 1000;
+      letter-spacing: -.05em;
+      color: rgba(255,255,255,.22);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .status-box.status-loading .progress-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.14);
+      overflow: hidden;
+      margin-top: auto;
+    }
+
+    .status-box.status-loading .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #fb7185 100%);
+      transition: width .36s ease;
+    }
+
+    .status-box.status-selection {
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .status-selection-wrap {
+      display: grid;
+      gap: 6px;
+      align-items: center;
+      justify-items: center;
+    }
+
+    .status-selection-label {
+      font-size: 10.5px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.72);
+      line-height: 1;
+    }
+
+    .status-selection-value {
+      font-size: clamp(20px, 5.8vw, 24px);
+      font-weight: 1000;
+      letter-spacing: -.04em;
+      line-height: 1;
+      color: #ffffff;
+    }
+
+    .status-box.status-done {
+      display: grid !important;
+      place-items: center;
+      background:
+        radial-gradient(circle at 16% 0%, rgba(64, 201, 255, .24), transparent 34%),
+        radial-gradient(circle at 88% 100%, rgba(251, 113, 133, .18), transparent 40%),
+        linear-gradient(135deg, rgba(64, 201, 255, .12), rgba(251, 113, 133, .09)),
+        rgba(5, 10, 28, .86);
+    }
+
+    .status-box.status-done,
+    .status-done-title {
+      animation: none !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box,
+      .status-box.status-loading,
+      .status-box.status-selection,
+      .status-box.status-done {
+        min-height: 72px !important;
+        height: 72px;
+        padding: 9px 10px;
+      }
+
+      .status-box.status-loading .status-big-percent {
+        font-size: clamp(24px, 8vw, 28px);
+      }
+
+      .status-selection-label {
+        font-size: 9.8px;
+      }
+
+      .status-selection-value {
+        font-size: clamp(18px, 6vw, 22px);
+      }
+    }
+
+
+    /* Retouche v25 : affichage bloc scan / sélection / bouton plus cohérent */
+    .scan-btn:disabled {
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .66) 0%, rgba(59, 107, 255, .58) 46%, rgba(251, 113, 133, .54) 100%),
+        rgba(12, 24, 48, .92) !important;
+      color: rgba(255,255,255,.96) !important;
+      box-shadow: 0 10px 24px rgba(64, 201, 255, .10), inset 0 1px 0 rgba(255,255,255,.08) !important;
+      opacity: 1 !important;
+    }
+
+    .status-box,
+    .status-box.status-selection,
+    .status-box.status-loading,
+    .status-box.status-done {
+      min-height: 78px !important;
+      height: 78px !important;
+      padding: 10px 12px !important;
+      border-radius: 16px !important;
+      overflow: hidden !important;
+      box-sizing: border-box;
+      will-change: opacity, transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+    }
+
+    .status-box.status-selection {
+      display: grid !important;
+      place-items: center;
+      text-align: center;
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .08), rgba(251, 113, 133, .06)),
+        rgba(5, 10, 28, .86) !important;
+      border-color: rgba(64, 201, 255, .26) !important;
+    }
+
+    .status-selection-wrap {
+      width: 100%;
+      min-height: 100%;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 6px;
+    }
+
+    .status-selection-label {
+      font-size: 10.2px !important;
+      letter-spacing: .14em !important;
+      line-height: 1 !important;
+      color: rgba(255,255,255,.74) !important;
+    }
+
+    .status-selection-value {
+      font-size: clamp(17px, 5.3vw, 22px) !important;
+      line-height: 1 !important;
+      letter-spacing: -.03em !important;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-box.status-loading {
+      display: block !important;
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .10), rgba(251, 113, 133, .08)),
+        rgba(5, 10, 28, .86) !important;
+      border-color: rgba(64, 201, 255, .26) !important;
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #fb7185 100%) !important;
+      opacity: .17 !important;
+      transition: width .48s cubic-bezier(.22, .61, .36, 1) !important;
+    }
+
+    .status-box.status-loading .status-progress-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      position: absolute;
+      inset: 50% 0 auto 0;
+      transform: translateY(-52%);
+      text-align: center;
+      font-size: clamp(24px, 7vw, 30px) !important;
+      font-weight: 1000;
+      letter-spacing: -.05em;
+      color: rgba(255,255,255,.26) !important;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .status-box.status-loading .progress-track,
+    .status-box.status-loading .progress-fill {
+      border-radius: 0 !important;
+    }
+
+    .status-box.status-loading .progress-track {
+      height: 6px !important;
+      background: rgba(255,255,255,.14) !important;
+      overflow: hidden;
+      margin-top: auto;
+    }
+
+    .status-box.status-loading .progress-fill {
+      height: 100%;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #fb7185 100%) !important;
+      transition: width .48s cubic-bezier(.22, .61, .36, 1) !important;
+    }
+
+    .status-box.status-done {
+      transition: opacity .22s ease, transform .22s ease, background .22s ease !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box,
+      .status-box.status-selection,
+      .status-box.status-loading,
+      .status-box.status-done {
+        min-height: 76px !important;
+        height: 76px !important;
+        padding: 9px 10px !important;
+      }
+
+      .status-selection-label {
+        font-size: 9.6px !important;
+      }
+
+      .status-selection-value {
+        font-size: clamp(16px, 5.6vw, 20px) !important;
+      }
+
+      .status-box.status-loading .status-big-percent {
+        font-size: clamp(22px, 8vw, 27px) !important;
+      }
+    }
+
+
+    /* Retouche v26 : fluidité générale + ballon scanner plus fluide */
+    @keyframes scanButtonBallRollV26 {
+      0% {
+        transform: translate3d(0, -50%, 0) rotate(0deg) scale(1);
+        opacity: .96;
+      }
+      14% {
+        transform: translate3d(28px, -53%, 0) rotate(110deg) scale(1.03);
+        opacity: 1;
+      }
+      58% {
+        transform: translate3d(min(36vw, 170px), -50%, 0) rotate(520deg) scale(1);
+        opacity: 1;
+      }
+      84% {
+        opacity: .92;
+      }
+      100% {
+        transform: translate3d(min(53vw, 248px), -50%, 0) rotate(860deg) scale(.92);
+        opacity: 0;
+      }
+    }
+
+    @keyframes scanButtonKickV26 {
+      0% { transform: translateZ(0) scale(1); filter: brightness(1); }
+      20% { transform: translateZ(0) scale(.988); filter: brightness(1.03); }
+      56% { transform: translateZ(0) scale(1.008); filter: brightness(1.08); }
+      100% { transform: translateZ(0) scale(1); filter: brightness(1); }
+    }
+
+    .scan-btn {
+      will-change: transform, filter, background-position;
+      backface-visibility: hidden;
+      transform: translateZ(0);
+    }
+
+    .scan-btn.scan-kick {
+      animation: scanButtonKickV26 .98s cubic-bezier(.22,.61,.36,1) both !important;
+      color: rgba(255,255,255,.08) !important;
+      filter: brightness(1.06) saturate(1.04) !important;
+    }
+
+    .scan-btn.scan-kick::before {
+      position: absolute !important;
+      left: 22px !important;
+      top: 50% !important;
+      margin-right: 0 !important;
+      z-index: 2;
+      will-change: transform, opacity;
+      animation: scanButtonBallRollV26 .98s cubic-bezier(.22,.61,.36,1) forwards !important;
+    }
+
+    .status-box,
+    .status-box.status-selection,
+    .status-box.status-loading,
+    .status-box.status-done,
+    .status-box .progress-fill,
+    .status-box .status-progress-bg,
+    .status-box .status-big-percent {
+      backface-visibility: hidden;
+      transform: translateZ(0);
+    }
+
+    .status-box {
+      transition: opacity .28s ease, transform .28s cubic-bezier(.22,.61,.36,1), background .28s ease, border-color .28s ease, box-shadow .28s ease !important;
+    }
+
+    .status-box.status-loading .status-progress-bg,
+    .status-box.status-loading .progress-fill {
+      transition: width .42s cubic-bezier(.22,.61,.36,1) !important;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      transition: opacity .28s ease, color .28s ease !important;
+    }
+
+    .status-box.status-done {
+      animation: statusSoftInV8 .34s cubic-bezier(.22,.61,.36,1) both !important;
+    }
+
+    .status-done-title {
+      animation: statusSoftInV8 .28s cubic-bezier(.22,.61,.36,1) both, doneTitleFloatV8 2.2s ease-in-out .32s infinite !important;
+    }
+
+
+    /* Retouche v27 : vérification finale fluidité scan + bouton + bloc */
+    .scan-btn:disabled {
+      background:
+        linear-gradient(135deg, rgba(64, 201, 255, .74) 0%, rgba(59, 107, 255, .66) 46%, rgba(251, 113, 133, .62) 100%),
+        rgba(10, 18, 38, .94) !important;
+      color: rgba(255,255,255,.97) !important;
+      border-color: rgba(255,255,255,.12) !important;
+      box-shadow:
+        0 12px 28px rgba(64, 201, 255, .12),
+        0 10px 24px rgba(251, 113, 133, .10),
+        inset 0 1px 0 rgba(255,255,255,.09) !important;
+      opacity: 1 !important;
+      filter: saturate(1.02) brightness(1.01) !important;
+    }
+
+    .scan-btn.scan-kick {
+      animation: scanButtonKickV26 1.08s cubic-bezier(.22,.61,.36,1) both !important;
+      color: rgba(255,255,255,.06) !important;
+    }
+
+    .scan-btn.scan-kick::before {
+      left: 24px !important;
+      animation: scanButtonBallRollV26 1.08s cubic-bezier(.22,.61,.36,1) forwards !important;
+    }
+
+    .status-box,
+    .status-box.status-selection,
+    .status-box.status-loading,
+    .status-box.status-done {
+      min-height: 78px !important;
+      height: 78px !important;
+      border-radius: 16px !important;
+    }
+
+    .status-box.status-selection {
+      display: grid !important;
+      place-items: center !important;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(64,201,255,.10), transparent 34%),
+        linear-gradient(135deg, rgba(64,201,255,.09), rgba(251,113,133,.07)),
+        rgba(5, 10, 28, .88) !important;
+      border-color: rgba(64, 201, 255, .26) !important;
+    }
+
+    .status-selection-wrap {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 5px;
+    }
+
+    .status-selection-label {
+      font-size: 10px !important;
+      line-height: 1 !important;
+      letter-spacing: .14em !important;
+    }
+
+    .status-selection-value {
+      font-size: clamp(16px, 5vw, 21px) !important;
+      line-height: 1 !important;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-box.status-loading {
+      display: block !important;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(64,201,255,.12), transparent 34%),
+        linear-gradient(135deg, rgba(64,201,255,.11), rgba(251,113,133,.08)),
+        rgba(5, 10, 28, .90) !important;
+      border-color: rgba(64, 201, 255, .26) !important;
+      box-shadow:
+        0 10px 24px rgba(0,0,0,.16),
+        0 0 0 1px rgba(64,201,255,.08),
+        inset 0 1px 0 rgba(255,255,255,.05) !important;
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      opacity: .20 !important;
+      transition: width .56s cubic-bezier(.22,.61,.36,1) !important;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      font-size: clamp(24px, 7vw, 31px) !important;
+      color: rgba(255,255,255,.24) !important;
+      transition: opacity .30s ease !important;
+    }
+
+    .status-box.status-loading .progress-track {
+      height: 6px !important;
+      border-radius: 0 !important;
+      background: rgba(255,255,255,.14) !important;
+      overflow: hidden;
+    }
+
+    .status-box.status-loading .progress-fill {
+      border-radius: 0 !important;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #fb7185 100%) !important;
+      transition: width .56s cubic-bezier(.22,.61,.36,1) !important;
+    }
+
+    .status-box.status-done {
+      animation: statusSoftInV8 .38s cubic-bezier(.22,.61,.36,1) both !important;
+    }
+
+    .status-done-title {
+      animation: statusSoftInV8 .34s cubic-bezier(.22,.61,.36,1) both, doneTitleFloatV8 2.2s ease-in-out .38s infinite !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box,
+      .status-box.status-selection,
+      .status-box.status-loading,
+      .status-box.status-done {
+        min-height: 76px !important;
+        height: 76px !important;
+        padding: 9px 10px !important;
+      }
+
+      .status-selection-label {
+        font-size: 9.4px !important;
+      }
+
+      .status-selection-value {
+        font-size: clamp(15px, 5.3vw, 19px) !important;
+      }
+    }
+
+
+    /* Retouche v28 : % plus visible sur mobile + bloc plus opaque + confetti plus tard */
+    .status-box.status-loading {
+      background:
+        radial-gradient(circle at 18% 0%, rgba(64,201,255,.14), transparent 34%),
+        linear-gradient(135deg, rgba(64,201,255,.13), rgba(251,113,133,.10)),
+        rgba(5, 10, 28, .94) !important;
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      opacity: .24 !important;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      position: absolute !important;
+      top: 50% !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: auto !important;
+      inset: auto !important;
+      transform: translateY(-62%) !important;
+      text-align: center !important;
+      line-height: 1 !important;
+      z-index: 2 !important;
+      font-size: clamp(25px, 7.2vw, 32px) !important;
+      color: rgba(255,255,255,.34) !important;
+      text-shadow: 0 2px 16px rgba(0,0,0,.10) !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box.status-loading .status-big-percent {
+        font-size: clamp(24px, 8.4vw, 29px) !important;
+        transform: translateY(-60%) !important;
+        color: rgba(255,255,255,.38) !important;
+      }
+    }
+
+
+    /* Retouche v29 : résumé rapide plus compact sur mobile + jauge scan à bords droits */
+    .summary-head {
+      overflow: hidden;
+    }
+
+    .summary-title {
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      text-wrap: balance;
+    }
+
+    @media (max-width: 520px) {
+      .summary-head {
+        padding: 12px 12px 13px !important;
+      }
+
+      .summary-title {
+        font-size: clamp(20px, 6.5vw, 30px) !important;
+        line-height: .96 !important;
+        letter-spacing: -0.052em !important;
+        margin-top: 6px !important;
+      }
+
+      .summary-head .summary-label {
+        font-size: 9.6px !important;
+        line-height: 1.2 !important;
+      }
+    }
+
+    @media (max-width: 430px) {
+      .summary-title {
+        font-size: clamp(19px, 6.2vw, 27px) !important;
+        line-height: .95 !important;
+      }
+
+      .summary-head .summary-label:last-child {
+        display: block;
+        margin-top: 7px;
+        font-size: 9.2px !important;
+        letter-spacing: .11em !important;
+        line-height: 1.22 !important;
+        overflow-wrap: anywhere;
+      }
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      left: 10px !important;
+      top: 10px !important;
+      bottom: 10px !important;
+      border-radius: 0 !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box.status-loading .status-progress-bg {
+        left: 9px !important;
+        top: 9px !important;
+        bottom: 9px !important;
+      }
+    }
+
+
+    /* Retouche v30 : pourcentage parfaitement centré + grande jauge rectangulaire */
+    .status-box.status-loading {
+      background:
+        radial-gradient(circle at 18% 0%, rgba(64,201,255,.15), transparent 34%),
+        linear-gradient(135deg, rgba(64,201,255,.14), rgba(251,113,133,.11)),
+        rgba(5, 10, 28, .95) !important;
+    }
+
+    .status-box.status-loading .status-progress-content {
+      position: absolute !important;
+      inset: 0 !important;
+      z-index: 1 !important;
+      display: block !important;
+      height: auto !important;
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      left: 10px !important;
+      right: auto !important;
+      top: 10px !important;
+      bottom: 20px !important;
+      border-radius: 0 !important;
+      opacity: .26 !important;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      position: absolute !important;
+      left: 50% !important;
+      top: 50% !important;
+      right: auto !important;
+      bottom: auto !important;
+      inset: auto !important;
+      transform: translate(-50%, -50%) !important;
+      margin: 0 !important;
+      width: auto !important;
+      min-width: 0 !important;
+      text-align: center !important;
+      line-height: 1 !important;
+      white-space: nowrap !important;
+      z-index: 3 !important;
+      font-size: clamp(26px, 7.4vw, 33px) !important;
+      color: rgba(255,255,255,.40) !important;
+      text-shadow: 0 3px 18px rgba(0,0,0,.14) !important;
+      pointer-events: none !important;
+    }
+
+    .status-box.status-loading .progress-track {
+      position: absolute !important;
+      left: 10px !important;
+      right: 10px !important;
+      bottom: 10px !important;
+      margin: 0 !important;
+      height: 6px !important;
+      border-radius: 0 !important;
+      background: rgba(255,255,255,.14) !important;
+      overflow: hidden !important;
+      z-index: 2 !important;
+    }
+
+    .status-box.status-loading .progress-fill {
+      border-radius: 0 !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box.status-loading .status-progress-bg {
+        left: 9px !important;
+        top: 9px !important;
+        bottom: 18px !important;
+      }
+
+      .status-box.status-loading .status-big-percent {
+        font-size: clamp(25px, 8.6vw, 31px) !important;
+        color: rgba(255,255,255,.42) !important;
+      }
+
+      .status-box.status-loading .progress-track {
+        left: 9px !important;
+        right: 9px !important;
+        bottom: 9px !important;
+      }
+    }
+
+
+    /* Retouche v32 : bloc de progression plein format, pourcentage centré sur mobile */
+    .status-box.status-loading {
+      position: relative !important;
+      overflow: hidden !important;
+      background: rgba(6, 12, 30, .96) !important;
+    }
+
+    .status-box.status-loading .status-progress-content {
+      position: absolute !important;
+      inset: 0 !important;
+      display: block !important;
+      z-index: 2 !important;
+      padding: 0 !important;
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      bottom: 0 !important;
+      width: 0%;
+      border-radius: 0 !important;
+      opacity: .26 !important;
+      background: linear-gradient(135deg, #40c9ff 0%, #3b6bff 45%, #fb7185 100%) !important;
+      transition: width .62s cubic-bezier(.22,.61,.36,1) !important;
+      z-index: 1 !important;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      position: absolute !important;
+      left: 50% !important;
+      top: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      margin: 0 !important;
+      width: auto !important;
+      min-width: 0 !important;
+      line-height: 1 !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+      z-index: 3 !important;
+      font-size: clamp(28px, 7.8vw, 36px) !important;
+      font-weight: 1000 !important;
+      color: rgba(255,255,255,.42) !important;
+      text-shadow: 0 2px 18px rgba(0,0,0,.14) !important;
+      pointer-events: none !important;
+      user-select: none !important;
+    }
+
+    .status-box.status-loading .progress-track {
+      display: none !important;
+    }
+
+    .status-box.status-loading .progress-fill {
+      display: none !important;
+    }
+
+    @media (max-width: 430px) {
+      .status-box.status-loading .status-big-percent {
+        font-size: clamp(27px, 9.4vw, 34px) !important;
+        color: rgba(255,255,255,.46) !important;
+      }
+    }
+
+
+    /* Retouche v33 : Matchs Utilisés + détails + compteur détails */
+    .match-row {
+      grid-template-columns: auto minmax(0, 1fr) !important;
+      align-items: stretch !important;
+    }
+
+    .match-row > :last-child {
+      grid-column: auto !important;
+      justify-self: stretch !important;
+    }
+
+    .match-number-badge {
+      width: 42px !important;
+      min-width: 42px !important;
+      height: auto !important;
+      min-height: 58px !important;
+      padding: 0 !important;
+      overflow: hidden;
+      display: grid !important;
+      grid-template-rows: 1fr 1px 1fr;
+      align-items: center;
+      justify-items: center;
+      border-radius: 14px !important;
+    }
+
+    .match-index,
+    .match-count-mini {
+      width: 100%;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+      font-family: inherit;
+      font-weight: 950;
+    }
+
+    .match-index {
+      font-size: 13px;
+      color: rgba(226, 232, 255, .82);
+    }
+
+    .match-count-mini {
+      grid-row: 3;
+      font-size: 13px;
+      color: #ffffff;
+      background: linear-gradient(135deg, rgba(64,201,255,.13), rgba(251,113,133,.10));
+    }
+
+    .match-number-badge::before {
+      content: "";
+      grid-row: 2;
+      width: 70%;
+      height: 1px;
+      background: rgba(255,255,255,.14);
+    }
+
+    details.clean summary {
+      justify-content: flex-start !important;
+      gap: 8px !important;
+    }
+
+    details.clean summary .count-pill {
+      margin-left: auto !important;
+      margin-right: 2px !important;
+    }
+
+    details.clean summary::after {
+      margin-left: 0 !important;
+      flex: 0 0 auto;
+    }
+
+    @media (max-width: 430px) {
+      .match-number-badge {
+        width: 40px !important;
+        min-width: 40px !important;
+        min-height: 56px !important;
+      }
+
+      .match-index,
+      .match-count-mini {
+        font-size: 12.5px;
+      }
+    }
+
+    /* Retouche v35 : hiérarchie résumé rapide + Domicile bleu / Extérieur rouge */
+    .summary-head {
+      padding-top: clamp(16px, 4.2vw, 22px) !important;
+      padding-bottom: clamp(16px, 4.2vw, 22px) !important;
+    }
+
+    .summary-title {
+      font-size: clamp(34px, 10.6vw, 58px) !important;
+      line-height: .94 !important;
+      letter-spacing: -0.066em !important;
+      margin-top: 8px !important;
+      margin-bottom: 8px !important;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: normal;
+    }
+
+    .summary-grid .summary-team-name,
+    .summary-team-name {
+      font-size: clamp(23px, 6.8vw, 34px) !important;
+      line-height: 1 !important;
+      letter-spacing: -0.052em !important;
+      font-weight: 1000 !important;
+    }
+
+    .summary-grid .mini-badge span,
+    .summary-grid .mini-badge strong {
+      font-size: clamp(13px, 3.6vw, 16px) !important;
+    }
+
+    .dominance-label {
+      font-size: clamp(12px, 3.5vw, 15px) !important;
+      letter-spacing: .14em !important;
+      line-height: 1.2 !important;
+      color: #c7d2fe !important;
+    }
+
+    .dominance-team {
+      font-size: clamp(30px, 8.2vw, 44px) !important;
+      line-height: .98 !important;
+      letter-spacing: -0.062em !important;
+    }
+
+    .team-hero .team-name,
+    .team-name {
+      font-size: clamp(27px, 7.2vw, 38px) !important;
+      line-height: 1 !important;
+      letter-spacing: -0.056em !important;
+    }
+
+    .team-meta {
+      text-transform: none !important;
+    }
+
+    @media (max-width: 430px) {
+      .summary-title {
+        font-size: clamp(31px, 9.7vw, 44px) !important;
+        line-height: .93 !important;
+      }
+
+      .summary-grid .summary-team-name,
+      .summary-team-name {
+        font-size: clamp(21px, 6.4vw, 30px) !important;
+      }
+
+      .dominance-label {
+        font-size: clamp(11.5px, 3.25vw, 13.5px) !important;
+      }
+
+      .dominance-team {
+        font-size: clamp(28px, 8.3vw, 38px) !important;
+      }
+
+      .team-hero .team-name,
+      .team-name {
+        font-size: clamp(25px, 7vw, 34px) !important;
+      }
+    }
+
+
+    /* Retouche v36 : finitions UI */
+    .mode-toggle {
+      gap: 8px !important;
+      padding: 8px 9px !important;
+      border-radius: 10px !important;
+      font-size: 11px !important;
+      line-height: 1.25 !important;
+      font-weight: 900 !important;
+      background: rgba(56, 189, 248, 0.055) !important;
+    }
+
+    .mode-toggle input {
+      width: 15px !important;
+      height: 15px !important;
+    }
+
+    .mode-toggle span {
+      opacity: .92;
+    }
+
+    .count-pill {
+      min-width: 38px;
+      display: inline-grid !important;
+      place-items: center;
+      padding: 6px 12px !important;
+      border-radius: 999px !important;
+      background: linear-gradient(135deg, rgba(64,201,255,.16), rgba(251,113,133,.12)), rgba(10,16,34,.96) !important;
+      border: 1px solid rgba(255,255,255,.12) !important;
+      color: #eef2ff !important;
+      font-size: 11px !important;
+      font-weight: 1000 !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 18px rgba(0,0,0,.14) !important;
+    }
+
+    .match-number-badge {
+      background: linear-gradient(180deg, rgba(64,201,255,.15), rgba(251,113,133,.10)), rgba(10,16,34,.98) !important;
+      border: 1px solid rgba(255,255,255,.11) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 20px rgba(0,0,0,.18) !important;
+    }
+
+    .match-index {
+      color: #eef2ff !important;
+    }
+
+    .match-count-mini {
+      color: #ffffff !important;
+      background: linear-gradient(135deg, rgba(64,201,255,.20), rgba(251,113,133,.16)) !important;
+    }
+
+    .match-number-badge::before {
+      background: rgba(255,255,255,.16) !important;
+    }
+
+    .rank-value,
+    .rank-card .rank-value {
+      font-size: 33px !important;
+      line-height: 1 !important;
+      letter-spacing: -0.07em !important;
+    }
+
+    .event-list {
+      gap: 10px !important;
+    }
+
+    .event-break {
+      height: 1px;
+      background: var(--line);
+      margin: 4px 8px 2px;
+      border-radius: 0;
+    }
+
+    .event-rich-row {
+      grid-template-columns: auto minmax(0, 1fr) !important;
+      align-items: start !important;
+      gap: 10px !important;
+    }
+
+    .event-rich-row > :last-child {
+      grid-column: auto !important;
+      justify-self: stretch !important;
+    }
+
+    .event-metric-pill {
+      min-width: 86px;
+      height: 36px;
+      display: grid;
+      grid-template-columns: auto auto;
+      align-items: stretch;
+      border-radius: 11px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.11);
+      background: linear-gradient(135deg, rgba(64,201,255,.11), rgba(251,113,133,.08)), rgba(10,16,34,.98);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+
+    .event-metric-code,
+    .event-metric-value {
+      display: grid;
+      place-items: center;
+      padding: 0 10px;
+      line-height: 1;
+      white-space: nowrap;
+      font-weight: 1000;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .event-metric-code {
+      color: #e2e8f0;
+      font-size: 12px;
+      letter-spacing: .04em;
+    }
+
+    .event-metric-value {
+      border-left: 1px solid rgba(255,255,255,.12);
+      font-size: 12px;
+      background: rgba(255,255,255,.03);
+    }
+
+    .event-rich-row .row-title {
+      font-size: 13px !important;
+      line-height: 1.28 !important;
+    }
+
+    .event-rich-row .row-sub {
+      margin-top: 5px !important;
+      line-height: 1.38 !important;
+    }
+
+    details.clean summary {
+      justify-content: flex-start !important;
+      gap: 8px !important;
+    }
+
+    details.clean summary .count-pill {
+      margin-left: 8px !important;
+      margin-right: auto !important;
+    }
+
+    details.clean summary::after {
+      margin-left: auto !important;
+    }
+
+    @media (max-width: 430px) {
+      .event-metric-pill {
+        min-width: 78px;
+        height: 34px;
+      }
+
+      .event-metric-code,
+      .event-metric-value {
+        padding: 0 8px;
+        font-size: 11px;
+      }
+
+      .rank-value,
+      .rank-card .rank-value {
+        font-size: 31px !important;
+      }
+
+      .mode-toggle {
+        font-size: 10.4px !important;
+      }
+    }
+
+
+    /* Retouche v37 : réglages fins des curseurs et rangs */
+    .auto-control {
+      padding: 10px !important;
+      gap: 8px !important;
+      border-radius: 17px !important;
+    }
+
+    .auto-control-top {
+      grid-template-columns: minmax(0, 1fr) minmax(64px, 76px) !important;
+      gap: 8px !important;
+    }
+
+    .auto-control-title {
+      font-size: 15px !important;
+      line-height: 1.1 !important;
+      font-weight: 1000 !important;
+      letter-spacing: -0.02em !important;
+      color: #e9ecff !important;
+    }
+
+    .auto-number {
+      width: 76px !important;
+      padding: 8px 8px !important;
+      border-radius: 9px !important;
+      font-size: 14px !important;
+    }
+
+    .auto-result-value {
+      font-size: 27px !important;
+      line-height: 1 !important;
+      letter-spacing: -0.055em !important;
+    }
+
+    @media (max-width: 430px) {
+      .auto-control {
+        padding: 9px !important;
+      }
+
+      .auto-control-title {
+        font-size: 14.5px !important;
+      }
+
+      .auto-number {
+        width: 72px !important;
+        padding: 7px 7px !important;
+      }
+
+      .auto-result-value {
+        font-size: 25px !important;
+      }
+    }
+
+
+    /* Retouche v38 : saisie plus compacte + libellés / boutons / équipes */
+    .auto-control-title {
+      font-size: 16px !important;
+      line-height: 1.08 !important;
+      font-weight: 1000 !important;
+      color: #eef2ff !important;
+    }
+
+    .auto-number {
+      width: 68px !important;
+      min-width: 68px !important;
+      padding: 6px 6px !important;
+      border-radius: 8px !important;
+      font-size: 14px !important;
+    }
+
+    .auto-result-value {
+      font-size: 24px !important;
+      line-height: 1 !important;
+      letter-spacing: -0.05em !important;
+    }
+
+    .preset-btn,
+    .auto-apply-btn,
+    .report-btn {
+      text-transform: uppercase !important;
+    }
+
+    .summary-title,
+    .summary-team-name,
+    .team-name,
+    .match-team-name,
+    .dominance-team {
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 430px) {
+      .auto-control-title {
+        font-size: 15px !important;
+      }
+
+      .auto-number {
+        width: 64px !important;
+        min-width: 64px !important;
+        padding: 6px 5px !important;
+      }
+
+      .auto-result-value {
+        font-size: 23px !important;
+      }
+    }
+
+
+    /* Retouche v39 : zone des rangs / auto-control placement / dominance crown / VS gradient */
+    .auto-control {
+      padding: 10px 11px 10px !important;
+      gap: 8px !important;
+    }
+
+    .auto-control-top {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) auto !important;
+      align-items: center !important;
+      gap: 10px !important;
+    }
+
+    .auto-control-title {
+      display: flex !important;
+      align-items: center !important;
+      min-height: 100%;
+      margin: 0 !important;
+      font-size: 16px !important;
+      line-height: 1.02 !important;
+      letter-spacing: -0.01em !important;
+      color: #eef2ff !important;
+    }
+
+    .auto-number {
+      align-self: center !important;
+      justify-self: end !important;
+      width: 62px !important;
+      min-width: 62px !important;
+      height: 36px !important;
+      padding: 6px 6px !important;
+      margin: 0 !important;
+      text-align: center !important;
+    }
+
+    .stat-title {
+      text-transform: uppercase !important;
+      letter-spacing: .08em !important;
+    }
+
+    .dominance-label {
+      font-size: clamp(13px, 3.6vw, 16px) !important;
+      line-height: 1.16 !important;
+      letter-spacing: .12em !important;
+    }
+
+    .dominance-team {
+      margin-top: 6px !important;
+    }
+
+    .summary-title {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-wrap: wrap !important;
+      gap: .26em !important;
+    }
+
+    .summary-vs-gradient {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 0 !important;
+      font-weight: 1000 !important;
+      letter-spacing: -.04em !important;
+      line-height: 1 !important;
+    }
+
+    .summary-vs-v {
+      color: #38bdf8 !important;
+      text-shadow: 0 0 14px rgba(56,189,248,.16) !important;
+    }
+
+    .summary-vs-s {
+      color: #f472b6 !important;
+      text-shadow: 0 0 14px rgba(255,77,157,.16) !important;
+    }
+
+    @media (max-width: 430px) {
+      .auto-control-top {
+        gap: 8px !important;
+      }
+      .auto-control-title {
+        font-size: 15px !important;
+      }
+      .auto-number {
+        width: 58px !important;
+        min-width: 58px !important;
+        height: 34px !important;
+      }
+      .summary-title {
+        gap: .2em !important;
+      }
+      .dominance-label {
+        font-size: 12px !important;
+      }
+    }
+
+    /* Retouche ciblée depuis v39 : corrections demandées */
+    .report-buttons .report-btn:not(.primary):not(.red) {
+      background: rgba(64, 201, 255, 0.14) !important;
+      border-color: rgba(134, 203, 255, 0.34) !important;
+      color: #eaf6ff !important;
+      box-shadow: 0 12px 26px rgba(64, 201, 255, 0.10) !important;
+    }
+
+    .auto-head {
+      justify-content: center !important;
+      text-align: center !important;
+    }
+
+    .auto-head > div {
+      width: 100% !important;
+    }
+
+    .auto-title {
+      text-align: center !important;
+    }
+
+    .notice-title {
+      justify-content: center !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      margin-bottom: 9px !important;
+      padding: 12px 11px !important;
+      border-radius: 17px !important;
+      border: 1px solid rgba(134, 203, 255, 0.34) !important;
+      background: rgba(64, 201, 255, 0.14) !important;
+      color: #f4fbff !important;
+      text-align: center !important;
+      font-size: clamp(14px, 3.8vw, 15.5px) !important;
+      line-height: 1.12 !important;
+      letter-spacing: -0.006em !important;
+      white-space: nowrap !important;
+      text-transform: none !important;
+    }
+
+    .notice-inline-icon {
+      width: auto !important;
+      height: auto !important;
+      flex: 0 0 auto !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      animation: none !important;
+      font-size: inherit !important;
+    }
+
+    .hero .hero-text,
+    .notice .notice-text {
+      max-width: none !important;
+      box-sizing: border-box !important;
+      padding: 12px 13px !important;
+      border-radius: 16px !important;
+      border: 1px solid rgba(251, 113, 133, 0.25) !important;
+      background: rgba(251, 113, 133, 0.10) !important;
+      color: #ffeaf2 !important;
+    }
+
+
+    /* Retouche v42 : ajustements mobiles demandés */
+    .notice-title {
+      justify-content: center !important;
+      align-items: center !important;
+      gap: 7px !important;
+      padding: 10px 10px !important;
+      border-radius: 18px !important;
+      font-size: clamp(14px, 3.8vw, 15.5px) !important;
+      line-height: 1 !important;
+      letter-spacing: -0.006em !important;
+      text-transform: uppercase !important;
+      white-space: nowrap !important;
+    }
+
+    .notice-title span:last-child {
+      min-width: 0 !important;
+      white-space: nowrap !important;
+      overflow: visible !important;
+    }
+
+    .notice-inline-icon {
+      width: 28px !important;
+      height: 28px !important;
+      flex: 0 0 28px !important;
+      display: inline-grid !important;
+      place-items: center !important;
+      border-radius: 9px !important;
+      border: 1px solid rgba(251, 113, 133, 0.44) !important;
+      background: rgba(251, 113, 133, 0.14) !important;
+      box-shadow: 0 0 0 rgba(251, 113, 133, 0) !important;
+      font-size: 16px !important;
+      animation: termuxStopBlinkV42 1.05s ease-in-out infinite !important;
+    }
+
+    @keyframes termuxStopBlinkV42 {
+      0%, 100% {
+        opacity: .78;
+        transform: scale(1);
+        box-shadow: 0 0 0 rgba(251, 113, 133, 0);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.06);
+        box-shadow: 0 0 18px rgba(251, 113, 133, .36);
+      }
+    }
+
+    @media (max-width: 700px) {
+      .auto-grid {
+        gap: 12px !important;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) minmax(88px, 88px) !important;
+        gap: 10px !important;
+      }
+
+      .auto-number {
+        width: 88px !important;
+        min-width: 88px !important;
+        height: 38px !important;
+        padding: 6px 8px !important;
+        border-radius: 10px !important;
+        font-size: 14px !important;
+      }
+
+      .auto-result,
+      .auto-body {
+        gap: 12px !important;
+      }
+
+      .auto-result-card,
+      .auto-formula,
+      .mode-toggle {
+        border-radius: 18px !important;
+      }
+
+      .mode-toggle {
+        gap: 12px !important;
+        padding: 14px !important;
+        min-height: 82px !important;
+        align-items: center !important;
+        border-color: rgba(64, 201, 255, .26) !important;
+        background: linear-gradient(135deg, rgba(64, 201, 255, .075), rgba(251, 113, 133, .045)), rgba(5, 10, 28, .64) !important;
+        font-size: 12.4px !important;
+        line-height: 1.32 !important;
+        font-weight: 950 !important;
+      }
+
+      .mode-toggle input {
+        width: 19px !important;
+        height: 19px !important;
+        flex: 0 0 19px !important;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .notice-title {
+        gap: 6px !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        font-size: clamp(13.4px, 3.75vw, 14.5px) !important;
+      }
+
+      .notice-inline-icon {
+        width: 26px !important;
+        height: 26px !important;
+        flex-basis: 26px !important;
+        font-size: 15px !important;
+      }
+
+      .auto-control-top {
+        grid-template-columns: minmax(0, 1fr) minmax(86px, 86px) !important;
+      }
+
+      .auto-number {
+        width: 86px !important;
+        min-width: 86px !important;
+      }
+    }
+
+
+    /* Retouche v43 : ajustements validés après mobile */
+    .report-buttons .report-btn:not(.primary):not(.red) {
+      background: rgba(37, 99, 235, 0.34) !important;
+      border-color: rgba(64, 201, 255, 0.46) !important;
+      color: #f2fbff !important;
+      box-shadow: 0 12px 26px rgba(64, 201, 255, 0.16) !important;
+    }
+
+    .report-buttons .report-btn.red {
+      background: rgba(251, 113, 133, 0.22) !important;
+      border-color: rgba(244, 114, 182, 0.44) !important;
+      color: #fff1f6 !important;
+      box-shadow: 0 12px 26px rgba(251, 113, 133, 0.12) !important;
+    }
+
+    .notice-title {
+      background: rgba(22, 32, 74, 0.72) !important;
+      border-color: rgba(64, 201, 255, 0.24) !important;
+      box-shadow: inset 0 0 0 1px rgba(251, 113, 133, 0.05) !important;
+    }
+
+    .notice-inline-icon {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 28px !important;
+      height: 28px !important;
+      flex: 0 0 28px !important;
+      min-width: 28px !important;
+      padding: 0 0 1px 0 !important;
+      line-height: 1 !important;
+      text-align: center !important;
+      transform-origin: center center !important;
+      border-radius: 999px !important;
+      animation: termuxStopBlinkV43 1.05s ease-in-out infinite !important;
+    }
+
+    @keyframes termuxStopBlinkV43 {
+      0%, 100% {
+        opacity: .84;
+        transform: scale(1);
+        box-shadow: 0 0 0 rgba(251, 113, 133, 0);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.045);
+        box-shadow: 0 0 15px rgba(251, 113, 133, .30);
+      }
+    }
+
+    .mode-toggle {
+      display: none !important;
+    }
+
+
+    /* Retouche v44 : boutons rapport, chargement et bulle Termux */
+    .report-buttons .report-btn:not(.primary):not(.red) {
+      background: rgba(22, 32, 74, 0.88) !important;
+      border-color: rgba(64, 201, 255, 0.28) !important;
+      color: #eef6ff !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), 0 10px 22px rgba(0,0,0,0.16) !important;
+    }
+
+    .report-buttons .report-btn.red {
+      background: rgba(126, 25, 55, 0.82) !important;
+      border-color: rgba(255, 78, 127, 0.36) !important;
+      color: #fff1f6 !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), 0 10px 22px rgba(0,0,0,0.16) !important;
+    }
+
+    .status-box.status-loading {
+      background:
+        radial-gradient(circle at 18% 0%, rgba(64,201,255,.17), transparent 34%),
+        linear-gradient(135deg, rgba(64,201,255,.15), rgba(251,113,133,.115)),
+        rgba(5, 10, 28, .96) !important;
+      border-color: rgba(64, 201, 255, .32) !important;
+    }
+
+    .status-box.status-loading .status-progress-bg {
+      opacity: .29 !important;
+    }
+
+    .status-box.status-loading .status-big-percent {
+      color: rgba(255,255,255,.46) !important;
+      text-shadow: 0 2px 16px rgba(0,0,0,.18) !important;
+    }
+
+    .status-box.status-loading .progress-track {
+      background: rgba(255,255,255,.18) !important;
+    }
+
+    .status-box.status-loading .progress-fill {
+      filter: saturate(1.08) brightness(1.04) !important;
+      box-shadow: 0 0 12px rgba(64, 201, 255, .18) !important;
+    }
+
+    .notice-inline-icon {
+      width: 30px !important;
+      height: 30px !important;
+      flex: 0 0 30px !important;
+      min-width: 30px !important;
+      padding: 0 !important;
+      display: inline-grid !important;
+      place-items: center !important;
+      border-radius: 12px !important;
+      background: rgba(251, 113, 133, 0.16) !important;
+      border: 1px solid rgba(255, 86, 134, 0.42) !important;
+      font-size: 0 !important;
+      line-height: 1 !important;
+      text-align: center !important;
+      transform-origin: center center !important;
+      box-shadow: 0 0 0 rgba(251, 113, 133, 0), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+      animation: termuxStopBlinkV44 1.05s ease-in-out infinite !important;
+    }
+
+    .notice-inline-icon::before {
+      content: "🛑";
+      display: block;
+      font-size: 16px;
+      line-height: 1;
+      transform: translateY(0);
+    }
+
+    @keyframes termuxStopBlinkV44 {
+      0%, 100% {
+        opacity: .84;
+        transform: scale(1);
+        border-color: rgba(255, 86, 134, 0.38);
+        box-shadow: 0 0 0 rgba(251, 113, 133, 0), inset 0 1px 0 rgba(255,255,255,0.06);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.06);
+        border-color: rgba(255, 118, 160, 0.72);
+        box-shadow: 0 0 16px rgba(251, 113, 133, .28), inset 0 1px 0 rgba(255,255,255,0.08);
+      }
+    }
+
+    @media (max-width: 380px) {
+      .notice-inline-icon {
+        width: 28px !important;
+        height: 28px !important;
+        flex-basis: 28px !important;
+        min-width: 28px !important;
+        border-radius: 11px !important;
+      }
+
+      .notice-inline-icon::before {
+        font-size: 15px;
+      }
+    }
+
+
+    /* Retouche v45 : compteur rapport dans la grille + centrage emoji Termux */
+    .report-count-pill {
+      cursor: default !important;
+      pointer-events: none !important;
+      user-select: none !important;
+      display: grid !important;
+      place-items: center !important;
+      text-align: center !important;
+      font-weight: 1000 !important;
+      letter-spacing: -0.02em !important;
+      background: rgba(22, 32, 74, 0.88) !important;
+      border-color: rgba(64, 201, 255, 0.28) !important;
+      color: #eef6ff !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), 0 10px 22px rgba(0,0,0,0.16) !important;
+    }
+
+    .notice-inline-icon {
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      font-size: 0 !important;
+      line-height: 0 !important;
+      text-indent: 0 !important;
+    }
+
+    .notice-inline-icon::before {
+      content: "🛑" !important;
+      position: absolute !important;
+      inset: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      font-size: 17px !important;
+      line-height: 1 !important;
+      text-align: center !important;
+    }
+
+    @media (max-width: 380px) {
+      .notice-inline-icon::before {
+        font-size: 15.5px !important;
+      }
+    }
+
+
+    /* Retouche v46 : app foot plus fun & moderne (mêmes couleurs) */
+
+    /* — Sensations d'app mobile — */
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #050816;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #40c9ff, #fb7185);
+      border-radius: 999px;
+      border: 2px solid #050816;
+    }
+
+    button:focus-visible {
+      outline: 2px solid rgba(64, 201, 255, .85);
+      outline-offset: 2px;
+    }
+
+    /* — Coup d'envoi : entrée de page orchestrée — */
+    @keyframes cardPopV46 {
+      0% {
+        opacity: 0;
+        transform: translateY(18px) scale(.975);
+      }
+      72% {
+        opacity: 1;
+        transform: translateY(-2px) scale(1.004);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .hero {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) backwards;
+    }
+
+    .panel.notice {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) .08s backwards;
+    }
+
+    section.panel.panel-pad:not(.notice) {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) .16s backwards;
+    }
+
+    .report-panel {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) .24s backwards;
+    }
+
+    .bar-box {
+      animation: cardPopV46 .6s cubic-bezier(.22, .9, .28, 1) .32s backwards;
+    }
+
+    .result-shell .summary {
+      animation: cardPopV46 .5s cubic-bezier(.22, .9, .28, 1) backwards;
+    }
+
+    .result-shell .team-card {
+      animation: cardPopV46 .55s cubic-bezier(.22, .9, .28, 1) .08s backwards;
+    }
+
+    /* — Titre FOOTSCAN : reflet maillot animé — */
+    @keyframes titleShineV46 {
+      0%, 100% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+    }
+
+    .home-title {
+      background-image: linear-gradient(95deg, #ffffff 0%, #dff4ff 30%, #40c9ff 48%, #fb7185 66%, #ffffff 88%);
+      background-size: 240% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: #ffffff;
+      text-shadow: none;
+      animation: titleShineV46 7s ease-in-out infinite;
+    }
+
+    /* — Badge du haut : halo qui respire — */
+    @keyframes kickerPulseV46 {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(64, 201, 255, 0), 0 6px 16px rgba(0, 0, 0, .18);
+      }
+      50% {
+        box-shadow: 0 0 12px 1px rgba(64, 201, 255, .20), 0 6px 16px rgba(0, 0, 0, .18);
+      }
+    }
+
+    .kicker {
+      animation: kickerPulseV46 3.6s ease-in-out infinite;
+    }
+
+    /* — Logo FS : reflet qui passe — */
+    @keyframes logoShineV46 {
+      0%, 64% {
+        transform: translateX(-150%) skewX(-18deg);
+      }
+      86%, 100% {
+        transform: translateX(260%) skewX(-18deg);
+      }
+    }
+
+    .brand-logo::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 46%;
+      background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .42), transparent);
+      transform: translateX(-150%) skewX(-18deg);
+      animation: logoShineV46 4.6s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* — Pastille Worker : onde radar — */
+    @keyframes pingV46 {
+      0% {
+        transform: scale(.7);
+        opacity: .9;
+      }
+      75%, 100% {
+        transform: scale(2.4);
+        opacity: 0;
+      }
+    }
+
+    .worker-dot {
+      position: relative;
+    }
+
+    .worker-dot::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      border: 2px solid rgba(64, 201, 255, .55);
+      animation: pingV46 2s cubic-bezier(0, 0, .2, 1) infinite;
+    }
+
+    /* — Boutons : toucher élastique — */
+    .scan-btn,
+    .auto-apply-btn,
+    .report-btn,
+    .preset-btn,
+    .skip-grid button {
+      transition:
+        transform .18s cubic-bezier(.34, 1.56, .64, 1),
+        filter .2s ease,
+        box-shadow .28s ease,
+        background .28s ease,
+        border-color .28s ease,
+        color .28s ease;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .preset-btn:hover,
+      .skip-grid button:hover,
+      .report-btn:hover,
+      .auto-apply-btn:hover,
+      .scan-btn:hover:not(:disabled) {
+        transform: translateY(-2px) scale(1.012);
+        filter: brightness(1.07) saturate(1.05);
+      }
+    }
+
+    .scan-btn:active:not(:disabled),
+    .auto-apply-btn:active,
+    .report-btn:active,
+    .preset-btn:active,
+    .skip-grid button:active {
+      transform: scale(.96);
+      filter: brightness(1.1);
+    }
+
+    /* — Bouton SCANNER : respiration + ballon qui rebondit — */
+    @keyframes scanGlowV46 {
+      0%, 100% {
+        box-shadow: 0 10px 26px rgba(64, 201, 255, .16), 0 8px 22px rgba(251, 113, 133, .12);
+      }
+      50% {
+        box-shadow: 0 12px 26px rgba(64, 201, 255, .30), 0 10px 22px rgba(251, 113, 133, .22);
+      }
+    }
+
+    .scan-btn:not(:disabled) {
+      animation: scanGlowV46 2.6s ease-in-out infinite;
+    }
+
+    @keyframes ballBobV46 {
+      0%, 100% {
+        transform: translateY(0) rotate(0deg);
+      }
+      30% {
+        transform: translateY(-3px) rotate(-14deg);
+      }
+      60% {
+        transform: translateY(1px) rotate(10deg);
+      }
+    }
+
+    .scan-btn:not(.scan-kick)::before {
+      display: inline-block;
+      animation: ballBobV46 1.7s ease-in-out infinite;
+    }
+
+    /* — Curseurs plus joueurs (mêmes couleurs que la jauge) — */
+    input[type="range"]::-webkit-slider-thumb {
+      width: 22px;
+      height: 22px;
+      margin-top: -7px;
+      border: 2px solid rgba(255, 255, 255, .95);
+      background: linear-gradient(135deg, #40c9ff 0%, #4f73ff 52%, #fb7185 100%);
+      box-shadow: 0 4px 14px rgba(64, 201, 255, .35), 0 0 0 4px rgba(64, 201, 255, .10);
+      transition: transform .16s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s ease;
+      cursor: grab;
+    }
+
+    input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.22);
+      cursor: grabbing;
+      box-shadow: 0 6px 18px rgba(251, 113, 133, .40), 0 0 0 7px rgba(64, 201, 255, .14);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(255, 255, 255, .95);
+      background: linear-gradient(135deg, #40c9ff 0%, #4f73ff 52%, #fb7185 100%);
+      box-shadow: 0 4px 14px rgba(64, 201, 255, .35), 0 0 0 4px rgba(64, 201, 255, .10);
+      transition: transform .16s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s ease;
+      cursor: grab;
+    }
+
+    input[type="range"]:active::-moz-range-thumb {
+      transform: scale(1.22);
+      cursor: grabbing;
+      box-shadow: 0 6px 18px rgba(251, 113, 133, .40), 0 0 0 7px rgba(64, 201, 255, .14);
+    }
+
+    /* — Cases à cocher → interrupteurs modernes — */
+    .mode-toggle input {
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      width: 40px !important;
+      height: 22px !important;
+      margin: 0;
+      border-radius: 999px !important;
+      border: 1px solid rgba(255, 255, 255, .22);
+      background: rgba(255, 255, 255, .12);
+      position: relative;
+      cursor: pointer;
+      transition: background .28s ease, border-color .28s ease, box-shadow .28s ease;
+    }
+
+    .mode-toggle input::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, .40);
+      transform: translateY(-50%);
+      transition: transform .26s cubic-bezier(.34, 1.56, .64, 1);
+    }
+
+    .mode-toggle input:checked {
+      background: linear-gradient(135deg, #40c9ff, #fb7185);
+      border-color: rgba(255, 255, 255, .12);
+      box-shadow: 0 0 16px rgba(64, 201, 255, .30);
+    }
+
+    .mode-toggle input:checked::before {
+      transform: translateY(-50%) translateX(18px);
+    }
+
+    /* — VS : petit battement de cœur — */
+    @keyframes vsPulseV46 {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.08);
+      }
+    }
+
+    .vs-box {
+      animation: vsPulseV46 2.4s ease-in-out infinite;
+    }
+
+    /* — Logos d'équipe : pop au survol — */
+    @media (hover: hover) and (pointer: fine) {
+      .logo-xl,
+      .logo-m,
+      .logo-s {
+        transition: transform .2s cubic-bezier(.34, 1.56, .64, 1);
+      }
+
+      .logo-xl:hover,
+      .logo-m:hover,
+      .logo-s:hover {
+        transform: scale(1.08) rotate(-3deg);
+      }
+
+      .summary:hover,
+      .team-card:hover {
+        box-shadow: var(--shadow), 0 0 30px rgba(64, 201, 255, .08), inset 0 1px 0 rgba(255, 255, 255, .055);
+      }
+    }
+
+    /* — Barème : ouverture animée — */
+    .bar-box summary {
+      cursor: pointer;
+      transition: color .2s ease;
+    }
+
+    .bar-box summary:hover {
+      color: #ffffff;
+    }
+
+    .bar-box[open] .bar-grid {
+      animation: cardPopV46 .4s cubic-bezier(.22, .9, .28, 1) backwards;
+    }
+
+
+    /* Retouche v47 : priorité mobile — retours tactiles partout */
+    button {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .mode-toggle {
+      transition: transform .18s cubic-bezier(.34, 1.56, .64, 1);
+    }
+
+    .mode-toggle:active {
+      transform: scale(.985);
+    }
+
+    @media (hover: none) {
+      .logo-xl,
+      .logo-m,
+      .logo-s {
+        transition: transform .2s cubic-bezier(.34, 1.56, .64, 1);
+      }
+
+      .logo-xl:active,
+      .logo-m:active,
+      .logo-s:active {
+        transform: scale(1.08) rotate(-3deg);
+      }
+
+      .summary,
+      .team-card {
+        transition: transform .18s ease, box-shadow .25s ease;
+      }
+
+      .summary:active,
+      .team-card:active {
+        transform: scale(.992);
+        box-shadow: var(--shadow), 0 0 26px rgba(64, 201, 255, .10), inset 0 1px 0 rgba(255, 255, 255, .055);
+      }
+
+      .bar-box summary:active {
+        color: #ffffff;
+      }
+    }
+
+
+    /* Retouche v48 : identité visuelle — typo Outfit, logo ballon, fond panneaux de ballon */
+
+    /* — Typographie d'appli moderne — */
+    html,
+    body,
+    button,
+    input {
+      font-family: "Outfit", "Google Sans", "Roboto", "Arial", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .home-title {
+      letter-spacing: -0.05em;
+    }
+
+    .brand-title {
+      letter-spacing: -0.025em;
+    }
+
+    .rank-value,
+    .auto-result-value,
+    .auto-number,
+    .status-percent,
+    .status-big-percent,
+    .count-pill,
+    .stat-badge {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* — Fond : filet d'hexagones (panneaux de ballon), très discret — */
+    body {
+      background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23ffffff' fill-opacity='0.022'/%3E%3C/svg%3E"),
+        radial-gradient(circle at 15% 8%, rgba(64, 201, 255, .10), transparent 38%),
+        radial-gradient(circle at 88% 6%, rgba(251, 113, 133, .09), transparent 36%),
+        linear-gradient(180deg, #060a1e, #04060f);
+    }
+
+    /* — Logo : ballon dessiné qui tourne lentement — */
+    .brand-ball {
+      width: 60%;
+      height: 60%;
+      display: block;
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35));
+      animation: ballSpinV48 16s linear infinite;
+    }
+
+    @keyframes ballSpinV48 {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+
+    /* Retouche v49 : retours mobile — logo fixe, tailles ballon, couleurs skip/notice */
+
+    /* — Logo : ballon fixe — */
+    .brand-ball {
+      animation: none;
+    }
+
+    /* — Ballon du bouton scan : même taille que la loupe du texte — */
+    .scan-btn:not(.scan-kick)::before {
+      font-size: 1em !important;
+      vertical-align: -1px !important;
+    }
+
+    /* — Ignorer domicile / extérieur : valeurs non sélectionnées en navy (fini le noir) — */
+    .skip-grid button:not(.active) {
+      background: rgba(22, 32, 74, 0.66) !important;
+      border-color: rgba(134, 203, 255, 0.20) !important;
+      color: #c9d8f2 !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
+    }
+
+    /* — Bulle Termux : fini le jaune, alignée sur la palette navy/rose du site — */
+    .panel.notice {
+      background:
+        linear-gradient(135deg, rgba(251, 113, 133, 0.10), rgba(64, 201, 255, 0.05)),
+        rgba(10, 15, 36, 0.92) !important;
+      border-color: rgba(244, 114, 182, 0.28) !important;
+    }
+
+    .notice-icon {
+      background: rgba(251, 113, 133, 0.14) !important;
+      color: #fda4af !important;
+      border-color: rgba(244, 114, 182, 0.34) !important;
+    }
+
+
+    /* Retouche v50 : 🛑 fixe + bulle lumineuse, boutons rapport aux couleurs du site */
+
+    /* — Émoji 🛑 immobile, c'est la bulle ronde autour qui clignote — */
+    .notice-inline-icon {
+      border-radius: 999px !important;
+      animation: termuxBubbleV50 1.4s ease-in-out infinite !important;
+    }
+
+    .notice-inline-icon::before {
+      animation: none !important;
+      transform: none !important;
+    }
+
+    @keyframes termuxBubbleV50 {
+      0%, 100% {
+        background: rgba(251, 113, 133, 0.14);
+        border-color: rgba(255, 86, 134, 0.38);
+        box-shadow:
+          0 0 0 0 rgba(251, 113, 133, 0.30),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+      50% {
+        background: rgba(251, 113, 133, 0.26);
+        border-color: rgba(255, 128, 168, 0.85);
+        box-shadow:
+          0 0 0 5px rgba(251, 113, 133, 0.14),
+          0 0 18px 2px rgba(251, 113, 133, 0.40),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+    }
+
+    /* — Boutons rapport secondaires : liseré dégradé cyan→rose du site sur verre navy — */
+    .report-buttons .report-btn:not(.primary):not(.red) {
+      border: 1px solid transparent !important;
+      background:
+        linear-gradient(rgba(13, 20, 46, 0.96), rgba(13, 20, 46, 0.96)) padding-box,
+        linear-gradient(135deg, rgba(64, 201, 255, 0.62), rgba(59, 107, 255, 0.52), rgba(251, 113, 133, 0.58)) border-box !important;
+      color: #eaf6ff !important;
+      box-shadow:
+        0 10px 22px rgba(0, 0, 0, 0.18),
+        0 0 16px rgba(64, 201, 255, 0.08) !important;
+    }
+
+    .report-buttons .report-btn.red {
+      border: 1px solid transparent !important;
+      background:
+        linear-gradient(rgba(40, 12, 24, 0.96), rgba(40, 12, 24, 0.96)) padding-box,
+        linear-gradient(135deg, rgba(251, 113, 133, 0.78), rgba(192, 132, 252, 0.42)) border-box !important;
+      color: #ffe9f0 !important;
+      box-shadow:
+        0 10px 22px rgba(0, 0, 0, 0.18),
+        0 0 16px rgba(251, 113, 133, 0.10) !important;
+    }
+
+    .report-buttons .report-count-pill {
+      border: 1px solid transparent !important;
+      background:
+        linear-gradient(rgba(13, 20, 46, 0.96), rgba(13, 20, 46, 0.96)) padding-box,
+        linear-gradient(135deg, rgba(64, 201, 255, 0.40), rgba(251, 113, 133, 0.36)) border-box !important;
+      color: #cfe4ff !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+    }
+
+    /* — Presets de calcul : non sélectionnés en verre navy, comme les boutons Ignorer — */
+    .preset-btn:not(.active) {
+      background: rgba(22, 32, 74, 0.55) !important;
+      border-color: rgba(134, 203, 255, 0.18) !important;
+      color: #c9d8f2 !important;
+    }
+
+
+    /* Retouche v51 : 🛑 sans bulle (halo pulsant), titre Termux façon pastille kicker, ballon du logo */
+
+    /* — 🛑 : plus de bulle, juste une lumière qui augmente puis diminue — */
+    .notice-inline-icon {
+      animation: none !important;
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+    }
+
+    @keyframes stopGlowV51 {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px rgba(255, 59, 114, 0.25));
+      }
+      50% {
+        transform: scale(1.18);
+        filter: drop-shadow(0 0 9px rgba(255, 59, 114, 0.95)) drop-shadow(0 0 16px rgba(255, 59, 114, 0.45));
+      }
+    }
+
+    .notice-inline-icon::before {
+      animation: stopGlowV51 1.5s ease-in-out infinite !important;
+      transform-origin: center center !important;
+    }
+
+    /* — Titre Termux : même style que la pastille sous FOOTSCAN, en version rose — */
+    .notice-title {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      padding: 7px 13px 7px 9px !important;
+      border-radius: 999px !important;
+      border: 1px solid rgba(244, 114, 182, 0.36) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.10), rgba(251, 113, 133, 0.16)) !important;
+      box-shadow: none !important;
+    }
+
+    /* — Ballon du logo : un poil plus grand pour bien lire les panneaux — */
+    .brand-ball {
+      width: 68%;
+      height: 68%;
+    }
+
+
+    /* Retouche v52 : FOOTSCAN unifié blanc + style pastille décliné sur les titres de section */
+
+    /* — Le grand FOOTSCAN reprend exactement la couleur de celui du haut — */
+    .home-title {
+      background-image: none;
+      -webkit-text-fill-color: currentColor;
+      color: #ffffff;
+      text-shadow: 0 18px 44px rgba(0, 0, 0, .42);
+      animation: none;
+    }
+
+    /* — Style pastille (façon kicker) décliné en cyan sur les titres de section — */
+    .auto-title,
+    .report-title {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      width: fit-content !important;
+      padding: 7px 13px !important;
+      border-radius: 999px !important;
+      border: 1px solid rgba(64, 201, 255, 0.30) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(59, 107, 255, 0.10)) !important;
+      color: #e0f2fe !important;
+      font-size: 13px !important;
+      letter-spacing: 0.10em !important;
+      line-height: 1.15 !important;
+    }
+
+
+    /* Retouche v53 : badge de version visible dans le topbar */
+    .brand-title .ver-tag {
+      display: inline-block;
+      margin-left: 7px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(134, 203, 255, 0.22);
+      background: rgba(22, 32, 74, 0.6);
+      color: rgba(199, 216, 238, 0.75);
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      vertical-align: middle;
+    }
+
+
+    /* Retouche v54 : animation 🛑 fiabilisée + lumière qui balaie le grand FOOTSCAN */
+
+    /* — 🛑 : l'animation passe sur le conteneur (la méthode qui marchait en v44) — */
+    @keyframes stopGlowV54 {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px rgba(255, 59, 114, 0.25));
+      }
+      50% {
+        transform: scale(1.22);
+        filter: drop-shadow(0 0 9px rgba(255, 59, 114, 0.95)) drop-shadow(0 0 16px rgba(255, 59, 114, 0.50));
+      }
+    }
+
+    .notice-inline-icon {
+      animation: stopGlowV54 1.5s ease-in-out infinite !important;
+      transform-origin: center center !important;
+      will-change: transform, filter;
+    }
+
+    .notice-inline-icon::before {
+      animation: none !important;
+    }
+
+    /* — Grand FOOTSCAN : blanc comme le petit, avec le même passage de lumière cyan→rose — */
+    @keyframes titleGlintV54 {
+      0%, 52% {
+        background-position: 100% 0;
+      }
+      88%, 100% {
+        background-position: 0% 0;
+      }
+    }
+
+    .home-title {
+      background-image: linear-gradient(100deg,
+        #ffffff 0%, #ffffff 38%,
+        #7fdcff 46%, #ff7aa2 54%,
+        #ffffff 62%, #ffffff 100%);
+      background-size: 300% 100%;
+      background-position: 100% 0;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: #ffffff;
+      text-shadow: none;
+      animation: titleGlintV54 5.5s ease-in-out infinite;
+    }
+
+
+    /* Retouche v55 : titre vivant (priorité sur le verrou v14) + nouveau fond du bloc hero */
+
+    /* — Grand FOOTSCAN : l'ondulation est définie en v57 (les !important d'ici bloquaient l'animation) — */
+    @keyframes titleWaveV55 {
+      0%, 100% {
+        background-position: 0% 0;
+      }
+      50% {
+        background-position: 100% 0;
+      }
+    }
+
+    /* — Fond du hero : projecteurs, rond central de terrain et ballon vectoriel flottant — */
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 1;
+      animation: none;
+      background:
+        linear-gradient(115deg, transparent 40%, rgba(124, 199, 255, 0.05) 50%, transparent 60%),
+        radial-gradient(circle at 50% calc(100% - 86px), rgba(255, 255, 255, 0.11) 0 2.5px, transparent 3.5px),
+        radial-gradient(circle at 50% calc(100% + 64px), transparent 148px, rgba(255, 255, 255, 0.09) 149px 151px, transparent 152px),
+        linear-gradient(90deg, transparent 0 calc(50% - 1px), rgba(255, 255, 255, 0.045) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px) 100%),
+        radial-gradient(circle at 8% -12%, rgba(64, 201, 255, 0.20), transparent 46%),
+        radial-gradient(circle at 90% 112%, rgba(251, 113, 133, 0.21), transparent 48%);
+    }
+
+    @keyframes heroBallFloatV55 {
+      0%, 100% {
+        transform: translateY(0) rotate(10deg);
+      }
+      50% {
+        transform: translateY(12px) rotate(17deg);
+      }
+    }
+
+    .hero::after {
+      content: "";
+      left: auto;
+      right: -34px;
+      top: -26px;
+      width: 212px;
+      height: 212px;
+      font-size: 0;
+      opacity: 0.11;
+      filter: none;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3CclipPath id='hb'%3E%3Ccircle cx='24' cy='24' r='19'/%3E%3C/clipPath%3E%3Cpath id='hp' d='M0 -6.5 L6.18 -2.01 L3.82 5.26 L-3.82 5.26 L-6.18 -2.01 Z'/%3E%3C/defs%3E%3Cg clip-path='url(%23hb)' fill='%23ffffff'%3E%3Cpath d='M24 15 L32.56 21.22 L29.29 31.28 L18.71 31.28 L15.44 21.22 Z'/%3E%3Cuse href='%23hp' transform='translate(24 4.5) rotate(180)'/%3E%3Cuse href='%23hp' transform='translate(5.45 17.97) rotate(108)'/%3E%3Cuse href='%23hp' transform='translate(12.54 39.78) rotate(36)'/%3E%3Cuse href='%23hp' transform='translate(35.46 39.78) rotate(324)'/%3E%3Cuse href='%23hp' transform='translate(42.55 17.97) rotate(252)'/%3E%3C/g%3E%3Ccircle cx='24' cy='24' r='19' fill='none' stroke='%23ffffff' stroke-width='1.4'/%3E%3C/svg%3E") center / contain no-repeat;
+      animation: heroBallFloatV55 7s ease-in-out infinite;
+      will-change: transform;
+    }
+
+
+    /* Retouche v56 : ballon du hero adapté au mobile + dégradé du titre rééquilibré */
+
+    /* — Sur téléphone, le ballon filaire devient un clin d'œil discret en coin, plus un décor envahissant — */
+    @media (max-width: 700px) {
+      .hero::after {
+        width: 132px;
+        height: 132px;
+        right: -26px;
+        top: -18px;
+        opacity: 0.09;
+      }
+    }
+
+
+    /* Retouche v57 : ondulation du titre enfin libre + ballon du hero à panneaux pleins */
+
+    /* — Grand FOOTSCAN : mêmes couleurs, dégradé qui glisse à travers les lettres (aucun !important : l'animation peut bouger) — */
+    .home-title {
+      background-image: linear-gradient(92deg,
+        #ffffff 0%, #dff4ff 10%, #7dd3fc 24%,
+        #8b5cf6 40%, #f472b6 56%,
+        #dff4ff 78%, #7dd3fc 100%);
+      background-size: 230% 100%;
+      background-position: 0% 0;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      text-shadow: none;
+      animation: titleWaveV55 8s ease-in-out infinite;
+    }
+
+    /* — Ballon du hero : panneaux pleins (le dessin du logo), fini l'effet jante — */
+    .hero::after {
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3CclipPath id='hb'%3E%3Ccircle cx='24' cy='24' r='19'/%3E%3C/clipPath%3E%3Cpath id='hp' d='M0 -6.5 L6.18 -2.01 L3.82 5.26 L-3.82 5.26 L-6.18 -2.01 Z'/%3E%3C/defs%3E%3Cg clip-path='url(%23hb)' fill='%23ffffff'%3E%3Cpath d='M24 15 L32.56 21.22 L29.29 31.28 L18.71 31.28 L15.44 21.22 Z'/%3E%3Cuse href='%23hp' transform='translate(24 4.5) rotate(180)'/%3E%3Cuse href='%23hp' transform='translate(5.45 17.97) rotate(108)'/%3E%3Cuse href='%23hp' transform='translate(12.54 39.78) rotate(36)'/%3E%3Cuse href='%23hp' transform='translate(35.46 39.78) rotate(324)'/%3E%3Cuse href='%23hp' transform='translate(42.55 17.97) rotate(252)'/%3E%3C/g%3E%3Ccircle cx='24' cy='24' r='19' fill='none' stroke='%23ffffff' stroke-width='1.4'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+
+
+    /* Retouche v58 : après-scan festif — gagnant, VS écho, teintes équipes, clics animés */
+
+    /* — SCANNER retrouve son changement de couleur (perdu en v46), en plus du halo — */
+    .scan-btn:not(:disabled) {
+      animation: derbySweep 5.5s ease infinite, scanGlowV46 2.6s ease-in-out infinite;
+    }
+
+    /* — Titres de section centrés (Rapport de session comme Calcul guidé) — */
+    .auto-title,
+    .report-title {
+      display: flex !important;
+      width: fit-content !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+
+    /* — Bloc gagnant : confettis, trophée en fond, tout centré — */
+    .dominance-box {
+      text-align: center;
+    }
+
+    .dominance-box.dominance-win {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      border: 1px solid transparent !important;
+      background:
+        linear-gradient(rgba(13, 20, 46, 0.94), rgba(13, 20, 46, 0.94)) padding-box,
+        linear-gradient(135deg, rgba(64, 201, 255, 0.65), rgba(251, 113, 133, 0.60)) border-box !important;
+      padding: 16px 14px 15px !important;
+    }
+
+    .dominance-win .dominance-label,
+    .dominance-win .dominance-team,
+    .dominance-win .dominance-meta {
+      position: relative;
+      z-index: 2;
+    }
+
+    .dominance-win .dominance-team {
+      font-size: clamp(22px, 6vw, 30px);
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      color: #ffffff;
+      text-shadow: 0 0 22px rgba(64, 201, 255, 0.25), 0 4px 18px rgba(0, 0, 0, 0.4);
+      margin: 4px 0 3px;
+    }
+
+    .dominance-trophy {
+      position: absolute;
+      right: -10px;
+      bottom: -18px;
+      font-size: 86px;
+      line-height: 1;
+      opacity: 0.16;
+      transform: rotate(-12deg);
+      pointer-events: none;
+      z-index: 0;
+      filter: saturate(1.2);
+    }
+
+    .dominance-win .status-confetti {
+      z-index: 1;
+      opacity: 0.85;
+    }
+
+    /* — En-tête du résumé : label à gauche, mode scan en haut à droite — */
+    .summary-head-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .summary-head-top .summary-label {
+      line-height: 1.15;
+      display: flex;
+      align-items: center;
+    }
+
+    .summary-mode {
+      text-align: right;
+      max-width: 60%;
+    }
+
+    /* — VS en écho : V bleus / S roses, opacité qui fond vers les extrémités — */
+    .vs-echo {
+      display: inline-flex;
+      align-items: baseline;
+      font-style: italic;
+      font-weight: 1000;
+      font-size: 0.78em;
+      line-height: 1;
+      margin: 0 0.12em;
+      transform: translateY(-0.02em);
+    }
+
+    .vs-echo i {
+      font-style: italic;
+      margin-left: -0.14em;
+    }
+
+    .vs-echo i:first-child {
+      margin-left: 0;
+    }
+
+    .vs-echo .ve-v {
+      color: #38bdf8;
+      text-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+    }
+
+    .vs-echo .ve-s {
+      color: #fb7185;
+      text-shadow: 0 0 14px rgba(251, 113, 133, 0.25);
+    }
+
+    .vs-echo i:nth-child(1) { opacity: 0.07; }
+    .vs-echo i:nth-child(2) { opacity: 0.14; }
+    .vs-echo i:nth-child(3) { opacity: 0.26; }
+    .vs-echo i:nth-child(4) { opacity: 0.42; }
+    .vs-echo i:nth-child(5) { opacity: 0.62; }
+    .vs-echo i:nth-child(6) { opacity: 0.82; }
+    .vs-echo i:nth-child(7) { opacity: 1; }
+    .vs-echo i:nth-child(8) { opacity: 1; }
+    .vs-echo i:nth-child(9) { opacity: 0.82; }
+    .vs-echo i:nth-child(10) { opacity: 0.62; }
+    .vs-echo i:nth-child(11) { opacity: 0.42; }
+    .vs-echo i:nth-child(12) { opacity: 0.26; }
+    .vs-echo i:nth-child(13) { opacity: 0.14; }
+    .vs-echo i:nth-child(14) { opacity: 0.07; }/* — Teintes : domicile bleu,
+    extérieur rose {
+      background:
+        linear-gradient(165deg, rgba(56, 189, 248, 0.11), rgba(56, 189, 248, 0.02) 38%),
+        rgba(10, 15, 36, 0.92) !important;
+      border-color: rgba(56, 189, 248, 0.30) !important;
+    }
+
+    .summary-grid .summary-cell:first-child {
+      background: linear-gradient(165deg, rgba(56, 189, 248, 0.10), rgba(10, 15, 36, 0.6)) !important;
+      border-color: rgba(56, 189, 248, 0.26) !important;
+    }
+
+    .summary-grid .summary-cell:last-child {
+      background: linear-gradient(165deg, rgba(251, 113, 133, 0.10), rgba(10, 15, 36, 0.6)) !important;
+      border-color: rgba(251, 113, 133, 0.26) !important;
+    }
+
+    .summary {
+      background:
+        linear-gradient(135deg, rgba(56, 189, 248, 0.07), rgba(251, 113, 133, 0.06)),
+        rgba(10, 15, 36, 0.92) !important;
+      border-color: rgba(134, 203, 255, 0.22) !important;
+    }
+
+    /* — Pop au clic (gagnant, résumé, scan terminé) — */
+    @keyframes fxPopV58 {
+      0% { transform: scale(1); }
+      32% { transform: scale(1.025); }
+      62% { transform: scale(0.992); }
+      100% { transform: scale(1); }
+    }
+
+    .fx-pop {
+      animation: fxPopV58 0.5s cubic-bezier(.34, 1.3, .5, 1) !important;
+    }
+
+
+    /* Retouche v60 : RAPPORT DE SESSION réellement centré (toute la chaîne de conteneurs) */
+    .report-head {
+      display: flex !important;
+      justify-content: center !important;
+    }
+
+    .report-head > div {
+      width: 100% !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+    }
+
+    /* — Loupe devant le compteur d'analyses — */
+    .report-count-pill::before {
+      content: "🔎";
+      margin-right: 6px;
+    }/* Retouche v69 : teintes domicile/extérieur renforcées {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(64, 201, 255, 0.18), transparent 34%),
+        linear-gradient(165deg, rgba(56, 189, 248, 0.18), rgba(56, 189, 248, 0.045) 42%, rgba(10, 15, 36, 0.94)) !important;
+      border-color: rgba(64, 201, 255, 0.46) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 26px rgba(64, 201, 255, 0.08) !important;
+    }
+
+    details.clean.events-details summary.events-summary {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      gap: 9px !important;
+    }
+
+    .events-summary-label {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+    }
+
+    details.clean.events-details summary.events-summary::after {
+      order: 2 !important;
+      margin-left: auto !important;
+      margin-right: 0 !important;
+      flex: 0 0 auto !important;
+    }
+
+    details.clean.events-details summary.events-summary .events-count-pill {
+      order: 3 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      flex: 0 0 auto !important;
+      min-width: 34px !important;
+      justify-content: center !important;
+      background: rgba(13, 20, 46, 0.88) !important;
+    }
+
+    /* Retouche v69 : loupe du compteur rapport sur la même ligne que le texte */
+    .report-count-pill {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 7px !important;
+      text-align: center !important;
+    }
+
+    .report-count-pill::before {
+      margin-right: 0 !important;
+      flex: 0 0 auto !important;
+      line-height: 1 !important;
+    }
+
+
+    /* Retouche v70 : ordre événements + fluidité mobile */
+    details.clean.events-details summary.events-summary {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      gap: 8px !important;
+    }
+
+    details.clean.events-details summary.events-summary .events-summary-label {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+    }
+
+    details.clean.events-details summary.events-summary .events-count-pill {
+      order: 2 !important;
+      margin-left: auto !important;
+      margin-right: 0 !important;
+      min-width: 34px !important;
+      flex: 0 0 auto !important;
+    }
+
+    details.clean.events-details summary.events-summary::after {
+      order: 3 !important;
+      margin-left: 2px !important;
+      margin-right: 0 !important;
+      flex: 0 0 auto !important;
+    }
+
+    @media (max-width: 700px) {}
+
+
+    /* Retouche v71 : transparence sur les événements ignorés / scan partiel */
+    .data-quality-banner {
+      margin: 16px 0 0;
+      padding: 14px 16px;
+      border-radius: 22px;
+      border: 1px solid rgba(251, 113, 133, .44);
+      background: rgba(70, 16, 36, .42);
+      color: #ffe6ec;
+      font-weight: 900;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.055);
+    }
+
+    .data-quality-banner.ok {
+      border-color: rgba(64, 201, 255, .34);
+      background: rgba(12, 36, 64, .36);
+      color: #dff4ff;
+    }
+
+    .data-quality-main {
+      font-size: .86rem;
+      line-height: 1.25;
+    }
+
+    .data-quality-sub {
+      margin-top: 5px;
+      font-size: .72rem;
+      line-height: 1.35;
+      color: rgba(255,255,255,.74);
+      text-transform: none;
+      letter-spacing: .01em;
+      font-weight: 800;
+    }
+
+    .team-warning-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      margin-top: 10px;
+      padding: 8px 11px;
+      border-radius: 16px;
+      border: 1px solid rgba(251, 113, 133, .46);
+      background: rgba(70, 16, 36, .46);
+      color: #ffe6ec;
+      font-size: .74rem;
+      font-weight: 950;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .match-row.issue {
+      border-color: rgba(251, 113, 133, .36) !important;
+      background: rgba(70, 16, 36, .22) !important;
+    }
+
+    .event-data-issue-label {
+      display: inline-flex;
+      margin-left: 6px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(251, 113, 133, .42);
+      background: rgba(251, 113, 133, .12);
+      color: #ffb4c2;
+      font-size: .68rem;
+      font-weight: 950;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 700px) {
+      .data-quality-banner {
+        margin-top: 14px;
+        padding: 12px 13px;
+        border-radius: 19px;
+      }
+
+      .data-quality-main {
+        font-size: .78rem;
+      }
+
+      .data-quality-sub {
+        font-size: .68rem;
+      }
+    }
+
+
+    /* Retouche v72 : fluidité flèches + alignement résumé/mode + bulle données web compacte */
+    .summary-head-top {
+      align-items: flex-start !important;
+    }
+
+    .summary-head-top .summary-label,
+    .summary-head-top .summary-mode {
+      min-height: 28px !important;
+      display: flex !important;
+      align-items: center !important;
+      margin-top: 0 !important;
+    }
+
+    .summary-head-top .summary-label:first-child {
+      justify-content: flex-start !important;
+    }
+
+    .summary-mode {
+      justify-content: flex-end !important;
+      align-self: flex-start !important;
+    }
+
+    .summary .data-quality-banner {
+      width: fit-content !important;
+      max-width: calc(100% - 20px) !important;
+      margin: 10px auto 12px !important;
+      padding: 9px 12px !important;
+      border-radius: 16px !important;
+      box-sizing: border-box !important;
+      text-align: center !important;
+    }
+
+    .summary .data-quality-banner.ok {
+      background: rgba(12, 36, 64, .30) !important;
+      border-color: rgba(64, 201, 255, .28) !important;
+    }
+
+    .summary .data-quality-main {
+      font-size: .72rem !important;
+      line-height: 1.18 !important;
+      white-space: nowrap !important;
+    }
+
+    .summary .data-quality-sub {
+      font-size: .66rem !important;
+      line-height: 1.26 !important;
+    }
+
+    details.clean.events-details summary.events-summary,
+    details.clean.events-details summary.events-summary:hover,
+    details.clean.events-details summary.events-summary:active {
+      transform: none !important;
+      filter: none !important;
+      transition: background-color .14s ease, border-color .14s ease, color .14s ease !important;
+      touch-action: manipulation !important;
+    }
+
+    details.clean.events-details summary.events-summary::after {
+      transform: rotate(90deg) translateZ(0) !important;
+      transform-origin: center center !important;
+      transition: transform .16s ease, color .16s ease !important;
+      will-change: transform !important;
+      backface-visibility: hidden !important;
+    }
+
+    details.clean.events-details[open] summary.events-summary::after {
+      transform: rotate(-90deg) translateZ(0) !important;
+    }
+
+    @media (max-width: 430px) {
+      .summary-head-top {
+        gap: 8px !important;
+      }
+
+      .summary-head-top .summary-label:last-child,
+      .summary-mode {
+        margin-top: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+      }
+
+      .summary .data-quality-banner {
+        margin-top: 10px !important;
+        margin-bottom: 10px !important;
+        padding: 8px 10px !important;
+        border-radius: 15px !important;
+      }
+
+      .summary .data-quality-main {
+        font-size: .68rem !important;
+        letter-spacing: .035em !important;
+      }
+    }
+
+
+    /* Retouche v80 : VS rétabli, miroir away complet (matchs/événements), boîtes texte neutres */
+
+    /* — VS : un cran plus grand qu'en v78 (j'avais trop réduit) — */
+    .summary-title .vs-echo {
+      font-size: min(0.92em, 5.6vw) !important;
+      transform: translateY(-0.02em) !important;
+    }/* texte d'événement (but sans passeur,
+    minute…) : pourpre rosé doux,
+    .row-title,
+    .event-metric-code) {
+      color: #f6c9d8 !important;
+    }
+
+    /* — Boîtes texte sous FOOTSCAN et sous Termux : neutres, fondues dans leur panneau — */
+    .hero .hero-text {
+      border: 1px solid rgba(125, 211, 252, 0.16) !important;
+      background: rgba(12, 20, 44, 0.42) !important;
+      color: #e8f1ff !important;
+    }
+
+    .notice .notice-text {
+      border: 1px solid rgba(251, 113, 133, 0.20) !important;
+      background: rgba(40, 16, 30, 0.42) !important;
+      color: #ffe9f1 !important;
+    }
+
+    /* Retouche v80 : VS rétabli, miroir AWAY complet (cartes match + texte), 3 bulles roses unifiées */
+
+    /* — VS : revenu à une taille lisible (entre v77 et v78) — */
+    .summary-title .vs-echo {
+      font-size: min(0.9em, 5.4vw) !important;
+      max-width: 100% !important;
+      transform: translateY(-0.02em) !important;
+    }
+
+    /* — Les 3 bulles d'avertissement (Termux + les 2 sous le titre) : même rose/pourpre, aligné sur le bloc hero — */
+    .panel.notice {
+      background:
+        linear-gradient(135deg, rgba(251, 113, 133, 0.13), rgba(168, 85, 247, 0.06)),
+        rgba(12, 10, 26, 0.92) !important;
+      border-color: rgba(244, 114, 182, 0.30) !important;
+    }
+
+    .notice-icon {
+      background: rgba(251, 113, 133, 0.15) !important;
+      color: #fda4af !important;
+      border-color: rgba(244, 114, 182, 0.34) !important;
+    }
+
+    /* Retouche v80 : VS rétabli, miroir extérieur complet (matchs/events/texte), 3 notices homogènes, toggle simultané visible */
+
+    /* — VS : on annule le rétrécissement de v78, retour à une taille lisible — */
+    .summary-title .vs-echo {
+      font-size: 0.9em !important;
+      max-width: 100% !important;
+      transform: translateY(-0.02em) !important;
+      letter-spacing: -0.02em !important;
+    }/* — Extérieur : tout ce qui restait bleu (events,
+    labels,
+    badges,
+    .section,
+    .rank-card) {
+      background: linear-gradient(160deg, rgba(251, 113, 133, 0.06), rgba(22, 14, 28, 0.86)) !important;
+      border-color: rgba(244, 114, 182, 0.16) !important;
+    }.match-count-mini) {
+      background: linear-gradient(135deg, rgba(251, 113, 133, 0.20), rgba(168, 85, 247, 0.14)) !important;
+      border-color: rgba(244, 114, 182, 0.30) !important;
+      color: #ffd9e1 !important;
+    }.section-title,
+    .events-summary-label) {
+      color: #f6d6de !important;
+    }
+
+
+
+    /* — Les 3 notices (Termux + hero) : même rose franc, légèrement plus rouge que violet — */
+    .panel.notice {
+      background:
+        linear-gradient(135deg, rgba(251, 113, 133, 0.16), rgba(244, 63, 110, 0.10)),
+        rgba(20, 9, 18, 0.93) !important;
+      border-color: rgba(251, 113, 133, 0.34) !important;
+    }
+
+    .notice-icon {
+      background: rgba(251, 113, 133, 0.17) !important;
+      color: #fda4af !important;
+      border-color: rgba(251, 113, 133, 0.38) !important;
+    }
+
+    /* Retouche v86 : harmonisation des cartes, valeurs +/- rétablies, cadre résumé pos/neg, bordures en haut, slider corrigé */
+
+    /* — MATCH ANALYSÉ centré + VS sur une ligne (V bleu / S rose) — */
+    .match-hero { text-align: center !important; justify-items: center !important; }
+    .match-hero .kicker, .match-hero .hero-text {
+      margin-left: auto !important; margin-right: auto !important; text-align: center !important;
+    }
+    .vs-box, .vs-divider {
+      display: inline-flex !important; flex-direction: row !important;
+      align-items: center !important; justify-content: center !important; gap: 0 !important;
+    }
+    .vs-box .vsb-v, .vs-divider .vsb-v { color: #38bdf8 !important; text-shadow: 0 0 12px rgba(56,189,248,.28); }
+    .vs-box .vsb-s, .vs-divider .vsb-s { color: #fb7185 !important; text-shadow: 0 0 12px rgba(251,113,133,.28); }
+
+    /* — Statut + résumé centrés — */
+    .status-box, .status-box .status-head, .status-box .status-message, .status-done-title,
+    .summary-title { text-align: center !important; justify-content: center !important; }
+
+    /* — VVVSSS agrandi — */
+    .summary-title .vs-echo { font-size: 1.6em !important; max-width: 100% !important; letter-spacing: -0.02em !important; }
+
+    /* === VALEURS : positive bleu, négative rose (rétabli) === */
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }
+    /* Titres restent blancs (noms, titres de match, sections, valeurs de RANG affichées en valeur) */
+    .team-card .team-name, .team-card .match-team-name, .team-card .row-title, .team-card .section-title { color: #ffffff !important; }.events-summary,
+    .section,
+    .match-row),
+    .events-summary,
+    .section,
+    .match-row) {
+      background:
+        linear-gradient(100deg, rgba(56,189,248,.04), rgba(56,189,248,0) 45%),
+        linear-gradient(260deg, rgba(251,113,133,.04), rgba(251,113,133,0) 45%),
+        rgba(13,18,40,.86) !important;
+      border-color: rgba(134,170,230,.12) !important;
+    }
+    /* Labels secondaires : gris-bleu neutre et homogène des deux côtés */
+    .team-card :is(.rank-label, .team-meta, .row-sub, .events-summary-label, .match-index,
+      .stat-kicker, .stat-subtitle, .stat-badge, .dominance-label, .event-metric-code, .summary-label) {
+      color: #aebbd6 !important;
+    }
+    .team-card :is(.count-pill, .match-count-mini, .camp-badge) {
+      background: linear-gradient(135deg, rgba(56,189,248,.10), rgba(251,113,133,.08)) !important;
+      border-color: rgba(134,170,230,.20) !important;
+      color: #d7e1f5 !important;
+    }
+    .team-card .event-metric-pill {
+      background: linear-gradient(135deg, rgba(56,189,248,.07), rgba(251,113,133,.055)) !important;
+      border-color: rgba(134,170,230,.16) !important;
+    }
+
+    /* === RÉSUMÉ : cadre coloré selon la moyenne des rangs (bleu si positive, rose si négative) === */
+    .summary-grid .summary-cell.cell-pos {
+      border-color: rgba(64,201,255,.45) !important;
+      background: linear-gradient(180deg, rgba(64,201,255,.10), rgba(10,15,36,.65) 60%) !important;
+      box-shadow: inset 0 2px 0 rgba(64,201,255,.45) !important;
+    }
+    .summary-grid .summary-cell.cell-neg {
+      border-color: rgba(251,113,133,.45) !important;
+      background: linear-gradient(180deg, rgba(251,113,133,.10), rgba(20,11,24,.65) 60%) !important;
+      box-shadow: inset 0 2px 0 rgba(251,113,133,.45) !important;
+    }
+    /* lignes de match/événement (texte à gauche) : accent sur le CÔTÉ, ton neutre mélangé */
+    .team-card .match-row, .team-card .event-rich-row {
+      box-shadow: inset 3px 0 0 rgba(134,170,230,.34) !important;
+    }
+    .event-rich-row { border-radius: 12px; overflow: hidden; }
+
+    /* Notice Termux + panneaux à titre centré : bordure en HAUT */
+    .panel.notice {
+      box-shadow: inset 0 3px 0 rgba(251,113,133,.40) !important;
+      background: linear-gradient(135deg, rgba(251,113,133,.07), rgba(244,63,110,.035)), rgba(13,11,24,.92) !important;
+      border-color: rgba(251,113,133,.20) !important;
+    }
+    .notice-icon { background: rgba(251,113,133,.10) !important; color: #fda4af !important; border-color: rgba(251,113,133,.24) !important; }
+    .panel.notice .notice-text { text-align: center !important; }
+    .report-panel, section.panel.panel-pad:not(.notice) { box-shadow: inset 0 3px 0 rgba(56,189,248,.22); }
+
+    /* === SLIDER 2 MODES : bulle qui épouse l'option active === */
+    .calc-mode-slider {
+      position: relative; display: flex; align-items: stretch; gap: 0;
+      margin: 12px 0 4px; padding: 4px; border-radius: 999px;
+      border: 1px solid rgba(134,170,230,.24); background: rgba(22,32,74,.55);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05); overflow: hidden; min-height: 48px;
+    }
+    .calc-mode-thumb {
+      position: absolute; top: 4px; bottom: 4px;
+      left: var(--thumb-left, 4px); width: var(--thumb-width, calc(50% - 8px));
+      border-radius: 999px; background: linear-gradient(135deg,#38bdf8,#2563eb); background-size: 180% 180%;
+      box-shadow: 0 6px 18px rgba(56,189,248,.30); animation: mobileButtonGlow 3.6s ease infinite;
+      transition: left .32s cubic-bezier(.34,1.4,.5,1), width .32s cubic-bezier(.34,1.4,.5,1), background .3s ease;
+      z-index: 0;
+    }
+    .calc-mode-slider.sim .calc-mode-thumb {
+      transform: none !important;
+      background: linear-gradient(135deg,#fb7185,#b91c6b) !important;
+      box-shadow: 0 6px 18px rgba(251,113,133,.30) !important;
+    }
+    .calc-mode-opt {
+      position: relative; z-index: 1; flex: 1 1 auto;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent !important; border: 0 !important; box-shadow: none !important;
+      margin: 0 !important; padding: 12px 14px !important;
+      font-size: 12px; font-weight: 800; letter-spacing: .04em; line-height: 1;
+      color: #aebfe0; cursor: pointer; transition: color .26s ease; white-space: nowrap;
+      transform: none !important;
+    }
+    .calc-mode-opt.is-active { color: #ffffff; }
+    .mode-toggle[for="simultaneousMode"] { display: none !important; }
+
+    /* Retouche v82 : notice rouge atténuée, slider 2 modes, VS agrandi, rebords, derniers bleus */
+
+    /* — On masque l'ancienne case à cocher : le slider la pilote — */
+    .mode-toggle[for="simultaneousMode"] {
+      display: none !important;
+    }
+
+    /* — Slider à 2 positions : Calcul Séparé | Calcul Simultané — */
+    .calc-mode-slider {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      margin: 12px 0 4px;
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.26);
+      background: rgba(22, 32, 74, 0.55);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+    }
+
+    .calc-mode-thumb {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: 4px;
+      width: calc(50% - 4px);
+      border-radius: 999px;
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+      background-size: 180% 180%;
+      box-shadow: 0 8px 20px rgba(56, 189, 248, 0.28);
+      animation: mobileButtonGlow 3.6s ease infinite;
+      transition: transform .32s cubic-bezier(.34, 1.4, .5, 1);
+      z-index: 0;
+    }
+
+    /* (ancienne règle .sim translateX retirée en v91 — la bulle est pilotée par JS) */
+
+    .calc-mode-opt {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      margin: 0 !important;
+      padding: 11px 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      color: #aebfe0;
+      cursor: pointer;
+      transition: color .26s ease;
+      white-space: nowrap;
+    }
+
+    .calc-mode-opt.is-active {
+      color: #ffffff;
+    }
+
+    /* — Notice "Émulateur Termux" : rouge conservé mais atténué (moins de contraste avec le site) — */
+    .panel.notice {
+      background:
+        linear-gradient(135deg, rgba(251, 113, 133, 0.08), rgba(244, 63, 110, 0.04)),
+        rgba(13, 11, 24, 0.92) !important;
+      border-color: rgba(251, 113, 133, 0.22) !important;
+    }
+
+    .notice-icon {
+      background: rgba(251, 113, 133, 0.11) !important;
+      color: #fda4af !important;
+      border-color: rgba(251, 113, 133, 0.26) !important;
+    }
+
+    /* — VVVVVVVSSSSSSS (taille gérée en couche finale v94) — */
+    .summary-title .vs-echo {
+      /* font-size retiré */
+      max-width: 100% !important;
+      transform: translateY(-0.02em) !important;
+      letter-spacing: -0.02em !important;
+    }.camp-badge,
+    .event-metric-code,
+    .section-title,
+    .events-summary-label,
+    .match-index,
+    .row-title) {
+      color: #e3cdd6 !important;
+    }
+
+    /* — REBORDS : liseré gauche sur les événements (comme les matchs), par camp — */
+    /* (event-rich-row : rebord géré en v86) */
+
+    .event-rich-row {
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    /* — (rebords latéraux v82 retirés : remplacés par des bordures EN HAUT en v86) — */
+
+
+    /* Retouche v78 : extérieur en pourpre rose (#fb7185), miroir complet des accents, VS recentré */
+
+    /* — VS (taille gérée en couche finale v94) — */
+    .summary-title .vs-echo {
+      /* font-size retiré */
+      max-width: 100% !important;
+      transform: translateX(-1.5%) translateY(-0.02em) !important;
+    }.events-summary,
+    .section) {
+      background: linear-gradient(160deg, rgba(251, 113, 133, 0.06), rgba(22, 14, 28, 0.85)) !important;
+      border-color: rgba(244, 114, 182, 0.16) !important;
+    }
+
+    /* — Cellules du résumé : extérieur recalé en pourpre rose — */
+    .summary-grid .summary-cell:last-child {
+      background: linear-gradient(180deg, rgba(251, 113, 133, 0.14), rgba(168, 85, 247, 0.05) 55%, rgba(24, 11, 26, 0.65)) !important;
+      border-color: rgba(244, 114, 182, 0.36) !important;
+    }
+
+    .summary-grid .summary-cell:first-child {
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.14), rgba(10, 15, 36, 0.65) 60%) !important;
+      border-color: rgba(56, 189, 248, 0.36) !important;
+    }
+
+    /* — Résumé : le côté droit suit le pourpre rose — */
+    .summary {
+      background:
+        linear-gradient(90deg, rgba(56, 189, 248, 0.10), rgba(56, 189, 248, 0) 40%),
+        linear-gradient(270deg, rgba(251, 113, 133, 0.09), rgba(168, 85, 247, 0.04) 22%, rgba(251, 113, 133, 0) 42%),
+        rgba(9, 14, 33, 0.94) !important;
+    }
+
+    /* Retouche v77 : VS étendu, tons domicile/extérieur renforcés, dégradés harmonisés, en-tête en badges */
+
+    /* — VVVVVVVVVSSSSSSSSS (taille gérée en couche finale v94) — */
+    .vs-echo {
+      /* font-size retiré */
+      letter-spacing: -0.03em;
+    }
+
+    .vs-echo i:nth-child(1) { opacity: 0.06; }
+    .vs-echo i:nth-child(2) { opacity: 0.11; }
+    .vs-echo i:nth-child(3) { opacity: 0.18; }
+    .vs-echo i:nth-child(4) { opacity: 0.28; }
+    .vs-echo i:nth-child(5) { opacity: 0.42; }
+    .vs-echo i:nth-child(6) { opacity: 0.58; }
+    .vs-echo i:nth-child(7) { opacity: 0.74; }
+    .vs-echo i:nth-child(8) { opacity: 0.88; }
+    .vs-echo i:nth-child(9) { opacity: 1; }
+    .vs-echo i:nth-child(10) { opacity: 1; }
+    .vs-echo i:nth-child(11) { opacity: 0.88; }
+    .vs-echo i:nth-child(12) { opacity: 0.74; }
+    .vs-echo i:nth-child(13) { opacity: 0.58; }
+    .vs-echo i:nth-child(14) { opacity: 0.42; }
+    .vs-echo i:nth-child(15) { opacity: 0.28; }
+    .vs-echo i:nth-child(16) { opacity: 0.18; }
+    .vs-echo i:nth-child(17) { opacity: 0.11; }
+    .vs-echo i:nth-child(18) { opacity: 0.06; }.events-summary,
+    .section) {
+      background: linear-gradient(160deg, rgba(56, 189, 248, 0.06), rgba(12, 18, 40, 0.85)) !important;
+      border-color: rgba(56, 189, 248, 0.16) !important;
+    }.events-summary,
+    .section) {
+      background: linear-gradient(160deg, rgba(251, 113, 133, 0.13), rgba(34, 12, 22, 0.85)) !important;
+      border-color: rgba(251, 113, 133, 0.26) !important;
+    }
+
+    /* — Cellules du résumé : même renfort, blocs internes compris — */
+    .summary-grid .summary-cell:first-child {
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.17), rgba(10, 15, 36, 0.65) 60%) !important;
+      border-color: rgba(56, 189, 248, 0.40) !important;
+    }
+
+    .summary-grid .summary-cell:last-child {
+      background: linear-gradient(180deg, rgba(251, 113, 133, 0.17), rgba(22, 10, 18, 0.65) 60%) !important;
+      border-color: rgba(251, 113, 133, 0.40) !important;
+    }
+
+    .summary-grid .summary-cell:first-child .mini-badge {
+      background: rgba(56, 189, 248, 0.14) !important;
+      border-color: rgba(56, 189, 248, 0.30) !important;
+    }
+
+    .summary-grid .summary-cell:last-child .mini-badge {
+      background: rgba(251, 113, 133, 0.14) !important;
+      border-color: rgba(251, 113, 133, 0.30) !important;
+    }
+
+    /* — Bloc Résumé : teinte scindée, bleu côté domicile, rose côté extérieur — */
+    .summary {
+      background:
+        linear-gradient(90deg, rgba(56, 189, 248, 0.11), rgba(56, 189, 248, 0) 40%),
+        linear-gradient(270deg, rgba(251, 113, 133, 0.11), rgba(251, 113, 133, 0) 40%),
+        rgba(9, 14, 33, 0.94) !important;
+      border-color: rgba(134, 203, 255, 0.26) !important;
+    }
+
+    /* — En-tête du résumé : trio de badges harmonisés et centrés — */
+    .summary-head-top {
+      justify-content: center !important;
+      align-items: center !important;
+      gap: 8px !important;
+      flex-wrap: wrap !important;
+    }
+
+    .summary-head-top .summary-label,
+    .summary-head-top .summary-label:first-child,
+    .summary-head-top .summary-mode,
+    .summary-mode {
+      justify-content: center !important;
+      align-self: auto !important;
+      margin: 0 !important;
+      min-height: 0 !important;
+      padding: 6px 12px !important;
+      border-radius: 999px !important;
+      border: 1px solid rgba(134, 203, 255, 0.30) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(59, 107, 255, 0.08)) !important;
+      color: #dff2ff !important;
+      font-size: 10.5px !important;
+      letter-spacing: 0.10em !important;
+      line-height: 1.15 !important;
+    }
+
+    .summary .data-quality-banner,
+    .summary .data-quality-banner.ok {
+      border-radius: 999px !important;
+      border: 1px solid rgba(110, 231, 183, 0.32) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.10), rgba(34, 197, 94, 0.12)) !important;
+      margin: 9px auto 12px !important;
+    }
+
+    /* Retouche v75 : bases presets 41.75, centrage VS, confettis réajustés */
+    .summary-title {
+      flex-wrap: wrap !important;
+    }
+
+    .summary-title .vs-echo {
+      flex-basis: 100% !important;
+      justify-content: center !important;
+    }
+
+    /* Retouche v74 : logos fiables, centrage résumé, fluidité */
+    .summary-title {
+      justify-content: center !important;
+      text-align: center !important;
+    }
+
+    .logo-fb {
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .brand-logo,
+    .kicker,
+    .status-confetti {
+      transform: translateZ(0);
+    }/* ============================================================
+       Retouche v88 — COUCHE FINALE (priorité maximale {
+      background:
+        linear-gradient(100deg, rgba(56,189,248,.045), rgba(56,189,248,0) 40%),
+        linear-gradient(260deg, rgba(251,113,133,.045), rgba(251,113,133,0) 40%),
+        rgba(12,17,38,.93) !important;
+      border-color: rgba(140,170,225,.15) !important;
+      box-shadow: none !important;
+    }.events-summary,
+    .section,
+    .match-row,
+    .event-rich-row),
+    .events-summary,
+    .section,
+    .match-row,
+    .event-rich-row),
+    .events-summary,
+    .section,
+    .match-row,
+    .event-rich-row),
+    .events-summary,
+    .section,
+    .match-row,
+    .event-rich-row) {
+      background:
+        linear-gradient(100deg, rgba(56,189,248,.035), rgba(56,189,248,0) 48%),
+        linear-gradient(260deg, rgba(251,113,133,.035), rgba(251,113,133,0) 48%),
+        rgba(14,19,42,.88) !important;
+      border-color: rgba(140,170,225,.12) !important;
+    }
+    /* labels secondaires neutres des deux côtés */
+    .team-card :is(.rank-label,.team-meta,.row-sub,.events-summary-label,.match-index,
+      .stat-kicker,.stat-subtitle,.stat-badge,.dominance-label,.event-metric-code,.summary-label) {
+      color: #aebbd6 !important;
+    }
+    .team-card :is(.count-pill,.match-count-mini,.camp-badge) {
+      background: linear-gradient(135deg, rgba(56,189,248,.10), rgba(251,113,133,.08)) !important;
+      border-color: rgba(140,170,225,.20) !important;
+      color: #d7e1f5 !important;
+    }
+    .team-card .event-metric-pill {
+      background: linear-gradient(135deg, rgba(56,189,248,.07), rgba(251,113,133,.055)) !important;
+      border-color: rgba(140,170,225,.16) !important;
+    }
+    /* valeurs : positive bleu / négative rose (priorité absolue) */
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }
+    .team-card .team-name, .team-card .match-team-name,
+    .team-card .row-title, .team-card .section-title { color: #ffffff !important; }/* --- 2. BORDURES : système cohérent (recherche design : accent subtil,
+    pas d'ombre) --- */
+    /* Toute carte/section principale : fin liseré EN HAUT,
+    .panel.notice,
+    .report-panel,
+    section.panel.panel-pad:not(.notice) {
+      position: relative;
+    }.panel.notice::after,
+    .report-panel::after,
+    section.panel.panel-pad:not(.notice)::after {
+      content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 2.5px;
+      border-radius: 0 0 999px 999px; pointer-events: none; z-index: 2;
+      background: linear-gradient(90deg, transparent, rgba(56,189,248,.5), rgba(251,113,133,.5), transparent);
+    }
+    /* notice = alerte : liseré haut rose pur */
+    .panel.notice::after {
+      background: linear-gradient(90deg, transparent, rgba(251,113,133,.6), transparent) !important;
+    }
+    /* sous-éléments à texte aligné à gauche (lignes match/événement) : accent sur le CÔTÉ, neutre */
+    .team-card .match-row, .team-card .event-rich-row {
+      box-shadow: inset 3px 0 0 rgba(140,170,225,.30) !important;
+      border-radius: 12px; overflow: hidden;
+    }
+
+    /* --- 3. SLIDER : bulle pilotée par JS (mesure réelle), robuste --- */
+    .calc-mode-slider {
+      position: relative; display: flex; align-items: stretch; gap: 0;
+      margin: 12px 0 4px; padding: 4px; border-radius: 999px;
+      border: 1px solid rgba(140,170,225,.24); background: rgba(22,32,74,.55);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05); overflow: hidden; min-height: 48px;
+    }
+    .calc-mode-thumb {
+      position: absolute; top: 4px; bottom: 4px;
+      left: var(--thumb-left, 4px);
+      width: var(--thumb-width, 44%);
+      border-radius: 999px; background: linear-gradient(135deg,#38bdf8,#2563eb); background-size: 180% 180%;
+      box-shadow: 0 6px 18px rgba(56,189,248,.30); animation: mobileButtonGlow 3.6s ease infinite;
+      transition: left .32s cubic-bezier(.34,1.4,.5,1), width .32s cubic-bezier(.34,1.4,.5,1), background .3s ease;
+      z-index: 0;
+    }
+    .calc-mode-slider.sim .calc-mode-thumb {
+      transform: none !important;
+      background: linear-gradient(135deg,#fb7185,#b91c6b) !important;
+      box-shadow: 0 6px 18px rgba(251,113,133,.30) !important;
+    }
+    .calc-mode-opt {
+      position: relative; z-index: 1; flex: 1 1 auto;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent !important; border: 0 !important; box-shadow: none !important;
+      margin: 0 !important; padding: 0 14px !important; min-height: 40px;
+      font-size: 11.5px; font-weight: 800; letter-spacing: .03em; line-height: 1;
+      color: #aebfe0; cursor: pointer; transition: color .26s ease; white-space: nowrap;
+      transform: none !important;
+    }
+    .calc-mode-opt.is-active { color: #ffffff; }/* === v92 : correctif titre/secondaire des deux côtés === */
+    /* Le titre de match (.row-title) reste BLANC partout,
+    .team-card .row-title { color: #ffffff !important; }/* Le secondaire suit le ton du camp : bleu chez domicile,
+    .rank-label,
+    .team-meta,
+    .events-summary-label,
+    .match-index,
+    .stat-kicker,
+    .stat-subtitle,
+    .dominance-label,
+    .event-metric-code,
+    .summary-label,
+    .camp-badge) {
+      color: #a9c9ec !important;
+    }.rank-label,
+    .team-meta,
+    .events-summary-label,
+    .match-index,
+    .stat-kicker,
+    .stat-subtitle,
+    .dominance-label,
+    .event-metric-code,
+    .summary-label,
+    .camp-badge) {
+      color: #e6b8c8 !important;
+    }.match-team-name,
+    .section-title),
+    .match-team-name,
+    .section-title) {
+      color: #ffffff !important;
+    }
+    /* valeurs : positive bleu / négative pourpre (inchangé) */
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }/* === v93 : nettoyage final — textes bleus extérieur → pourpre,
+    zone des rangs harmonisée,
+    .rank-label,
+    .team-meta,
+    .events-summary-label,
+    .match-index,
+    .stat-kicker,
+    .stat-subtitle,
+    .stat-title,
+    .stat-badge,
+    .mode-detail,
+    .dominance-label,
+    .event-metric-code,
+    .summary-label,
+    .camp-badge,
+    .zone-sub,
+    .stat-origin) {
+      color: #e6b8c8 !important;
+    }.rank-label,
+    .team-meta,
+    .events-summary-label,
+    .match-index,
+    .stat-kicker,
+    .stat-subtitle,
+    .stat-title,
+    .stat-badge,
+    .mode-detail,
+    .dominance-label,
+    .event-metric-code,
+    .summary-label,
+    .zone-sub,
+    .stat-origin) {
+      color: #a9c9ec !important;
+    }.team-name,
+    .match-team-name,
+    .section-title,
+    .stat-number),
+    .team-name,
+    .match-team-name,
+    .section-title,
+    .stat-number) {
+      color: #ffffff !important;
+    }
+    /* la valeur "Moyenne" de la zone suit positif/négatif, pas le camp */
+    .team-card .zone-card .positive, .team-card .stat-number.positive { color: #40c9ff !important; }
+    .team-card .zone-card .negative, .team-card .stat-number.negative { color: #fb7185 !important; }
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }/* --- 2. ZONE DES RANGS : fond très discret {
+      background: linear-gradient(160deg, rgba(56,189,248,.05), rgba(12,18,40,.9)) !important;
+      border-color: rgba(56,189,248,.16) !important;
+    }
+
+    /* --- 3. Cellules du RÉSUMÉ : la bordure suit la performance (pos=bleu / neg=pourpre), peu importe le côté --- */
+    .summary-grid .summary-cell.cell-pos {
+      border-color: rgba(64,201,255,.42) !important;
+      box-shadow: inset 0 2.5px 0 rgba(64,201,255,.5) !important;
+      background: linear-gradient(180deg, rgba(64,201,255,.08), rgba(10,15,36,.6) 60%) !important;
+    }
+    .summary-grid .summary-cell.cell-neg {
+      border-color: rgba(251,113,133,.42) !important;
+      box-shadow: inset 0 2.5px 0 rgba(251,113,133,.5) !important;
+      background: linear-gradient(180deg, rgba(251,113,133,.08), rgba(20,11,24,.6) 60%) !important;
+    }
+    .summary-grid .summary-cell.cell-neutral {
+      border-color: rgba(140,170,225,.30) !important;
+      box-shadow: inset 0 2.5px 0 rgba(140,170,225,.4) !important;
+    }
+    /* mini-badge dans la cellule : neutre, ne contredit plus la bordure */
+    .summary-grid .summary-cell .mini-badge {
+      background: rgba(140,170,225,.12) !important;
+      border-color: rgba(140,170,225,.22) !important;
+    }
+
+
+    /* === v94 : VS taille définitive (prioritaire, dernier bloc) + coordination animation boutons === */
+    .summary-title .vs-echo,
+    .vs-echo {
+      font-size: 1.85em !important;
+      max-width: 100% !important;
+      letter-spacing: -0.02em !important;
+    }
+
+    /* Synchroniser l'animation de dégradé de TOUS les boutons (même phase) */
+    .scan-btn, .auto-apply-btn, .report-btn.primary,
+    .preset-btn.active, .skip-grid button.active,
+    .calc-mode-thumb {
+      animation-name: mobileButtonGlow !important;
+      animation-duration: 3.6s !important;
+      animation-timing-function: ease !important;
+      animation-iteration-count: infinite !important;
+      animation-delay: 0s !important;
+    }/* === v95 : zone halos neutralisés par camp,
+    VS taille juste {
+      background:
+        radial-gradient(circle at top right, rgba(56,189,248,.10), transparent 38%),
+        radial-gradient(circle at bottom left, rgba(56,189,248,.05), transparent 44%) !important;
+      opacity: .7 !important;
+    }
+
+    /* --- 2. VVVSSS : taille juste (un peu plus grand que l'origine, pas énorme) --- */
+    .summary-title .vs-echo,
+    .vs-echo {
+      font-size: 1.45em !important;
+      max-width: 100% !important;
+      letter-spacing: -0.02em !important;
+    }
+
+    /* --- 3. ANIMATIONS BOUTONS : tous sur la MÊME (mobileButtonGlow 3.6s, délai 0) --- */
+    .scan-btn,
+    .auto-apply-btn,
+    .report-btn.primary,
+    .preset-btn.active,
+    .skip-grid button.active,
+    .calc-mode-thumb {
+      animation: mobileButtonGlow 3.6s ease infinite !important;
+      animation-delay: 0s !important;
+      background-size: 180% 180% !important;
+    }
+    /* le bouton scanner gardait un derbySweep + scanGlow désynchronisé : on neutralise le sweep,
+       on garde juste un léger glow de pulsation en plus, mais calé sur la même horloge */
+    .scan-btn {
+      animation: mobileButtonGlow 3.6s ease infinite !important;
+    }/* ============================================================
+       v97 — RÈGLE FINALE DE COULEUR (source unique de vérité)
+       Placée en dernier dans le CSS de page = priorité absolue
+       ============================================================ */
+
+    /* --- BLANC des deux côtés : titres de match,
+    noms,
+    titres de section,
+    labels de rang {
+      color: #ffffff !important;
+    }/* --- SECONDAIRE qui suit le camp (bleu doux domicile / pourpre doux extérieur) --- */
+    /* détail "#27 · Cumul...",
+    sous-titre zone "Rangs 27.75 à...",
+    compétition,
+    métas,
+    .team-meta,
+    .stat-subtitle,
+    .stat-kicker,
+    .events-summary-label,
+    .match-index,
+    .dominance-label,
+    .event-metric-code,
+    .summary-label,
+    .camp-badge,
+    .mode-detail,
+    .stat-origin) {
+      color: #a9c9ec !important;
+    }.team-meta,
+    .stat-subtitle,
+    .stat-kicker,
+    .events-summary-label,
+    .match-index,
+    .dominance-label,
+    .event-metric-code,
+    .summary-label,
+    .camp-badge,
+    .mode-detail,
+    .stat-origin) {
+      color: #e6b8c8 !important;
+    }
+
+    /* --- VALEURS : barème positif/négatif (priorité maximale) --- */
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }
+
+    /* --- VVVSSS : plus petit, centré, sans débordement --- */
+    .summary-title { overflow: hidden !important; }
+    .summary-title .vs-echo, .vs-echo {
+      font-size: 1.15em !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      justify-content: center !important;
+      text-align: center !important;
+      letter-spacing: -0.04em !important;
+      transform: none !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+
+    /* --- RÉSUMÉ : bordure HAUTE selon la performance de l'équipe (bleu=positif / pourpre=négatif),
+           on neutralise toute coloration par position (1ère/2ème cellule) --- */
+    .summary-grid .summary-cell:first-child,
+    .summary-grid .summary-cell:last-child {
+      box-shadow: none !important;
+    }
+    .summary-grid .summary-cell.cell-pos {
+      border-color: rgba(64,201,255,.42) !important;
+      box-shadow: inset 0 3px 0 rgba(64,201,255,.55) !important;
+    }
+    .summary-grid .summary-cell.cell-neg {
+      border-color: rgba(251,113,133,.42) !important;
+      box-shadow: inset 0 3px 0 rgba(251,113,133,.55) !important;
+    }
+    .summary-grid .summary-cell.cell-neutral {
+      border-color: rgba(140,170,225,.30) !important;
+      box-shadow: inset 0 3px 0 rgba(140,170,225,.42) !important;
+    }/* ============================================================
+       v99 — SYSTÈME DE TON UNIQUE (refait à zéro {
+      background:
+        linear-gradient(180deg, rgba(56,189,248,.06), rgba(56,189,248,.015) 50%, transparent),
+        rgba(11,16,38,.93) !important;
+      border-color: rgba(56,189,248,.20) !important;
+    }.events-summary,
+    .section,
+    .match-row,
+    .event-rich-row,
+    .zone-card,
+    .summary-cell) {
+      background: linear-gradient(160deg, rgba(56,189,248,.04), rgba(12,18,40,.86)) !important;
+      border-color: rgba(56,189,248,.13) !important;
+    }.events-summary,
+    .section,
+    .match-row,
+    .event-rich-row,
+    .zone-card,
+    .summary-cell) {
+      background: linear-gradient(160deg, rgba(251,113,133,.04), rgba(20,13,28,.86)) !important;
+      border-color: rgba(244,114,182,.13) !important;
+    }.events-summary,
+    .section,
+    .match-row,
+    .event-rich-row,
+    .zone-card) {
+      background: linear-gradient(160deg, rgba(140,170,225,.03), rgba(14,19,42,.86)) !important;
+      border-color: rgba(140,170,225,.11) !important;
+    }.match-count-mini,
+    .camp-badge,
+    .event-metric-pill,
+    .stat-badge) {
+      background: linear-gradient(135deg, rgba(56,189,248,.14), rgba(37,99,235,.08)) !important; border-color: rgba(56,189,248,.24) !important;
+    }.match-count-mini,
+    .camp-badge,
+    .event-metric-pill,
+    .stat-badge) {
+      background: linear-gradient(135deg, rgba(251,113,133,.14), rgba(168,85,247,.08)) !important; border-color: rgba(244,114,182,.24) !important;
+    }.match-count-mini,
+    .camp-badge,
+    .event-metric-pill,
+    .stat-badge) {
+      background: linear-gradient(135deg, rgba(140,170,225,.12), rgba(140,170,225,.06)) !important; border-color: rgba(140,170,225,.22) !important;
+    }
+
+    /* ===== TEXTES : titres + sous-titres BLANCS, détails suivent le ton ===== */
+    body .team-card :is(.row-title,.team-name,.match-team-name,.section-title,.rank-label,.stat-title,.stat-subtitle,.dominance-label,.events-summary-label) {
+      color: #ffffff !important;
+    }.team-meta,
+    .stat-kicker,
+    .match-index,
+    .event-metric-code,
+    .summary-label,
+    .camp-badge,
+    .mode-detail,
+    .stat-origin) { color: #a9c9ec !important; }.team-meta,
+    .stat-kicker,
+    .match-index,
+    .event-metric-code,
+    .summary-label,
+    .camp-badge,
+    .mode-detail,
+    .stat-origin) { color: #e6b8c8 !important; }.team-meta,
+    .stat-kicker,
+    .match-index,
+    .event-metric-code,
+    .summary-label,
+    .camp-badge,
+    .mode-detail,
+    .stat-origin) { color: #aebbd6 !important; }
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }
+
+    /* ===== VS — tous synchronisés sur la perf (V=home, S=away) ===== */
+    .vs-echo.v-pos .ve-v, .vs-box.v-pos .vsb-v, .vs-divider.v-pos .vsb-v { color: #38bdf8 !important; }
+    .vs-echo.v-neg .ve-v, .vs-box.v-neg .vsb-v, .vs-divider.v-neg .vsb-v { color: #fb7185 !important; }
+    .vs-echo.v-neu .ve-v, .vs-box.v-neu .vsb-v, .vs-divider.v-neu .vsb-v { color: #8aa0c8 !important; }
+    .vs-echo.s-pos .ve-s, .vs-box.s-pos .vsb-s, .vs-divider.s-pos .vsb-s { color: #38bdf8 !important; }
+    .vs-echo.s-neg .ve-s, .vs-box.s-neg .vsb-s, .vs-divider.s-neg .vsb-s { color: #fb7185 !important; }
+    .vs-echo.s-neu .ve-s, .vs-box.s-neu .vsb-s, .vs-divider.s-neu .vsb-s { color: #8aa0c8 !important; }
+
+    /* ===== VVVSSS : propre, sans bords visibles, centré, rampe douce ===== */
+    .summary-title { overflow: visible !important; }
+    .summary-title .vs-echo, .vs-echo {
+      font-size: 1.15em !important;
+      display: inline-flex !important;
+      justify-content: center !important;
+      width: auto !important;
+      max-width: 96% !important;
+      margin: 0 auto !important;
+      letter-spacing: -0.06em !important;
+      transform: none !important;
+      overflow: hidden !important;
+    }
+    .vs-echo i { -webkit-text-stroke: 0 !important; }
+    /* ============================================================
+       SYSTÈME DE TON UNIQUE — basé sur la performance
+       (positif = bleu / négatif = pourpre / neutre = gris-bleu)
+       Seul bloc de ton du site. Ne pas dupliquer ailleurs.
+       ============================================================ */
+
+    /* fond + bordure des cartes */
+    .team-card-pos {
+      background: linear-gradient(180deg, rgba(56,189,248,.06), rgba(56,189,248,.015) 50%, transparent), rgba(11,16,38,.93) !important;
+      border-color: rgba(56,189,248,.20) !important;
+    }
+    .team-card-neg {
+      background: linear-gradient(180deg, rgba(251,113,133,.06), rgba(251,113,133,.015) 50%, transparent), rgba(16,12,30,.93) !important;
+      border-color: rgba(244,114,182,.20) !important;
+    }
+    .team-card-neutral {
+      background: linear-gradient(180deg, rgba(140,170,225,.04), transparent 55%), rgba(12,17,38,.92) !important;
+      border-color: rgba(140,170,225,.16) !important;
+    }
+
+    /* sous-blocs internes */
+    .team-card-pos :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card) {
+      background: linear-gradient(160deg, rgba(56,189,248,.04), rgba(12,18,40,.86)) !important; border-color: rgba(56,189,248,.13) !important;
+    }
+    .team-card-neg :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card) {
+      background: linear-gradient(160deg, rgba(251,113,133,.04), rgba(20,13,28,.86)) !important; border-color: rgba(244,114,182,.13) !important;
+    }
+    .team-card-neutral :is(.rank-card,.events-summary,.section,.match-row,.event-rich-row,.zone-card) {
+      background: linear-gradient(160deg, rgba(140,170,225,.03), rgba(14,19,42,.86)) !important; border-color: rgba(140,170,225,.11) !important;
+    }
+
+    /* halos de la zone-card */
+    .team-card-pos .zone-card::before { background: radial-gradient(circle at top right, rgba(56,189,248,.09), transparent 40%), radial-gradient(circle at bottom left, rgba(56,189,248,.045), transparent 46%) !important; opacity:.65 !important; }
+    .team-card-neg .zone-card::before { background: radial-gradient(circle at top right, rgba(251,113,133,.09), transparent 40%), radial-gradient(circle at bottom left, rgba(251,113,133,.045), transparent 46%) !important; opacity:.65 !important; }
+
+    /* bordure haute des cartes */
+    .team-card-pos::before { content:""; position:absolute; top:0; left:18px; right:18px; height:3px; border-radius:0 0 999px 999px; pointer-events:none; background: linear-gradient(90deg, transparent, rgba(56,189,248,.55), transparent) !important; }
+    .team-card-neg::before { content:""; position:absolute; top:0; left:18px; right:18px; height:3px; border-radius:0 0 999px 999px; pointer-events:none; background: linear-gradient(90deg, transparent, rgba(251,113,133,.55), transparent) !important; }
+    .team-card-neutral::before { content:""; position:absolute; top:0; left:18px; right:18px; height:3px; border-radius:0 0 999px 999px; pointer-events:none; background: linear-gradient(90deg, transparent, rgba(140,170,225,.45), transparent) !important; }
+    .team-card-pos, .team-card-neg, .team-card-neutral { position: relative; }
+
+    /* liseré latéral des lignes match/événement */
+    .team-card-pos .match-row, .team-card-pos .event-rich-row { box-shadow: inset 3px 0 0 rgba(56,189,248,.40) !important; }
+    .team-card-neg .match-row, .team-card-neg .event-rich-row { box-shadow: inset 3px 0 0 rgba(251,113,133,.40) !important; }
+    .team-card-neutral .match-row, .team-card-neutral .event-rich-row { box-shadow: inset 3px 0 0 rgba(140,170,225,.34) !important; }
+    .event-rich-row { border-radius: 12px; overflow: hidden; }
+
+    /* pastilles internes */
+    .team-card-pos :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) { background: linear-gradient(135deg, rgba(56,189,248,.14), rgba(37,99,235,.08)) !important; border-color: rgba(56,189,248,.24) !important; }
+    .team-card-neg :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) { background: linear-gradient(135deg, rgba(251,113,133,.14), rgba(168,85,247,.08)) !important; border-color: rgba(244,114,182,.24) !important; }
+    .team-card-neutral :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge) { background: linear-gradient(135deg, rgba(140,170,225,.12), rgba(140,170,225,.06)) !important; border-color: rgba(140,170,225,.22) !important; }
+
+    /* halo du logo */
+    .team-card-pos .logo-m { box-shadow: 0 0 0 2px rgba(56,189,248,.32), 0 6px 16px rgba(56,189,248,.16) !important; }
+    .team-card-neg .logo-m { box-shadow: 0 0 0 2px rgba(244,114,182,.32), 0 6px 16px rgba(251,113,133,.16) !important; }
+
+    /* TEXTES : titres + sous-titres BLANCS, détails suivent le ton */
+    .team-card :is(.row-title,.team-name,.match-team-name,.section-title,.rank-label,.stat-title,.stat-subtitle,.dominance-label,.events-summary-label) { color: #ffffff !important; }
+    .team-card-pos :is(.row-sub,.team-meta,.stat-kicker,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) { color: #a9c9ec !important; }
+    .team-card-neg :is(.row-sub,.team-meta,.stat-kicker,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) { color: #e6b8c8 !important; }
+    .team-card-neutral :is(.row-sub,.team-meta,.stat-kicker,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) { color: #aebbd6 !important; }
+    .positive { color: #40c9ff !important; }
+    .negative { color: #fb7185 !important; }
+
+    /* VS — couleur selon la perf (V = équipe du haut/home, S = bas/away) */
+    .vs-echo.v-pos .ve-v, .vs-box.v-pos .vsb-v, .vs-divider.v-pos .vsb-v { color: #38bdf8 !important; }
+    .vs-echo.v-neg .ve-v, .vs-box.v-neg .vsb-v, .vs-divider.v-neg .vsb-v { color: #fb7185 !important; }
+    .vs-echo.v-neu .ve-v, .vs-box.v-neu .vsb-v, .vs-divider.v-neu .vsb-v { color: #8aa0c8 !important; }
+    .vs-echo.s-pos .ve-s, .vs-box.s-pos .vsb-s, .vs-divider.s-pos .vsb-s { color: #38bdf8 !important; }
+    .vs-echo.s-neg .ve-s, .vs-box.s-neg .vsb-s, .vs-divider.s-neg .vsb-s { color: #fb7185 !important; }
+    .vs-echo.s-neu .ve-s, .vs-box.s-neu .vsb-s, .vs-divider.s-neu .vsb-s { color: #8aa0c8 !important; }
+    /* fallback si pas de classe perf : V bleu / S pourpre */
+    .vs-echo .ve-v, .vs-box .vsb-v, .vs-divider .vsb-v { color: #38bdf8; }
+    .vs-echo .ve-s, .vs-box .vsb-s, .vs-divider .vsb-s { color: #fb7185; }
+
+    /* VVVSSS : centré, propre, sans bord visible */
+    .summary-title .vs-echo, .vs-echo {
+      font-size: 1.15em !important; display: inline-flex !important; justify-content: center !important;
+      width: auto !important; max-width: 96% !important; margin: 0 auto !important;
+      letter-spacing: -0.05em !important; transform: none !important; overflow: hidden !important;
+    }
+
+    /* résumé : bordure haute selon la perf de l'équipe (pos/neg/neutre) */
+    .summary-grid .summary-cell.cell-pos { border-color: rgba(64,201,255,.42) !important; box-shadow: inset 0 3px 0 rgba(64,201,255,.55) !important; }
+    .summary-grid .summary-cell.cell-neg { border-color: rgba(251,113,133,.42) !important; box-shadow: inset 0 3px 0 rgba(251,113,133,.55) !important; }
+    .summary-grid .summary-cell.cell-neutral { border-color: rgba(140,170,225,.30) !important; box-shadow: inset 0 3px 0 rgba(140,170,225,.42) !important; }
+
+
+
+    /* Retouche v101 : harmonisation finale après scan — VS non coupé + tons performance propres */
+    :root {
+      --fs-pos-blue: #38bdf8;
+      --fs-pos-blue-soft: rgba(56, 189, 248, .18);
+      --fs-neg-rose: #fb7185;
+      --fs-neg-rose-soft: rgba(251, 113, 133, .18);
+      --fs-neutral-soft: rgba(140, 170, 225, .16);
+    }
+
+    /* Le VVVSSS ne doit jamais être coupé sur mobile. */
+    .result-shell .summary-title {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-wrap: wrap !important;
+      gap: .14rem .36rem !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow: visible !important;
+      text-align: center !important;
+      line-height: 1.15 !important;
+      word-break: normal !important;
+    }
+
+    .result-shell .summary-title .vs-echo,
+    .result-shell .vs-echo {
+      display: inline-flex !important;
+      align-items: baseline !important;
+      justify-content: center !important;
+      flex: 0 0 auto !important;
+      width: auto !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      overflow: visible !important;
+      white-space: nowrap !important;
+      margin: 0 !important;
+      padding: 0 .06rem !important;
+      font-size: clamp(.86rem, 3.85vw, 1.15rem) !important;
+      letter-spacing: -0.07em !important;
+      line-height: 1 !important;
+      transform: none !important;
+    }
+
+    .result-shell .vs-echo i {
+      display: inline-block !important;
+      margin-left: -0.06em !important;
+      font-style: italic !important;
+      -webkit-text-stroke: 0 !important;
+    }
+
+    .result-shell .vs-echo i:first-child { margin-left: 0 !important; }
+
+    @media (max-width: 430px) {
+      .result-shell .summary-title {
+        gap: .10rem .24rem !important;
+      }
+
+      .result-shell .summary-title .vs-echo,
+      .result-shell .vs-echo {
+        font-size: clamp(.76rem, 3.35vw, 1rem) !important;
+        letter-spacing: -0.085em !important;
+      }
+    }
+
+    /* Tous les VS suivent le ton : V = domicile, S = extérieur. */
+    .result-shell .vs-box,
+    .result-shell .vs-divider {
+      overflow: visible !important;
+    }
+
+    .result-shell .vs-echo.v-pos .ve-v,
+    .result-shell .vs-box.v-pos .vsb-v,
+    .result-shell .vs-divider.v-pos .vsb-v {
+      color: var(--fs-pos-blue) !important;
+      text-shadow: 0 0 13px rgba(56, 189, 248, .38) !important;
+    }
+
+    .result-shell .vs-echo.v-neg .ve-v,
+    .result-shell .vs-box.v-neg .vsb-v,
+    .result-shell .vs-divider.v-neg .vsb-v {
+      color: var(--fs-neg-rose) !important;
+      text-shadow: 0 0 13px rgba(251, 113, 133, .36) !important;
+    }
+
+    .result-shell .vs-echo.v-neu .ve-v,
+    .result-shell .vs-box.v-neu .vsb-v,
+    .result-shell .vs-divider.v-neu .vsb-v {
+      color: #8aa0c8 !important;
+      text-shadow: 0 0 10px rgba(138, 160, 200, .22) !important;
+    }
+
+    .result-shell .vs-echo.s-pos .ve-s,
+    .result-shell .vs-box.s-pos .vsb-s,
+    .result-shell .vs-divider.s-pos .vsb-s {
+      color: var(--fs-pos-blue) !important;
+      text-shadow: 0 0 13px rgba(56, 189, 248, .38) !important;
+    }
+
+    .result-shell .vs-echo.s-neg .ve-s,
+    .result-shell .vs-box.s-neg .vsb-s,
+    .result-shell .vs-divider.s-neg .vsb-s {
+      color: var(--fs-neg-rose) !important;
+      text-shadow: 0 0 13px rgba(251, 113, 133, .36) !important;
+    }
+
+    .result-shell .vs-echo.s-neu .ve-s,
+    .result-shell .vs-box.s-neu .vsb-s,
+    .result-shell .vs-divider.s-neu .vsb-s {
+      color: #8aa0c8 !important;
+      text-shadow: 0 0 10px rgba(138, 160, 200, .22) !important;
+    }
+
+    /* Le bloc équipe entier suit la performance : bleu si positif, pourpre-rose si négatif. */
+    .result-shell .team-card.team-card-pos {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(56, 189, 248, .18), transparent 34%),
+        linear-gradient(165deg, rgba(56, 189, 248, .12), rgba(15, 23, 48, .94) 52%, rgba(8, 12, 30, .96)) !important;
+      border-color: rgba(56, 189, 248, .34) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 24px rgba(56, 189, 248, .08) !important;
+    }
+
+    .result-shell .team-card.team-card-neg {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(251, 113, 133, .16), transparent 34%),
+        linear-gradient(165deg, rgba(251, 113, 133, .105), rgba(27, 15, 39, .94) 52%, rgba(12, 10, 28, .96)) !important;
+      border-color: rgba(251, 113, 133, .32) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 24px rgba(251, 113, 133, .075) !important;
+    }
+
+    .result-shell .team-card.team-card-neutral {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(140, 170, 225, .12), transparent 34%),
+        linear-gradient(165deg, rgba(140, 170, 225, .07), rgba(13, 18, 42, .94) 55%, rgba(8, 12, 30, .96)) !important;
+      border-color: rgba(140, 170, 225, .24) !important;
+    }
+
+    .result-shell .team-card-pos :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary) {
+      background: linear-gradient(160deg, rgba(56, 189, 248, .075), rgba(10, 16, 38, .88)) !important;
+      border-color: rgba(56, 189, 248, .21) !important;
+    }
+
+    .result-shell .team-card-neg :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary) {
+      background: linear-gradient(160deg, rgba(251, 113, 133, .07), rgba(20, 12, 32, .88)) !important;
+      border-color: rgba(251, 113, 133, .20) !important;
+    }
+
+    .result-shell .team-card-neutral :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary) {
+      background: linear-gradient(160deg, rgba(140, 170, 225, .055), rgba(12, 17, 40, .88)) !important;
+      border-color: rgba(140, 170, 225, .16) !important;
+    }
+
+    .result-shell .team-card-pos :is(.side-pill, .count-pill, .match-count-mini, .camp-badge, .event-metric-pill, .stat-badge) {
+      background: linear-gradient(135deg, rgba(56, 189, 248, .18), rgba(37, 99, 235, .09)) !important;
+      border-color: rgba(56, 189, 248, .30) !important;
+      color: #e6f8ff !important;
+    }
+
+    .result-shell .team-card-neg :is(.side-pill, .count-pill, .match-count-mini, .camp-badge, .event-metric-pill, .stat-badge) {
+      background: linear-gradient(135deg, rgba(251, 113, 133, .17), rgba(168, 85, 247, .09)) !important;
+      border-color: rgba(251, 113, 133, .30) !important;
+      color: #ffe8ee !important;
+    }
+
+    .result-shell .team-card-neutral :is(.side-pill, .count-pill, .match-count-mini, .camp-badge, .event-metric-pill, .stat-badge) {
+      background: linear-gradient(135deg, rgba(140, 170, 225, .14), rgba(140, 170, 225, .07)) !important;
+      border-color: rgba(140, 170, 225, .24) !important;
+      color: #e9eefc !important;
+    }
+
+    .result-shell .team-card-pos .zone-card::before {
+      background: radial-gradient(circle at top right, rgba(56,189,248,.12), transparent 42%), radial-gradient(circle at bottom left, rgba(56,189,248,.06), transparent 46%) !important;
+      opacity: .75 !important;
+    }
+
+    .result-shell .team-card-neg .zone-card::before {
+      background: radial-gradient(circle at top right, rgba(251,113,133,.12), transparent 42%), radial-gradient(circle at bottom left, rgba(251,113,133,.06), transparent 46%) !important;
+      opacity: .75 !important;
+    }
+
+    .result-shell .team-card-pos .logo-m {
+      box-shadow: 0 0 0 2px rgba(56,189,248,.36), 0 8px 18px rgba(56,189,248,.15) !important;
+    }
+
+    .result-shell .team-card-neg .logo-m {
+      box-shadow: 0 0 0 2px rgba(251,113,133,.35), 0 8px 18px rgba(251,113,133,.13) !important;
+    }
+
+    /* Résumé : mêmes tons que les cartes, sans mélange sale. */
+    .result-shell .summary-grid .summary-cell.cell-pos {
+      background: linear-gradient(160deg, rgba(56, 189, 248, .105), rgba(10, 16, 38, .88)) !important;
+      border-color: rgba(56, 189, 248, .32) !important;
+      box-shadow: inset 0 3px 0 rgba(56,189,248,.48) !important;
+    }
+
+    .result-shell .summary-grid .summary-cell.cell-neg {
+      background: linear-gradient(160deg, rgba(251, 113, 133, .095), rgba(20, 12, 32, .88)) !important;
+      border-color: rgba(251, 113, 133, .32) !important;
+      box-shadow: inset 0 3px 0 rgba(251,113,133,.46) !important;
+    }
+
+    .result-shell .summary-grid .summary-cell.cell-neutral {
+      background: linear-gradient(160deg, rgba(140, 170, 225, .07), rgba(12, 17, 40, .88)) !important;
+      border-color: rgba(140, 170, 225, .22) !important;
+      box-shadow: inset 0 3px 0 rgba(140,170,225,.34) !important;
+    }
+
+    .result-shell .positive { color: var(--fs-pos-blue) !important; }
+    .result-shell .negative { color: var(--fs-neg-rose) !important; }
+
+
+    /* Même règle pour le VS du bloc match analysé, qui est en dehors de result-shell. */
+    .vs-box.v-pos .vsb-v, .vs-divider.v-pos .vsb-v, .vs-echo.v-pos .ve-v { color: var(--fs-pos-blue) !important; text-shadow: 0 0 13px rgba(56, 189, 248, .38) !important; }
+    .vs-box.v-neg .vsb-v, .vs-divider.v-neg .vsb-v, .vs-echo.v-neg .ve-v { color: var(--fs-neg-rose) !important; text-shadow: 0 0 13px rgba(251, 113, 133, .36) !important; }
+    .vs-box.v-neu .vsb-v, .vs-divider.v-neu .vsb-v, .vs-echo.v-neu .ve-v { color: #8aa0c8 !important; text-shadow: 0 0 10px rgba(138, 160, 200, .22) !important; }
+    .vs-box.s-pos .vsb-s, .vs-divider.s-pos .vsb-s, .vs-echo.s-pos .ve-s { color: var(--fs-pos-blue) !important; text-shadow: 0 0 13px rgba(56, 189, 248, .38) !important; }
+    .vs-box.s-neg .vsb-s, .vs-divider.s-neg .vsb-s, .vs-echo.s-neg .ve-s { color: var(--fs-neg-rose) !important; text-shadow: 0 0 13px rgba(251, 113, 133, .36) !important; }
+    .vs-box.s-neu .vsb-s, .vs-divider.s-neu .vsb-s, .vs-echo.s-neu .ve-s { color: #8aa0c8 !important; text-shadow: 0 0 10px rgba(138, 160, 200, .22) !important; }
+    .vs-box, .vs-divider { overflow: visible !important; }
+
+
+
+    /* Retouche v102 : rendu après scan — 6V/6S centré, tons positifs/négatifs symétriques, VS complet */
+    :root {
+      --fs-v102-blue: #38bdf8;
+      --fs-v102-blue-strong: rgba(56, 189, 248, .42);
+      --fs-v102-blue-soft: rgba(56, 189, 248, .115);
+      --fs-v102-blue-faint: rgba(56, 189, 248, .052);
+      --fs-v102-rose: #fb7185;
+      --fs-v102-rose-strong: rgba(251, 113, 133, .42);
+      --fs-v102-rose-soft: rgba(251, 113, 133, .115);
+      --fs-v102-rose-faint: rgba(251, 113, 133, .052);
+      --fs-v102-neutral: #8aa0c8;
+    }
+
+    /* Liserés principaux : retour du dégradé bleu → rose, sauf le bloc Termux qui reste pourpre. */
+    body :is(.panel:not(.notice), .summary, .report-panel) {
+      position: relative;
+    }
+
+    body :is(.panel:not(.notice), .summary, .report-panel)::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 18px;
+      right: 18px;
+      height: 2.5px;
+      border-radius: 0 0 999px 999px;
+      pointer-events: none;
+      z-index: 3;
+      background: linear-gradient(90deg, transparent, rgba(56,189,248,.62), rgba(251,113,133,.58), transparent) !important;
+    }
+
+    body .panel.notice::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 18px;
+      right: 18px;
+      height: 2.5px;
+      border-radius: 0 0 999px 999px;
+      pointer-events: none;
+      z-index: 3;
+      background: linear-gradient(90deg, transparent, rgba(251,113,133,.68), rgba(168,85,247,.42), transparent) !important;
+    }
+
+    /* Le grand VS du résumé : 6 V + 6 S, jamais collé aux bords, centré en ligne dédiée. */
+    body .result-shell .summary-title {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 7px !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow: visible !important;
+      text-align: center !important;
+      line-height: .98 !important;
+      padding: 0 12px !important;
+      margin: 12px auto 0 !important;
+    }
+
+    body .result-shell .summary-title .vs-echo,
+    body .result-shell .vs-echo {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: min(100%, 340px) !important;
+      max-width: calc(100vw - 72px) !important;
+      overflow: visible !important;
+      white-space: nowrap !important;
+      padding: 0 .44em !important;
+      margin: 0 auto !important;
+      font-size: clamp(36px, 10.8vw, 54px) !important;
+      line-height: .82 !important;
+      letter-spacing: -0.118em !important;
+      transform: none !important;
+      opacity: .96 !important;
+    }
+
+    body .result-shell .vs-echo i {
+      display: inline-block !important;
+      margin: 0 !important;
+      font-style: italic !important;
+      -webkit-text-stroke: 0 !important;
+      text-rendering: geometricPrecision;
+    }
+
+    @media (max-width: 430px) {
+      body .result-shell .summary-title {
+        gap: 6px !important;
+        padding: 0 10px !important;
+      }
+      body .result-shell .summary-title .vs-echo,
+      body .result-shell .vs-echo {
+        width: min(100%, 306px) !important;
+        max-width: calc(100vw - 84px) !important;
+        font-size: clamp(31px, 10.2vw, 44px) !important;
+        letter-spacing: -0.123em !important;
+        padding: 0 .48em !important;
+      }
+    }
+
+    /* Tous les VS : V = domicile, S = extérieur, couleur selon la performance réelle du camp. */
+    body :is(.vs-box, .vs-divider) {
+      overflow: visible !important;
+    }
+
+    body :is(.vs-box, .vs-divider, .vs-echo).v-pos .vsb-v,
+    body .vs-echo.v-pos .ve-v { color: var(--fs-v102-blue) !important; text-shadow: 0 0 14px rgba(56,189,248,.40) !important; }
+    body :is(.vs-box, .vs-divider, .vs-echo).v-neg .vsb-v,
+    body .vs-echo.v-neg .ve-v { color: var(--fs-v102-rose) !important; text-shadow: 0 0 14px rgba(251,113,133,.38) !important; }
+    body :is(.vs-box, .vs-divider, .vs-echo).v-neu .vsb-v,
+    body .vs-echo.v-neu .ve-v { color: var(--fs-v102-neutral) !important; text-shadow: 0 0 10px rgba(138,160,200,.26) !important; }
+
+    body :is(.vs-box, .vs-divider, .vs-echo).s-pos .vsb-s,
+    body .vs-echo.s-pos .ve-s { color: var(--fs-v102-blue) !important; text-shadow: 0 0 14px rgba(56,189,248,.40) !important; }
+    body :is(.vs-box, .vs-divider, .vs-echo).s-neg .vsb-s,
+    body .vs-echo.s-neg .ve-s { color: var(--fs-v102-rose) !important; text-shadow: 0 0 14px rgba(251,113,133,.38) !important; }
+    body :is(.vs-box, .vs-divider, .vs-echo).s-neu .vsb-s,
+    body .vs-echo.s-neu .ve-s { color: var(--fs-v102-neutral) !important; text-shadow: 0 0 10px rgba(138,160,200,.26) !important; }
+
+    body .vs-box .vsb-v, body .vs-divider .vsb-v, body .vs-echo .ve-v { color: var(--fs-v102-blue); }
+    body .vs-box .vsb-s, body .vs-divider .vsb-s, body .vs-echo .ve-s { color: var(--fs-v102-rose); }
+
+    /* Système de ton final : le bloc entier dépend de la moyenne de l'équipe, pas du côté domicile/extérieur. */
+    body .result-shell .team-card.team-card-pos,
+    body .result-shell .summary-grid .summary-cell.cell-pos {
+      background:
+        radial-gradient(circle at 13% 5%, rgba(56,189,248,.18), transparent 34%),
+        linear-gradient(155deg, var(--fs-v102-blue-soft), rgba(12,18,42,.94) 48%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(56,189,248,.36) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 22px rgba(56,189,248,.075) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg,
+    body .result-shell .summary-grid .summary-cell.cell-neg {
+      background:
+        radial-gradient(circle at 13% 5%, rgba(251,113,133,.17), transparent 34%),
+        linear-gradient(155deg, var(--fs-v102-rose-soft), rgba(27,15,38,.94) 48%, rgba(10,8,24,.96)) !important;
+      border-color: rgba(251,113,133,.36) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 22px rgba(251,113,133,.072) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral,
+    body .result-shell .summary-grid .summary-cell.cell-neutral {
+      background:
+        radial-gradient(circle at 13% 5%, rgba(140,170,225,.12), transparent 34%),
+        linear-gradient(155deg, rgba(140,170,225,.065), rgba(12,18,42,.94) 50%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(140,170,225,.26) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      background: linear-gradient(90deg, transparent, rgba(56,189,248,.70), transparent) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      background: linear-gradient(90deg, transparent, rgba(251,113,133,.70), transparent) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      background: linear-gradient(90deg, transparent, rgba(140,170,225,.55), transparent) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-pos, .summary-cell.cell-pos) :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
+      background: linear-gradient(160deg, var(--fs-v102-blue-faint), rgba(10,16,38,.88)) !important;
+      border-color: rgba(56,189,248,.22) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neg, .summary-cell.cell-neg) :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
+      background: linear-gradient(160deg, var(--fs-v102-rose-faint), rgba(20,12,32,.88)) !important;
+      border-color: rgba(251,113,133,.22) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neutral, .summary-cell.cell-neutral) :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card) {
+      background: linear-gradient(160deg, rgba(140,170,225,.04), rgba(12,17,40,.88)) !important;
+      border-color: rgba(140,170,225,.17) !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-pos, .summary-cell.cell-pos) :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge,.side-pill) {
+      background: linear-gradient(135deg, rgba(56,189,248,.17), rgba(37,99,235,.09)) !important;
+      border-color: rgba(56,189,248,.30) !important;
+      color: #e8f8ff !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neg, .summary-cell.cell-neg) :is(.count-pill,.match-count-mini,.camp-badge,.event-metric-pill,.stat-badge,.side-pill) {
+      background: linear-gradient(135deg, rgba(251,113,133,.17), rgba(168,85,247,.09)) !important;
+      border-color: rgba(251,113,133,.30) !important;
+      color: #ffe7ee !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-pos, .summary-cell.cell-pos) :is(.team-meta,.row-sub,.stat-kicker,.stat-subtitle,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) {
+      color: #b7d8f3 !important;
+    }
+
+    body .result-shell :is(.team-card.team-card-neg, .summary-cell.cell-neg) :is(.team-meta,.row-sub,.stat-kicker,.stat-subtitle,.match-index,.event-metric-code,.summary-label,.camp-badge,.mode-detail,.stat-origin) {
+      color: #f0becd !important;
+    }
+
+    body .result-shell .team-card .team-name,
+    body .result-shell .summary-team-name,
+    body .result-shell .team-card :is(.row-title,.section-title,.rank-label,.stat-title,.events-summary-label) {
+      color: #ffffff !important;
+    }
+
+    body .result-shell .positive { color: #40c9ff !important; }
+    body .result-shell .negative { color: #fb7185 !important; }
+
+
+    /* v103 mobile scroll polish : fond continu + fluidité légère */
+    html {
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(64, 201, 255, .16), transparent 34%),
+        radial-gradient(circle at 88% 100%, rgba(251, 113, 133, .12), transparent 40%),
+        linear-gradient(180deg, #050816 0%, #071023 46%, #050816 100%) !important;
+      background-color: #050816 !important;
+    }
+
+    body {
+      min-height: 100svh;
+      background-color: transparent !important;
+      overscroll-behavior-y: contain;
+    }
+
+    @supports (height: 100dvh) {
+      body { min-height: 100dvh; }
+    }
+
+    @media (max-width: 700px) {
+      html {
+        scroll-behavior: auto;
+        background-attachment: scroll !important;
+      }
+
+      body {
+        background: transparent !important;
+      }
+
+      body::before {
+        inset: 0 !important;
+        background:
+          radial-gradient(circle at 16% 0%, rgba(64, 201, 255, .12), transparent 34%),
+          radial-gradient(circle at 88% 100%, rgba(251, 113, 133, .10), transparent 42%),
+          linear-gradient(180deg, rgba(5, 8, 22, .96), rgba(7, 16, 35, .92) 50%, rgba(5, 8, 22, .96)) !important;
+        opacity: 1 !important;
+        animation: none !important;
+        transform: none !important;
+        filter: none !important;
+      }
+
+      body::after {
+        animation: none !important;
+        filter: none !important;
+        opacity: .34 !important;
+      }
+
+      .app {
+        padding-bottom: calc(132px + env(safe-area-inset-bottom)) !important;
+      }
+
+      .panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .report-panel,
+      .auto-box,
+      .auto-control {
+        backface-visibility: hidden;
+        transform: translateZ(0);
+      }
+    }
+
+    @supports (animation-timeline: view()) {
+      @media (max-width: 700px) {
+        .panel,
+        .summary,
+        .team-card,
+        .bar-box,
+        .report-panel {
+          animation: none !important;
+          animation-timeline: auto !important;
+        }
+      }
+    }
+
+
+    /* Retouche v105 : liserés centre -> extrémités plus subtils
+       Transition plus douce, moins saturée, sans toucher au bloc Termux/notice. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after {
+      opacity: .72 !important;
+      background: linear-gradient(90deg,
+        rgba(56,189,248,.18) 0%,
+        rgba(56,189,248,.26) 22%,
+        rgba(124,92,255,.22) 39%,
+        rgba(251,113,133,.32) 50%,
+        rgba(124,92,255,.22) 61%,
+        rgba(56,189,248,.26) 78%,
+        rgba(56,189,248,.18) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card::before,
+    body .result-shell .summary-grid .summary-cell::before {
+      opacity: .70 !important;
+      background: linear-gradient(90deg,
+        rgba(56,189,248,.13) 0%,
+        rgba(56,189,248,.22) 24%,
+        rgba(124,92,255,.18) 40%,
+        rgba(251,113,133,.28) 50%,
+        rgba(124,92,255,.18) 60%,
+        rgba(56,189,248,.22) 76%,
+        rgba(56,189,248,.13) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      opacity: .72 !important;
+      background: linear-gradient(90deg,
+        rgba(56,189,248,.12) 0%,
+        rgba(56,189,248,.24) 34%,
+        rgba(56,189,248,.34) 50%,
+        rgba(56,189,248,.24) 66%,
+        rgba(56,189,248,.12) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      opacity: .72 !important;
+      background: linear-gradient(90deg,
+        rgba(251,113,133,.12) 0%,
+        rgba(251,113,133,.24) 34%,
+        rgba(251,113,133,.34) 50%,
+        rgba(251,113,133,.24) 66%,
+        rgba(251,113,133,.12) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      opacity: .70 !important;
+      background: linear-gradient(90deg,
+        rgba(140,170,225,.10) 0%,
+        rgba(140,170,225,.22) 40%,
+        rgba(140,170,225,.28) 50%,
+        rgba(140,170,225,.22) 60%,
+        rgba(140,170,225,.10) 100%
+      ) !important;
+    }
+
+
+    /* Retouche v109 : bordures visibles mais plus fondues + Résumé rapide par performance réelle
+       Base stable v105/v107. Correction ciblée sans toucher au scroll, aux logos, ni à la logique. */
+    :root {
+      --fs-v109-blue: #40c9ff;
+      --fs-v109-blue-edge: rgba(64, 201, 255, .34);
+      --fs-v109-blue-soft: rgba(64, 201, 255, .145);
+      --fs-v109-rose: #fb7185;
+      --fs-v109-rose-edge: rgba(251, 113, 133, .34);
+      --fs-v109-rose-soft: rgba(251, 113, 133, .145);
+      --fs-v109-violet-soft: rgba(124, 92, 255, .18);
+      --fs-v109-neutral-edge: rgba(150, 170, 215, .26);
+    }
+
+    /* Liserés généraux : visibles, mais sans effet barre dure. Notice/Termux exclu. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
+    body .topbar::after {
+      height: 2px !important;
+      left: 22px !important;
+      right: 22px !important;
+      opacity: .62 !important;
+      filter: saturate(.86) blur(.22px) !important;
+      box-shadow: 0 0 10px rgba(64,201,255,.08), 0 0 12px rgba(251,113,133,.055) !important;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(64,201,255,.10) 8%,
+        rgba(64,201,255,.24) 24%,
+        rgba(124,92,255,.22) 40%,
+        rgba(251,113,133,.32) 50%,
+        rgba(124,92,255,.22) 60%,
+        rgba(64,201,255,.24) 76%,
+        rgba(64,201,255,.10) 92%,
+        transparent 100%
+      ) !important;
+    }
+
+    /* Contours des grands blocs : un peu plus lisibles que v108, mais pas saturés. */
+    body :is(.hero, .panel:not(.notice), .summary, .report-panel, .auto-box, .bar-box) {
+      border-color: rgba(118, 158, 220, .225) !important;
+    }
+
+    /* Cartes post-scan : liseré haut visible mais fondu. */
+    body .result-shell .team-card::before,
+    body .result-shell .summary-grid .summary-cell::before {
+      height: 2px !important;
+      left: 20px !important;
+      right: 20px !important;
+      opacity: .58 !important;
+      filter: saturate(.9) blur(.18px) !important;
+      box-shadow: 0 0 10px rgba(64,201,255,.06), 0 0 10px rgba(251,113,133,.045) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(64,201,255,.16) 12%,
+        rgba(64,201,255,.34) 38%,
+        rgba(64,201,255,.46) 50%,
+        rgba(64,201,255,.34) 62%,
+        rgba(64,201,255,.16) 88%,
+        transparent 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(251,113,133,.15) 12%,
+        rgba(251,113,133,.33) 38%,
+        rgba(251,113,133,.45) 50%,
+        rgba(251,113,133,.33) 62%,
+        rgba(251,113,133,.15) 88%,
+        transparent 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(150,170,215,.12) 12%,
+        rgba(150,170,215,.25) 38%,
+        rgba(150,170,215,.34) 50%,
+        rgba(150,170,215,.25) 62%,
+        rgba(150,170,215,.12) 88%,
+        transparent 100%
+      ) !important;
+    }
+
+    /* Les bordures internes gardent un repère visible sans devenir des néons. */
+    body .result-shell .team-card.team-card-pos :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card),
+    body .result-shell .summary-grid .summary-cell.cell-pos .mini-badge {
+      border-color: rgba(64,201,255,.28) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card),
+    body .result-shell .summary-grid .summary-cell.cell-neg .mini-badge {
+      border-color: rgba(251,113,133,.28) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral :is(.rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card),
+    body .result-shell .summary-grid .summary-cell.cell-neutral .mini-badge {
+      border-color: rgba(150,170,215,.22) !important;
+    }
+
+    /* Résumé rapide : chaque bloc équipe suit la performance réelle, pas le côté domicile/extérieur. */
+    body .result-shell .summary-grid .summary-cell.cell-pos {
+      background:
+        radial-gradient(circle at 12% 5%, rgba(64,201,255,.18), transparent 35%),
+        linear-gradient(155deg, rgba(64,201,255,.095), rgba(12,18,42,.94) 54%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(64,201,255,.36) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 18px rgba(64,201,255,.06) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neg {
+      background:
+        radial-gradient(circle at 12% 5%, rgba(251,113,133,.17), transparent 35%),
+        linear-gradient(155deg, rgba(251,113,133,.09), rgba(24,13,36,.94) 54%, rgba(9,8,24,.96)) !important;
+      border-color: rgba(251,113,133,.36) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055), 0 0 18px rgba(251,113,133,.055) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neutral {
+      background:
+        radial-gradient(circle at 12% 5%, rgba(150,170,215,.12), transparent 35%),
+        linear-gradient(155deg, rgba(150,170,215,.06), rgba(12,18,42,.94) 54%, rgba(7,10,26,.96)) !important;
+      border-color: rgba(150,170,215,.28) !important;
+    }
+
+    /* Bulles du Résumé rapide : corrige notamment une équipe extérieure positive qui restait pourpre. */
+    body .result-shell .summary-grid .summary-cell.cell-pos .mini-badge {
+      background: linear-gradient(135deg, rgba(64,201,255,.155), rgba(37,99,235,.075)) !important;
+      color: #ecfbff !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neg .mini-badge {
+      background: linear-gradient(135deg, rgba(251,113,133,.15), rgba(168,85,247,.075)) !important;
+      color: #ffeaf0 !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neutral .mini-badge {
+      background: linear-gradient(135deg, rgba(150,170,215,.105), rgba(150,170,215,.045)) !important;
+      color: #edf2ff !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-pos .logo-s {
+      border-color: rgba(64,201,255,.25) !important;
+      box-shadow: 0 0 0 1px rgba(64,201,255,.26), 0 6px 14px rgba(64,201,255,.10) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neg .logo-s {
+      border-color: rgba(251,113,133,.24) !important;
+      box-shadow: 0 0 0 1px rgba(251,113,133,.25), 0 6px 14px rgba(251,113,133,.09) !important;
+    }
+
+    @media (max-width: 700px) {
+      body :is(.panel:not(.notice), .summary, .report-panel)::after,
+      body .topbar::after {
+        left: 18px !important;
+        right: 18px !important;
+        opacity: .58 !important;
+        filter: saturate(.84) blur(.20px) !important;
+      }
+
+      body .result-shell .team-card::before,
+      body .result-shell .summary-grid .summary-cell::before {
+        left: 18px !important;
+        right: 18px !important;
+        opacity: .54 !important;
+      }
+    }
+
+
+    /* Retouche v110 : stabilité scroll mobile + bordures plus cohérentes
+       Objectif : éviter les flashs/blocs blancs au défilement, sans supprimer l'identité visuelle.
+       Les liserés restent visibles, mais avec une transition continue pour éviter l'effet clair/sombre. */
+    :root {
+      --fs-v110-bg: #050816;
+      --fs-v110-bg2: #071023;
+      --fs-v110-blue-border: rgba(64, 201, 255, .36);
+      --fs-v110-blue-border-soft: rgba(64, 201, 255, .20);
+      --fs-v110-rose-border: rgba(251, 113, 133, .34);
+      --fs-v110-rose-border-soft: rgba(251, 113, 133, .19);
+      --fs-v110-violet-border: rgba(134, 109, 255, .27);
+      --fs-v110-neutral-border: rgba(150, 170, 215, .26);
+    }
+
+    /* Fond réel sur html + body : évite les zones blanches pendant le scroll Firefox/Android. */
+    html,
+    body {
+      background-color: var(--fs-v110-bg) !important;
+    }
+
+    @media (max-width: 700px) {
+      html,
+      body {
+        min-height: 100% !important;
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23ffffff' fill-opacity='0.022'/%3E%3C/svg%3E"),
+          radial-gradient(circle at 16% 0%, rgba(64, 201, 255, .13), transparent 34%),
+          radial-gradient(circle at 92% 8%, rgba(251, 113, 133, .105), transparent 37%),
+          linear-gradient(180deg, var(--fs-v110-bg) 0%, var(--fs-v110-bg2) 46%, var(--fs-v110-bg) 100%) !important;
+        background-attachment: scroll !important;
+        overflow-x: hidden !important;
+      }
+
+      body {
+        overscroll-behavior-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Les pseudo-fonds fixed/animés sont les plus suspects pour les flashs blancs au scroll mobile. */
+      body::before,
+      body::after {
+        display: none !important;
+        content: none !important;
+        animation: none !important;
+        transform: none !important;
+        filter: none !important;
+      }
+
+      /* Moins de calques forcés = moins de trous de rendu lors du chargement/défilement. */
+      .panel,
+      .summary,
+      .team-card,
+      .bar-box,
+      .report-panel,
+      .auto-box,
+      .auto-control,
+      .hero {
+        transform: none !important;
+        backface-visibility: visible !important;
+        will-change: auto !important;
+        contain: none !important;
+      }
+
+      .topbar {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        background: rgba(6, 10, 28, .96) !important;
+      }
+    }
+
+    /* Liserés généraux : dégradé continu, pas de zones transparentes qui donnent un effet de trou. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
+    body .topbar::after {
+      height: 2px !important;
+      opacity: .64 !important;
+      filter: none !important;
+      box-shadow: 0 0 9px rgba(64,201,255,.06), 0 0 9px rgba(251,113,133,.05) !important;
+      background: linear-gradient(90deg,
+        rgba(64,201,255,.23) 0%,
+        rgba(91,119,220,.26) 32%,
+        rgba(212,98,178,.29) 50%,
+        rgba(91,119,220,.26) 68%,
+        rgba(64,201,255,.23) 100%
+      ) !important;
+    }
+
+    body :is(.hero, .panel:not(.notice), .summary, .report-panel, .auto-box, .bar-box) {
+      border-color: rgba(108, 150, 216, .24) !important;
+    }
+
+    /* Bordures internes : lisibles, mais une seule famille de tons pour éviter l'effet patchwork. */
+    body :is(.auto-body, .preset-box, .auto-control, .auto-formula, .mode-toggle, .rank-card, .zone-card, .section, .match-row, .event-rich-row, .events-summary, .stat-card, .mini-badge) {
+      border-color: rgba(120, 156, 220, .20) !important;
+    }
+
+    /* Cartes post-scan : liseré haut continu, pas transparent aux extrémités. */
+    body .result-shell .team-card::before,
+    body .result-shell .summary-grid .summary-cell::before {
+      height: 2px !important;
+      left: 18px !important;
+      right: 18px !important;
+      opacity: .62 !important;
+      filter: none !important;
+      box-shadow: 0 0 10px rgba(64,201,255,.055) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      background: linear-gradient(90deg,
+        var(--fs-v110-blue-border-soft) 0%,
+        var(--fs-v110-blue-border) 50%,
+        var(--fs-v110-blue-border-soft) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      background: linear-gradient(90deg,
+        var(--fs-v110-rose-border-soft) 0%,
+        var(--fs-v110-rose-border) 50%,
+        var(--fs-v110-rose-border-soft) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      background: linear-gradient(90deg,
+        rgba(150,170,215,.14) 0%,
+        var(--fs-v110-neutral-border) 50%,
+        rgba(150,170,215,.14) 100%
+      ) !important;
+    }
+
+    body .result-shell .team-card.team-card-pos,
+    body .result-shell .summary-grid .summary-cell.cell-pos {
+      border-color: rgba(64,201,255,.34) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.05), 0 0 18px rgba(64,201,255,.055) !important;
+    }
+
+    body .result-shell .team-card.team-card-neg,
+    body .result-shell .summary-grid .summary-cell.cell-neg {
+      border-color: rgba(251,113,133,.32) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.05), 0 0 18px rgba(251,113,133,.05) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-pos .mini-badge {
+      background: linear-gradient(150deg, rgba(64,201,255,.13), rgba(20,32,64,.86)) !important;
+      border-color: rgba(64,201,255,.29) !important;
+      color: #eefbff !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neg .mini-badge {
+      background: linear-gradient(150deg, rgba(251,113,133,.13), rgba(42,18,42,.84)) !important;
+      border-color: rgba(251,113,133,.28) !important;
+      color: #ffeaf0 !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neutral .mini-badge {
+      background: linear-gradient(150deg, rgba(150,170,215,.09), rgba(18,26,52,.86)) !important;
+      border-color: rgba(150,170,215,.22) !important;
+    }
+
+
+
+    /* Retouche v111 : bordures plus homogènes
+       - Termux : liseré pourpre uniforme (pas rose -> pourpre)
+       - Sections générales : bleu aux extrémités, pourpre au centre, transition régulière
+       - Sections positives/négatives : ton propre, sans alternance clair/sombre */
+    :root {
+      --fs-v111-blue: rgba(64, 201, 255, .34);
+      --fs-v111-blue-soft: rgba(64, 201, 255, .19);
+      --fs-v111-purple: rgba(168, 85, 247, .34);
+      --fs-v111-purple-soft: rgba(168, 85, 247, .18);
+      --fs-v111-rose-purple: rgba(216, 91, 176, .31);
+      --fs-v111-neutral: rgba(126, 156, 214, .22);
+    }
+
+    /* Liserés principaux : 3 points seulement, transition douce et régulière. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
+    body .topbar::after {
+      height: 2px !important;
+      opacity: .68 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(168,85,247,.04) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v111-blue-soft) 0%,
+        var(--fs-v111-blue) 18%,
+        var(--fs-v111-purple) 50%,
+        var(--fs-v111-blue) 82%,
+        var(--fs-v111-blue-soft) 100%
+      ) !important;
+    }
+
+    /* Contours des grandes sections : base sobre bleutée, pas de patchwork. */
+    body :is(.hero, .panel:not(.notice), .summary, .report-panel, .auto-box, .bar-box) {
+      border-color: rgba(93, 138, 205, .25) !important;
+    }
+
+    /* Termux : pourpre uniforme, sans changement rose/pourpre qui ressemble à un bug. */
+    body .panel.notice {
+      border-color: rgba(168, 85, 247, .24) !important;
+      box-shadow: inset 0 3px 0 rgba(168, 85, 247, .30), var(--shadow) !important;
+    }
+
+    body .panel.notice::after {
+      height: 2px !important;
+      left: 18px !important;
+      right: 18px !important;
+      opacity: .72 !important;
+      filter: none !important;
+      box-shadow: 0 0 10px rgba(168,85,247,.08) !important;
+      background: linear-gradient(90deg,
+        rgba(168,85,247,.20) 0%,
+        rgba(168,85,247,.34) 50%,
+        rgba(168,85,247,.20) 100%
+      ) !important;
+    }
+
+    body .notice-title,
+    body .notice-text {
+      border-color: rgba(168, 85, 247, .22) !important;
+    }
+
+    body .notice-inline-icon,
+    body .notice-icon {
+      border-color: rgba(168, 85, 247, .30) !important;
+      box-shadow: 0 0 0 1px rgba(168,85,247,.08), 0 0 14px rgba(168,85,247,.10) !important;
+    }
+
+    /* Cartes post-scan positives : bleu régulier. */
+    body .result-shell .team-card.team-card-pos::before,
+    body .result-shell .summary-grid .summary-cell.cell-pos::before {
+      opacity: .66 !important;
+      background: linear-gradient(90deg,
+        rgba(64,201,255,.17) 0%,
+        rgba(64,201,255,.37) 50%,
+        rgba(64,201,255,.17) 100%
+      ) !important;
+      box-shadow: 0 0 9px rgba(64,201,255,.07) !important;
+    }
+
+    /* Cartes post-scan négatives : pourpre/rose régulier, sans bleu clair autour. */
+    body .result-shell .team-card.team-card-neg::before,
+    body .result-shell .summary-grid .summary-cell.cell-neg::before {
+      opacity: .66 !important;
+      background: linear-gradient(90deg,
+        rgba(216,91,176,.16) 0%,
+        rgba(216,91,176,.34) 50%,
+        rgba(216,91,176,.16) 100%
+      ) !important;
+      box-shadow: 0 0 9px rgba(216,91,176,.065) !important;
+    }
+
+    body .result-shell .team-card.team-card-neutral::before,
+    body .result-shell .summary-grid .summary-cell.cell-neutral::before {
+      opacity: .60 !important;
+      background: linear-gradient(90deg,
+        rgba(126,156,214,.13) 0%,
+        rgba(126,156,214,.25) 50%,
+        rgba(126,156,214,.13) 100%
+      ) !important;
+      box-shadow: none !important;
+    }
+
+    /* Bordures internes dans Résumé rapide : cohérentes avec le niveau réel de l'équipe. */
+    body .result-shell .summary-grid .summary-cell.cell-pos :is(.mini-badge, .rank-card, .zone-card, .section, .stat-card),
+    body .result-shell .team-card.team-card-pos :is(.rank-card, .zone-card, .section, .stat-card) {
+      border-color: rgba(64,201,255,.29) !important;
+    }
+
+    body .result-shell .summary-grid .summary-cell.cell-neg :is(.mini-badge, .rank-card, .zone-card, .section, .stat-card),
+    body .result-shell .team-card.team-card-neg :is(.rank-card, .zone-card, .section, .stat-card) {
+      border-color: rgba(216,91,176,.28) !important;
+    }
+
+    @media (max-width: 700px) {
+      body :is(.panel:not(.notice), .summary, .report-panel)::after,
+      body .topbar::after {
+        opacity: .64 !important;
+        left: 18px !important;
+        right: 18px !important;
+      }
+
+      body .panel.notice::after {
+        opacity: .70 !important;
+      }
+    }
+
+
+    /* Retouche v112 : dégradés inversés + Termux stable au chargement
+       - Dégradés généraux : pourpre aux extrémités, bleu au centre, pourpre aux extrémités.
+       - Notice Termux : plus de flash rose/pourpre au chargement, liseré statique et cohérent.
+       - Les bordures positives/négatives post-scan restent dans leur ton dédié. */
+    :root {
+      --fs-v112-purple-edge: rgba(168, 85, 247, .24);
+      --fs-v112-purple-mid: rgba(168, 85, 247, .30);
+      --fs-v112-blue-center: rgba(64, 201, 255, .34);
+      --fs-v112-blue-center-soft: rgba(64, 201, 255, .24);
+    }
+
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
+    body .topbar::after {
+      opacity: .66 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(168,85,247,.045) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v112-purple-edge) 0%,
+        var(--fs-v112-purple-mid) 18%,
+        var(--fs-v112-blue-center-soft) 36%,
+        var(--fs-v112-blue-center) 50%,
+        var(--fs-v112-blue-center-soft) 64%,
+        var(--fs-v112-purple-mid) 82%,
+        var(--fs-v112-purple-edge) 100%
+      ) !important;
+    }
+
+    /* Grandes bordures générales : une base violette/bleue douce, sans alternance clair/sombre. */
+    body :is(.hero, .panel:not(.notice), .summary, .report-panel, .auto-box, .bar-box) {
+      border-color: rgba(120, 139, 220, .25) !important;
+    }
+
+    /* Termux : neutralise le flash de chargement sur la carte et stabilise le liseré. */
+    body .panel.notice {
+      animation: none !important;
+      border-color: rgba(168, 85, 247, .25) !important;
+      box-shadow: inset 0 2px 0 rgba(168, 85, 247, .24), var(--shadow) !important;
+    }
+
+    body .panel.notice::after {
+      height: 2px !important;
+      left: 18px !important;
+      right: 18px !important;
+      opacity: .66 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.035), 0 0 8px rgba(168,85,247,.04) !important;
+      background: linear-gradient(90deg,
+        rgba(168,85,247,.22) 0%,
+        rgba(168,85,247,.29) 22%,
+        rgba(64,201,255,.24) 50%,
+        rgba(168,85,247,.29) 78%,
+        rgba(168,85,247,.22) 100%
+      ) !important;
+    }
+
+    body .notice-title {
+      border: 1px solid transparent !important;
+      background:
+        linear-gradient(rgba(38, 16, 43, .92), rgba(38, 16, 43, .92)) padding-box,
+        linear-gradient(90deg,
+          rgba(168,85,247,.28) 0%,
+          rgba(168,85,247,.34) 22%,
+          rgba(64,201,255,.26) 50%,
+          rgba(168,85,247,.34) 78%,
+          rgba(168,85,247,.28) 100%
+        ) border-box !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.045) !important;
+      transition: none !important;
+    }
+
+    body .notice-text {
+      border-color: rgba(168,85,247,.22) !important;
+      background: rgba(30, 12, 34, .54) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035) !important;
+      transition: none !important;
+    }
+
+    @media (max-width: 700px) {
+      body :is(.panel:not(.notice), .summary, .report-panel)::after,
+      body .topbar::after,
+      body .panel.notice::after {
+        opacity: .64 !important;
+      }
+    }
+
+
+
+    /* Retouche v113 : corrections ciblées Termux + bordures
+       - suppression de la bulle ajoutée autour de 🛑 ; l'emoji reste seul avec une lueur rouge discrète ;
+       - suppression du flash clair/sombre au chargement de la carte Termux ;
+       - Termux passe en rose/pourpre/rouge, pas violet ;
+       - bordures générales : pourpre aux extrémités, bleu au centre, transition régulière. */
+    :root {
+      --fs-v113-blue-center: rgba(64, 201, 255, .34);
+      --fs-v113-blue-center-soft: rgba(64, 201, 255, .22);
+      --fs-v113-purple-edge: rgba(164, 85, 235, .23);
+      --fs-v113-purple-edge-soft: rgba(164, 85, 235, .15);
+      --fs-v113-termux-edge: rgba(159, 18, 57, .22);
+      --fs-v113-termux-mid: rgba(244, 63, 94, .38);
+      --fs-v113-termux-soft: rgba(251, 113, 133, .16);
+    }
+
+    /* Liserés généraux : ordre demandé, mais sans alternance inégale. */
+    body :is(.panel:not(.notice), .summary, .report-panel)::after,
+    body .topbar::after {
+      opacity: .68 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v113-purple-edge-soft) 0%,
+        var(--fs-v113-purple-edge) 18%,
+        var(--fs-v113-blue-center-soft) 38%,
+        var(--fs-v113-blue-center) 50%,
+        var(--fs-v113-blue-center-soft) 62%,
+        var(--fs-v113-purple-edge) 82%,
+        var(--fs-v113-purple-edge-soft) 100%
+      ) !important;
+    }
+
+    /* Carte Termux : pas de flash au chargement, pas d'animation d'entrée, pas de transition couleur. */
+    body .panel.notice,
+    body .panel.notice.fx-card,
+    body .panel.notice.fx-card.is-visible {
+      opacity: 1 !important;
+      transform: none !important;
+      animation: none !important;
+      transition: none !important;
+      will-change: auto !important;
+      background:
+        linear-gradient(135deg, rgba(42, 10, 31, .94), rgba(17, 8, 27, .96)) !important;
+      border-color: rgba(244, 63, 94, .24) !important;
+      box-shadow: inset 0 2px 0 rgba(244, 63, 94, .24), var(--shadow) !important;
+    }
+
+    body .panel.notice::after {
+      height: 2px !important;
+      left: 18px !important;
+      right: 18px !important;
+      opacity: .70 !important;
+      filter: none !important;
+      box-shadow: 0 0 9px rgba(244,63,94,.08) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v113-termux-edge) 0%,
+        rgba(225, 29, 72, .30) 24%,
+        var(--fs-v113-termux-mid) 50%,
+        rgba(225, 29, 72, .30) 76%,
+        var(--fs-v113-termux-edge) 100%
+      ) !important;
+      transition: none !important;
+    }
+
+    body .panel.notice .notice-title {
+      border: 1px solid transparent !important;
+      background:
+        linear-gradient(rgba(45, 12, 34, .94), rgba(45, 12, 34, .94)) padding-box,
+        linear-gradient(90deg,
+          rgba(159,18,57,.25) 0%,
+          rgba(225,29,72,.34) 24%,
+          rgba(251,113,133,.40) 50%,
+          rgba(225,29,72,.34) 76%,
+          rgba(159,18,57,.25) 100%
+        ) border-box !important;
+      color: #fff4f7 !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+      transition: none !important;
+    }
+
+    body .panel.notice .notice-text {
+      border-color: rgba(244,63,94,.23) !important;
+      background: rgba(42, 10, 31, .56) !important;
+      color: #fff0f4 !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035) !important;
+      transition: none !important;
+    }
+
+    /* 🛑 : pas de bulle ajoutée autour. L'emoji reste seul, avec une lueur rouge discrète et fixe. */
+    body .panel.notice .notice-inline-icon,
+    body .panel.notice .notice-inline-icon.fx-card,
+    body .panel.notice .notice-inline-icon.is-visible {
+      width: auto !important;
+      height: auto !important;
+      min-width: 0 !important;
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      margin: 0 4px 0 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      animation: none !important;
+      transform: none !important;
+      opacity: 1 !important;
+      font-size: 1.08em !important;
+      line-height: 1 !important;
+      filter: drop-shadow(0 0 5px rgba(244,63,94,.46)) !important;
+      transition: none !important;
+    }
+
+    body .panel.notice .notice-inline-icon::before,
+    body .panel.notice .notice-inline-icon::after {
+      content: none !important;
+      display: none !important;
+      animation: none !important;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    @media (max-width: 700px) {
+      body :is(.panel:not(.notice), .summary, .report-panel)::after,
+      body .topbar::after {
+        opacity: .66 !important;
+      }
+
+      body .panel.notice::after {
+        opacity: .70 !important;
+      }
+    }
+
+
+
+    /* v118 : correction clavier mobile sans créer de bande artificielle.
+       Le problème v117 venait du min-height +420px et du pseudo-fond fixed :
+       ça masquait le blanc, mais créait encore une grosse zone noire au-dessus du clavier.
+       Ici on stabilise le fond réel de la page et on laisse le viewport gérer la hauteur. */
+    @media (max-width: 700px) {
+      html,
+      body {
+        background-color: #050816 !important;
+        background-image:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23ffffff' fill-opacity='0.022'/%3E%3C/svg%3E"),
+          radial-gradient(circle at 16% 0%, rgba(64, 201, 255, .13), transparent 34%),
+          radial-gradient(circle at 92% 8%, rgba(251, 113, 133, .10), transparent 37%),
+          linear-gradient(180deg, #050816 0%, #071023 46%, #050816 100%) !important;
+        background-attachment: scroll !important;
+        background-repeat: repeat, no-repeat, no-repeat, no-repeat !important;
+        min-height: 100% !important;
+        overflow-x: hidden !important;
+      }
+
+      body.keyboard-focus {
+        min-height: 100dvh !important;
+        isolation: auto !important;
+        background-color: #050816 !important;
+      }
+
+      body.keyboard-focus::after {
+        content: none !important;
+        display: none !important;
+      }
+
+      body.keyboard-focus > .topbar,
+      body.keyboard-focus > .app {
+        position: relative !important;
+        z-index: auto !important;
+      }
+
+      body.keyboard-focus .app {
+        padding-bottom: max(18px, env(safe-area-inset-bottom)) !important;
+      }
+
+      body.keyboard-focus input:focus,
+      body.keyboard-focus textarea:focus,
+      body.keyboard-focus select:focus {
+        scroll-margin-top: 92px !important;
+        scroll-margin-bottom: 36vh !important;
+      }
+    }
+</style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-logo" aria-label="FOOTSCAN">
+          <svg class="brand-ball" viewBox="0 0 48 48" aria-hidden="true">
+            <defs>
+              <clipPath id="fsBallClip"><circle cx="24" cy="24" r="19" /></clipPath>
+              <path id="fsPent" d="M0 -6.5 L6.18 -2.01 L3.82 5.26 L-3.82 5.26 L-6.18 -2.01 Z" />
+            </defs>
+            <circle cx="24" cy="24" r="19" fill="#ffffff" />
+            <g clip-path="url(#fsBallClip)" fill="#101733">
+              <path d="M24 15 L32.56 21.22 L29.29 31.28 L18.71 31.28 L15.44 21.22 Z" />
+              <use href="#fsPent" transform="translate(24 4.5) rotate(180)" />
+              <use href="#fsPent" transform="translate(5.45 17.97) rotate(108)" />
+              <use href="#fsPent" transform="translate(12.54 39.78) rotate(36)" />
+              <use href="#fsPent" transform="translate(35.46 39.78) rotate(324)" />
+              <use href="#fsPent" transform="translate(42.55 17.97) rotate(252)" />
+            </g>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v100</span></div>
+          <div class="brand-subtitle">Performance scanner</div>
+        </div>
+      </div>
+
+      <div class="worker-pill">
+        <span class="worker-dot"></span>
+        Worker
+      </div>
+    </div>
+  </div>
+
+  <main class="app">
+    <section class="hero" id="hero">
+      <div class="hero-inner">
+        <div class="kicker">🔎 Scan Complet Via Données Web</div>
+        <h1 class="home-title">FOOTSCAN</h1>
+        <p class="hero-text">
+          FOOTSCAN est un site qui permet d'analyser les confrontations (de football) à partir de l'historique des deux équipes. Le calcul se base sur la performance (via les buts) au fil du temps (du passé vers le présent).
+        </p>
+      </div>
+    </section>
+
+    <section class="panel notice panel-pad">
+      <div>
+        <div class="notice-title"><span class="notice-inline-icon">🛑</span><span>ÉMULATEUR TERMUX OBLIGATOIRE</span></div>
+        <p class="notice-text">
+          L'application Termux doit obligatoirement être ouverte en arrière-plan (sur mobile ou PC) pendant le scan du match.
+        </p>
+      </div>
+    </section>
+
+    <section class="panel panel-pad">
+      <div class="form-grid">
+        <div>
+          <label for="matchInput">URL WEB ou Match ID</label>
+          <input id="matchInput" placeholder="Ex: 14023959 ou lien WEB" />
+        </div>
+
+        <div class="auto-box">
+          <div class="auto-head">
+            <div>
+              <div class="auto-title">CALCUL GUIDÉ DES RANGS</div>
+              <div class="auto-sub" aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="auto-body">
+            <div class="preset-box">
+              <div class="preset-title">
+                <span>Présélections</span>
+                <span id="activePresetLabel">Libre</span>
+              </div>
+              <div class="preset-actions">
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 CLUBS/PAYS OFFICIELS<small>Base 31,3125 · Progression 1 · Changements 7</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 PAYS AMICAUX<small>Base 31,3125 · Progression 1 · Changements 13</small></button>
+              </div>
+            </div>
+
+            <div class="auto-grid">
+              <div class="auto-control">
+                <div class="auto-control-top">
+                  <div class="auto-control-title">Base</div>
+                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="31.3125" />
+                </div>
+                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="31.3125" />
+              </div>
+
+              <div class="auto-control">
+                <div class="auto-control-top">
+                  <div class="auto-control-title">Progression</div>
+                  <input id="autoAdvanceNumber" class="auto-number" type="number" min="0.0001" max="5" step="0.0001" value="1" />
+                </div>
+                <input id="autoAdvanceRange" type="range" min="0.0001" max="5" step="0.0001" value="1" />
+              </div>
+
+              <div class="auto-control">
+                <div class="auto-control-top">
+                  <div class="auto-control-title">Changements</div>
+                  <input id="autoChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="3" />
+                </div>
+                <input id="autoChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
+              </div>
+            </div>
+
+            <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de calcul">
+              <span class="calc-mode-thumb" aria-hidden="true"></span>
+              <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">CALCUL SÉPARÉ</button>
+              <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">CALCUL SIMULTANÉ</button>
+            </div>
+
+            <div class="auto-result">
+              <div class="auto-result-card">
+                <div class="auto-result-label">Rang Bas</div>
+                <div class="auto-result-value" id="autoLow">26.8125</div>
+              </div>
+
+              <div class="auto-result-card">
+                <div class="auto-result-label">Rang Haut</div>
+                <div class="auto-result-value" id="autoHigh">35.8125</div>
+              </div>
+            </div>
+
+            <div class="auto-formula" id="autoFormula"></div>
+
+            <label class="mode-toggle" for="simultaneousMode">
+              <input id="simultaneousMode" type="checkbox" />
+              <span>Calcul Simultané : les deux équipes sont parcourues en parallèle, match par match puis minute par minute.</span>
+            </label>
+
+            <label class="mode-toggle" for="performanceAdvanceMode">
+              <input id="performanceAdvanceMode" type="checkbox" />
+              <span>Progression = Valeur De Performance : But Avec Passeur 1, But Sans Passeur 0,6667, CSC / Erreur 0,3333.</span>
+            </label>
+
+            <label class="mode-toggle" for="evolutionWinnerMode">
+              <input id="evolutionWinnerMode" type="checkbox" />
+              <span>Gagnant Par Meilleure Évolution : comparaison de la Moyenne De Zone vers la Moyenne Des Deux Rangs.</span>
+            </label>
+
+            <button class="auto-apply-btn" id="applyAutoRanksBtn" type="button">
+              APPLIQUER LES RANGS
+            </button>
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <label for="rank1">Rang 1</label>
+            <input id="rank1" placeholder="Ex: 51" inputmode="decimal" />
+          </div>
+
+          <div>
+            <label for="rank2">Rang 2 Optionnel</label>
+            <input id="rank2" placeholder="Ex: 75 ou vide" inputmode="decimal" />
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <label>Ignorer domicile</label>
+            <div class="skip-grid" id="skipHome"></div>
+          </div>
+
+          <div>
+            <label>Ignorer extérieur</label>
+            <div class="skip-grid" id="skipAway"></div>
+          </div>
+        </div>
+
+        <button class="scan-btn" id="scanBtn">SCANNER →</button>
+      </div>
+
+      <div id="statusBox" class="status-box"></div>
+      <div id="errorBox" class="error-box"></div>
+    </section>
+
+    <section class="report-panel" id="reportPanel">
+      <div class="report-head">
+        <div>
+          <div class="report-title">RAPPORT DE SESSION</div>
+        </div>
+      </div>
+
+      <div class="report-body">
+        <div class="report-buttons">
+          <button class="report-btn primary" id="addReportBtn" type="button">AJOUTER L’ANALYSE ACTUELLE</button>
+          <button class="report-btn" id="copySimpleReportBtn" type="button">Copier Simple</button>
+          <button class="report-btn" id="copyFullReportBtn" type="button">Copier Complet</button>
+          <button class="report-btn" id="downloadSimpleReportBtn" type="button">TXT Simple</button>
+          <button class="report-btn" id="printSimpleReportBtn" type="button">PDF Simple</button>
+          <button class="report-btn" id="downloadFullReportBtn" type="button">TXT Complet</button>
+          <div class="report-btn report-count-pill" id="reportCount" role="status" aria-live="polite">0 ANALYSE</div>
+          <button class="report-btn red" id="clearReportBtn" type="button">VIDER LE RAPPORT</button>
+        </div>
+
+        <div class="report-hint" id="reportHint">
+          Après un scan terminé, ajoute l’analyse. Le TXT s’ouvre dans Google Docs. Le PDF utilise Google Sans en taille 6.
+        </div>
+      </div>
+    </section>
+
+    <div id="result" class="result-shell"></div>
+
+    <details class="bar-box">
+      <summary>BARÈME</summary>
+
+      <div class="bar-grid">
+        <div class="bar-card">
+          <div class="bar-card-title">✅ Équipe Analysée</div>
+          <div class="bar-line"><span>⚽ But Avec Passeur</span><strong class="positive">+1</strong></div>
+          <div class="bar-line"><span>⚽ But Sans Passeur</span><strong class="positive">+0.6667</strong></div>
+          <div class="bar-line"><span>🥅 CSC / Erreur Adverse</span><strong class="positive">+0.3333</strong></div>
+        </div>
+
+        <div class="bar-card">
+          <div class="bar-card-title">⚔️ Adversaire</div>
+          <div class="bar-line"><span>⚽ But Adverse Avec Passeur</span><strong class="negative">−1</strong></div>
+          <div class="bar-line"><span>⚽ But Adverse Sans Passeur</span><strong class="negative">−0.6667</strong></div>
+          <div class="bar-line"><span>🥅 CSC / Erreur Équipe Analysée</span><strong class="negative">−0.3333</strong></div>
+        </div>
+      </div>
+    </details>
+  </main>
+
+  <script>
+    let skipHomeValue = 0;
+    let skipAwayValue = 0;
+    let currentJobId = null;
+    let pollingTimer = null;
+    let pollingErrorCount = 0;
+    let lastResult = null;
+    let activePreset = "Libre";
+
+    const REPORT_KEY = "footscan_session_report_v1";
+    const DOMINANCE_TIE_THRESHOLD = 0;
+
+    const LABELS = {
+      goal: "But Sans Passeur",
+      goalWithAssist: "But Avec Passeur",
+      goalNoAssistError: "CSC / Erreur",
+      ownGoal: "CSC / Erreur",
+    };
+
+    const ICONS = {
+      goal: "⚽",
+      goalWithAssist: "⚽",
+      goalNoAssistError: "🥅",
+      ownGoal: "🥅",
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function eventShortLabel(event) {
+      switch (event?.type) {
+        case "goalWithAssist":
+          return "BAP";
+        case "goalNoAssistError":
+        case "ownGoal":
+          return "CSC";
+        case "goal":
+        default:
+          return "BSP";
+      }
+    }
+
+    function esc(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function valueClass(value) {
+      if (value > 0) return "positive";
+      if (value < 0) return "negative";
+      return "neutral";
+    }
+
+    function numberOrNull(value) {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    }
+
+    function formatValue(value) {
+      if (value == null) return "—";
+
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
+        return String(value);
+      }
+
+      const rounded = Math.round(number * 10000) / 10000;
+      return `${rounded > 0 ? "+" : ""}${rounded}`;
+    }
+
+    function formatRank(value) {
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
+        return "";
+      }
+
+      return String(Math.round(number * 10000) / 10000);
+    }
+
+
+
+    function getSelectedRanksText() {
+      const rank1 = String($("rank1")?.value || "").trim();
+      const rank2 = String($("rank2")?.value || "").trim();
+
+      if (rank1 && rank2) {
+        return `RANGS : ${rank1} / ${rank2}`;
+      }
+
+      if (rank1) {
+        return `RANG 1 : ${rank1}`;
+      }
+
+      if (rank2) {
+        return `RANG 2 : ${rank2}`;
+      }
+
+      return "RANGS : —";
+    }
+
+    function clamp(number, min, max) {
+      if (!Number.isFinite(number)) return min;
+      return Math.max(min, Math.min(max, number));
+    }
+
+    function logoUrl(teamId) {
+      return `https://img.sofascore.com/api/v1/team/${encodeURIComponent(teamId)}/image`;
+    }
+
+    window.__logoErr = function (img) {
+      const id = img.getAttribute("data-team-id") || "";
+      if (id && img.src.indexOf("/api/logo") === -1) {
+        img.src = `/api/logo?teamId=${encodeURIComponent(id)}`;
+        return;
+      }
+      img.style.display = "none";
+      const p = img.parentElement;
+      if (p && !p.querySelector(".logo-fb")) {
+        const s = document.createElement("span");
+        s.className = "logo-fb";
+        s.textContent = "\u26BD";
+        p.appendChild(s);
+      }
+    };
+
+    function eventIcon(event) {
+      return ICONS[event.type] || event.icon || "•";
+    }
+
+    function sideText(item) {
+      if (item?.displaySide) return item.displaySide;
+      return item?.side === "team" ? "Équipe analysée" : "Adversaire";
+    }
+
+    function sideCampClass(item) {
+      return item?.side === "opponent" ? "camp-opponent" : "camp-team";
+    }
+
+    function weightText(source) {
+      const weight = Number(source?.weight || 0);
+
+      if (!weight || weight >= 0.9999) {
+        return "";
+      }
+
+      const percent = Math.round(weight * 1000) / 10;
+      return ` · Poids ${percent}%`;
+    }
+
+    function readCalculatorValues(prefix) {
+      const rawBase = parseFloat(String($(`${prefix}BaseNumber`).value).replace(",", "."));
+      const rawAdvancement = parseFloat(String($(`${prefix}AdvanceNumber`).value).replace(",", "."));
+      const rawChanges = parseFloat(String($(`${prefix}ChangeNumber`).value).replace(",", "."));
+      return {
+        base: clamp(rawBase, 0, 1000),
+        advancement: clamp(rawAdvancement, 0.0001, 5),
+        changes: clamp(rawChanges, 0, 22),
+        reds: 0,
+      };
+    }
+
+    function writeCalculatorValues(prefix, calc) {
+      $(`${prefix}BaseNumber`).value = formatRank(calc.base);
+      $(`${prefix}BaseRange`).value = calc.base;
+
+      $(`${prefix}AdvanceNumber`).value = formatRank(calc.advancement);
+      $(`${prefix}AdvanceRange`).value = calc.advancement;
+
+      $(`${prefix}ChangeNumber`).value = calc.changes;
+      $(`${prefix}ChangeRange`).value = calc.changes;
+    }
+
+    function calculateRanksFromValues(values) {
+      const { base, advancement, changes, reds } = values;
+
+      const adjustedBase = base;
+
+      const marginUnit = 2;
+      const marginFinal = marginUnit * changes;
+
+      const lowBeforeCards = adjustedBase - marginFinal;
+      const highBeforeCards = adjustedBase + marginFinal;
+
+      const redEffect = 0;
+      const totalCardEffect = 0;
+
+      const low = lowBeforeCards;
+      const high = highBeforeCards;
+
+      return {
+        base,
+        advancement,
+        changes,
+        reds,
+        adjustedBase,
+        marginUnit,
+        marginFinal,
+        lowBeforeCards,
+        highBeforeCards,
+        redEffect,
+        totalCardEffect,
+        low,
+        high,
+      };
+    }
+
+    function getAutoValues() {
+      return readCalculatorValues("auto");
+    }
+
+    function setupCalcModeSlider() {
+      const slider = document.getElementById("calcModeSlider");
+      const box = document.getElementById("simultaneousMode");
+      if (!slider || !box) return;
+      const opts = slider.querySelectorAll(".calc-mode-opt");
+      const positionThumb = () => {
+        const active = slider.querySelector(".calc-mode-opt.is-active");
+        if (!active) return;
+        const pad = 4;            // padding du conteneur
+        const inset = 2;          // marge de sécurité de chaque côté de la bulle
+        const sliderW = slider.clientWidth;
+        let left = active.offsetLeft + inset;
+        let width = active.offsetWidth - inset * 2;
+        // borne stricte : la bulle ne peut jamais sortir du conteneur
+        const maxRight = sliderW - pad;
+        if (left < pad) left = pad;
+        if (left + width > maxRight) width = maxRight - left;
+        slider.style.setProperty("--thumb-left", left + "px");
+        slider.style.setProperty("--thumb-width", width + "px");
+      };
+      const sync = () => {
+        const sim = Boolean(box.checked);
+        slider.classList.toggle("sim", sim);
+        opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "simultaneous") === sim));
+        requestAnimationFrame(positionThumb);
+      };
+      window.addEventListener("resize", () => requestAnimationFrame(positionThumb));
+      setTimeout(positionThumb, 80);
+      setTimeout(positionThumb, 350);
+      opts.forEach((o) => o.addEventListener("click", () => {
+        box.checked = (o.dataset.mode === "simultaneous");
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+        sync();
+        if (typeof navigator.vibrate === "function") navigator.vibrate(8);
+      }));
+      sync();
+    }
+
+    function isSimultaneousMode() {
+      return Boolean($("simultaneousMode")?.checked);
+    }
+
+    function isPerformanceAdvanceMode() {
+      return Boolean($("performanceAdvanceMode")?.checked);
+    }
+
+    function isEvolutionWinnerMode() {
+      return Boolean($("evolutionWinnerMode")?.checked);
+    }
+
+    function rankEventModeLabel(mode, step) {
+      if (mode === "performance") return "Valeur De Performance";
+      return `${formatRank(step)} Par Événement`;
+    }
+
+    function calculateAutoRanks() {
+      return {
+        ...calculateRanksFromValues(getAutoValues()),
+        mode: "single",
+        presetLabel: activePreset,
+        rankEventMode: isPerformanceAdvanceMode() ? "performance" : "fixed",
+        winnerMode: isEvolutionWinnerMode() ? "evolution" : "dominance",
+      };
+    }
+
+    function formulaTextForCalc(calc) {
+      const modeText = isPerformanceAdvanceMode()
+        ? "Progression : Valeur De Performance"
+        : `Progression : ${formatRank(calc.advancement)} Par Événement`;
+
+      return (
+        `Base : ${formatRank(calc.base)} · ` +
+        `${modeText} · ` +
+        `Marge : ${calc.marginUnit} × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
+        `Rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
+      );
+    }
+
+    function updateAutoCalculator() {
+      const calc = calculateAutoRanks();
+      writeCalculatorValues("auto", calc);
+
+      if ($("activePresetLabel")) {
+        $("activePresetLabel").textContent = activePreset;
+      }
+
+      if ($("officialPresetBtn")) {
+        $("officialPresetBtn").classList.toggle("active", activePreset === "Clubs/Pays Officiels");
+      }
+
+      if ($("friendlyPresetBtn")) {
+        $("friendlyPresetBtn").classList.toggle("active", activePreset === "Pays Amicaux");
+      }
+
+      $("autoLow").textContent = formatRank(calc.low);
+      $("autoHigh").textContent = formatRank(calc.high);
+      $("autoFormula").textContent = formulaTextForCalc(calc);
+    }
+
+    function applyPreset(label) {
+      activePreset = label;
+
+      const isFriendly = label === "Pays Amicaux";
+      const advancement = "1";
+      const changes = isFriendly ? "13" : "7";
+
+      $("autoBaseNumber").value = "41.75";
+      $("autoBaseRange").value = "41.75";
+
+      $("autoAdvanceNumber").value = advancement;
+      $("autoAdvanceRange").value = advancement;
+
+      $("autoChangeNumber").value = changes;
+      $("autoChangeRange").value = changes;
+
+      updateAutoCalculator();
+    }
+
+    function markPresetAsCustom() {
+      activePreset = "Libre";
+    }
+
+    function applyAutoRanks() {
+      const calc = calculateAutoRanks();
+
+      $("rank1").value = formatRank(calc.low);
+      $("rank2").value = formatRank(calc.high);
+
+      renderSelectedRanksStatus();
+    }
+
+    function averagePerformance(team) {
+      const values = [];
+
+      const r1 = numberOrNull(team?.r1?.value);
+      const r2 = numberOrNull(team?.r2?.value);
+
+      if (r1 !== null) values.push(r1);
+      if (r2 !== null) values.push(r2);
+
+      if (!values.length) return null;
+
+      const sum = values.reduce((acc, value) => acc + value, 0);
+      return sum / values.length;
+    }
+
+    function roundedForComparison(value) {
+      const number = numberOrNull(value);
+      return number === null ? null : Math.round(number * 10000) / 10000;
+    }
+
+    function winnerModeForResult(result) {
+      return result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance");
+    }
+
+    function teamEvolution(team) {
+      const rankAverage = averagePerformance(team);
+      const zoneAverage = numberOrNull(team?.zoneStats?.average);
+
+      if (rankAverage === null || zoneAverage === null) {
+        return null;
+      }
+
+      return rankAverage - zoneAverage;
+    }
+
+    function makeDominanceWinner(team, metric, diff, mode, extra = {}) {
+      return {
+        type: "winner",
+        team,
+        label: team.name,
+        average: metric,
+        metric,
+        diff,
+        mode,
+        ...extra,
+      };
+    }
+
+    function getDominance(result) {
+      const mode = winnerModeForResult(result);
+      const isEvolution = mode === "evolution";
+
+      const homeMetric = isEvolution ? teamEvolution(result?.home) : averagePerformance(result?.home);
+      const awayMetric = isEvolution ? teamEvolution(result?.away) : averagePerformance(result?.away);
+
+      const labelNone = isEvolution ? "Évolution indisponible" : "Domination indisponible";
+
+      if (homeMetric === null && awayMetric === null) {
         return {
-            "value": None,
-            "sources": [],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": CURRENT_RANK_EVENT_STEP,
-            "targetRank": target_rank,
-            "totalQuantity": 0,
-        }
+          type: "none",
+          label: labelNone,
+          average: null,
+          metric: null,
+          diff: null,
+          mode,
+        };
+      }
 
-    total_quantity = sum(event_rank_quantity(event) for event in clean_events)
+      if (homeMetric !== null && awayMetric === null) {
+        return makeDominanceWinner(result.home, homeMetric, null, mode, {
+          rankAverage: averagePerformance(result.home),
+          zoneAverage: numberOrNull(result.home?.zoneStats?.average),
+        });
+      }
 
-    if target_rank > total_quantity + 1e-9:
+      if (awayMetric !== null && homeMetric === null) {
+        return makeDominanceWinner(result.away, awayMetric, null, mode, {
+          rankAverage: averagePerformance(result.away),
+          zoneAverage: numberOrNull(result.away?.zoneStats?.average),
+        });
+      }
+
+      const homeCompare = roundedForComparison(homeMetric);
+      const awayCompare = roundedForComparison(awayMetric);
+      const diff = homeCompare - awayCompare;
+      const absDiff = Math.abs(diff);
+
+      if (absDiff < 0.000000001) {
         return {
-            "value": None,
-            "sources": [],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": CURRENT_RANK_EVENT_STEP,
-            "targetRank": target_rank,
-            "totalQuantity": round(total_quantity, 6),
-        }
+          type: "tie",
+          label: "Égalité",
+          average: (homeMetric + awayMetric) / 2,
+          metric: (homeMetric + awayMetric) / 2,
+          diff: absDiff,
+          mode,
+        };
+      }
 
-    if mode == "performance":
-        cumulative = 0.0
-
-        for event_index, event in enumerate(clean_events):
-            quantity = event_rank_quantity(event)
-            cumulative_start = cumulative
-            cumulative_end = cumulative + quantity
-
-            if cumulative_end >= target_rank - 1e-9:
-                source = annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank)
-                source["weight"] = 1
-                source["rankMode"] = "quantity_performance"
-
-                return {
-                    "value": float(source.get("value", 0)),
-                    "sources": [source],
-                    "rankMode": "quantity_performance",
-                    "eventStepMode": mode,
-                    "eventStep": CURRENT_RANK_EVENT_STEP,
-                    "targetRank": target_rank,
-                    "totalQuantity": round(total_quantity, 6),
-                }
-
-            cumulative = cumulative_end
-
-        return {
-            "value": None,
-            "sources": [],
-            "rankMode": "quantity_performance",
-            "eventStepMode": mode,
-            "eventStep": CURRENT_RANK_EVENT_STEP,
-            "targetRank": target_rank,
-            "totalQuantity": round(total_quantity, 6),
-        }
-
-    step = CURRENT_RANK_EVENT_STEP
-    exact_position = target_rank / step
-
-    # Si le rang tombe exactement sur la borne d'un événement, on prend cet événement.
-    nearest_integer = round(exact_position)
-
-    if nearest_integer >= 1 and abs(exact_position - nearest_integer) < 1e-9:
-        event_index = int(nearest_integer) - 1
-
-        if event_index < 0 or event_index >= len(clean_events):
-            return {
-                "value": None,
-                "sources": [],
-                "rankMode": "quantity_exact",
-                "eventStepMode": mode,
-                "eventStep": step,
-                "targetRank": target_rank,
-                "exactPosition": exact_position,
-                "totalQuantity": round(total_quantity, 6),
-            }
-
-        cumulative_start = event_index * step
-        cumulative_end = cumulative_start + step
-        source = annotate_rank_source(clean_events[event_index], event_index, cumulative_start, cumulative_end, target_rank)
-        source["rankIndexExact"] = exact_position
-        source["exactPosition"] = exact_position
-        source["weight"] = 1
-
-        return {
-            "value": float(source.get("value", 0)),
-            "sources": [source],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": step,
-            "targetRank": target_rank,
-            "exactPosition": exact_position,
-            "totalQuantity": round(total_quantity, 6),
-        }
-
-    lower_rank_index = math.floor(exact_position)
-    fraction = exact_position - lower_rank_index
-
-    # Si la position est avant le premier événement complet, on utilise le premier événement.
-    if lower_rank_index < 1:
-        source = annotate_rank_source(clean_events[0], 0, 0, step, target_rank)
-        source["rankIndexExact"] = exact_position
-        source["exactPosition"] = exact_position
-        source["weight"] = 1
-
-        return {
-            "value": float(source.get("value", 0)),
-            "sources": [source],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": step,
-            "targetRank": target_rank,
-            "exactPosition": exact_position,
-            "totalQuantity": round(total_quantity, 6),
-        }
-
-    lower_index = lower_rank_index - 1
-    upper_index = lower_rank_index
-
-    if lower_index < 0 or upper_index >= len(clean_events):
-        return {
-            "value": None,
-            "sources": [],
-            "rankMode": "quantity_exact",
-            "eventStepMode": mode,
-            "eventStep": step,
-            "targetRank": target_rank,
-            "exactPosition": exact_position,
-            "totalQuantity": round(total_quantity, 6),
-        }
-
-    lower_weight = 1 - fraction
-    upper_weight = fraction
-
-    lower_start = lower_index * step
-    lower_end = lower_start + step
-    upper_start = upper_index * step
-    upper_end = upper_start + step
-
-    lower_source = annotate_rank_source(clean_events[lower_index], lower_index, lower_start, lower_end, target_rank)
-    upper_source = annotate_rank_source(clean_events[upper_index], upper_index, upper_start, upper_end, target_rank)
-
-    lower_source["rankIndexExact"] = exact_position
-    lower_source["exactPosition"] = exact_position
-    lower_source["weight"] = round(lower_weight, 8)
-
-    upper_source["rankIndexExact"] = exact_position
-    upper_source["exactPosition"] = exact_position
-    upper_source["weight"] = round(upper_weight, 8)
-
-    value = (
-        float(lower_source.get("value", 0)) * lower_weight +
-        float(upper_source.get("value", 0)) * upper_weight
-    )
-
-    return {
-        "value": float(value),
-        "sources": [lower_source, upper_source],
-        "rankMode": "quantity_exact",
-        "eventStepMode": mode,
-        "eventStep": step,
-        "targetRank": target_rank,
-        "exactPosition": exact_position,
-        "totalQuantity": round(total_quantity, 6),
+      return diff > 0
+        ? makeDominanceWinner(result.home, homeMetric, Math.abs(diff), mode, {
+            rankAverage: averagePerformance(result.home),
+            zoneAverage: numberOrNull(result.home?.zoneStats?.average),
+          })
+        : makeDominanceWinner(result.away, awayMetric, Math.abs(diff), mode, {
+            rankAverage: averagePerformance(result.away),
+            zoneAverage: numberOrNull(result.away?.zoneStats?.average),
+          });
     }
 
-def event_intersects_rank_zone(cumulative_start, cumulative_end, low_rank, high_rank):
-    # Chaque événement couvre (start, end]. Il est dans la zone s'il touche
-    # le rang bas ou s'il commence strictement avant le rang haut.
-    if high_rank < low_rank:
-        low_rank, high_rank = high_rank, low_rank
-
-    return cumulative_end >= low_rank - 1e-9 and cumulative_start < high_rank - 1e-9
-
-
-def events_between_rank_quantities(events, rank1, rank2=None):
-    if not events or not rank1:
-        return [], None, None, 0.0
-
-    try:
-        first_rank = float(rank1)
-        second_rank = float(rank2) if rank2 is not None else first_rank
-    except Exception:
-        return [], None, None, 0.0
-
-    low_rank = min(first_rank, second_rank)
-    high_rank = max(first_rank, second_rank)
-
-    cumulative = 0.0
-    selected = []
-
-    for event_index, event in enumerate(events or []):
-        quantity = event_rank_quantity(event)
-
-        if quantity <= 0:
-            continue
-
-        cumulative_start = cumulative
-        cumulative_end = cumulative + quantity
-
-        if event_intersects_rank_zone(cumulative_start, cumulative_end, low_rank, high_rank):
-            selected.append(annotate_rank_source(event, event_index, cumulative_start, cumulative_end, low_rank))
-
-        cumulative = cumulative_end
-
-        if cumulative_start > high_rank + 1e-9:
-            break
-
-    return selected, round(low_rank, 4), round(high_rank, 4), round(sum(event_rank_quantity(event) for event in selected), 4)
-
-
-def zone_stats_between_ranks(events, rank1, rank2=None, group_mode="target"):
-    """Calcule les stats entre deux rangs, rangs finaux inclus.
-
-    Nouvelle logique: l’avancement vient du curseur ou de la valeur de performance selon l’option choisie.
-
-    group_mode="target" : groupe par événement + équipe attribuée + valeur.
-      -> utile pour une zone d'équipe.
-    group_mode="global" : groupe seulement par événement + valeur.
-      -> utile pour la zone collective simultanée, qui n'appartient à aucun camp.
-    """
-    empty = {
-        "average": None,
-        "modeValues": [],
-        "modeItems": [],
-        "modeCount": 0,
-        "count": 0,
-        "startRankIndex": None,
-        "endRankIndex": None,
-        "totalQuantity": 0,
-        "rankMode": "quantity",
-        "eventStepMode": CURRENT_RANK_ADVANCEMENT_MODE,
-        "eventStep": CURRENT_RANK_EVENT_STEP,
-        "eventStepLabel": rank_advancement_label(),
-        "groupMode": group_mode,
-    }
-
-    selected_events, start_rank_value, end_rank_value, selected_quantity = events_between_rank_quantities(events, rank1, rank2)
-
-    if not selected_events:
-        result = dict(empty)
-        result["startRankIndex"] = start_rank_value
-        result["endRankIndex"] = end_rank_value
-        return result
-
-    values = []
-    counts = {}
-    examples = {}
-
-    def fallback_target_label(event):
-        display_side = event.get("displaySide")
-
-        if display_side:
-            text = str(display_side)
-            for prefix in ["Attribué à ", "Performance "]:
-                if text.startswith(prefix):
-                    return text[len(prefix):]
-            return text
-
-        return "Équipe analysée" if event.get("side") == "team" else "Adversaire"
-
-    def target_label(event):
-        return event.get("targetName") or fallback_target_label(event)
-
-    def origin_label(event):
-        if event.get("originLabel"):
-            return event.get("originLabel")
-
-        if event.get("linkedFromOpponentPast"):
-            return "adversaire passé"
-
-        return "passé direct"
-
-    for event in selected_events:
-        try:
-            value = round(float(event.get("value", 0)), 4)
-        except Exception:
-            continue
-
-        values.append(value)
-
-        event_type = event.get("type") or "unknown"
-        target = target_label(event)
-        origin = origin_label(event)
-
-        if group_mode == "global":
-            key = f"{event_type}|{value:.4f}"
-        else:
-            key = f"{event_type}|{target}|{value:.4f}"
-
-        counts[key] = counts.get(key, 0) + 1
-
-        if key not in examples:
-            examples[key] = {
-                "type": event_type,
-                "label": LABELS.get(event_type, event_type),
-                "targetLabel": target,
-                "sideLabel": f"attribué à {target}",
-                "value": value,
-                "icon": event.get("icon") or "•",
-                "origins": {},
-                "targets": {},
-                "groupMode": group_mode,
-                "isGlobal": group_mode == "global",
-                "rankMode": "quantity",
-            }
-
-        origins = examples[key].setdefault("origins", {})
-        origins[origin] = origins.get(origin, 0) + 1
-
-        targets = examples[key].setdefault("targets", {})
-        target_bucket = targets.setdefault(target, {"count": 0, "origins": {}})
-        target_bucket["count"] += 1
-        target_bucket["origins"][origin] = target_bucket["origins"].get(origin, 0) + 1
-
-    if not values:
-        result = dict(empty)
-        result["startRankIndex"] = start_rank_value
-        result["endRankIndex"] = end_rank_value
-        return result
-
-    mode_count = max(counts.values())
-    mode_items = []
-
-    for key, count in counts.items():
-        if count != mode_count:
-            continue
-
-        item = dict(examples[key])
-        item["count"] = count
-
-        origins_dict = item.get("origins") or {}
-        item["origins"] = [
-            {"label": label, "count": origin_count}
-            for label, origin_count in sorted(
-                origins_dict.items(),
-                key=lambda pair: (-pair[1], pair[0]),
-            )
-        ]
-
-        targets_dict = item.get("targets") or {}
-        target_breakdown = []
-
-        for label, info in sorted(
-            targets_dict.items(),
-            key=lambda pair: (-pair[1].get("count", 0), pair[0]),
-        ):
-            origin_items = [
-                {"label": origin_label_value, "count": origin_count}
-                for origin_label_value, origin_count in sorted(
-                    (info.get("origins") or {}).items(),
-                    key=lambda pair: (-pair[1], pair[0]),
-                )
-            ]
-            target_breakdown.append({
-                "label": label,
-                "count": info.get("count", 0),
-                "origins": origin_items,
-            })
-
-        item["targetBreakdown"] = target_breakdown
-        mode_items.append(item)
-
-    mode_items.sort(key=lambda item: (
-        -item.get("count", 0),
-        str(item.get("label", "")),
-        float(item.get("value", 0)),
-        str(item.get("targetLabel", "")),
-    ))
-
-    mode_values = sorted({round(float(item["value"]), 4) for item in mode_items})
-
-    return {
-        "average": round(sum(values) / len(values), 4),
-        "modeValues": mode_values,
-        "modeItems": mode_items,
-        "modeCount": mode_count,
-        "count": len(values),
-        "startRankIndex": start_rank_value,
-        "endRankIndex": end_rank_value,
-        "totalQuantity": round(selected_quantity, 4),
-        "rankMode": "quantity",
-        "eventStepMode": CURRENT_RANK_ADVANCEMENT_MODE,
-        "eventStep": CURRENT_RANK_EVENT_STEP,
-        "eventStepLabel": rank_advancement_label(),
-        "groupMode": group_mode,
-    }
-
-
-def zone_events_between_ranks(events, rank1, rank2=None):
-    """Retourne les événements situés entre deux rangs, rangs finaux inclus.
-
-    Nouvelle logique: la zone est basée sur le cumul d’avancement choisi, pas sur un rang 1 événement = 1.
-    """
-    selected_events, start_rank_value, end_rank_value, _selected_quantity = events_between_rank_quantities(events, rank1, rank2)
-    return selected_events, start_rank_value, end_rank_value
-
-
-def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
-    """Zone collective simultanée générale.
-
-    Pour la moyenne globale uniquement, on parcourt la liste collective complète :
-    équipe A + équipe B + adversaire passé de A + adversaire passé de B.
-
-    Les rangs utilisés restent ceux indiqués : pas de multiplication automatique.
-
-    Chaque événement avance selon le curseur ou selon sa valeur de performance.
-    """
-    try:
-        used_rank1 = float(rank1)
-        used_rank2 = float(rank2) if rank2 is not None else used_rank1
-    except Exception:
-        used_rank1 = rank1
-        used_rank2 = rank2
-
-    result = zone_stats_between_ranks(combined_events or [], used_rank1, used_rank2, group_mode="global")
-    result["globalMethod"] = "combined_all_events_rank_advancement"
-    result["rankMultiplier"] = 1
-    result["eventStep"] = CURRENT_RANK_EVENT_STEP
-    result["eventStepMode"] = CURRENT_RANK_ADVANCEMENT_MODE
-    result["eventStepLabel"] = rank_advancement_label()
-    result["originalRank1"] = rank1
-    result["originalRank2"] = rank2
-    result["usedRank1"] = used_rank1
-    result["usedRank2"] = used_rank2
-    result["combinedEventCount"] = len(combined_events or [])
-    return result
-
-def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span):
-    update_scan_job(
-        job_id,
-        status="running",
-        message=f"{team_name} · Récupération Des Pages Web…",
-        progress=base_progress,
-    )
-
-    pages = []
-    stopped_history = False
-
-    def build_finished_matches():
-        by_id = {}
-
-        for match in pages:
-            if not isinstance(match, dict):
-                continue
-
-            match_id = match.get("id")
-
-            if not match_id:
-                continue
-
-            status_type = (match.get("status") or {}).get("type")
-            home_id = (match.get("homeTeam") or {}).get("id")
-            away_id = (match.get("awayTeam") or {}).get("id")
-
-            if status_type != "finished":
-                continue
-
-            if home_id != analyzed_team_id and away_id != analyzed_team_id:
-                continue
-
-            by_id[match_id] = match
-
-        return by_id
-
-    page_targets = [step for step in PAGE_LOAD_STEPS if step <= PAGES_TO_LOAD]
-    if PAGES_TO_LOAD not in page_targets:
-        page_targets.append(PAGES_TO_LOAD)
-
-    next_page = 0
-    by_id = {}
-
-    for target_pages in page_targets:
-        if stopped_history:
-            break
-
-        for page in range(next_page, target_pages):
-            update_scan_job(
-                job_id,
-                status="running",
-                message=f"{team_name} · Page {page + 1}/{target_pages}",
-                progress=base_progress + int(progress_span * 0.10 * ((page + 1) / max(1, target_pages))),
-            )
-
-            page_path = f"team/{analyzed_team_id}/events/last/{page}"
-
-            try:
-                data = get_json(page_path)
-            except Exception as e:
-                error_text = str(e)
-
-                # Web renvoie parfois 404 quand une équipe n'a plus de page historique.
-                # Ce n'est pas une vraie erreur de scan : on s'arrête simplement aux pages déjà récupérées.
-                if "HTTP 404" in error_text or "Not Found" in error_text:
-                    update_scan_job(
-                        job_id,
-                        status="running",
-                        message=(
-                            f"{team_name} · Fin De L'Historique Web À La Page {page + 1}.\n"
-                            f"Pages récupérées : {page}/{target_pages}"
-                        ),
-                        progress=base_progress + int(progress_span * 0.10),
-                    )
-                    stopped_history = True
-                    break
-
-                # Erreur réseau sur une page historique : si on a déjà des pages, on continue
-                # avec ce qu'on a au lieu de faire planter tout le scan. Si la page 0 plante,
-                # on remonte l'erreur car on n'a aucune base pour analyser l'équipe.
-                if pages:
-                    if FOOTSCAN_STRICT_DATA:
-                        raise RuntimeError(
-                            "Scan stoppé pour éviter un résultat variable : "
-                            f"page Web {page + 1}/{target_pages} non récupérée pour {team_name}. "
-                            "Relance plus tard ou lance le worker avec FOOTSCAN_ALLOW_PARTIAL=1 "
-                            "si tu acceptes un résultat partiel."
-                        )
-                    update_scan_job(
-                        job_id,
-                        status="running",
-                        message=(
-                            f"{team_name} · Page {page + 1} Ignorée Après Erreur Réseau.\n"
-                            f"Pages déjà récupérées : {page}/{target_pages}"
-                        ),
-                        progress=base_progress + int(progress_span * 0.10),
-                    )
-                    stopped_history = True
-                    break
-
-                raise
-
-            page_events = data.get("events") if isinstance(data, dict) else data
-
-            if isinstance(page_events, list) and page_events:
-                pages.extend(page_events)
-            else:
-                update_scan_job(
-                    job_id,
-                    status="running",
-                    message=f"{team_name} · Page {page + 1} Vide, Arrêt De L'Historique.",
-                    progress=base_progress + int(progress_span * 0.10),
-                )
-                stopped_history = True
-                break
-
-        next_page = max(next_page, target_pages)
-        by_id = build_finished_matches()
-
-        # On démarre avec 10 pages. Si elles ne suffisent pas pour alimenter le scan
-        # progressif après les matchs ignorés, on étend automatiquement à 15 puis 20.
-        if len(by_id) >= skip + MAX_MATCHES_PER_TEAM:
-            break
-
-        if target_pages < PAGES_TO_LOAD and not stopped_history:
-            next_target = next((step for step in page_targets if step > target_pages), PAGES_TO_LOAD)
-            update_scan_job(
-                job_id,
-                status="running",
-                message=(
-                    f"{team_name} · 10 Pages Insuffisantes, Extension Jusqu’à {next_target} Pages…"
-                    if target_pages == 10 else
-                    f"{team_name} · Extension Jusqu’à {next_target} Pages…"
-                ),
-                progress=base_progress + int(progress_span * 0.10),
-            )
-
-    sorted_matches = sorted(
-        by_id.values(),
-        key=lambda m: (m.get("startTimestamp") or 0, int(m.get("id") or 0)),
-        reverse=True,
-    )
-
-    selected_matches = sorted_matches[skip:skip + MAX_MATCHES_PER_TEAM]
-    stages = []
-
-    for limit in [INITIAL_MATCHES_PER_TEAM, SECOND_MATCHES_PER_TEAM, MAX_MATCHES_PER_TEAM]:
-        limit = max(1, min(limit, len(selected_matches)))
-        if limit not in stages:
-            stages.append(limit)
-
-    all_events = []
-    matches_used = []
-    event_data_issues = []
-    scanned_until = 0
-
-    for stage_limit in stages:
-        if total_rank_quantity(all_events) >= max_needed:
-            break
-
-        update_scan_job(
-            job_id,
-            status="running",
-            message=(
-                f"{team_name} · Scan Progressif Jusqu’à {stage_limit} matchs\n"
-                f"Progression Trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
-            ),
-            progress=base_progress + int(progress_span * 0.13),
-        )
-
-        for start in range(scanned_until, stage_limit, INCIDENT_BATCH_SIZE):
-            batch = selected_matches[start:min(start + INCIDENT_BATCH_SIZE, stage_limit)]
-            batch_end = min(start + len(batch), stage_limit)
-
-            stage_position = batch_end / max(1, MAX_MATCHES_PER_TEAM)
-
-            update_scan_job(
-                job_id,
-                status="running",
-                message=(
-                    f"{team_name} · Événements Matchs {start + 1}-{batch_end}/{stage_limit}\n"
-                    f"Progression Trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
-                ),
-                progress=base_progress + int(progress_span * (0.15 + 0.80 * stage_position)),
-            )
-
-            scanned = []
-
-            max_workers = max(1, min(len(batch) or 1, INCIDENT_MAX_WORKERS))
-
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {}
-
-                for idx, match in enumerate(batch):
-                    future = executor.submit(get_incidents_json, f"event/{match['id']}/incidents")
-                    futures[future] = (idx, match)
-
-                for future in as_completed(futures):
-                    idx, match = futures[future]
-
-                    try:
-                        data = future.result()
-                    except Exception as e:
-                        # En mode strict, aucun match partiel n'est accepté : sinon deux scans
-                        # identiques peuvent donner des valeurs différentes selon les blocages Web.
-                        err_text = str(e)
-                        expected_web_gap = (
-                            "challenge" in err_text
-                            or "HTTP 403" in err_text
-                            or "HTTP 404" in err_text
-                            or "Not Found" in err_text
-                        )
-                        if FOOTSCAN_STRICT_DATA:
-                            raise RuntimeError(
-                                "Scan stoppé pour éviter un résultat variable : "
-                                f"événements non récupérés pour {make_match_label(match)}. "
-                                f"Détail: {err_text}"
-                            )
-                        if SOFA_DEBUG_NETWORK or not expected_web_gap:
-                            print(f"Match sans événements récupérés {match.get('id')}: {e}", file=sys.stderr)
-
-                        issue_type = "missing" if ("HTTP 404" in err_text or "Not Found" in err_text) else ("blocked" if ("challenge" in err_text or "HTTP 403" in err_text) else "error")
-                        issue = {
-                            "id": match.get("id"),
-                            "label": make_match_label(match),
-                            "competition": get_competition_name(match),
-                            "startTimestamp": match.get("startTimestamp") or 0,
-                            "type": issue_type,
-                            "reason": err_text,
-                            "message": "Événements non récupérés pour ce match.",
-                        }
-                        event_data_issues.append(issue)
-
-                        scanned.append({
-                            "idx": idx,
-                            "match": match,
-                            "events": [],
-                            "matchUsed": {
-                                "id": match.get("id"),
-                                "label": make_match_label(match),
-                                "count": 0,
-                                "startTimestamp": match.get("startTimestamp") or 0,
-                                "competition": get_competition_name(match),
-                                "eventDataStatus": issue_type,
-                                "eventDataIssue": True,
-                                "error": err_text,
-                            },
-                        })
-                        continue
-
-                    data_issue = data.get("_footscanIssue") if isinstance(data, dict) else None
-                    incidents = data.get("incidents") if isinstance(data, dict) else data
-
-                    if not isinstance(incidents, list):
-                        incidents = []
-
-                    if data_issue:
-                        issue = {
-                            "id": match.get("id"),
-                            "label": make_match_label(match),
-                            "competition": get_competition_name(match),
-                            "startTimestamp": match.get("startTimestamp") or 0,
-                            "type": data_issue.get("type") or "blocked",
-                            "reason": data_issue.get("reason") or data_issue.get("message") or "Événements non récupérés",
-                            "message": data_issue.get("message") or "Événements non récupérés pour ce match.",
-                        }
-                        event_data_issues.append(issue)
-                        if FOOTSCAN_STRICT_DATA:
-                            raise RuntimeError(
-                                "Scan stoppé pour éviter un résultat variable : "
-                                f"événements non récupérés pour {make_match_label(match)}. "
-                                f"Détail: {issue.get('reason') or issue.get('message')}"
-                            )
-
-                    events = parse_incidents(incidents, match, analyzed_team_id)
-
-                    match_used = {
-                        "id": match.get("id"),
-                        "label": make_match_label(match),
-                        "count": len(events),
-                        "startTimestamp": match.get("startTimestamp") or 0,
-                        "competition": get_competition_name(match),
-                        "eventDataStatus": "ok",
-                    }
-
-                    if data_issue:
-                        match_used["eventDataStatus"] = data_issue.get("type") or "blocked"
-                        match_used["eventDataIssue"] = True
-                        match_used["error"] = data_issue.get("reason") or data_issue.get("message") or "Événements non récupérés"
-
-                    scanned.append({
-                        "idx": idx,
-                        "match": match,
-                        "events": events,
-                        "matchUsed": match_used,
-                    })
-
-            scanned.sort(key=lambda item: item["idx"])
-
-            for item in scanned:
-                all_events.extend(item["events"])
-                matches_used.append(item["matchUsed"])
-
-                if total_rank_quantity(all_events) >= max_needed:
-                    break
-
-            scanned_until = batch_end
-
-            if total_rank_quantity(all_events) >= max_needed:
-                break
-
-    issue_count = len(event_data_issues)
-    issue_note = f" · ⚠️ {issue_count} match(s) sans événements récupérés" if issue_count else ""
-
-    update_scan_job(
-        job_id,
-        status="running",
-        message=f"{team_name} · Terminé ({len(all_events)} événements, Progression {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs){issue_note}.",
-        progress=base_progress + progress_span,
-    )
-
-    if issue_count:
-        print(f"⚠️ {team_name}: {issue_count} match(s) sans événements récupérés. Résultat partiel pour cette équipe.")
-
-    return {
-        "events": all_events,
-        "matchesUsed": matches_used,
-        "eventDataIssues": event_data_issues,
-        "eventDataIssueCount": issue_count,
-        "scanPartial": bool(issue_count),
+    function renderDominance(result) {
+      const dominance = getDominance(result);
+      const isEvolution = dominance.mode === "evolution";
+      const title = isEvolution ? "Gagnant Par Évolution" : "👑 Gagnant Par Moyenne Des Rangs";
+
+      if (dominance.type === "none") {
+        return `
+          <div class="dominance-box">
+            <div class="dominance-label">${title}</div>
+            <div class="dominance-team">Indisponible</div>
+            <div class="dominance-meta">${isEvolution ? "Moyenne de zone ou moyenne des rangs indisponible." : "Aucune moyenne disponible sur les rangs."}</div>
+          </div>
+        `;
+      }
+
+      if (dominance.type === "tie") {
+        return `
+          <div class="dominance-box">
+            <div class="dominance-label">${title}</div>
+            <div class="dominance-team">Égalité</div>
+            <div class="dominance-meta">${isEvolution ? "Même évolution affichée après arrondi." : `Moyenne des deux Rangs : ${esc(formatValue(dominance.average))}`}</div>
+          </div>
+        `;
+      }
+
+      const meta = isEvolution
+        ? `Évolution : ${esc(formatValue(dominance.metric))} · Zone ${esc(formatValue(dominance.zoneAverage))} → Rangs ${esc(formatValue(dominance.rankAverage))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`
+        : `Moyenne Dominante : ${esc(formatValue(dominance.average))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`;
+
+      const confColors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
+      const confetti = Array.from({ length: 20 }, (_, i) => `
+        <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
+      `).join("");
+
+      return `
+        <div class="dominance-box dominance-win">
+          <div class="status-confetti" aria-hidden="true">${confetti}</div>
+          <div class="dominance-trophy" aria-hidden="true">🏆</div>
+          <div class="dominance-label">${title}</div>
+          <div class="dominance-team">${esc(String(dominance.label || "").toUpperCase())}</div>
+          <div class="dominance-meta">${meta}</div>
+        </div>
+      `;
     }
 
 
 
-def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domicile", away_name="Extérieur"):
-    """Construit le mode simultané match par match puis minute par minute.
+    function renderSelectedRanksStatus() {
+      const box = $("statusBox");
+      const rank1 = String($("rank1")?.value || "").trim();
+      const rank2 = String($("rank2")?.value || "").trim();
 
-    Règle importante demandée:
-    - les événements de l'équipe analysée restent dans son flux.
-    - les événements de l'adversaire dans le passé de A sont transférés au flux de B,
-      avec la valeur inversée.
-    - les événements de l'adversaire dans le passé de B sont transférés au flux de A,
-      avec la valeur inversée.
-    """
+      if (!rank1 && !rank2) {
+        box.classList.remove("status-selection");
+        box.innerHTML = "";
+        box.style.display = "none";
+        return;
+      }
 
-    def strip_camp_prefix(detail):
-        text = str(detail or "")
-        for prefix in ["Équipe analysée · ", "Adversaire · "]:
-            if text.startswith(prefix):
-                return text[len(prefix):]
-        return text
+      const value = rank1 && rank2 ? `${rank1} / ${rank2}` : (rank1 || rank2);
 
-    def group_by_match(scan):
-        order = []
-        grouped = {}
+      box.style.display = "grid";
+      box.classList.remove("status-done", "status-loading", "status-fade-out");
+      box.classList.add("status-selection");
+      box.innerHTML = `
+        <div class="status-selection-wrap">
+          <div class="status-selection-label">RANGS SÉLECTIONNÉS</div>
+          <div class="status-selection-value">${esc(value)}</div>
+        </div>
+      `;
+    }
 
-        for match in scan.get("matchesUsed") or []:
-            match_id = match.get("id")
-            if match_id is None:
-                continue
-            order.append(match_id)
-            grouped.setdefault(match_id, [])
 
-        for event in scan.get("events") or []:
-            match_id = event.get("matchId")
-            grouped.setdefault(match_id, []).append(event)
-            if match_id not in order:
-                order.append(match_id)
 
-        return order, grouped
+    function animateStatusProgress(box, target) {
+      const percentNode = box.querySelector('.status-big-percent');
+      const fillNode = box.querySelector('.progress-fill');
+      const bgNode = box.querySelector('.status-progress-bg');
+      const start = Number(box._displayProgress ?? 0);
+      const end = Math.max(0, Math.min(100, Number(target || 0)));
 
-    def copy_for_target(event, target_key, source_name, target_name, linked_from_opponent):
-        copied = dict(event)
-        clean_detail = strip_camp_prefix(copied.get("detail"))
+      if (box._progressRAF) {
+        cancelAnimationFrame(box._progressRAF);
+        box._progressRAF = null;
+      }
 
-        copied["targetName"] = target_name
-        copied["simultaneousTarget"] = target_key
-        copied["displaySide"] = f"Attribué à {target_name}"
+      const duration = 620;
+      const t0 = performance.now();
+      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
-        if linked_from_opponent:
-            try:
-                copied["value"] = round(-float(copied.get("value", 0)), 4)
-            except Exception:
-                copied["value"] = copied.get("value")
+      const step = (now) => {
+        const t = Math.min(1, (now - t0) / duration);
+        const eased = easeOutCubic(t);
+        const value = start + (end - start) * eased;
+        box._displayProgress = value;
 
-            copied["side"] = "team"
-            copied["linkedFromOpponentPast"] = True
-            copied["originLabel"] = f"adversaire passé de {source_name}"
-            copied["detail"] = f"Attribué à {target_name} · origine: adversaire passé de {source_name} · {clean_detail}"
-        else:
-            copied["originLabel"] = f"passé direct de {target_name}"
-            copied["detail"] = f"Attribué à {target_name} · origine: passé direct · {clean_detail}"
+        if (percentNode) percentNode.textContent = `${Math.round(value)}%`;
+        if (fillNode) fillNode.style.width = `${value}%`;
+        if (bgNode) bgNode.style.width = `${value}%`;
 
-        return copied
+        if (t < 1) {
+          box._progressRAF = requestAnimationFrame(step);
+        } else {
+          box._progressRAF = null;
+          box._displayProgress = end;
+        }
+      };
 
-    home_order, home_grouped = group_by_match(home_scan)
-    away_order, away_grouped = group_by_match(away_scan)
+      box._progressRAF = requestAnimationFrame(step);
+    }
 
-    home_events = []
-    away_events = []
-    combined_events = []
-    shared_index = 0
-    max_len = max(len(home_order), len(away_order))
+    function setStatus(message, progress = 0) {
+      const box = $("statusBox");
 
-    for match_index in range(max_len):
-        items = []
+      if (box._doneTimer) {
+        clearTimeout(box._doneTimer);
+        box._doneTimer = null;
+      }
 
-        if match_index < len(home_order):
-            for original_index, event in enumerate(home_grouped.get(home_order[match_index], [])):
-                items.append(("home", original_index, event))
+      if (!message) {
+        if (box._progressRAF) {
+          cancelAnimationFrame(box._progressRAF);
+          box._progressRAF = null;
+        }
+        box._displayProgress = 0;
+        box.classList.remove("status-done", "status-loading", "status-selection", "status-fade-out");
+        box.innerHTML = "";
+        box.style.display = "none";
+        return;
+      }
 
-        if match_index < len(away_order):
-            for original_index, event in enumerate(away_grouped.get(away_order[match_index], [])):
-                items.append(("away", original_index, event))
+      const safeProgress = Math.max(0, Math.min(100, Number(progress || 0)));
+      const cleanMessage = String(message || "")
+        .replace(/(?:⚠️\s*){2,}/g, "⚠️ ")
+        .replaceAll("Incident(s)", "Événement(s)")
+        .replaceAll("Incidents", "Événements")
+        .replaceAll("incidents", "Événements")
+        .replaceAll("Avancement", "Progression")
+        .replaceAll("avancement", "progression")
+        .replaceAll("page", "Page");
+      const isDone = safeProgress >= 100 && /scan terminé/i.test(cleanMessage);
 
-        def sort_key(item):
-            source_key, original_index, event = item
-            minute = event.get("minute") or 0
-            added = event.get("added") or 0
-            return (-(minute + added / 100), 0 if source_key == "home" else 1, original_index)
+      const renderDoneStatus = () => {
+        const colors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
+        const pieces = Array.from({ length: 26 }, (_, i) => `
+          <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${colors[i % colors.length]}"></span>
+        `).join("");
 
-        for source_key, original_index, event in sorted(items, key=sort_key):
-            shared_index += 1
+        box.classList.remove("status-loading", "status-selection", "status-fade-out");
+        box.classList.add("status-done");
+        box.style.display = "grid";
+        box.innerHTML = `
+          <div class="status-confetti" aria-hidden="true">${pieces}</div>
+          <div class="status-done-title">SCAN TERMINÉ</div>
+        `;
+      };
 
-            if source_key == "home":
-                if event.get("side") == "opponent":
-                    copied = copy_for_target(event, "away", home_name, away_name, True)
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    away_events.append(copied)
-                    combined_events.append(dict(copied))
-                else:
-                    copied = copy_for_target(event, "home", home_name, home_name, False)
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    home_events.append(copied)
-                    combined_events.append(dict(copied))
-            else:
-                if event.get("side") == "opponent":
-                    copied = copy_for_target(event, "home", away_name, home_name, True)
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    home_events.append(copied)
-                    combined_events.append(dict(copied))
-                else:
-                    copied = copy_for_target(event, "away", away_name, away_name, False)
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    away_events.append(copied)
-                    combined_events.append(dict(copied))
+      if (isDone) {
+        if (box.classList.contains("status-loading")) {
+          const percentNode = box.querySelector('.status-big-percent');
+          const fillNode = box.querySelector('.progress-fill');
+          const bgNode = box.querySelector('.status-progress-bg');
+          animateStatusProgress(box, 100);
+          box._doneTimer = window.setTimeout(renderDoneStatus, 3300);
+          return;
+        }
+        renderDoneStatus();
+        return;
+      }
 
-    combined_events.sort(key=lambda event: event.get("simultaneousIndex") or 0)
+      box.style.display = "block";
+      box.classList.remove("status-done", "status-selection", "status-fade-out");
+      box.classList.add("status-loading");
 
-    home_result = dict(home_scan)
-    away_result = dict(away_scan)
-    home_result["events"] = home_events
-    away_result["events"] = away_events
-    home_result["simultaneousLinkedMode"] = True
-    away_result["simultaneousLinkedMode"] = True
+      if (!box.querySelector('.status-progress-content')) {
+        box.innerHTML = `
+          <div class="status-progress-bg" style="width:0%" aria-hidden="true"></div>
+          <div class="status-progress-content">
+            <div class="status-big-percent">0%</div>
+            <div class="progress-track" aria-hidden="true">
+              <div class="progress-fill" style="width:0%"></div>
+            </div>
+          </div>
+        `;
+      }
 
-    return home_result, away_result, combined_events
+      animateStatusProgress(box, safeProgress);
+    }
 
-def process_scan_job(job_id):
-    raw = redis_cmd("GET", f"{SCAN_JOB_PREFIX}{job_id}")
+    function setError(message) {
+      const box = $("errorBox");
+      box.style.display = message ? "block" : "none";
+      box.textContent = message || "";
+    }
 
-    if not raw:
-        print(f"Scan job absent: {job_id}")
-        return
 
-    job = json.loads(raw)
-    params = job.get("params") or {}
+    function triggerScanButtonKick() {
+      const button = $("scanBtn");
+      button.classList.remove("scan-kick");
+      void button.offsetWidth;
+      button.classList.add("scan-kick");
 
-    match_id = str(params.get("matchId") or "").strip()
-    rank1 = float(params.get("rank1"))
-    rank2 = params.get("rank2")
-    rank2 = float(rank2) if rank2 is not None else None
-    skip_home = int(params.get("skipHome") or 0)
-    skip_away = int(params.get("skipAway") or 0)
-    simultaneous_mode = bool(params.get("simultaneousMode"))
-    rank_event_step = params.get("rankEventStep", DEFAULT_RANK_EVENT_STEP)
-    rank_event_mode = params.get("rankEventMode") or params.get("rankStepMode") or "fixed"
-    winner_mode = "evolution" if params.get("winnerMode") == "evolution" else "dominance"
-    configure_rank_advancement(rank_event_step, rank_event_mode)
+      return new Promise((resolve) => {
+        window.setTimeout(() => {
+          button.classList.remove("scan-kick");
+          resolve();
+        }, 1080);
+      });
+    }
 
-    effective_rank1 = rank1
-    effective_rank2 = rank2
+    function launchFinishFx() {
+      const previous = document.querySelector(".finish-fx");
+      if (previous) previous.remove();
 
-    ranks = [effective_rank1]
+      const fx = document.createElement("div");
+      fx.className = "finish-fx";
+      fx.setAttribute("aria-hidden", "true");
+      document.body.appendChild(fx);
 
-    if effective_rank2 is not None:
-        ranks.append(effective_rank2)
+      const colors = ["#38bdf8", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
 
-    max_needed = float(max(ranks))
+      for (let i = 0; i < 96; i++) {
+        const piece = document.createElement("span");
+        piece.className = "confetti-piece";
+        piece.style.setProperty("--left", `${Math.random() * 100}%`);
+        piece.style.setProperty("--x", `${(Math.random() - 0.5) * 150}px`);
+        piece.style.setProperty("--r", `${(Math.random() * 980 + 420).toFixed(0)}deg`);
+        piece.style.setProperty("--d", `${3600 + Math.random() * 2600}ms`);
+        piece.style.setProperty("--delay", `${-Math.random() * 5200}ms`);
+        piece.style.setProperty("--c", colors[i % colors.length]);
+        fx.appendChild(piece);
+      }
 
-    # En mode simultané, chaque performance attribuée à une équipe est construite
-    # avec deux historiques :
-    # - le passé direct de cette équipe ;
-    # - l'adversaire passé de l'autre équipe.
-    #
-    # Si on ne récupère que "max_needed" événements bruts par équipe, il peut
-    # manquer des événements après réattribution, car tous les événements bruts ne
-    # finissent pas dans la même liste attribuée. On récupère donc plus large en
-    # simultané, puis on reclasse seulement après.
-    scan_fetch_needed = max_needed * 2 if simultaneous_mode else max_needed
+      const bursts = [
+        { left: 24, top: 30 },
+        { left: 76, top: 28 },
+        { left: 50, top: 18 },
+      ];
 
-    print(
-        f"🔎 Scan complet: job={job_id} match={match_id} "
-        f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
-        f"objectif progression brute={scan_fetch_needed} simultaneous={simultaneous_mode} "
-        f"progression={rank_advancement_label()}"
-    )
+      bursts.forEach((burst, burstIndex) => {
+        for (let i = 0; i < 18; i++) {
+          const dot = document.createElement("span");
+          const angle = (Math.PI * 2 * i) / 18;
+          const distance = 42 + Math.random() * 44;
+          dot.className = "firework-dot";
+          dot.style.setProperty("--left", `${burst.left}%`);
+          dot.style.setProperty("--top", `${burst.top}%`);
+          dot.style.setProperty("--x", `${Math.cos(angle) * distance}px`);
+          dot.style.setProperty("--y", `${Math.sin(angle) * distance}px`);
+          dot.style.setProperty("--c", colors[(i + burstIndex) % colors.length]);
+          dot.style.animationDelay = `${burstIndex * 120}ms`;
+          fx.appendChild(dot);
+        }
+      });
 
-    try:
-        update_scan_job(job_id, status="running", message="Récupération Du Match Principal…", progress=5)
+      window.setTimeout(() => fx.remove(), 12000);
+    }
 
-        match_data = get_json(f"event/{match_id}")
-        match = match_data.get("event") if isinstance(match_data, dict) else match_data
+    function extractMatchId(input) {
+      const value = String(input || "").trim();
 
-        if not isinstance(match, dict) or not match.get("homeTeam") or not match.get("awayTeam"):
-            raise RuntimeError("Format du match principal inattendu")
+      if (/^\d+$/.test(value)) {
+        return value;
+      }
 
-        home_team = match["homeTeam"]
-        away_team = match["awayTeam"]
+      const found =
+        value.match(/#id:(\d+)/) ||
+        value.match(/\/event\/(\d+)/) ||
+        value.match(/\/(\d+)(?:[/?#]|$)/);
 
-        update_scan_job(
-            job_id,
-            status="running",
-            message=f"Match trouvé : {home_team.get('name')} vs {away_team.get('name')}",
-            progress=10,
-        )
+      return found ? found[1] : value;
+    }
 
-        home_scan = scan_team(
-            job_id,
-            home_team["id"],
-            skip_home,
-            scan_fetch_needed,
-            home_team.get("name") or "Domicile",
-            12,
-            40,
-        )
+    async function startScanJob() {
+      const matchId = extractMatchId($("matchInput").value);
+      const rank1 = parseFloat(String($("rank1").value).replace(",", "."));
+      const rank2Raw = String($("rank2").value || "").trim();
+      const rank2 = rank2Raw ? parseFloat(rank2Raw.replace(",", ".")) : null;
 
-        away_scan = scan_team(
-            job_id,
-            away_team["id"],
-            skip_away,
-            scan_fetch_needed,
-            away_team.get("name") or "Extérieur",
-            54,
-            40,
-        )
+      if (!matchId || !rank1 || rank1 <= 0) {
+        setError("Mets un Match ID ou une URL WEB, puis un rang 1 supérieur à 0.");
+        return;
+      }
 
-        simultaneous_combined_events = []
+      if (rank2 !== null && (!rank2 || rank2 <= 0)) {
+        setError("Le rang 2 doit être vide ou supérieur à 0.");
+        return;
+      }
 
-        if simultaneous_mode:
-            update_scan_job(
-                job_id,
-                status="running",
-                message="Calcul simultané: reclassement match par match puis minute par minute…",
-                progress=96,
-            )
-            home_scan, away_scan, simultaneous_combined_events = apply_simultaneous_match_minute_order(
-                home_scan,
-                away_scan,
-                home_team.get("name") or "Domicile",
-                away_team.get("name") or "Extérieur",
-            )
+      setError("");
+      document.querySelectorAll(".finish-fx").forEach((element) => element.remove());
+      setStatus("🔎 Création Du Job De Scan…", 1);
+      $("result").innerHTML = "";
+      $("scanBtn").disabled = true;
+      $("scanBtn").textContent = "🔎 SCAN EN COURS…";
 
-        home = {
-            **home_team,
-            **home_scan,
-            "r1": value_at_rank(home_scan["events"], effective_rank1),
-            "r2": value_at_rank(home_scan["events"], effective_rank2) if effective_rank2 else None,
-            "zoneStats": zone_stats_between_ranks(home_scan["events"], effective_rank1, effective_rank2),
+      const scanCalc = calculateAutoRanks();
+      const rankEventMode = isPerformanceAdvanceMode() ? "performance" : "fixed";
+      const winnerMode = isEvolutionWinnerMode() ? "evolution" : "dominance";
+
+      const response = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matchId,
+          rank1,
+          rank2,
+          skipHome: skipHomeValue,
+          skipAway: skipAwayValue,
+          simultaneousMode: isSimultaneousMode(),
+          rankEventStep: scanCalc.advancement,
+          rankEventMode,
+          winnerMode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      currentJobId = data.id;
+      pollingErrorCount = 0;
+      pollJob();
+    }
+
+    async function pollJob() {
+      if (!currentJobId) return;
+
+      try {
+        const response = await fetch(`/api/scan?jobId=${encodeURIComponent(currentJobId)}&_=${Date.now()}`, {
+          cache: "no-store",
+        });
+
+        const job = await response.json();
+
+        if (!response.ok) {
+          throw new Error(job.error || `HTTP ${response.status}`);
         }
 
-        away = {
-            **away_team,
-            **away_scan,
-            "r1": value_at_rank(away_scan["events"], effective_rank1),
-            "r2": value_at_rank(away_scan["events"], effective_rank2) if effective_rank2 else None,
-            "zoneStats": zone_stats_between_ranks(away_scan["events"], effective_rank1, effective_rank2),
-        }
+        pollingErrorCount = 0;
+        setError("");
+        setStatus(job.message || job.status || "🔎 SCAN EN COURS…", job.progress || 0);
 
-        home_issue_count = int(home.get("eventDataIssueCount") or 0)
-        away_issue_count = int(away.get("eventDataIssueCount") or 0)
-        total_issue_count = home_issue_count + away_issue_count
-        data_quality = {
-            "strictMode": FOOTSCAN_STRICT_DATA,
-            "partialAllowed": FOOTSCAN_ALLOW_PARTIAL,
-            "isPartial": total_issue_count > 0,
-            "eventDataIssueCount": total_issue_count,
-            "homeIssueCount": home_issue_count,
-            "awayIssueCount": away_issue_count,
-            "message": (
-                f"⚠️ Scan partiel : {total_issue_count} match(s) sans événements récupérés. "
-                "Les buts de ces matchs ne sont pas comptés."
-                if total_issue_count else
-                "Scan complet : aucun match sans événements récupérés."
-            ),
-        }
+        if (job.status === "done") {
+          const resultWithOptions = {
+            ...job.result,
+            simultaneousMode: Boolean(job.result?.simultaneousMode ?? isSimultaneousMode()),
+            rankEventStep: Number(job.result?.rankEventStep ?? calculateAutoRanks().advancement),
+            rankEventMode: job.result?.rankEventMode || (isPerformanceAdvanceMode() ? "performance" : "fixed"),
+            winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
+          };
 
-        result = {
-            "match": {
-                "id": match.get("id"),
-                "homeTeam": home_team,
-                "awayTeam": away_team,
-                "startTimestamp": match.get("startTimestamp"),
-                "label": make_match_label(match),
+          lastResult = {
+            createdAt: new Date().toISOString(),
+            skipHome: skipHomeValue,
+            skipAway: skipAwayValue,
+            autoSearch: {
+              ...calculateAutoRanks(),
+              simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
+              rankEventStep: resultWithOptions.rankEventStep,
+              rankEventMode: resultWithOptions.rankEventMode,
+              winnerMode: resultWithOptions.winnerMode,
+              usedRank1: resultWithOptions.rank1,
+              usedRank2: resultWithOptions.rank2,
+              requestedRank1: resultWithOptions.requestedRank1,
+              requestedRank2: resultWithOptions.requestedRank2,
             },
-            "home": home,
-            "away": away,
-            "requestedRank1": rank1,
-            "requestedRank2": rank2,
-            "rank1": effective_rank1,
-            "rank2": effective_rank2,
-            "simultaneousMode": simultaneous_mode,
-            "rankEventStep": CURRENT_RANK_EVENT_STEP,
-            "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
-            "rankEventStepLabel": rank_advancement_label(),
-            "winnerMode": winner_mode,
-            "scanModeLabel": "Simultané lié: mêmes rangs, match par match / minute par minute" if simultaneous_mode else "Standard",
-            "overallZoneStats": None,
-            "dataQuality": data_quality,
-            "config": {
-                "pagesToLoad": PAGES_TO_LOAD,
-                "initialMatchesPerTeam": INITIAL_MATCHES_PER_TEAM,
-                "secondMatchesPerTeam": SECOND_MATCHES_PER_TEAM,
-                "maxMatchesPerTeam": MAX_MATCHES_PER_TEAM,
-                "incidentBatchSize": INCIDENT_BATCH_SIZE,
-                "zoneMethod": "final_ranks_low_to_high",
-                "rankEventStep": CURRENT_RANK_EVENT_STEP,
-                "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
-                "rankEventStepLabel": rank_advancement_label(),
-                "winnerMode": winner_mode,
-                "strictDataMode": FOOTSCAN_STRICT_DATA,
-                "partialAllowed": FOOTSCAN_ALLOW_PARTIAL,
-            },
+            result: resultWithOptions,
+          };
+
+          renderResult(resultWithOptions);
+          setStatus("Scan Terminé", 100);
+          window.setTimeout(launchFinishFx, 3400);
+          $("reportHint").textContent = "Analyse prête. Appuie sur “AJOUTER L’ANALYSE ACTUELLE” pour l’enregistrer dans le rapport.";
+          finishScan();
+          return;
         }
 
-        update_scan_job(
-            job_id,
-            status="done",
-            message="🔎 Scan terminé.",
-            progress=100,
-            result=result,
-            finishedAt=now_ts(),
-        )
+        if (job.status === "error") {
+          setError(job.error || "Erreur pendant le scan.");
+          setStatus("");
+          finishScan();
+          return;
+        }
 
-        if data_quality["isPartial"]:
-            print(f"⚠️ Scan terminé avec données partielles: {job_id} · {data_quality['eventDataIssueCount']} match(s) sans événements récupérés")
-        else:
-            print(f"✅ Scan terminé complet: {job_id} · aucun événement ignoré")
+        pollingTimer = setTimeout(pollJob, 850);
+      } catch (error) {
+        pollingErrorCount += 1;
 
-    except Exception as e:
-        update_scan_job(
-            job_id,
-            status="error",
-            message="Erreur pendant le scan.",
-            progress=100,
-            error=str(e),
-        )
+        if (currentJobId && pollingErrorCount <= 30) {
+          setError("Connexion instable avec le serveur. Nouvelle tentative…");
+          setStatus("🔎 Récupération du résultat…", Math.min(96, 55 + pollingErrorCount));
+          pollingTimer = setTimeout(pollJob, Math.min(2500, 850 + pollingErrorCount * 120));
+          return;
+        }
 
-        print(f"ERREUR scan {job_id}: {e}", file=sys.stderr)
+        setError(error.message || String(error));
+        setStatus("");
+        finishScan();
+      }
+    }
+
+    function finishScan() {
+      if (pollingTimer) {
+        clearTimeout(pollingTimer);
+        pollingTimer = null;
+      }
+
+      pollingErrorCount = 0;
+      $("scanBtn").disabled = false;
+      $("scanBtn").textContent = "SCANNER →";
+    }
+
+    function updateHero(match, result = null) {
+      if (!match?.homeTeam || !match?.awayTeam) return;
+
+      $("hero").innerHTML = `
+        <div class="match-hero">
+          <div class="kicker">Match Analysé</div>
+          <div class="match-teams">
+            <div class="match-team">
+              <div class="logo-xl">
+                <img src="${logoUrl(match.homeTeam.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${match.homeTeam.id}" onerror="__logoErr(this)" />
+              </div>
+              <div class="match-team-name">${esc(String(match.homeTeam.name || "").toUpperCase())}</div>
+            </div>
+
+            <div class="vs-box ${result ? vsEchoToneClass(result) : ""}"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
+
+            <div class="match-team">
+              <div class="logo-xl">
+                <img src="${logoUrl(match.awayTeam.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${match.awayTeam.id}" onerror="__logoErr(this)" />
+              </div>
+              <div class="match-team-name">${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+            </div>
+          </div>
+
+          <p class="hero-text">
+            Résultat Calculé Dans Termux Avec Les Derniers Matchs Toutes Compétitions Confondues.
+          </p>
+        </div>
+      `;
+    }
+
+    function renderResult(result) {
+      if (!result) return;
+
+      updateHero(result.match, result);
+
+      $("result").innerHTML = `
+        ${renderSummary(result)}
+        ${renderTeam(result.home, "Domicile", result.rank1, result.rank2)}
+        <div class="vs-divider ${vsEchoToneClass(result)}"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
+        ${renderTeam(result.away, "Extérieur", result.rank1, result.rank2)}
+      `;
+    }
+
+    function renderOverallZoneStats(result) {
+      return "";
+    }
+
+    function pluralizeMatchCount(count) {
+      return Number(count || 0) > 1 ? "MATCHS" : "MATCH";
+    }
+
+    function renderDataQualityWarning(result) {
+      const quality = result?.dataQuality || {};
+      const issueCount = Number(quality.eventDataIssueCount || 0);
+
+      if (!quality.isPartial && issueCount <= 0) {
+        return `
+          <div class="data-quality-banner ok">
+            <div class="data-quality-main">✅ Données Web Complètes</div>
+          </div>
+        `;
+      }
+
+      const homeCount = Number(quality.homeIssueCount || 0);
+      const awayCount = Number(quality.awayIssueCount || 0);
+
+      return `
+        <div class="data-quality-banner">
+          <div class="data-quality-main">⚠️ Scan partiel · ${esc(issueCount)} ${pluralizeMatchCount(issueCount)} sans événements récupérés</div>
+          <div class="data-quality-sub">Les buts de ces matchs ne sont pas comptés. Domicile : ${esc(homeCount)} · Extérieur : ${esc(awayCount)}</div>
+        </div>
+      `;
+    }
+
+    function renderTeamDataIssueWarning(team) {
+      const issueCount = Number(team?.eventDataIssueCount || 0);
+      if (!issueCount) return "";
+
+      return `<div class="team-warning-pill">⚠️ ${esc(issueCount)} ${pluralizeMatchCount(issueCount)} sans événements</div>`;
+    }
+
+    function renderSummary(result) {
+      const match = result.match;
+
+      return `
+        <section class="summary">
+          <div class="summary-head">
+            <div class="summary-head-top">
+              <div class="summary-label">Résumé rapide</div>
+              <div class="summary-label summary-mode">Mode scan : ${result.simultaneousMode ? "Simultané" : "Séparé"}</div>
+            </div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+          </div>
+
+          ${renderDominance(result)}
+          ${renderOverallZoneStats(result)}
+
+          <div class="summary-grid">
+            ${renderSummaryCell(result.home, result.rank1, result.rank2)}
+            ${renderSummaryCell(result.away, result.rank1, result.rank2)}
+          </div>
+
+          ${renderDataQualityWarning(result)}
+        </section>
+      `;
+    }
+
+    function teamAvg(team) {
+      const v = [team?.r1?.value, team?.r2?.value]
+        .map((x) => Number(x))
+        .filter((x) => Number.isFinite(x));
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+    }
+
+    function vsEchoToneClass(result) {
+      const h = teamAvg(result?.home);
+      const a = teamAvg(result?.away);
+      const hcl = h > 0 ? "v-pos" : (h < 0 ? "v-neg" : "v-neu");
+      const acl = a > 0 ? "s-pos" : (a < 0 ? "s-neg" : "s-neu");
+      return hcl + " " + acl;
+    }
+
+    function renderSummaryCell(team, rank1, rank2) {
+      const vals = [team.r1?.value, team.r2?.value]
+        .map((v) => Number(v))
+        .filter((v) => Number.isFinite(v));
+      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+      const cellTone = avg > 0 ? "cell-pos" : (avg < 0 ? "cell-neg" : "cell-neutral");
+      return `
+        <div class="summary-cell ${cellTone}">
+          <div class="summary-team-row">
+            <div class="logo-s">
+              <img src="${logoUrl(team.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${team.id}" onerror="__logoErr(this)" />
+            </div>
+            <div class="summary-team-name">${esc(String(team.name || "").toUpperCase())}</div>
+          </div>
+
+          <div class="mini-values">
+            <div class="mini-badge">
+              <span>Rang ${esc(rank1)}</span>
+              <strong class="${valueClass(team.r1?.value)}">${esc(formatValue(team.r1?.value))}</strong>
+            </div>
+
+            ${rank2 ? `
+              <div class="mini-badge">
+                <span>Rang ${esc(rank2)}</span>
+                <strong class="${valueClass(team.r2?.value)}">${esc(formatValue(team.r2?.value))}</strong>
+              </div>
+            ` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function rankSourceText(source) {
+      const index = source?.rankIndex ? `#${source.rankIndex}` : "";
+
+      if ((source?.rankMode === "quantity" || source?.rankMode === "quantity_exact") && source?.cumulativeEnd != null) {
+        const start = formatRank(source.cumulativeStart || 0);
+        const end = formatRank(source.cumulativeEnd);
+        const quantity = source.rankQuantity != null ? ` · Q ${formatRank(source.rankQuantity)}` : "";
+        const exact = source.rankIndexExact != null ? ` · Pos Exacte ${formatRank(source.rankIndexExact)}` : "";
+        return `${index ? `${index} · ` : ""}Cumul ${start}→${end}${quantity}${exact} · `;
+      }
+
+      return index ? `${index} · ` : "";
+    }
+
+    function renderValue(label, result) {
+      const value = result?.value;
+      const sources = result?.sources || [];
+      const cls = valueClass(value || 0);
+
+      let html = `
+        <div class="rank-card">
+          <div class="rank-label">${esc(label)}</div>
+          <div class="rank-value ${cls}">${esc(formatValue(value))}</div>
+      `;
+
+      if (sources.length) {
+        html += `<div class="source-list">`;
+
+        for (const source of sources) {
+          const rankText = rankSourceText(source);
+
+          html += `
+            <div class="source-item">
+              <div class="event-icon">${esc(eventIcon(source))}</div>
+              <div>
+                <div>${esc(source.match)}</div>
+                <div class="source-small">
+                  ${esc(rankText)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        html += `</div>`;
+      }
+
+      html += `</div>`;
+      return html;
+    }
 
 
-def process_raw_request(request_id):
-    request_key = f"{REQUEST_PREFIX}{request_id}"
-    raw = redis_cmd("GET", request_key)
+    function originsTextFromList(origins) {
+      if (!origins || !origins.length) {
+        return "";
+      }
 
-    if not raw:
-        print(f"Request expirée ou absente: {request_id}")
-        return
+      return origins.map((origin) => `${origin.label} ×${origin.count}`).join(", ");
+    }
 
-    payload = json.loads(raw)
-    path = payload["path"].lstrip("/")
-    lock_key = f"{LOCK_PREFIX}{request_id}"
+    function originText(item) {
+      const text = originsTextFromList(item?.origins || []);
+      return text ? ` · origines : ${text}` : "";
+    }
 
-    if is_cached(path):
-        redis_cmd("DEL", request_key)
-        redis_cmd("DEL", lock_key)
-        print(f"Déjà en cache: {path}")
-        return
+    function targetBreakdownText(item) {
+      const breakdown = item?.targetBreakdown || [];
 
-    print(f"Traitement: {path}")
+      if (!breakdown.length) {
+        return "";
+      }
 
-    try:
-        body = sofa_fetch(path)
+      return breakdown.map((target) => {
+        const originTextValue = originsTextFromList(target.origins || []);
+        return originTextValue
+          ? `${target.label} ×${target.count} (${originTextValue})`
+          : `${target.label} ×${target.count}`;
+      }).join(" · ");
+    }
 
-        set_cache(path, body)
-        redis_cmd("DEL", error_key(path))
-        redis_cmd("DEL", request_key)
-        redis_cmd("DEL", lock_key)
+    function modeItemText(item) {
+      const icon = item?.icon || ICONS[item?.type] || "•";
+      const label = item?.label || LABELS[item?.type] || item?.type || "Événement";
+      const value = formatValue(item?.value);
+      const count = Number(item?.count || 0);
+      const suffix = count > 0 ? ` ×${count}` : "";
 
-        print(f"OK: {path}")
+      if (item?.isGlobal || item?.groupMode === "global") {
+        const repartition = targetBreakdownText(item);
+        return `${icon} ${label} · ${value}${suffix}${repartition ? ` · répartition : ${repartition}` : ""}`;
+      }
 
-        maybe_enqueue_incidents_from_team_page(path, body)
+      const target = item?.targetLabel || (item?.sideLabel ? String(item.sideLabel).replace(/^attribué à\s+/i, "") : sideText(item));
+      return `${icon} ${label} attribué à ${target} · ${value}${suffix}${originText(item)}`;
+    }
 
-    except Exception as e:
-        set_error(path, str(e))
-        redis_cmd("DEL", lock_key)
+    function zoneModeText(stats) {
+      const items = stats?.modeItems || [];
 
-        print(f"ERREUR: {path}: {e}", file=sys.stderr)
+      if (items.length) {
+        return items.map(modeItemText).join(" / ");
+      }
+
+      const values = stats?.modeValues || [];
+
+      if (!values.length) {
+        return "—";
+      }
+
+      const formatted = values.map((value) => formatValue(value)).join(" / ");
+      const count = Number(stats?.modeCount || 0);
+
+      return count > 0 ? `${formatted} ×${count}` : formatted;
+    }
+
+    function renderModeItems(stats, options = {}) {
+      const items = stats?.modeItems || [];
+      const global = Boolean(options.global);
+
+      if (!items.length) {
+        return `<div class="mode-detail">—</div>`;
+      }
+
+      return `
+        <div class="mode-stack">
+          ${items.map((item) => {
+            const icon = item?.icon || ICONS[item?.type] || "•";
+            const label = item?.label || LABELS[item?.type] || item?.type || "Événement";
+            const value = formatValue(item?.value);
+            const count = Number(item?.count || 0);
+            const target = item?.targetLabel || (item?.sideLabel ? String(item.sideLabel).replace(/^attribué à\s+/i, "") : sideText(item));
+            const repartition = targetBreakdownText(item);
+            const origins = originsTextFromList(item?.origins || []);
+
+            const main = global
+              ? `${label} · ${value} ×${count}`
+              : `${label} attribué à ${target} · ${value} ×${count}`;
+
+            const detail = global
+              ? (repartition ? `Répartition globale : ${repartition}` : "Global = zones des deux équipes additionnées")
+              : (origins ? `Origines : ${origins}` : "Origine directe");
+
+            return `
+              <div class="mode-row">
+                <div class="mode-icon">${esc(icon)}</div>
+                <div>
+                  <div class="mode-main">${esc(main)}</div>
+                  <div class="mode-detail">${esc(detail)}</div>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function zoneAdvancementLabel(stats) {
+      if (stats?.eventStepMode === "performance") {
+        return "Progression = Valeur De Performance";
+      }
+
+      const step = numberOrNull(stats?.eventStep);
+      return step === null ? "Progression Par Événement" : `${formatRank(step)} Par Événement`;
+    }
+
+    function renderZoneStats(team) {
+      const stats = team?.zoneStats;
+      const teamName = team?.name || "équipe";
+
+      if (!stats || !stats.count) {
+        return `
+          <div class="zone-card">
+            <div class="stat-header">
+              <div>
+                <div class="stat-title">ZONE DES RANGS</div>
+                <div class="stat-subtitle">Événements attribués à ${esc(teamName)} entre le Rang Bas et le Rang Haut final.</div>
+              </div>
+              <div class="stat-badge">Équipe</div>
+            </div>
+            <div class="stat-grid">
+              <div class="stat-card">
+                <div class="stat-kicker">Moyenne Zone</div>
+                <div class="stat-number neutral">—</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-kicker">Plus Présent</div>
+                <div class="mode-detail">—</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="zone-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">ZONE DES RANGS</div>
+              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} Événements · Progression Totale ${esc(formatRank(stats.totalQuantity || 0))} · ${esc(zoneAdvancementLabel(stats))} · Zone Rang Bas → Rang Haut Final.</div>
+            </div>
+            <div class="stat-badge">Équipe</div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-kicker">Moyenne ${esc(teamName)}</div>
+              <div class="stat-number ${valueClass(stats.average)}">${esc(formatValue(stats.average))}</div>
+            </div>
+
+            <div class="stat-card wide">
+              <div class="stat-kicker">Événement Le Plus Présent</div>
+              ${renderModeItems(stats, { global: false })}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTeam(team, side, rank1, rank2) {
+      const events = team.events || [];
+      const matchesUsed = team.matchesUsed || [];
+      const sideClass = side === "Domicile" ? "side-home" : "side-away";
+      const teamIssueCount = Number(team.eventDataIssueCount || 0);
+      const _perfVals = [team.r1?.value, team.r2?.value]
+        .map((v) => Number(v))
+        .filter((v) => Number.isFinite(v));
+      const _perfAvg = _perfVals.length ? _perfVals.reduce((a, b) => a + b, 0) / _perfVals.length : 0;
+      const perfToneClass = _perfAvg > 0 ? "team-card-pos" : (_perfAvg < 0 ? "team-card-neg" : "team-card-neutral");
+
+      const eventRows = events.map((event, index) => {
+        const campClass = sideCampClass(event);
+        const campText = sideText(event);
+        const label = LABELS[event.type] || event.type || "Événement";
+        const separator = index > 0 && events[index - 1]?.match !== event?.match
+          ? `<div class="event-break" aria-hidden="true"></div>`
+          : "";
+
+        return `
+          ${separator}
+          <div class="event-row event-rich-row">
+            <div class="event-metric-pill">
+              <span class="event-metric-code">${esc(eventShortLabel(event))}</span>
+              <span class="event-metric-value ${valueClass(event.value)}">${esc(formatValue(event.value))}</span>
+            </div>
+
+            <div class="row-main">
+              <div class="row-title">${esc(event.match)}</div>
+              <div class="row-sub">
+                <span class="camp-badge ${campClass}">${campText}</span>${esc(label)} · ${esc(event.minuteLabel)}${event.detail ? ` · ${esc(event.detail)}` : ""}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      const matchRows = matchesUsed.map((match, index) => {
+        const hasIssue = Boolean(match.eventDataIssue);
+        const issueText = hasIssue ? `<span class="event-data-issue-label">événements non récupérés</span>` : "";
+
+        return `
+          <div class="match-row ${hasIssue ? "issue" : ""}">
+            <div class="row-number match-number-badge">
+              <span class="match-index">${index + 1}</span>
+              <span class="match-count-mini">${esc(match.count)}</span>
+            </div>
+
+            <div class="row-main">
+              <div class="row-title">${esc(match.label)}${issueText}</div>
+              <div class="row-sub">${esc(match.competition || "Toutes compétitions")}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      return `
+        <section class="team-card ${sideClass === "side-home" ? "team-card-home" : "team-card-away"} ${perfToneClass}">
+          <div class="team-hero">
+            <div class="side-pill ${sideClass}">${esc(side)}</div>
+
+            <div class="team-header-line">
+              <div class="logo-m">
+                <img src="${logoUrl(team.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${team.id}" onerror="__logoErr(this)" />
+              </div>
+
+              <div>
+                <div class="team-name">${esc(String(team.name || "").toUpperCase())}</div>
+                <div class="team-meta">${events.length} Événements · ${matchesUsed.length} Matchs Utilisés</div>
+                ${renderTeamDataIssueWarning(team)}
+              </div>
+            </div>
+          </div>
+
+          <div class="rank-grid ${rank2 ? "" : "one"}">
+            ${renderValue(`Performance Rang ${rank1}`, team.r1)}
+            ${rank2 ? renderValue(`Performance Rang ${rank2}`, team.r2) : ""}
+          </div>
+
+          ${renderZoneStats(team)}
+
+          <div class="section">
+            <div class="section-title">
+              Matchs Utilisés
+              <span class="count-pill">${matchesUsed.length}</span>
+            </div>
+
+            <div class="match-list">${matchRows || "Aucun match trouvé."}</div>
+          </div>
+
+          <details class="clean events-details">
+            <summary class="events-summary">
+              <span class="events-summary-label">Événements Trouvés</span>
+              <span class="count-pill events-count-pill">${events.length}</span>
+            </summary>
+
+            <div class="section">
+              <div class="event-list">${eventRows || (teamIssueCount ? "⚠️ Aucun événement affiché pour les matchs récupérés. Des matchs sans événements récupérés sont signalés plus haut." : "Aucun événement trouvé.")}</div>
+            </div>
+          </details>
+        </section>
+      `;
+    }
+
+    function loadReport() {
+      try {
+        return JSON.parse(localStorage.getItem(REPORT_KEY) || "[]");
+      } catch {
+        return [];
+      }
+    }
+
+    function saveReport(entries) {
+      localStorage.setItem(REPORT_KEY, JSON.stringify(entries));
+      updateReportCount();
+    }
+
+    function updateReportCount() {
+      const count = loadReport().length;
+      $("reportCount").textContent = `${count} ANALYSE${count > 1 ? "S" : ""}`;
+    }
+
+    function rankLines(team, rankLabel, rankResult) {
+      const lines = [];
+      const value = rankResult?.value;
+      const sources = rankResult?.sources || [];
+
+      lines.push(`${rankLabel} : ${formatValue(value)}`);
+
+      if (!sources.length) {
+        lines.push("Détail : événement introuvable");
+        return lines;
+      }
+
+      lines.push("Détail événement :");
+
+      for (const source of sources) {
+        const rankText = rankSourceText(source);
+
+        lines.push(
+          `- ${rankText}${eventIcon(source)} ${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
+        );
+      }
+
+      return lines;
+    }
 
 
-def process_prefetch_path(path):
-    clean_path = path.lstrip("/")
+    function overallZoneStatsCompactText(result) {
+      return "";
+    }
 
-    if is_cached(clean_path):
-        print(f"Préchargement ignoré, déjà en cache: {clean_path}")
-        return
+    function overallZoneStatsLines(result) {
+      return [];
+    }
 
-    print(f"Préchargement: {clean_path}")
+    function zoneStatsCompactText(team) {
+      const stats = team?.zoneStats;
+      const teamName = team?.name || "équipe";
 
-    try:
-        body = sofa_fetch(clean_path)
-        set_cache(clean_path, body)
-        print(f"OK préchargé: {clean_path}")
+      if (!stats || !stats.count) {
+        return `zone ${teamName}: —`;
+      }
 
-        maybe_enqueue_incidents_from_team_page(clean_path, body)
+      return `zone rangs finaux ${teamName} moyenne: ${formatValue(stats.average)} · plus présent: ${zoneModeText(stats)} · rangs ${stats.startRankIndex}-${stats.endRankIndex} · progression ${formatRank(stats.totalQuantity || 0)}`;
+    }
 
-    except Exception as e:
-        print(f"ERREUR préchargement: {clean_path}: {e}", file=sys.stderr)
+    function zoneStatsLines(team) {
+      const stats = team?.zoneStats;
+      const teamName = team?.name || "équipe";
+
+      if (!stats || !stats.count) {
+        return [
+          `Performance moyenne zone attribuée à ${teamName} : —`,
+          `Performance la plus présente zone attribuée à ${teamName} : —`,
+        ];
+      }
+
+      return [
+        `Performance moyenne zone attribuée à ${teamName} : ${formatValue(stats.average)}`,
+        `Performance la plus présente zone attribuée à ${teamName} : ${zoneModeText(stats)}`,
+        `Zone Rangs Finaux Attribuée : Rang ${stats.startRankIndex} à ${stats.endRankIndex} (${stats.count} Événements, Progression ${formatRank(stats.totalQuantity || 0)}, ${zoneAdvancementLabel(stats)})`,
+      ];
+    }
+
+    function compactCalcLine(label, calc) {
+      const presetText = calc.presetLabel ? ` · présélection ${calc.presetLabel}` : "";
+      const baseLine = `${label}${presetText} : Base ${formatRank(calc.base)} · Progression ${calc.rankEventMode === "performance" ? "Valeur De Performance" : formatRank(calc.advancement || calc.rankEventStep || 0)} · Changements ${calc.changes} · Rangs Calculés ${formatRank(calc.low)} / ${formatRank(calc.high)}`;
+      return calc.simultaneousMode
+        ? `${baseLine} · rangs utilisés ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`
+        : baseLine;
+    }
+
+    function detailedCalcLines(calc) {
+      return [
+        `Présélection : ${calc.presetLabel || "Libre"}`,
+        `Base écrite : ${formatRank(calc.base)}`,
+        `Progression : ${calc.rankEventMode === "performance" ? "Valeur De Performance" : formatRank(calc.advancement || calc.rankEventStep || 0)}`,
+        `Changements : ${calc.changes}`,
+        `Cartons ignorés : aucun jaune, second jaune ou rouge n’entre dans le scan`,
+        `Rang Bas calculé : ${formatRank(calc.low)}`,
+        `Rang Haut calculé : ${formatRank(calc.high)}`,
+        ...(calc.simultaneousMode ? [`Mode simultané : mêmes rangs utilisés → ${formatRank(calc.usedRank1)} / ${formatRank(calc.usedRank2)}`] : []),
+      ];
+    }
+
+    function searchValueLines(entry, compact = false) {
+      const calc = entry.autoSearch;
+      const lines = [];
+
+      lines.push("VALEUR DE RECHERCHE");
+      lines.push(`Mode scan : ${entry.result?.scanModeLabel || (entry.result?.simultaneousMode ? "simultané lié: mêmes rangs" : "standard")}`);
+
+      if (!calc) {
+        lines.push("Calculateur : non enregistré sur cette analyse.");
+        return lines;
+      }
+
+      if (compact) {
+        lines.push(compactCalcLine("Mode unique", calc));
+        return lines;
+      }
+
+      lines.push("Mode : calcul unique");
+      lines.push(...detailedCalcLines(calc));
+      return lines;
+    }
+
+    function dominanceLines(result, compact = false) {
+      const dominance = getDominance(result);
+      const isEvolution = dominance.mode === "evolution";
+      const title = isEvolution ? "Gagnant Par Évolution" : "👑 Gagnant Par Moyenne Des Rangs";
+
+      if (dominance.type === "none") {
+        return [`${title} : indisponible`];
+      }
+
+      if (dominance.type === "tie") {
+        return [`${title} : égalité${isEvolution ? "" : ` (${formatValue(dominance.average)})`}`];
+      }
+
+      if (compact) {
+        return isEvolution
+          ? [`${title} : ${dominance.label} · évolution ${formatValue(dominance.metric)}`]
+          : [`${title} : ${dominance.label} · moyenne ${formatValue(dominance.average)}`];
+      }
+
+      return isEvolution
+        ? [
+            `${title} : ${dominance.label}`,
+            `Évolution : ${formatValue(dominance.metric)} · Zone ${formatValue(dominance.zoneAverage)} → Rangs ${formatValue(dominance.rankAverage)}${dominance.diff !== null ? ` · écart : ${formatRank(dominance.diff)}` : ""}`,
+          ]
+        : [
+            `${title} : ${dominance.label}`,
+            `Moyenne dominante : ${formatValue(dominance.average)}${dominance.diff !== null ? ` · écart : ${formatRank(dominance.diff)}` : ""}`,
+          ];
+    }
+
+    function teamCompactLine(team, rank1, rank2) {
+      const avg = averagePerformance(team);
+      const parts = [
+        `${team.name}`,
+        `R${rank1}: ${formatValue(team.r1?.value)}`,
+      ];
+
+      if (rank2) {
+        parts.push(`R${rank2}: ${formatValue(team.r2?.value)}`);
+      }
+
+      parts.push(`moyenne rangs finaux: ${avg === null ? "—" : formatValue(avg)}`);
+      parts.push(zoneStatsCompactText(team));
+
+      return parts.join(" · ");
+    }
+
+    function entryToSimpleText(entry, index) {
+      const result = entry.result;
+      const match = result.match;
+      const home = result.home;
+      const away = result.away;
+      const date = new Date(entry.createdAt).toLocaleString("fr-FR");
+      const lines = [];
+
+      lines.push(`ANALYSE ${index + 1}`);
+      lines.push(`${date}`);
+      lines.push(`${match.homeTeam.name} vs ${match.awayTeam.name}`);
+      lines.push(...searchValueLines(entry, true));
+      lines.push(...dominanceLines(result, true));
+      const overallCompact = overallZoneStatsCompactText(result);
+      if (overallCompact) {
+        lines.push(`Ensemble : ${overallCompact}`);
+      }
+      lines.push(`Domicile : ${teamCompactLine(home, result.rank1, result.rank2)}`);
+      lines.push(`Extérieur : ${teamCompactLine(away, result.rank1, result.rank2)}`);
+      lines.push("────────────────────────");
+      lines.push("");
+
+      return lines.join("\n");
+    }
+
+    function entryToText(entry, index) {
+      const result = entry.result;
+      const match = result.match;
+      const home = result.home;
+      const away = result.away;
+      const date = new Date(entry.createdAt).toLocaleString("fr-FR");
+      const lines = [];
+
+      lines.push(`ANALYSE ${index + 1}`);
+      lines.push(`Date : ${date}`);
+      lines.push(`Match : ${match.homeTeam.name} vs ${match.awayTeam.name}`);
+      lines.push(`Ignorer domicile : ${entry.skipHome}`);
+      lines.push(`Ignorer extérieur : ${entry.skipAway}`);
+      lines.push("");
+
+      lines.push(...searchValueLines(entry));
+      lines.push("");
+
+      lines.push(...dominanceLines(result));
+      lines.push("");
+
+      const overallLines = overallZoneStatsLines(result);
+      if (overallLines.length) {
+        lines.push(...overallLines);
+        lines.push("");
+      }
+
+      lines.push(`DOMICILE — ${home.name}`);
+      lines.push("Performance des rangs finaux :");
+      lines.push(...rankLines(home, `Rang ${result.rank1}`, home.r1));
+
+      if (result.rank2) {
+        lines.push(...rankLines(home, `Rang ${result.rank2}`, home.r2));
+      }
+
+      lines.push(...zoneStatsLines(home));
+
+      lines.push("");
+      lines.push(`EXTÉRIEUR — ${away.name}`);
+      lines.push("Performance des rangs finaux :");
+      lines.push(...rankLines(away, `Rang ${result.rank1}`, away.r1));
+
+      if (result.rank2) {
+        lines.push(...rankLines(away, `Rang ${result.rank2}`, away.r2));
+      }
+
+      lines.push(...zoneStatsLines(away));
+
+      lines.push("");
+      lines.push("────────────────────────");
+      lines.push("");
+
+      return lines.join("\n");
+    }
+
+    function buildReportText(simple = false) {
+      const entries = loadReport();
+
+      if (!entries.length) {
+        return "Rapport FOOTSCAN\n\nAucune analyse enregistrée.";
+      }
+
+      return [
+        simple ? "RAPPORT FOOTSCAN — SIMPLE" : "RAPPORT FOOTSCAN — COMPLET",
+        `Généré le : ${new Date().toLocaleString("fr-FR")}`,
+        `Nombre d’analyses : ${entries.length}`,
+        "",
+        "────────────────────────",
+        "",
+        ...entries.map((entry, index) => simple ? entryToSimpleText(entry, index) : entryToText(entry, index)),
+      ].join("\n");
+    }
+
+    function reportFilename(kind, extension) {
+      return `rapport-FOOTSCAN-${kind}-${new Date().toISOString().slice(0, 10)}.${extension}`;
+    }
+
+    function downloadTextFile(filename, text) {
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+
+      URL.revokeObjectURL(url);
+    }
+
+    function addCurrentAnalysisToReport() {
+      if (!lastResult) {
+        $("reportHint").textContent = "Aucune analyse prête. Lance un scan puis ajoute-le au rapport.";
+        return;
+      }
+
+      const entries = loadReport();
+      entries.push(lastResult);
+      saveReport(entries);
+
+      $("reportHint").textContent = "Analyse ajoutée au rapport.";
+    }
+
+    async function copyReport(simple = true) {
+      const text = buildReportText(simple);
+
+      try {
+        await navigator.clipboard.writeText(text);
+        $("reportHint").textContent = simple
+          ? "Rapport simple copié. Tu peux le coller dans Google Docs."
+          : "Rapport complet copié. Tu peux le coller dans Google Docs.";
+      } catch {
+        $("reportHint").textContent = "Copie impossible sur ce navigateur. Essaie le téléchargement TXT.";
+      }
+    }
+
+    function downloadReportTxt(simple = true) {
+      const text = buildReportText(simple);
+      const kind = simple ? "simple" : "complet";
+
+      downloadTextFile(reportFilename(kind, "txt"), text);
+      $("reportHint").textContent = `Téléchargement TXT ${kind} lancé. Ce fichier doit s’ouvrir correctement dans Google Docs.`;
+    }
+
+    function openReportPdf(simple = true) {
+      const text = buildReportText(simple);
+      const title = simple ? "Rapport FOOTSCAN simple" : "Rapport FOOTSCAN complet";
+      const win = window.open("", "_blank");
+
+      if (!win) {
+        $("reportHint").textContent = "Ouverture PDF bloquée. Autorise les pop-ups ou utilise le TXT.";
+        return;
+      }
+
+      win.document.open();
+      win.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${esc(title)}</title>
+  <style>
+    @page { margin: 16mm; }
+    body { font-family: "Google Sans", "Roboto", Arial, sans-serif; color: #111; line-height: 1.25; font-size: 6pt; }
+    pre { white-space: pre-wrap; word-break: break-word; font-family: "Google Sans", "Roboto", Arial, sans-serif; font-size: 6pt; line-height: 1.25; }
 
 
-def main():
-    once = "--once" in sys.argv
 
-    print("Foot/Scan worker local démarré.")
-    print("Version niveau 1: 🔎 scan complet côté worker activé.")
-    print("Pages Web: 10 Pages d’abord, extension automatique à 15 puis 20 si nécessaire.")
-    print("Mode simultané lié: mêmes rangs, match par match, minute par minute.")
-    print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Progression des rangs: curseur par job, défaut 1 par événement.")
-    print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
-    print("Stabilité réseau: mode strict activé, aucun résultat partiel accepté par défaut.")
-    print("Pour autoriser un scan partiel volontaire: FOOTSCAN_ALLOW_PARTIAL=1 python scripts/local_worker.py")
-    print("Préchargement événements: désactivé par défaut pour économiser les requêtes.")
-    print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
+    /* Finitions v8 : effets plus doux et fondus plus fluides */
+    @keyframes scanButtonBallRollV8 {
+      0% { transform: translateY(-50%) translateX(0) rotate(0deg) scale(1); opacity: 0; filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+      8% { opacity: 1; }
+      22% { transform: translateY(-57%) translateX(38px) rotate(150deg) scale(1.08); opacity: 1; filter: drop-shadow(0 10px 14px rgba(0,0,0,.28)); }
+      58% { transform: translateY(-50%) translateX(min(38vw, 180px)) rotate(620deg) scale(1); opacity: 1; }
+      82% { opacity: .92; }
+      100% { transform: translateY(-50%) translateX(min(58vw, 292px)) rotate(1080deg) scale(.72); opacity: 0; filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+    }
 
-    while True:
-        scan_job_id = redis_cmd("RPOP", SCAN_QUEUE_KEY)
+    @keyframes scanButtonKickV8 {
+      0% { transform: translateZ(0) scale(1); background-position: 0% 50%; }
+      24% { transform: translateZ(0) scale(.985); background-position: 35% 50%; }
+      62% { transform: translateZ(0) scale(1.012); background-position: 78% 50%; }
+      100% { transform: translateZ(0) scale(1); background-position: 100% 50%; }
+    }
 
-        if scan_job_id:
-            process_scan_job(scan_job_id)
-            continue
+    @keyframes statusFadeOutV8 {
+      0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+      100% { opacity: 0; transform: translateY(6px) scale(.986); filter: blur(2px); }
+    }
 
-        request_id = redis_cmd("RPOP", RAW_QUEUE_KEY)
+    @keyframes statusSoftInV8 {
+      0% { opacity: 0; transform: translateY(-6px) scale(.99); filter: blur(1px); }
+      100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    }
 
-        if request_id:
-            process_raw_request(request_id)
-            continue
+    @keyframes doneTitleFloatV8 {
+      0%, 100% { transform: translateY(0) scale(1); text-shadow: 0 10px 24px rgba(0,0,0,.42), 0 0 18px rgba(64,201,255,.24); }
+      50% { transform: translateY(-1px) scale(1.018); text-shadow: 0 14px 28px rgba(0,0,0,.38), 0 0 26px rgba(64,201,255,.38); }
+    }
 
-        prefetch_path = redis_cmd("RPOP", RAW_PREFETCH_QUEUE_KEY)
+    @keyframes statusConfettiLoopV8 {
+      0% { transform: translate3d(0, -24px, 0) rotate(0deg) scale(.92); opacity: 0; }
+      9% { opacity: .98; }
+      88% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 136px, 0) rotate(var(--r, 540deg)) scale(1); opacity: 0; }
+    }
 
-        if prefetch_path:
-            process_prefetch_path(prefetch_path)
-            continue
+    @keyframes finishFxFadeV8 {
+      0% { opacity: 0; }
+      7%, 88% { opacity: 1; }
+      100% { opacity: 0; }
+    }
 
-        if once:
-            print("Aucune requête en attente.")
-            break
+    @keyframes pageConfettiFallV8 {
+      0% { transform: translate3d(0, -8vh, 0) rotate(0deg) scale(.94); opacity: 0; }
+      10% { opacity: .92; }
+      86% { opacity: .88; }
+      100% { transform: translate3d(var(--x, 0px), 114vh, 0) rotate(var(--r, 720deg)) scale(1); opacity: 0; }
+    }
 
-        time.sleep(SLEEP_SECONDS)
+    @keyframes pageFireworkBurstV8 {
+      0% { transform: translate3d(0, 0, 0) scale(.18); opacity: 0; filter: blur(.5px); }
+      18% { opacity: 1; }
+      100% { transform: translate3d(var(--x, 0px), var(--y, 0px), 0) scale(1); opacity: 0; filter: blur(0); }
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .auto-box,
+    .preset-btn,
+    .skip-grid button,
+    .report-btn,
+    .auto-apply-btn,
+    input {
+      transition:
+        border-color .26s ease,
+        background-color .26s ease,
+        box-shadow .26s ease,
+        transform .22s ease,
+        opacity .22s ease;
+    }
+
+    .scan-btn {
+      transition:
+        color .32s ease,
+        text-shadow .32s ease,
+        filter .32s ease,
+        transform .24s ease,
+        box-shadow .32s ease;
+      will-change: transform, filter;
+    }
+
+    .scan-btn.scan-kick {
+      animation: scanButtonKickV8 1.14s cubic-bezier(.2,.78,.22,1) both;
+      color: rgba(255,255,255,.035) !important;
+      text-shadow: none !important;
+      filter: brightness(1.09) saturate(1.1);
+    }
+
+    .scan-btn.scan-kick::before {
+      animation: scanButtonBallRollV8 1.14s cubic-bezier(.16,.84,.18,1) forwards;
+    }
+
+    .status-box {
+      animation: statusSoftInV8 .38s cubic-bezier(.2,.76,.22,1) both;
+      will-change: opacity, transform, filter;
+    }
+
+    .status-box.status-fade-out {
+      animation: statusFadeOutV8 .18s ease both;
+    }
+
+    .status-box.status-done {
+      min-height: 84px;
+      animation: statusSoftInV8 .46s cubic-bezier(.16,.84,.22,1) both;
+    }
+
+    .status-done-title {
+      animation: statusSoftInV8 .42s cubic-bezier(.18,.86,.24,1) both, doneTitleFloatV8 2.2s ease-in-out .44s infinite;
+    }
+
+    .status-confetti-piece {
+      animation-name: statusConfettiLoopV8;
+      animation-timing-function: linear;
+    }
+
+    .finish-fx {
+      animation: finishFxFadeV8 12s ease forwards;
+    }
+
+    .finish-fx::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 18% 22%, rgba(64,201,255,.11), transparent 28%),
+        radial-gradient(circle at 82% 18%, rgba(251,113,133,.10), transparent 30%);
+      opacity: .9;
+    }
+
+    .confetti-piece {
+      animation-name: pageConfettiFallV8;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+
+    .firework-dot {
+      animation: pageFireworkBurstV8 1100ms cubic-bezier(.12,.74,.24,1) forwards;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .preset-btn:hover,
+      .skip-grid button:hover,
+      .report-btn:hover,
+      .auto-apply-btn:hover,
+      .scan-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        filter: brightness(1.04);
+      }
+    }
+
+  
+    </style>
+</head>
+<body>
+  <pre>${esc(text)}</pre>
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () { window.print(); }, 300);
+    });
+  <\/script>
+</body>
+</html>`);
+      win.document.close();
+
+      $("reportHint").textContent = "Fenêtre PDF ouverte. Choisis “Enregistrer en PDF” dans l’écran d’impression.";
+    }
+
+    function clearReport() {
+      localStorage.removeItem(REPORT_KEY);
+      updateReportCount();
+      $("reportHint").textContent = "Rapport vidé.";
+    }
+
+    async function handleScan() {
+      const button = $("scanBtn");
+      if (button.disabled || button.classList.contains("scan-kick")) return;
+
+      try {
+        await triggerScanButtonKick();
+        await startScanJob();
+      } catch (error) {
+        setError(error.message || String(error));
+        setStatus("");
+        finishScan();
+      }
+    }
+
+    function renderSkipButtons(id, getValue, setValue) {
+      const container = $(id);
+
+      function draw() {
+        container.innerHTML = "";
+
+        for (let i = 0; i <= 5; i++) {
+          const button = document.createElement("button");
+          button.textContent = i;
+          button.type = "button";
+
+          if (getValue() === i) {
+            button.className = "active";
+          }
+
+          button.addEventListener("click", () => {
+            setValue(i);
+            draw();
+          });
+
+          container.appendChild(button);
+        }
+      }
+
+      draw();
+    }
 
 
-if __name__ == "__main__":
-    main()
+
+    function updateRangeGradientFill() {
+      document.querySelectorAll('input[type="range"]').forEach((slider) => {
+        const min = Number(slider.min || 0);
+        const max = Number(slider.max || 100);
+        const value = Number(slider.value || 0);
+        const pct = max > min ? ((value - min) * 100) / (max - min) : 0;
+        slider.style.setProperty('--fill', `${Math.max(0, Math.min(100, pct))}%`);
+      });
+    }
+
+    function bindRangeAndNumber(rangeId, numberId, callback) {
+      $(rangeId).addEventListener("input", () => {
+        $(numberId).value = $(rangeId).value;
+        updateRangeGradientFill();
+        callback();
+      });
+
+      $(numberId).addEventListener("input", () => {
+        $(rangeId).value = $(numberId).value;
+        updateRangeGradientFill();
+        callback();
+      });
+    }
+
+    renderSkipButtons("skipHome", () => skipHomeValue, (value) => skipHomeValue = value);
+    renderSkipButtons("skipAway", () => skipAwayValue, (value) => skipAwayValue = value);
+
+    $("scanBtn").addEventListener("click", handleScan);
+    $("addReportBtn").addEventListener("click", addCurrentAnalysisToReport);
+    $("copySimpleReportBtn").addEventListener("click", () => copyReport(true));
+    $("copyFullReportBtn").addEventListener("click", () => copyReport(false));
+    $("downloadSimpleReportBtn").addEventListener("click", () => downloadReportTxt(true));
+    $("printSimpleReportBtn").addEventListener("click", () => openReportPdf(true));
+    $("downloadFullReportBtn").addEventListener("click", () => downloadReportTxt(false));
+    $("clearReportBtn").addEventListener("click", clearReport);
+
+    function bindCalculatorInput(rangeId, numberId) {
+      bindRangeAndNumber(rangeId, numberId, () => {
+        markPresetAsCustom();
+        updateAutoCalculator();
+      });
+    }
+
+    bindCalculatorInput("autoBaseRange", "autoBaseNumber");
+    bindCalculatorInput("autoAdvanceRange", "autoAdvanceNumber");
+    bindCalculatorInput("autoChangeRange", "autoChangeNumber");
+
+    $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays Officiels"));
+    $("friendlyPresetBtn").addEventListener("click", () => applyPreset("Pays Amicaux"));
+
+    $("simultaneousMode").addEventListener("change", updateAutoCalculator);
+    $("performanceAdvanceMode").addEventListener("change", updateAutoCalculator);
+    $("evolutionWinnerMode").addEventListener("change", updateAutoCalculator);
+    $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
+    $("rank1").addEventListener("input", () => {
+      if (!currentJobId) renderSelectedRanksStatus();
+    });
+    $("rank2").addEventListener("input", () => {
+      if (!currentJobId) renderSelectedRanksStatus();
+    });
+
+
+
+    function initMobileNavigationEffects() {
+      const items = Array.from(document.querySelectorAll(".hero, .panel, .summary, .team-card, .bar-box, .report-panel"));
+      items.forEach((item) => item.classList.add("fx-card"));
+
+      if (!("IntersectionObserver" in window)) {
+        items.forEach((item) => item.classList.add("is-visible"));
+        return;
+      }
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+
+      items.forEach((item) => observer.observe(item));
+    }
+
+    console.log("FOOTSCAN v100 chargé");
+
+    // Retouche v58 : interactions festives sur les blocs de résultats
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("button, a, input, label, details, summary")) return;
+      const win = e.target.closest(".dominance-box.dominance-win");
+      const done = e.target.closest(".status-done");
+      const sum = e.target.closest(".summary");
+      const target = win || done || sum;
+      if (!target) return;
+      target.classList.remove("fx-pop");
+      void target.offsetWidth;
+      target.classList.add("fx-pop");
+      if (typeof navigator.vibrate === "function") navigator.vibrate(12);
+      if (win || done) launchFinishFx();
+    });
+
+    // Retouche v47 : vibration légère au tap des boutons et interrupteurs (Android)
+    document.addEventListener("pointerdown", (e) => {
+      if (typeof navigator.vibrate !== "function") return;
+      if (e.target.closest("button, .mode-toggle, input[type='checkbox']")) {
+        navigator.vibrate(8);
+      }
+    }, { passive: true });
+
+setupCalcModeSlider();
+    initMobileNavigationEffects();
+    updateReportCount();
+    updateAutoCalculator();
+    updateRangeGradientFill();
+  </script>
+
+<script>
+  /* v119 : garde le correctif clavier sans repositionnement forcé.
+     v118 supprimait la bande blanche/noire, mais scrollIntoView() provoquait un retour
+     automatique à une ancienne position pendant le scroll clavier ouvert. Ici on se limite
+     à stabiliser le fond et l'état clavier : aucun scroll programmatique. */
+  (() => {
+    const body = document.body;
+    const root = document.documentElement;
+    const mq = window.matchMedia ? window.matchMedia('(max-width: 700px)') : null;
+    const isMobile = () => mq ? mq.matches : window.innerWidth <= 700;
+    const isEditable = (el) => el && el.matches && el.matches('input, textarea, select, [contenteditable="true"]');
+    const vv = window.visualViewport || null;
+    let raf = null;
+    let blurTimer = null;
+
+    const syncVars = () => {
+      if (vv) {
+        root.style.setProperty('--fs-visual-height', `${Math.round(vv.height)}px`);
+        root.style.setProperty('--fs-visual-offset-top', `${Math.round(vv.offsetTop || 0)}px`);
+      }
+      body.classList.toggle('keyboard-focus', isMobile() && isEditable(document.activeElement));
+    };
+
+    const sync = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(syncVars);
+    };
+
+    document.addEventListener('focusin', () => {
+      clearTimeout(blurTimer);
+      sync();
+    }, true);
+    document.addEventListener('focusout', () => {
+      clearTimeout(blurTimer);
+      blurTimer = setTimeout(sync, 90);
+    }, true);
+    window.addEventListener('resize', sync, { passive: true });
+    window.addEventListener('orientationchange', sync, { passive: true });
+    if (vv) {
+      vv.addEventListener('resize', sync, { passive: true });
+    }
+    sync();
+  })();
+</script>
+
+</body>
+</html>
