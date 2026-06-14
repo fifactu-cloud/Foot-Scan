@@ -82,6 +82,8 @@ SOFA_FETCH_RETRIES = int(os.environ.get("SOFA_FETCH_RETRIES", "2"))
 SOFA_RETRY_SLEEP_SECONDS = float(os.environ.get("SOFA_RETRY_SLEEP_SECONDS", "0.4"))
 SOFA_FETCH_TIMEOUT_SECONDS = int(os.environ.get("SOFA_FETCH_TIMEOUT_SECONDS", "12"))
 SOFA_DEBUG_NETWORK = os.environ.get("SOFA_DEBUG_NETWORK", "0").strip().lower() in ("1", "true", "oui", "yes")
+FOOTSCAN_ALLOW_PARTIAL = os.environ.get("FOOTSCAN_ALLOW_PARTIAL", "0").strip().lower() in ("1", "true", "oui", "yes")
+FOOTSCAN_STRICT_DATA = not FOOTSCAN_ALLOW_PARTIAL
 SOFA_INCIDENT_TIMEOUT_SECONDS = int(os.environ.get("SOFA_INCIDENT_TIMEOUT_SECONDS", "8"))
 SOFA_INCIDENT_RETRIES = int(os.environ.get("SOFA_INCIDENT_RETRIES", "1"))
 PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
@@ -428,11 +430,14 @@ def get_json(path):
 
 
 def get_incidents_json(path):
-    """Récupère les incidents sans bloquer tout le scan si SofaScore challenge.
+    """Récupère les incidents de manière déterministe.
 
-    SofaScore renvoie parfois 403 {reason: challenge} sur /incidents. Dans ce
-    cas on retourne une liste vide pour le match concerné: le scan continue,
-    le match est marqué à 0 événement au lieu de faire planter ou attendre.
+    Par défaut, si les événements d'un match ne sont pas récupérables
+    (ex: 403 challenge SofaScore), le scan échoue au lieu de produire
+    un résultat partiel qui peut changer d'un lancement à l'autre.
+
+    Pour retrouver l'ancien comportement permissif, lancer le worker avec :
+        FOOTSCAN_ALLOW_PARTIAL=1 python scripts/local_worker.py
     """
     clean_path = path.lstrip("/")
     cached = get_cached_body(clean_path)
@@ -449,6 +454,13 @@ def get_incidents_json(path):
         if "challenge" in msg or "HTTP 403" in msg:
             if SOFA_DEBUG_NETWORK:
                 print(f"Incidents non récupérés (SofaScore challenge): {clean_path}", file=sys.stderr)
+            if FOOTSCAN_STRICT_DATA:
+                raise RuntimeError(
+                    "Scan stoppé pour éviter un résultat variable : "
+                    f"événements Web non récupérés pour {clean_path} (SofaScore challenge). "
+                    "Relance plus tard ou lance le worker avec FOOTSCAN_ALLOW_PARTIAL=1 "
+                    "si tu acceptes un résultat partiel."
+                )
             return {
                 "incidents": [],
                 "_footscanIssue": {
@@ -1381,6 +1393,13 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 # avec ce qu'on a au lieu de faire planter tout le scan. Si la page 0 plante,
                 # on remonte l'erreur car on n'a aucune base pour analyser l'équipe.
                 if pages:
+                    if FOOTSCAN_STRICT_DATA:
+                        raise RuntimeError(
+                            "Scan stoppé pour éviter un résultat variable : "
+                            f"page Web {page + 1}/{target_pages} non récupérée pour {team_name}. "
+                            "Relance plus tard ou lance le worker avec FOOTSCAN_ALLOW_PARTIAL=1 "
+                            "si tu acceptes un résultat partiel."
+                        )
                     update_scan_job(
                         job_id,
                         status="running",
@@ -1432,7 +1451,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 
     sorted_matches = sorted(
         by_id.values(),
-        key=lambda m: m.get("startTimestamp") or 0,
+        key=lambda m: (m.get("startTimestamp") or 0, int(m.get("id") or 0)),
         reverse=True,
     )
 
@@ -1496,9 +1515,8 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                     try:
                         data = future.result()
                     except Exception as e:
-                        # Erreur réseau ou match incident indisponible : on ignore ce match
-                        # au lieu de faire échouer tout le scan. Les 403/404 SofaScore sont
-                        # attendus sur certains matchs, donc on ne les affiche qu'en debug.
+                        # En mode strict, aucun match partiel n'est accepté : sinon deux scans
+                        # identiques peuvent donner des valeurs différentes selon les blocages Web.
                         err_text = str(e)
                         expected_web_gap = (
                             "challenge" in err_text
@@ -1506,6 +1524,12 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                             or "HTTP 404" in err_text
                             or "Not Found" in err_text
                         )
+                        if FOOTSCAN_STRICT_DATA:
+                            raise RuntimeError(
+                                "Scan stoppé pour éviter un résultat variable : "
+                                f"événements non récupérés pour {make_match_label(match)}. "
+                                f"Détail: {err_text}"
+                            )
                         if SOFA_DEBUG_NETWORK or not expected_web_gap:
                             print(f"Match sans événements récupérés {match.get('id')}: {e}", file=sys.stderr)
 
@@ -1555,6 +1579,12 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                             "message": data_issue.get("message") or "Événements non récupérés pour ce match.",
                         }
                         event_data_issues.append(issue)
+                        if FOOTSCAN_STRICT_DATA:
+                            raise RuntimeError(
+                                "Scan stoppé pour éviter un résultat variable : "
+                                f"événements non récupérés pour {make_match_label(match)}. "
+                                f"Détail: {issue.get('reason') or issue.get('message')}"
+                            )
 
                     events = parse_incidents(incidents, match, analyzed_team_id)
 
@@ -1869,6 +1899,8 @@ def process_scan_job(job_id):
         away_issue_count = int(away.get("eventDataIssueCount") or 0)
         total_issue_count = home_issue_count + away_issue_count
         data_quality = {
+            "strictMode": FOOTSCAN_STRICT_DATA,
+            "partialAllowed": FOOTSCAN_ALLOW_PARTIAL,
             "isPartial": total_issue_count > 0,
             "eventDataIssueCount": total_issue_count,
             "homeIssueCount": home_issue_count,
@@ -1914,6 +1946,8 @@ def process_scan_job(job_id):
                 "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
                 "rankEventStepLabel": rank_advancement_label(),
                 "winnerMode": winner_mode,
+                "strictDataMode": FOOTSCAN_STRICT_DATA,
+                "partialAllowed": FOOTSCAN_ALLOW_PARTIAL,
             },
         }
 
@@ -2012,7 +2046,8 @@ def main():
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Progression des rangs: curseur par job, défaut 1 par événement.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
-    print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
+    print("Stabilité réseau: mode strict activé, aucun résultat partiel accepté par défaut.")
+    print("Pour autoriser un scan partiel volontaire: FOOTSCAN_ALLOW_PARTIAL=1 python scripts/local_worker.py")
     print("Préchargement événements: désactivé par défaut pour économiser les requêtes.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
