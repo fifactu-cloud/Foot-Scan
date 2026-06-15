@@ -519,7 +519,7 @@ def maybe_enqueue_incidents_from_team_page(path, body):
         if not isinstance(match, dict):
             continue
 
-        if (match.get("status") or {}).get("type") != "finished":
+        if administrative_match_reason(match):
             continue
 
         match_id = match.get("id")
@@ -588,6 +588,103 @@ def get_competition_name(match):
         season.get("name") or
         ""
     )
+
+
+def normalize_status_text(value):
+    text = str(value or "").strip().lower()
+    replacements = {
+        "é": "e", "è": "e", "ê": "e", "ë": "e",
+        "à": "a", "â": "a", "ä": "a",
+        "î": "i", "ï": "i",
+        "ô": "o", "ö": "o",
+        "ù": "u", "û": "u", "ü": "u",
+        "ç": "c",
+    }
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+    return text
+
+
+ADMIN_MATCH_KEYWORDS = (
+    "forfeit", "forfait",
+    "walkover", "walk over",
+    "awarded", "award",
+    "abandoned", "abandonne",
+    "cancelled", "canceled", "annule",
+    "postponed", "reporte",
+    "suspended", "suspendu",
+    "interrupted", "interrompu",
+    "retired",
+    "defaulted", "default loss", "default win",
+    "technical defeat", "technical loss", "technical win",
+)
+
+
+def administrative_match_reason(match):
+    """Retourne une raison si le match doit être exclu du calcul sportif.
+
+    Règle FOOTSCAN : tout match décidé administrativement ou non terminé
+    normalement est ignoré entièrement. Cela évite de compter des buts d'un
+    match abandonné/forfait/attribué dont le résultat officiel ne reflète plus
+    une performance sportive comparable.
+    """
+    if not isinstance(match, dict):
+        return "Format match invalide"
+
+    status = match.get("status") or {}
+    status_type = normalize_status_text(status.get("type"))
+
+    if status_type and status_type != "finished":
+        return f"Statut non terminé normalement: {status.get('type')}"
+
+    values = []
+
+    def add(value):
+        if value is None:
+            return
+        if isinstance(value, (str, int, float, bool)):
+            values.append(str(value))
+
+    # Champs SofaScore connus ou fréquents pour les statuts administratifs.
+    for key in ("type", "description", "reason", "text", "name", "short", "detail"):
+        add(status.get(key))
+
+    for key in (
+        "statusDescription", "statusText", "statusReason", "reason",
+        "note", "notes", "description", "resultType", "matchStatus",
+        "defaultScore", "defaultWinner", "forfeit", "walkover",
+        "awarded", "abandoned", "cancelled", "canceled", "postponed",
+        "suspended", "interrupted", "retired",
+    ):
+        add(match.get(key))
+
+    haystack = " | ".join(normalize_status_text(v) for v in values if str(v).strip())
+
+    if not haystack:
+        return None
+
+    for keyword in ADMIN_MATCH_KEYWORDS:
+        if keyword in haystack:
+            return f"Statut administratif détecté: {keyword}"
+
+    # Cas de booléens explicites, si l'API les fournit.
+    for key in ("forfeit", "walkover", "awarded", "abandoned", "cancelled", "canceled", "postponed", "suspended", "interrupted", "retired"):
+        if match.get(key) is True:
+            return f"Statut administratif détecté: {key}"
+
+    return None
+
+
+def make_administrative_match_issue(match, reason):
+    return {
+        "id": match.get("id"),
+        "label": make_match_label(match),
+        "competition": get_competition_name(match),
+        "startTimestamp": match.get("startTimestamp") or 0,
+        "type": "administrative",
+        "reason": reason or "Match administratif / forfait",
+        "message": "Match ignoré: forfait, abandon, report, annulation ou décision administrative.",
+    }
 
 
 def make_match_label(match):
@@ -1387,6 +1484,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 
     pages = []
     stopped_history = False
+    administrative_matches_ignored = {}
 
     def build_finished_matches():
         by_id = {}
@@ -1400,14 +1498,15 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             if not match_id:
                 continue
 
-            status_type = (match.get("status") or {}).get("type")
             home_id = (match.get("homeTeam") or {}).get("id")
             away_id = (match.get("awayTeam") or {}).get("id")
 
-            if status_type != "finished":
+            if home_id != analyzed_team_id and away_id != analyzed_team_id:
                 continue
 
-            if home_id != analyzed_team_id and away_id != analyzed_team_id:
+            admin_reason = administrative_match_reason(match)
+            if admin_reason:
+                administrative_matches_ignored[match_id] = make_administrative_match_issue(match, admin_reason)
                 continue
 
             by_id[match_id] = match
@@ -1672,7 +1771,19 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 break
 
     issue_count = len(event_data_issues)
-    issue_note = f" · ⚠️ {issue_count} match(s) sans événements récupérés" if issue_count else ""
+    administrative_ignored = sorted(
+        administrative_matches_ignored.values(),
+        key=lambda item: (item.get("startTimestamp") or 0, item.get("id") or 0),
+        reverse=True,
+    )
+    administrative_count = len(administrative_ignored)
+
+    issue_parts = []
+    if issue_count:
+        issue_parts.append(f"⚠️ {issue_count} match(s) sans événements récupérés")
+    if administrative_count:
+        issue_parts.append(f"🚫 {administrative_count} match(s) administratif(s) ignoré(s)")
+    issue_note = " · " + " · ".join(issue_parts) if issue_parts else ""
 
     update_scan_job(
         job_id,
@@ -1683,12 +1794,16 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 
     if issue_count:
         print(f"⚠️ {team_name}: {issue_count} match(s) sans événements récupérés. Résultat partiel pour cette équipe.")
+    if administrative_count:
+        print(f"🚫 {team_name}: {administrative_count} match(s) forfait/administratif(s) ignoré(s).")
 
     return {
         "events": all_events,
         "matchesUsed": matches_used,
         "eventDataIssues": event_data_issues,
         "eventDataIssueCount": issue_count,
+        "administrativeMatchesIgnored": administrative_ignored,
+        "administrativeMatchCount": administrative_count,
         "scanPartial": bool(issue_count),
     }
 
@@ -1975,11 +2090,18 @@ def process_scan_job(job_id):
         home_issue_count = int(home.get("eventDataIssueCount") or 0)
         away_issue_count = int(away.get("eventDataIssueCount") or 0)
         total_issue_count = home_issue_count + away_issue_count
+        home_admin_count = int(home.get("administrativeMatchCount") or 0)
+        away_admin_count = int(away.get("administrativeMatchCount") or 0)
+        total_admin_count = home_admin_count + away_admin_count
         data_quality = {
             "isPartial": total_issue_count > 0,
             "eventDataIssueCount": total_issue_count,
             "homeIssueCount": home_issue_count,
             "awayIssueCount": away_issue_count,
+            "administrativeMatchCount": total_admin_count,
+            "homeAdministrativeMatchCount": home_admin_count,
+            "awayAdministrativeMatchCount": away_admin_count,
+            "administrativeMatchesIgnored": (home.get("administrativeMatchesIgnored") or []) + (away.get("administrativeMatchesIgnored") or []),
             "message": (
                 f"⚠️ Scan partiel : {total_issue_count} match(s) sans événements récupérés. "
                 "Les buts de ces matchs ne sont pas comptés."
@@ -2037,6 +2159,8 @@ def process_scan_job(job_id):
             print(f"⚠️ Scan terminé avec données partielles: {job_id} · {data_quality['eventDataIssueCount']} match(s) sans événements récupérés")
         else:
             print(f"✅ Scan terminé complet: {job_id} · aucun événement ignoré")
+        if data_quality.get("administrativeMatchCount"):
+            print(f"🚫 Matchs forfait/administratifs ignorés: {data_quality['administrativeMatchCount']}")
 
     except Exception as e:
         update_scan_job(
