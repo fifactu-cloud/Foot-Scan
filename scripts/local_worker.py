@@ -771,21 +771,75 @@ def signed_own_goal_value(is_for_analyzed_team):
     return base if is_for_analyzed_team else -base
 
 
+def incident_assist_name(incident):
+    """Retourne un nom de passeur si SofaScore expose une passe décisive."""
+    if not isinstance(incident, dict):
+        return None
+
+    for key in ("assist1", "assist2", "assist", "assistPlayer"):
+        assist = incident.get(key)
+
+        if isinstance(assist, dict):
+            name = assist.get("name") or assist.get("shortName") or assist.get("slug")
+            if name:
+                return str(name)
+
+        if isinstance(assist, str) and assist.strip():
+            return assist.strip()
+
+    return None
+
+
+def match_contains_goal_assist(incidents):
+    """Indique si le match contient au moins une passe décisive récupérée."""
+    for incident in incidents or []:
+        if not isinstance(incident, dict):
+            continue
+
+        if incident.get("incidentType") != "goal":
+            continue
+
+        if is_own_goal_incident(incident):
+            continue
+
+        minute = incident.get("time")
+        if minute is None or minute < 1 or minute > 90:
+            continue
+
+        if incident_assist_name(incident):
+            return True
+
+    return False
+
+
 def parse_incidents(incidents, match, analyzed_team_id):
     """Récupère uniquement les buts.
 
-    Depuis cette version, les cartons et les passes décisives seules ne sont
-    plus parcourus. Les seuls événements conservés sont :
-    - But Avec Passeur = performance 1
-    - But Sans Passeur = 2/3 de performance 1
-    - CSC / Erreur adverse = 1/3 de performance 1
+    Les cartons et les passes décisives seules ne sont pas parcourus.
+    Les seuls événements conservés sont :
+    - But Avec Passeur = performance 1 ;
+    - But Sans Passeur = performance 2/3, attribuée uniquement au camp qui marque ;
+    - CSC / Erreur = performance -1/3 pour l'équipe qui marque contre son camp.
 
-    Le 1/3 d'un But Sans Passeur est classé dans la catégorie CSC / Erreur :
-    il compte comme une erreur de l'équipe qui encaisse.
+    Important : un But Sans Passeur ne crée plus d'événement d'erreur
+    artificiel pour l'équipe qui encaisse.
     """
     events = []
     match_label = make_match_label(match)
     match_id = match.get("id")
+    match_has_assists = match_contains_goal_assist(incidents)
+
+    def common_event_fields(minute, added, minute_label, side, match_has_assists):
+        return {
+            "minute": minute,
+            "added": added,
+            "minuteLabel": minute_label,
+            "match": match_label,
+            "matchId": match_id,
+            "matchHasAssists": match_has_assists,
+            "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
+            "side": side,
+        }
 
     for inc in incidents:
         if not isinstance(inc, dict):
@@ -816,68 +870,33 @@ def parse_incidents(incidents, match, analyzed_team_id):
             events.append({
                 "type": "ownGoal",
                 "value": signed_own_goal_value(is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
+                **common_event_fields(minute, added, minute_label, side, match_has_assists),
                 "detail": f"{camp_label} · CSC / Erreur · {scorer}",
                 "icon": "🥅",
             })
             continue
 
-        assist1 = inc.get("assist1") or None
-        assister = assist1.get("name") if isinstance(assist1, dict) else None
+        assister = incident_assist_name(inc)
 
         if assister:
             events.append({
                 "type": "goalWithAssist",
                 "value": signed_attack_value("goalWithAssist", is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
+                **common_event_fields(minute, added, minute_label, side, match_has_assists),
                 "detail": f"{camp_label} · But Avec Passeur · {scorer} — passe : {assister}",
                 "icon": "⚽",
             })
         else:
-            # Un But Sans Passeur est volontairement découpé en deux événements :
-            # 1) le but de l'équipe qui marque = 2/3 de performance 1 ;
-            # 2) l'erreur de l'équipe qui encaisse = 1/3 de performance 1.
-            # L'ordre est important : but d'abord, erreur ensuite.
+            # Un But Sans Passeur compte désormais uniquement comme un
+            # événement du camp qui marque. Il ne crée plus de 1/3 d'erreur
+            # artificielle pour le camp qui encaisse.
             events.append({
                 "type": "goal",
                 "value": signed_attack_value("goal", is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": side,
+                **common_event_fields(minute, added, minute_label, side, match_has_assists),
                 "detail": f"{camp_label} · But Sans Passeur · {scorer}",
                 "icon": "⚽",
                 "subOrder": 0,
-            })
-
-            error_is_for_team = not is_for_team
-            error_camp_label = "Équipe analysée" if error_is_for_team else "Adversaire"
-            error_side = "team" if error_is_for_team else "opponent"
-
-            events.append({
-                "type": "ownGoal",
-                "value": signed_own_goal_value(error_is_for_team),
-                "minute": minute,
-                "added": added,
-                "minuteLabel": minute_label,
-                "match": match_label,
-                "matchId": match_id,
-                "side": error_side,
-                "detail": f"{error_camp_label} · CSC / Erreur sur But Sans Passeur · {scorer}",
-                "icon": "🥅",
-                "subOrder": 1,
             })
 
     def sort_key(ev):
@@ -892,7 +911,6 @@ def parse_incidents(incidents, match, analyzed_team_id):
 
     events.sort(key=sort_key)
     return events
-
 
 def event_rank_quantity(event):
     """Quantité qui fait avancer le rang.
@@ -1474,7 +1492,18 @@ def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
     result["combinedEventCount"] = len(combined_events or [])
     return result
 
-def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span):
+def direct_team_events_only(events):
+    """Calcul séparé: garde uniquement les événements propres à l'équipe.
+
+    - but de l'équipe analysée: gardé ;
+    - but adverse: ignoré ;
+    - CSC commis par l'équipe analysée: gardé comme événement négatif ;
+    - CSC adverse qui profite à l'équipe analysée: ignoré.
+    """
+    return [event for event in (events or []) if isinstance(event, dict) and event.get("side") == "team"]
+
+
+def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span, direct_team_only=False):
     update_scan_job(
         job_id,
         status="running",
@@ -1734,11 +1763,12 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                         event_data_issues.append(issue)
 
                     events = parse_incidents(incidents, match, analyzed_team_id)
+                    scan_events = direct_team_events_only(events) if direct_team_only else events
 
                     match_used = {
                         "id": match.get("id"),
                         "label": make_match_label(match),
-                        "count": len(events),
+                        "count": len(scan_events),
                         "startTimestamp": match.get("startTimestamp") or 0,
                         "competition": get_competition_name(match),
                         "eventDataStatus": "ok",
@@ -1752,15 +1782,18 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                     scanned.append({
                         "idx": idx,
                         "match": match,
-                        "events": events,
+                        "events": scan_events,
                         "matchUsed": match_used,
                     })
 
             scanned.sort(key=lambda item: item["idx"])
 
             for item in scanned:
-                all_events.extend(item["events"])
-                matches_used.append(item["matchUsed"])
+                item_events = item["events"] or []
+
+                if item_events:
+                    all_events.extend(item_events)
+                    matches_used.append(item["matchUsed"])
 
                 if total_rank_quantity(all_events) >= max_needed:
                     break
@@ -1812,12 +1845,16 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domicile", away_name="Extérieur"):
     """Construit le mode simultané match par match puis minute par minute.
 
-    Règle importante demandée:
-    - les événements de l'équipe analysée restent dans son flux.
-    - les événements de l'adversaire dans le passé de A sont transférés au flux de B,
-      avec la valeur inversée.
-    - les événements de l'adversaire dans le passé de B sont transférés au flux de A,
-      avec la valeur inversée.
+    Règle v127 : le mode simultané utilise la même attribution que le calcul
+    séparé. Un événement appartient uniquement au camp qui l'a produit.
+
+    Donc :
+    - événement direct domicile -> flux domicile ;
+    - événement direct extérieur -> flux extérieur ;
+    - événement adverse présent par sécurité -> ignoré, jamais réattribué.
+
+    La simultanéité change seulement l'ordre de lecture des événements, pas leur
+    propriétaire ni leur signe.
     """
 
     def strip_camp_prefix(detail):
@@ -1855,27 +1892,16 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
 
         return order, grouped, meta_by_id
 
-    def copy_for_target(event, target_key, source_name, target_name, linked_from_opponent):
+    def copy_for_target(event, target_key, source_name, target_name):
         copied = dict(event)
         clean_detail = strip_camp_prefix(copied.get("detail"))
 
         copied["targetName"] = target_name
         copied["simultaneousTarget"] = target_key
         copied["displaySide"] = f"Attribué à {target_name}"
-
-        if linked_from_opponent:
-            try:
-                copied["value"] = round(-float(copied.get("value", 0)), 4)
-            except Exception:
-                copied["value"] = copied.get("value")
-
-            copied["side"] = "team"
-            copied["linkedFromOpponentPast"] = True
-            copied["originLabel"] = f"adversaire passé de {source_name}"
-            copied["detail"] = f"Attribué à {target_name} · origine: adversaire passé de {source_name} · {clean_detail}"
-        else:
-            copied["originLabel"] = f"passé direct de {target_name}"
-            copied["detail"] = f"Attribué à {target_name} · origine: passé direct · {clean_detail}"
+        copied["originLabel"] = f"passé direct de {target_name}"
+        copied["linkedFromOpponentPast"] = False
+        copied["detail"] = f"Attribué à {target_name} · origine: passé direct · {clean_detail}"
 
         return copied
 
@@ -1915,38 +1941,27 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
             return (-(minute + added / 100), 0 if source_key == "home" else 1, original_index)
 
         for source_key, original_index, event in sorted(items, key=sort_key):
+            # Sécurité: si un événement adverse remonte malgré le filtrage direct,
+            # il est ignoré. Il ne doit jamais être inversé ni réattribué.
+            if event.get("side") != "team":
+                continue
+
             shared_index += 1
 
             if source_key == "home":
-                if event.get("side") == "opponent":
-                    copied = copy_for_target(event, "away", home_name, away_name, True)
-                    copied = attach_match_meta(copied, home_meta_by_id.get(event.get("matchId")))
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    away_events.append(copied)
-                    combined_events.append(dict(copied))
-                else:
-                    copied = copy_for_target(event, "home", home_name, home_name, False)
-                    copied = attach_match_meta(copied, home_meta_by_id.get(event.get("matchId")))
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    home_events.append(copied)
-                    combined_events.append(dict(copied))
+                copied = copy_for_target(event, "home", home_name, home_name)
+                copied = attach_match_meta(copied, home_meta_by_id.get(event.get("matchId")))
+                copied["simultaneousIndex"] = shared_index
+                copied["simultaneousMatchPair"] = match_index + 1
+                home_events.append(copied)
+                combined_events.append(dict(copied))
             else:
-                if event.get("side") == "opponent":
-                    copied = copy_for_target(event, "home", away_name, home_name, True)
-                    copied = attach_match_meta(copied, away_meta_by_id.get(event.get("matchId")))
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    home_events.append(copied)
-                    combined_events.append(dict(copied))
-                else:
-                    copied = copy_for_target(event, "away", away_name, away_name, False)
-                    copied = attach_match_meta(copied, away_meta_by_id.get(event.get("matchId")))
-                    copied["simultaneousIndex"] = shared_index
-                    copied["simultaneousMatchPair"] = match_index + 1
-                    away_events.append(copied)
-                    combined_events.append(dict(copied))
+                copied = copy_for_target(event, "away", away_name, away_name)
+                copied = attach_match_meta(copied, away_meta_by_id.get(event.get("matchId")))
+                copied["simultaneousIndex"] = shared_index
+                copied["simultaneousMatchPair"] = match_index + 1
+                away_events.append(copied)
+                combined_events.append(dict(copied))
 
     combined_events.sort(key=lambda event: event.get("simultaneousIndex") or 0)
 
@@ -1991,16 +2006,11 @@ def process_scan_job(job_id):
 
     max_needed = float(max(ranks))
 
-    # En mode simultané, chaque performance attribuée à une équipe est construite
-    # avec deux historiques :
-    # - le passé direct de cette équipe ;
-    # - l'adversaire passé de l'autre équipe.
-    #
-    # Si on ne récupère que "max_needed" événements bruts par équipe, il peut
-    # manquer des événements après réattribution, car tous les événements bruts ne
-    # finissent pas dans la même liste attribuée. On récupère donc plus large en
-    # simultané, puis on reclasse seulement après.
-    scan_fetch_needed = max_needed * 2 if simultaneous_mode else max_needed
+    # Règle v127: en séparé comme en simultané, un événement appartient
+    # uniquement au camp qui l'a produit. Le mode simultané ne réattribue plus
+    # les événements de l'adversaire passé: il ne fait que réordonner les
+    # événements directs des deux équipes match par match puis minute par minute.
+    scan_fetch_needed = max_needed
 
     print(
         f"🔎 Scan complet: job={job_id} match={match_id} "
@@ -2036,6 +2046,7 @@ def process_scan_job(job_id):
             home_team.get("name") or "Domicile",
             12,
             40,
+            direct_team_only=True,
         )
 
         away_scan = scan_team(
@@ -2046,6 +2057,7 @@ def process_scan_job(job_id):
             away_team.get("name") or "Extérieur",
             54,
             40,
+            direct_team_only=True,
         )
 
         simultaneous_combined_events = []
@@ -2054,7 +2066,7 @@ def process_scan_job(job_id):
             update_scan_job(
                 job_id,
                 status="running",
-                message="Calcul simultané: reclassement match par match puis minute par minute…",
+                message="Calcul simultané: ordre match par match/minute, événements directs uniquement…",
                 progress=96,
             )
             home_scan, away_scan, simultaneous_combined_events = apply_simultaneous_match_minute_order(
@@ -2129,7 +2141,7 @@ def process_scan_job(job_id):
             "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
             "rankEventStepLabel": rank_advancement_label(),
             "winnerMode": winner_mode,
-            "scanModeLabel": "Simultané lié: mêmes rangs, match par match / minute par minute" if simultaneous_mode else "Standard",
+            "scanModeLabel": "Simultané: événements directs uniquement, match par match / minute par minute" if simultaneous_mode else "Séparé: événements de l'équipe uniquement",
             "overallZoneStats": None,
             "dataQuality": data_quality,
             "config": {
@@ -2239,7 +2251,7 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: 🔎 scan complet côté worker activé.")
     print("Pages Web: 10 Pages d’abord, extension automatique à 15 puis 20 si nécessaire.")
-    print("Mode simultané lié: mêmes rangs, match par match, minute par minute.")
+    print("Mode simultané: événements directs uniquement, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Progression des rangs: curseur par job, défaut 1 par événement.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
