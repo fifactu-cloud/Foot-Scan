@@ -1654,6 +1654,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     matches_used = []
     event_data_issues = []
     scanned_until = 0
+    considered_matches = []
 
     for stage_limit in stages:
         if total_rank_quantity(all_events) >= max_needed:
@@ -1725,12 +1726,11 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                             "reason": err_text,
                             "message": "Événements non récupérés pour ce match.",
                         }
-                        event_data_issues.append(issue)
-
                         scanned.append({
                             "idx": idx,
                             "match": match,
                             "events": [],
+                            "issue": issue,
                             "matchUsed": {
                                 "id": match.get("id"),
                                 "label": make_match_label(match),
@@ -1760,7 +1760,8 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                             "reason": data_issue.get("reason") or data_issue.get("message") or "Événements non récupérés",
                             "message": data_issue.get("message") or "Événements non récupérés pour ce match.",
                         }
-                        event_data_issues.append(issue)
+                    else:
+                        issue = None
 
                     events = parse_incidents(incidents, match, analyzed_team_id)
                     scan_events = direct_team_events_only(events) if direct_team_only else events
@@ -1783,12 +1784,21 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                         "idx": idx,
                         "match": match,
                         "events": scan_events,
+                        "issue": issue,
                         "matchUsed": match_used,
                     })
 
             scanned.sort(key=lambda item: item["idx"])
 
             for item in scanned:
+                # On ne compte les erreurs/ignorés que pour les matchs réellement
+                # parcourus avant l'arrêt du scan. Les matchs récupérés en avance
+                # dans le même batch ne doivent pas gonfler les compteurs.
+                considered_matches.append(item.get("match") or {})
+
+                if item.get("issue"):
+                    event_data_issues.append(item["issue"])
+
                 item_events = item["events"] or []
 
                 if item_events:
@@ -1804,8 +1814,28 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 break
 
     issue_count = len(event_data_issues)
+
+    # Ne pas afficher tous les matchs administratifs trouvés dans les pages Web :
+    # cela donnait parfois des quantités abusives. On affiche seulement ceux qui
+    # se situent dans la tranche temporelle réellement parcourue par le scan.
+    if considered_matches:
+        considered_timestamps = [m.get("startTimestamp") or 0 for m in considered_matches if isinstance(m, dict)]
+        considered_timestamps = [ts for ts in considered_timestamps if ts]
+    else:
+        considered_timestamps = []
+
+    if considered_timestamps:
+        newest_considered = max(considered_timestamps)
+        oldest_considered = min(considered_timestamps)
+        administrative_source = [
+            item for item in administrative_matches_ignored.values()
+            if oldest_considered <= (item.get("startTimestamp") or 0) <= newest_considered
+        ]
+    else:
+        administrative_source = []
+
     administrative_ignored = sorted(
-        administrative_matches_ignored.values(),
+        administrative_source,
         key=lambda item: (item.get("startTimestamp") or 0, item.get("id") or 0),
         reverse=True,
     )
@@ -1845,16 +1875,15 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domicile", away_name="Extérieur"):
     """Construit le mode simultané match par match puis minute par minute.
 
-    Règle v127 : le mode simultané utilise la même attribution que le calcul
-    séparé. Un événement appartient uniquement au camp qui l'a produit.
+    Règle v128 validée :
+    - flux domicile = événements directs du domicile + événements directs des
+      adversaires passés de l'extérieur ;
+    - flux extérieur = événements directs de l'extérieur + événements directs des
+      adversaires passés du domicile.
 
-    Donc :
-    - événement direct domicile -> flux domicile ;
-    - événement direct extérieur -> flux extérieur ;
-    - événement adverse présent par sécurité -> ignoré, jamais réattribué.
-
-    La simultanéité change seulement l'ordre de lecture des événements, pas leur
-    propriétaire ni leur signe.
+    Important : on ne crée pas d'événement artificiel. Un événement adverse
+    transféré est simplement remis dans le sens de l'équipe qui l'a vraiment
+    produit : son signe est donc inversé par rapport au scan de départ.
     """
 
     def strip_camp_prefix(detail):
@@ -1873,7 +1902,8 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
             match_id = match.get("id")
             if match_id is None:
                 continue
-            order.append(match_id)
+            if match_id not in grouped:
+                order.append(match_id)
             grouped.setdefault(match_id, [])
             meta_by_id[match_id] = match
 
@@ -1892,16 +1922,29 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
 
         return order, grouped, meta_by_id
 
-    def copy_for_target(event, target_key, source_name, target_name):
+    def copy_for_target(event, target_key, source_name, target_name, linked_from_opponent):
         copied = dict(event)
         clean_detail = strip_camp_prefix(copied.get("detail"))
 
         copied["targetName"] = target_name
         copied["simultaneousTarget"] = target_key
         copied["displaySide"] = f"Attribué à {target_name}"
-        copied["originLabel"] = f"passé direct de {target_name}"
-        copied["linkedFromOpponentPast"] = False
-        copied["detail"] = f"Attribué à {target_name} · origine: passé direct · {clean_detail}"
+
+        if linked_from_opponent:
+            try:
+                copied["value"] = round(-float(copied.get("value", 0)), 4)
+            except Exception:
+                copied["value"] = copied.get("value")
+
+            copied["side"] = "team"
+            copied["linkedFromOpponentPast"] = True
+            copied["originLabel"] = f"adversaire passé de {source_name}"
+            copied["detail"] = f"Attribué à {target_name} · origine: adversaire passé de {source_name} · {clean_detail}"
+        else:
+            copied["side"] = "team"
+            copied["linkedFromOpponentPast"] = False
+            copied["originLabel"] = f"passé direct de {target_name}"
+            copied["detail"] = f"Attribué à {target_name} · origine: passé direct · {clean_detail}"
 
         return copied
 
@@ -1941,27 +1984,36 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
             return (-(minute + added / 100), 0 if source_key == "home" else 1, original_index)
 
         for source_key, original_index, event in sorted(items, key=sort_key):
-            # Sécurité: si un événement adverse remonte malgré le filtrage direct,
-            # il est ignoré. Il ne doit jamais être inversé ni réattribué.
-            if event.get("side") != "team":
+            side = event.get("side")
+            if side not in {"team", "opponent"}:
                 continue
 
             shared_index += 1
 
             if source_key == "home":
-                copied = copy_for_target(event, "home", home_name, home_name)
-                copied = attach_match_meta(copied, home_meta_by_id.get(event.get("matchId")))
-                copied["simultaneousIndex"] = shared_index
-                copied["simultaneousMatchPair"] = match_index + 1
-                home_events.append(copied)
-                combined_events.append(dict(copied))
+                if side == "opponent":
+                    # Adversaire passé du domicile -> flux extérieur.
+                    copied = copy_for_target(event, "away", home_name, away_name, True)
+                    copied = attach_match_meta(copied, home_meta_by_id.get(event.get("matchId")))
+                    away_events.append(copied)
+                else:
+                    copied = copy_for_target(event, "home", home_name, home_name, False)
+                    copied = attach_match_meta(copied, home_meta_by_id.get(event.get("matchId")))
+                    home_events.append(copied)
             else:
-                copied = copy_for_target(event, "away", away_name, away_name)
-                copied = attach_match_meta(copied, away_meta_by_id.get(event.get("matchId")))
-                copied["simultaneousIndex"] = shared_index
-                copied["simultaneousMatchPair"] = match_index + 1
-                away_events.append(copied)
-                combined_events.append(dict(copied))
+                if side == "opponent":
+                    # Adversaire passé de l'extérieur -> flux domicile.
+                    copied = copy_for_target(event, "home", away_name, home_name, True)
+                    copied = attach_match_meta(copied, away_meta_by_id.get(event.get("matchId")))
+                    home_events.append(copied)
+                else:
+                    copied = copy_for_target(event, "away", away_name, away_name, False)
+                    copied = attach_match_meta(copied, away_meta_by_id.get(event.get("matchId")))
+                    away_events.append(copied)
+
+            copied["simultaneousIndex"] = shared_index
+            copied["simultaneousMatchPair"] = match_index + 1
+            combined_events.append(dict(copied))
 
     combined_events.sort(key=lambda event: event.get("simultaneousIndex") or 0)
 
@@ -2006,11 +2058,11 @@ def process_scan_job(job_id):
 
     max_needed = float(max(ranks))
 
-    # Règle v127: en séparé comme en simultané, un événement appartient
-    # uniquement au camp qui l'a produit. Le mode simultané ne réattribue plus
-    # les événements de l'adversaire passé: il ne fait que réordonner les
-    # événements directs des deux équipes match par match puis minute par minute.
-    scan_fetch_needed = max_needed
+    # En mode simultané, chaque flux est composé de deux sources :
+    # - le passé direct de l'équipe ;
+    # - les événements directs des adversaires passés de l'autre équipe.
+    # On récupère donc une marge plus large, puis on masque la marge à l'affichage.
+    scan_fetch_needed = max_needed * 2 if simultaneous_mode else max_needed
 
     print(
         f"🔎 Scan complet: job={job_id} match={match_id} "
@@ -2046,7 +2098,7 @@ def process_scan_job(job_id):
             home_team.get("name") or "Domicile",
             12,
             40,
-            direct_team_only=True,
+            direct_team_only=not simultaneous_mode,
         )
 
         away_scan = scan_team(
@@ -2057,7 +2109,7 @@ def process_scan_job(job_id):
             away_team.get("name") or "Extérieur",
             54,
             40,
-            direct_team_only=True,
+            direct_team_only=not simultaneous_mode,
         )
 
         simultaneous_combined_events = []
@@ -2066,7 +2118,7 @@ def process_scan_job(job_id):
             update_scan_job(
                 job_id,
                 status="running",
-                message="Calcul simultané: ordre match par match/minute, événements directs uniquement…",
+                message="Calcul simultané: équipe + adversaires passés opposés, match/minute…",
                 progress=96,
             )
             home_scan, away_scan, simultaneous_combined_events = apply_simultaneous_match_minute_order(
@@ -2141,7 +2193,7 @@ def process_scan_job(job_id):
             "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
             "rankEventStepLabel": rank_advancement_label(),
             "winnerMode": winner_mode,
-            "scanModeLabel": "Simultané: événements directs uniquement, match par match / minute par minute" if simultaneous_mode else "Séparé: événements de l'équipe uniquement",
+            "scanModeLabel": "Simultané: équipe + adversaires passés opposés, match par match / minute" if simultaneous_mode else "Séparé: événements de l'équipe uniquement",
             "overallZoneStats": None,
             "dataQuality": data_quality,
             "config": {
@@ -2251,7 +2303,7 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: 🔎 scan complet côté worker activé.")
     print("Pages Web: 10 Pages d’abord, extension automatique à 15 puis 20 si nécessaire.")
-    print("Mode simultané: événements directs uniquement, match par match, minute par minute.")
+    print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Progression des rangs: curseur par job, défaut 1 par événement.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
