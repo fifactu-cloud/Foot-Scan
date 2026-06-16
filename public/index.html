@@ -5482,6 +5482,38 @@
       line-height: 1.38 !important;
     }
 
+    .assist-check-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 20px;
+      padding: 0 6px;
+      margin-right: 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 1000;
+      letter-spacing: .03em;
+      vertical-align: 1px;
+      border: 1px solid rgba(255,255,255,.13);
+      background: rgba(15, 23, 42, .54);
+      color: rgba(226,232,240,.86);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+
+    .assist-check-ok {
+      border-color: rgba(56,189,248,.28);
+      background: rgba(14,165,233,.13);
+      color: #bfdbfe;
+    }
+
+    .assist-check-missing {
+      border-color: rgba(244,114,182,.20);
+      background: rgba(168,85,247,.10);
+      color: #e9d5ff;
+    }
+
     details.clean summary {
       justify-content: flex-start !important;
       gap: 8px !important;
@@ -7786,7 +7818,7 @@
       margin: 9px auto 12px !important;
     }
 
-    /* Retouche v75 : bases presets 41.75, centrage VS, confettis réajustés */
+    /* Retouche v124 : presets basés sur v58 divisés par deux, progression conservée */
     .summary-title {
       flex-wrap: wrap !important;
     }
@@ -9718,8 +9750,8 @@
                 <span id="activePresetLabel">Libre</span>
               </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 CLUBS/PAYS OFFICIELS<small>Base 31,3125 · Progression 1 · Changements 7</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 PAYS AMICAUX<small>Base 31,3125 · Progression 1 · Changements 13</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 CLUBS/PAYS OFFICIELS<small>Base 15,65625 · Progression 1 · Changements 3,5</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 PAYS AMICAUX<small>Base 15,65625 · Progression 1 · Changements 6,5</small></button>
               </div>
             </div>
 
@@ -9727,9 +9759,9 @@
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Base</div>
-                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="31.3125" />
+                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="15.65625" />
                 </div>
-                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="31.3125" />
+                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="15.65625" />
               </div>
 
               <div class="auto-control">
@@ -9758,12 +9790,12 @@
             <div class="auto-result">
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang Bas</div>
-                <div class="auto-result-value" id="autoLow">26.8125</div>
+                <div class="auto-result-value" id="autoLow">13.40625</div>
               </div>
 
               <div class="auto-result-card">
                 <div class="auto-result-label">Rang Haut</div>
-                <div class="auto-result-value" id="autoHigh">35.8125</div>
+                <div class="auto-result-value" id="autoHigh">17.90625</div>
               </div>
             </div>
 
@@ -10023,6 +10055,29 @@
       return ` · Poids ${percent}%`;
     }
 
+    function assistDataState(event) {
+      return Boolean(event?.matchHasAssists);
+    }
+
+    function assistDataShort(event) {
+      return assistDataState(event) ? "A✓" : "A?";
+    }
+
+    function assistDataTitle(event) {
+      return assistDataState(event)
+        ? "Passeurs décisifs détectés dans ce match Web"
+        : "Aucun passeur décisif détecté dans ce match Web";
+    }
+
+    function assistDataBadge(event) {
+      const ok = assistDataState(event);
+      return `<span class="assist-check-badge ${ok ? "assist-check-ok" : "assist-check-missing"}" title="${esc(assistDataTitle(event))}" aria-label="${esc(assistDataTitle(event))}">${esc(assistDataShort(event))}</span>`;
+    }
+
+    function assistDataText(event) {
+      return `${assistDataShort(event)} (${assistDataTitle(event)})`;
+    }
+
     function readCalculatorValues(prefix) {
       const rawBase = parseFloat(String($(`${prefix}BaseNumber`).value).replace(",", "."));
       const rawAdvancement = parseFloat(String($(`${prefix}AdvanceNumber`).value).replace(",", "."));
@@ -10051,7 +10106,7 @@
 
       const adjustedBase = base;
 
-      const marginUnit = 2;
+      const marginUnit = 0.75;
       const marginFinal = marginUnit * changes;
 
       const lowBeforeCards = adjustedBase - marginFinal;
@@ -10188,10 +10243,10 @@
 
       const isFriendly = label === "Pays Amicaux";
       const advancement = "1";
-      const changes = isFriendly ? "13" : "7";
+      const changes = isFriendly ? "6.5" : "3.5";
 
-      $("autoBaseNumber").value = "41.75";
-      $("autoBaseRange").value = "41.75";
+      $("autoBaseNumber").value = "15.65625";
+      $("autoBaseRange").value = "15.65625";
 
       $("autoAdvanceNumber").value = advancement;
       $("autoAdvanceRange").value = advancement;
@@ -10931,7 +10986,7 @@
               <div>
                 <div>${esc(source.match)}</div>
                 <div class="source-small">
-                  ${esc(rankText)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
+                  ${esc(rankText)}${esc(assistDataShort(source))} · ${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
                 </div>
               </div>
             </div>
@@ -11060,56 +11115,7 @@
     }
 
     function renderZoneStats(team) {
-      const stats = team?.zoneStats;
-      const teamName = team?.name || "équipe";
-
-      if (!stats || !stats.count) {
-        return `
-          <div class="zone-card">
-            <div class="stat-header">
-              <div>
-                <div class="stat-title">ZONE DES RANGS</div>
-                <div class="stat-subtitle">Événements attribués à ${esc(teamName)} entre le Rang Bas et le Rang Haut final.</div>
-              </div>
-              <div class="stat-badge">Équipe</div>
-            </div>
-            <div class="stat-grid">
-              <div class="stat-card">
-                <div class="stat-kicker">Moyenne Zone</div>
-                <div class="stat-number neutral">—</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-kicker">Plus Présent</div>
-                <div class="mode-detail">—</div>
-              </div>
-            </div>
-          </div>
-        `;
-      }
-
-      return `
-        <div class="zone-card">
-          <div class="stat-header">
-            <div>
-              <div class="stat-title">ZONE DES RANGS</div>
-              <div class="stat-subtitle">Rangs ${esc(stats.startRankIndex)} à ${esc(stats.endRankIndex)} · ${esc(stats.count)} Événements · Progression Totale ${esc(formatRank(stats.totalQuantity || 0))} · ${esc(zoneAdvancementLabel(stats))} · Zone Rang Bas → Rang Haut Final.</div>
-            </div>
-            <div class="stat-badge">Équipe</div>
-          </div>
-
-          <div class="stat-grid">
-            <div class="stat-card">
-              <div class="stat-kicker">Moyenne ${esc(teamName)}</div>
-              <div class="stat-number ${valueClass(stats.average)}">${esc(formatValue(stats.average))}</div>
-            </div>
-
-            <div class="stat-card wide">
-              <div class="stat-kicker">Événement Le Plus Présent</div>
-              ${renderModeItems(stats, { global: false })}
-            </div>
-          </div>
-        </div>
-      `;
+      return "";
     }
 
     function renderTeam(team, side, rank1, rank2) {
@@ -11142,7 +11148,7 @@
             <div class="row-main">
               <div class="row-title">${esc(event.match)}</div>
               <div class="row-sub">
-                <span class="camp-badge ${campClass}">${campText}</span>${esc(label)} · ${esc(event.minuteLabel)}${event.detail ? ` · ${esc(event.detail)}` : ""}
+                <span class="camp-badge ${campClass}">${campText}</span>${assistDataBadge(event)}${esc(label)} · ${esc(event.minuteLabel)}${event.detail ? ` · ${esc(event.detail)}` : ""}
               </div>
             </div>
           </div>
@@ -11252,7 +11258,7 @@
         const rankText = rankSourceText(source);
 
         lines.push(
-          `- ${rankText}${eventIcon(source)} ${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
+          `- ${rankText}${eventIcon(source)} ${assistDataShort(source)} · ${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
         );
       }
 
