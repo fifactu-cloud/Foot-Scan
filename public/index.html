@@ -5527,6 +5527,7 @@
     .event-match-title .assist-check-badge,
     .event-match-title .adv-weight-badge,
     .source-match-title .assist-check-badge,
+    .source-match-title .adv-weight-badge,
     .match-title-with-badges .assist-check-badge,
     .match-title-with-badges .adv-weight-badge {
       margin-right: 0;
@@ -10101,7 +10102,7 @@
       const divisor = Number(source?.opponentPastDivisor || 0);
 
       if (source?.opponentPastWeighted || source?.linkedFromOpponentPast) {
-        return divisor > 1 ? ` · ADV ÷${formatRank(divisor)}` : " · ADV";
+        return "";
       }
 
       const weight = Number(source?.weight || 0);
@@ -11132,7 +11133,7 @@
             <div class="source-item">
               <div class="event-icon">${esc(eventIcon(source))}</div>
               <div>
-                <div class="source-match-title">${esc(source.match)}${assistDataBadge(source)}</div>
+                <div class="source-match-title">${esc(source.match)}${assistDataBadge(source)}${advDataBadge(source)}</div>
                 <div class="source-small">
                   ${esc(rankText)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
                 </div>
@@ -11295,7 +11296,7 @@
             </div>
 
             <div class="row-main">
-              <div class="row-title event-match-title">${esc(event.match)}${advDataBadge(event)}</div>
+              <div class="row-title event-match-title">${esc(event.match)}${assistDataBadge(event)}${advDataBadge(event)}</div>
               <div class="row-sub">
                 <span class="camp-badge ${campClass}">${campText}</span>${esc(label)} · ${esc(event.minuteLabel)}${event.detail ? ` · ${esc(event.detail)}` : ""}
               </div>
