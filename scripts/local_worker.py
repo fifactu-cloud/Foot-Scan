@@ -937,10 +937,21 @@ def event_rank_quantity(event):
     if not math.isfinite(value):
         return 0.0
 
-    if CURRENT_RANK_ADVANCEMENT_MODE == "performance":
-        return abs(value)
+    try:
+        weight = float(event.get("weight", 1))
+    except Exception:
+        weight = 1.0
 
-    return CURRENT_RANK_EVENT_STEP
+    if not math.isfinite(weight) or weight <= 0:
+        weight = 1.0
+
+    # La pondération des adversaires passés agit uniquement sur la
+    # progression des rangs. Elle ne modifie jamais la performance brute
+    # de l'événement, qui reste stockée dans event["value"].
+    if CURRENT_RANK_ADVANCEMENT_MODE == "performance":
+        return abs(value) * weight
+
+    return CURRENT_RANK_EVENT_STEP * weight
 
 
 def total_rank_quantity(events):
@@ -1023,6 +1034,110 @@ def trim_scan_display_to_used(scan, max_needed):
     result["displayEventCount"] = len(used_events)
     result["displayMatchCount"] = len(result["matchesUsed"])
     return result
+
+
+def opponent_past_source_match_key(event, fallback_index=0):
+    """Clé stable du match source pour un événement ADV pondéré."""
+    if not isinstance(event, dict):
+        return f"adv-{fallback_index}"
+
+    match_id = event.get("sourceMatchId") or event.get("matchId")
+    if match_id is None:
+        match_id = event.get("match") or f"adv-{fallback_index}"
+
+    return str(match_id)
+
+
+def set_opponent_past_progression_divisor(events, divisor):
+    """Applique un diviseur uniquement à la progression des événements ADV."""
+    try:
+        divisor = int(divisor)
+    except Exception:
+        divisor = 1
+
+    divisor = max(1, divisor)
+    weight = round(1 / divisor, 6)
+
+    for event in events or []:
+        if not isinstance(event, dict) or not event.get("opponentPastWeighted"):
+            continue
+        event["opponentPastDivisor"] = divisor
+        event["weight"] = weight
+
+
+def trim_events_to_rank_need_realtime_opponent_past(events, max_needed):
+    """Trim avec division ADV recalculée en temps réel.
+
+    Dès qu'un nouveau match source ADV entre dans la tranche utilisée, le
+    diviseur augmente et s'applique immédiatement à tout le passé déjà gardé,
+    à l'événement courant et aux suivants. La performance brute n'est jamais
+    modifiée: seul event["weight"] change pour la progression des rangs.
+    """
+    try:
+        needed = float(max_needed)
+    except Exception:
+        needed = 0
+
+    used = []
+    adv_match_ids = set()
+    divisor = 1
+
+    for source_index, event in enumerate(events or [], start=1):
+        if not isinstance(event, dict):
+            continue
+
+        copied = dict(event)
+
+        if copied.get("opponentPastWeighted"):
+            adv_match_ids.add(opponent_past_source_match_key(copied, source_index))
+            divisor = max(1, len(adv_match_ids))
+
+        used.append(copied)
+
+        # Impact passé + présent + futur : dès que le diviseur change, on
+        # réécrit la progression de tous les ADV déjà présents dans la tranche.
+        set_opponent_past_progression_divisor(used, divisor)
+
+        if needed > 0 and total_rank_quantity(used) >= needed:
+            break
+
+    set_opponent_past_progression_divisor(used, divisor)
+    return used, divisor
+
+
+def finalize_simultaneous_scan_to_used(scan, max_needed):
+    """Finalise un flux simultané avec diviseur ADV dynamique.
+
+    Le diviseur n'est pas un compteur global final. Il avance en temps réel
+    dans le calcul cible : pour les rangs de A, seuls les matchs source B dont
+    les événements ADV entrent réellement dans la tranche de A augmentent le
+    diviseur; le même principe s'applique séparément pour B.
+    """
+    result = dict(scan or {})
+    events = [dict(event) for event in (result.get("events") or [])]
+
+    used_events, divisor = trim_events_to_rank_need_realtime_opponent_past(events, max_needed)
+
+    result["events"] = used_events
+    result["matchesUsed"] = build_matches_used_from_events(used_events)
+    result["displayTrimmedToRankNeed"] = True
+    result["displayProgressionUsed"] = round(total_rank_quantity(used_events), 4)
+    result["displayEventCount"] = len(used_events)
+    result["displayMatchCount"] = len(result["matchesUsed"])
+    result["simultaneousTargetSpecificAdvDivisor"] = divisor
+    result["realtimeOpponentPastDivisor"] = divisor
+    return result
+
+
+def rebuild_simultaneous_combined_events(home_scan, away_scan):
+    """Reconstruit la liste commune à partir des deux flux déjà finalisés."""
+    combined = []
+    for event in (home_scan.get("events") or []) + (away_scan.get("events") or []):
+        if isinstance(event, dict):
+            combined.append(dict(event))
+
+    combined.sort(key=lambda event: (event.get("simultaneousIndex") or 0, event.get("simultaneousTarget") or ""))
+    return combined
 
 
 def annotate_rank_source(event, event_index, cumulative_start, cumulative_end, target_rank):
@@ -1493,14 +1608,89 @@ def simultaneous_overall_zone_stats(combined_events, rank1, rank2=None):
     return result
 
 def direct_team_events_only(events):
-    """Calcul séparé: garde uniquement les événements propres à l'équipe.
-
-    - but de l'équipe analysée: gardé ;
-    - but adverse: ignoré ;
-    - CSC commis par l'équipe analysée: gardé comme événement négatif ;
-    - CSC adverse qui profite à l'équipe analysée: ignoré.
-    """
+    """Garde uniquement les événements propres à l'équipe analysée."""
     return [event for event in (events or []) if isinstance(event, dict) and event.get("side") == "team"]
+
+
+def opponent_past_events_for_separate(events):
+    """
+    Calcul séparé v130 : ajoute les événements directs des adversaires passés.
+
+    Ils sont remis dans le sens de l'adversaire qui les a vraiment produits,
+    puis pondérés dynamiquement par le nombre de matchs utilisés. Les
+    événements directs de l'équipe analysée ne sont jamais pondérés.
+    """
+    converted = []
+
+    for event in events or []:
+        if not isinstance(event, dict) or event.get("side") != "opponent":
+            continue
+
+        copied = dict(event)
+
+        try:
+            raw_value = -float(copied.get("value", 0))
+        except Exception:
+            raw_value = 0.0
+
+        copied["side"] = "opponent"
+        copied["displaySide"] = "Adversaire passé"
+        copied["originLabel"] = "adversaire passé"
+        copied["linkedFromOpponentPast"] = True
+        copied["opponentPastWeighted"] = True
+        copied["opponentPastRawValue"] = round(raw_value, 6)
+        copied["value"] = round(raw_value, 6)
+        copied["weight"] = 1
+        copied["opponentPastDivisor"] = 1
+
+        detail = str(copied.get("detail") or "")
+        for prefix in ("Équipe analysée · ", "Adversaire · "):
+            if detail.startswith(prefix):
+                detail = detail[len(prefix):]
+                break
+        copied["detail"] = f"Adversaire passé · {detail}" if detail else "Adversaire passé"
+
+        converted.append(copied)
+
+    return converted
+
+
+def separate_mode_events(events):
+    """Équipe analysée directe + adversaires passés pondérés."""
+    return direct_team_events_only(events) + opponent_past_events_for_separate(events)
+
+
+def renormalize_opponent_past_events(events, matches_used_count):
+    """
+    Applique la division dynamique demandée :
+    adversaires passés / nombre de matchs utilisés.
+
+    Le nombre brut d'événements reste inchangé. La performance brute
+    de l'événement reste inchangée aussi. Seule la progression de rang
+    des événements adversaires passés est pondérée.
+    """
+    try:
+        divisor = int(matches_used_count)
+    except Exception:
+        divisor = 1
+
+    divisor = max(1, divisor)
+    weight = 1 / divisor
+
+    for event in events or []:
+        if not isinstance(event, dict) or not event.get("opponentPastWeighted"):
+            continue
+
+        try:
+            raw_value = float(event.get("opponentPastRawValue", event.get("value", 0)))
+        except Exception:
+            raw_value = 0.0
+
+        event["opponentPastDivisor"] = divisor
+        event["weight"] = round(weight, 6)
+        # Important : la division ne touche pas la performance.
+        # Elle sert uniquement à faire avancer les rangs moins vite.
+        event["value"] = round(raw_value, 6)
 
 
 def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span, direct_team_only=False):
@@ -1764,7 +1954,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                         issue = None
 
                     events = parse_incidents(incidents, match, analyzed_team_id)
-                    scan_events = direct_team_events_only(events) if direct_team_only else events
+                    scan_events = separate_mode_events(events) if direct_team_only else events
 
                     match_used = {
                         "id": match.get("id"),
@@ -1804,6 +1994,9 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 if item_events:
                     all_events.extend(item_events)
                     matches_used.append(item["matchUsed"])
+
+                    if direct_team_only:
+                        renormalize_opponent_past_events(all_events, len(matches_used))
 
                 if total_rank_quantity(all_events) >= max_needed:
                     break
@@ -1922,12 +2115,14 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
 
         return order, grouped, meta_by_id
 
-    def copy_for_target(event, target_key, source_name, target_name, linked_from_opponent):
+    def copy_for_target(event, target_key, source_key, source_name, target_name, linked_from_opponent):
         copied = dict(event)
         clean_detail = strip_camp_prefix(copied.get("detail"))
 
         copied["targetName"] = target_name
         copied["simultaneousTarget"] = target_key
+        copied["simultaneousSourceKey"] = source_key
+        copied["sourceMatchId"] = copied.get("matchId")
         copied["displaySide"] = f"Attribué à {target_name}"
 
         if linked_from_opponent:
@@ -1938,11 +2133,17 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
 
             copied["side"] = "team"
             copied["linkedFromOpponentPast"] = True
+            copied["opponentPastWeighted"] = True
+            copied["opponentPastDivisor"] = 1
+            copied["weight"] = 1
             copied["originLabel"] = f"adversaire passé de {source_name}"
             copied["detail"] = f"Attribué à {target_name} · origine: adversaire passé de {source_name} · {clean_detail}"
         else:
             copied["side"] = "team"
             copied["linkedFromOpponentPast"] = False
+            copied["opponentPastWeighted"] = False
+            copied["opponentPastDivisor"] = 1
+            copied["weight"] = 1
             copied["originLabel"] = f"passé direct de {target_name}"
             copied["detail"] = f"Attribué à {target_name} · origine: passé direct · {clean_detail}"
 
@@ -1950,6 +2151,11 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
 
     home_order, home_grouped, home_meta_by_id = group_by_match(home_scan)
     away_order, away_grouped, away_meta_by_id = group_by_match(away_scan)
+
+    # Les diviseurs simultanés ne sont pas globaux. Ils sont recalculés
+    # plus bas pour chaque flux cible :
+    # - rangs de A => adversaires passés de B ÷ matchs B utilisés pour A ;
+    # - rangs de B => adversaires passés de A ÷ matchs A utilisés pour B.
 
     def attach_match_meta(event, meta):
         if not meta:
@@ -1993,21 +2199,21 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
             if source_key == "home":
                 if side == "opponent":
                     # Adversaire passé du domicile -> flux extérieur.
-                    copied = copy_for_target(event, "away", home_name, away_name, True)
+                    copied = copy_for_target(event, "away", "home", home_name, away_name, True)
                     copied = attach_match_meta(copied, home_meta_by_id.get(event.get("matchId")))
                     away_events.append(copied)
                 else:
-                    copied = copy_for_target(event, "home", home_name, home_name, False)
+                    copied = copy_for_target(event, "home", "home", home_name, home_name, False)
                     copied = attach_match_meta(copied, home_meta_by_id.get(event.get("matchId")))
                     home_events.append(copied)
             else:
                 if side == "opponent":
                     # Adversaire passé de l'extérieur -> flux domicile.
-                    copied = copy_for_target(event, "home", away_name, home_name, True)
+                    copied = copy_for_target(event, "home", "away", away_name, home_name, True)
                     copied = attach_match_meta(copied, away_meta_by_id.get(event.get("matchId")))
                     home_events.append(copied)
                 else:
-                    copied = copy_for_target(event, "away", away_name, away_name, False)
+                    copied = copy_for_target(event, "away", "away", away_name, away_name, False)
                     copied = attach_match_meta(copied, away_meta_by_id.get(event.get("matchId")))
                     away_events.append(copied)
 
@@ -2129,10 +2335,11 @@ def process_scan_job(job_id):
             )
 
             # Affichage déterministe en mode simultané: ne jamais montrer la marge
-            # récupérée en réserve. Les compteurs du site doivent s'arrêter au
-            # dernier événement réellement nécessaire pour les rangs demandés.
-            home_scan = trim_scan_display_to_used(home_scan, max_needed)
-            away_scan = trim_scan_display_to_used(away_scan, max_needed)
+            # récupérée en réserve. Le diviseur ADV est propre à chaque calcul cible :
+            # rangs A => matchs B utilisés pour A ; rangs B => matchs A utilisés pour B.
+            home_scan = finalize_simultaneous_scan_to_used(home_scan, max_needed)
+            away_scan = finalize_simultaneous_scan_to_used(away_scan, max_needed)
+            simultaneous_combined_events = rebuild_simultaneous_combined_events(home_scan, away_scan)
             simultaneous_combined_events = trim_events_to_rank_need(simultaneous_combined_events, max_needed * 2)
 
         home = {
@@ -2193,7 +2400,7 @@ def process_scan_job(job_id):
             "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
             "rankEventStepLabel": rank_advancement_label(),
             "winnerMode": winner_mode,
-            "scanModeLabel": "Simultané: équipe + adversaires passés opposés, match par match / minute" if simultaneous_mode else "Séparé: événements de l'équipe uniquement",
+            "scanModeLabel": "Simultané: équipe + adversaires passés opposés, match par match / minute" if simultaneous_mode else "Séparé: équipe + adversaires passés pondérés",
             "overallZoneStats": None,
             "dataQuality": data_quality,
             "config": {
@@ -2303,6 +2510,7 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: 🔎 scan complet côté worker activé.")
     print("Pages Web: 10 Pages d’abord, extension automatique à 15 puis 20 si nécessaire.")
+    print("Mode séparé: équipe analysée + adversaires passés pondérés par match utilisé.")
     print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Progression des rangs: curseur par job, défaut 1 par événement.")
