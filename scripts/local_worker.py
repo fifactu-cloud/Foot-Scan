@@ -958,6 +958,27 @@ def total_rank_quantity(events):
     return sum(event_rank_quantity(event) for event in (events or []))
 
 
+def direct_team_rank_quantity(events):
+    """Progression portée uniquement par les événements directs de l'équipe.
+
+    En mode simultané, l'ancien arrêt se faisait sur le total brut
+    équipe + adversaire. Cela pouvait arrêter le scan alors que le flux direct
+    d'une équipe n'avait pas encore assez de progression pour atteindre le rang
+    haut. Le résultat affichait alors un "—" malgré beaucoup d'événements
+    bruts récupérés.
+    """
+    return sum(
+        event_rank_quantity(event)
+        for event in (events or [])
+        if isinstance(event, dict) and event.get("side") == "team"
+    )
+
+
+def scan_completion_quantity(events, completion_mode="total"):
+    if completion_mode == "team_direct":
+        return direct_team_rank_quantity(events)
+    return total_rank_quantity(events)
+
 
 def trim_events_to_rank_need(events, max_needed):
     """Garde seulement les événements réellement nécessaires pour atteindre le rang demandé.
@@ -1693,7 +1714,7 @@ def renormalize_opponent_past_events(events, matches_used_count):
         event["value"] = round(raw_value, 6)
 
 
-def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span, direct_team_only=False):
+def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span, direct_team_only=False, completion_mode="total"):
     update_scan_job(
         job_id,
         status="running",
@@ -1852,7 +1873,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     considered_matches = []
 
     for stage_limit in stages:
-        if total_rank_quantity(all_events) >= max_needed:
+        if scan_completion_quantity(all_events, completion_mode) >= max_needed:
             break
 
         update_scan_job(
@@ -1860,7 +1881,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             status="running",
             message=(
                 f"{team_name} · Scan Progressif Jusqu’à {stage_limit} matchs\n"
-                f"Progression Trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
+                f"Progression Trouvée : {round(scan_completion_quantity(all_events, completion_mode), 2)}/{max_needed}"
             ),
             progress=base_progress + int(progress_span * 0.13),
         )
@@ -1876,7 +1897,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                 status="running",
                 message=(
                     f"{team_name} · Événements Matchs {start + 1}-{batch_end}/{stage_limit}\n"
-                    f"Progression Trouvée : {round(total_rank_quantity(all_events), 2)}/{max_needed}"
+                    f"Progression Trouvée : {round(scan_completion_quantity(all_events, completion_mode), 2)}/{max_needed}"
                 ),
                 progress=base_progress + int(progress_span * (0.15 + 0.80 * stage_position)),
             )
@@ -2003,15 +2024,15 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                     if direct_team_only:
                         renormalize_opponent_past_events(all_events, len(matches_used))
 
-                if total_rank_quantity(all_events) >= max_needed:
+                if scan_completion_quantity(all_events, completion_mode) >= max_needed:
                     break
 
             scanned_until = batch_end
 
-            if total_rank_quantity(all_events) >= max_needed:
+            if scan_completion_quantity(all_events, completion_mode) >= max_needed:
                 break
 
-    progression_found = round(total_rank_quantity(all_events), 6)
+    progression_found = round(scan_completion_quantity(all_events, completion_mode), 6)
     rank_reached = progression_found >= float(max_needed) - 1e-9
 
     issue_count = len(event_data_issues)
@@ -2054,7 +2075,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
     update_scan_job(
         job_id,
         status="running",
-        message=f"{team_name} · Terminé ({len(all_events)} événements, Progression {round(total_rank_quantity(all_events), 2)}, {len(matches_used)} matchs){issue_note}.",
+        message=f"{team_name} · Terminé ({len(all_events)} événements, Progression {round(scan_completion_quantity(all_events, completion_mode), 2)}, {len(matches_used)} matchs){issue_note}.",
         progress=base_progress + progress_span,
     )
 
@@ -2293,16 +2314,16 @@ def process_scan_job(job_id):
 
     max_needed = float(max(ranks))
 
-    # En mode simultané, chaque flux est composé de deux sources :
-    # - le passé direct de l'équipe ;
-    # - les événements directs des adversaires passés de l'autre équipe.
-    # On récupère donc une marge plus large, puis on masque la marge à l'affichage.
-    scan_fetch_needed = max_needed * 2 if simultaneous_mode else max_needed
+    # En mode simultané, on ne doit pas arrêter le scan sur le total brut
+    # équipe + adversaires. Chaque équipe doit d'abord avoir assez de progression
+    # directe pour atteindre le rang demandé. Les événements des adversaires passés
+    # restent un complément pondéré dans le flux final.
+    scan_fetch_needed = max_needed
 
     print(
         f"🔎 Scan complet: job={job_id} match={match_id} "
         f"ranks demandés={[rank1, rank2]} ranks utilisés={ranks} "
-        f"objectif progression brute={scan_fetch_needed} simultaneous={simultaneous_mode} "
+        f"objectif progression={scan_fetch_needed} simultaneous={simultaneous_mode} "
         f"progression={rank_advancement_label()}"
     )
 
@@ -2334,6 +2355,7 @@ def process_scan_job(job_id):
             12,
             40,
             direct_team_only=not simultaneous_mode,
+            completion_mode="team_direct" if simultaneous_mode else "total",
         )
 
         away_scan = scan_team(
@@ -2345,6 +2367,7 @@ def process_scan_job(job_id):
             54,
             40,
             direct_team_only=not simultaneous_mode,
+            completion_mode="team_direct" if simultaneous_mode else "total",
         )
 
         simultaneous_combined_events = []
