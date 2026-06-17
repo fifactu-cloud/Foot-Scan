@@ -5514,6 +5514,44 @@
       color: #e9d5ff;
     }
 
+    .event-match-title,
+    .source-match-title,
+    .match-title-with-badges {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .event-match-title .assist-check-badge,
+    .event-match-title .adv-weight-badge,
+    .source-match-title .assist-check-badge,
+    .match-title-with-badges .assist-check-badge,
+    .match-title-with-badges .adv-weight-badge {
+      margin-right: 0;
+      flex: 0 0 auto;
+      transform: translateY(-1px);
+    }
+
+    .adv-weight-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      height: 20px;
+      padding: 0 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 1000;
+      letter-spacing: .03em;
+      border: 1px solid rgba(56,189,248,.22);
+      background: rgba(14,165,233,.10);
+      color: #bfdbfe;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+
     details.clean summary {
       justify-content: flex-start !important;
       gap: 8px !important;
@@ -10081,7 +10119,7 @@
     }
 
     function assistDataShort(event) {
-      return assistDataState(event) ? "A✓" : "A?";
+      return assistDataState(event) ? "A✔️" : "A❌️";
     }
 
     function assistDataTitle(event) {
@@ -10097,6 +10135,79 @@
 
     function assistDataText(event) {
       return `${assistDataShort(event)} (${assistDataTitle(event)})`;
+    }
+
+    function matchKey(item) {
+      const raw = item?.id ?? item?.matchId ?? item?.sourceMatchId ?? item?.match ?? item?.label ?? "";
+      return String(raw);
+    }
+
+    function buildMatchBadgeMeta(events) {
+      const meta = new Map();
+
+      for (const event of events || []) {
+        if (!event || typeof event !== "object") continue;
+
+        const key = matchKey(event);
+        if (!key) continue;
+
+        if (!meta.has(key)) {
+          meta.set(key, {
+            hasAssistInfo: false,
+            matchHasAssists: false,
+            hasAdv: false,
+            advDivisors: new Set(),
+          });
+        }
+
+        const entry = meta.get(key);
+
+        if (event.matchHasAssists !== undefined || event.assistDataStatus) {
+          entry.hasAssistInfo = true;
+          entry.matchHasAssists = entry.matchHasAssists || assistDataState(event);
+        }
+
+        if (event.opponentPastWeighted || event.linkedFromOpponentPast) {
+          entry.hasAdv = true;
+          const divisor = Number(event.opponentPastDivisor || 0);
+          if (Number.isFinite(divisor) && divisor > 1) {
+            entry.advDivisors.add(formatRank(divisor));
+          }
+        }
+      }
+
+      return meta;
+    }
+
+    function advDataBadgeFromMeta(meta) {
+      if (!meta?.hasAdv) return "";
+
+      const divisors = Array.from(meta.advDivisors || []);
+      const text = divisors.length
+        ? `ADV ÷${divisors.join("/")}`
+        : "ADV";
+
+      return `<span class="adv-weight-badge" title="Événements des adversaires passés · division appliquée seulement sur la progression des rangs">${esc(text)}</span>`;
+    }
+
+    function advDataBadge(event) {
+      if (!(event?.opponentPastWeighted || event?.linkedFromOpponentPast)) return "";
+
+      const divisor = Number(event?.opponentPastDivisor || 0);
+      const text = Number.isFinite(divisor) && divisor > 1
+        ? `ADV ÷${formatRank(divisor)}`
+        : "ADV";
+
+      return `<span class="adv-weight-badge" title="Événement des adversaires passés · division appliquée seulement sur la progression des rangs">${esc(text)}</span>`;
+    }
+
+    function matchBadgesHtml(match, metaMap) {
+      const meta = metaMap.get(matchKey(match)) || null;
+      const assistBadge = meta?.hasAssistInfo
+        ? assistDataBadge({ matchHasAssists: meta.matchHasAssists })
+        : "";
+
+      return `${assistBadge}${advDataBadgeFromMeta(meta)}`;
     }
 
     function readCalculatorValues(prefix) {
@@ -11021,9 +11132,9 @@
             <div class="source-item">
               <div class="event-icon">${esc(eventIcon(source))}</div>
               <div>
-                <div>${esc(source.match)}</div>
+                <div class="source-match-title">${esc(source.match)}${assistDataBadge(source)}</div>
                 <div class="source-small">
-                  ${esc(rankText)}${esc(assistDataShort(source))} · ${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
+                  ${esc(rankText)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
                 </div>
               </div>
             </div>
@@ -11158,6 +11269,7 @@
     function renderTeam(team, side, rank1, rank2) {
       const events = team.events || [];
       const matchesUsed = team.matchesUsed || [];
+      const matchBadgeMeta = buildMatchBadgeMeta(events);
       const sideClass = side === "Domicile" ? "side-home" : "side-away";
       const teamIssueCount = Number(team.eventDataIssueCount || 0);
       const _perfVals = [team.r1?.value, team.r2?.value]
@@ -11183,9 +11295,9 @@
             </div>
 
             <div class="row-main">
-              <div class="row-title">${esc(event.match)}</div>
+              <div class="row-title event-match-title">${esc(event.match)}${advDataBadge(event)}</div>
               <div class="row-sub">
-                <span class="camp-badge ${campClass}">${campText}</span>${assistDataBadge(event)}${esc(label)} · ${esc(event.minuteLabel)}${event.detail ? ` · ${esc(event.detail)}` : ""}
+                <span class="camp-badge ${campClass}">${campText}</span>${esc(label)} · ${esc(event.minuteLabel)}${event.detail ? ` · ${esc(event.detail)}` : ""}
               </div>
             </div>
           </div>
@@ -11204,7 +11316,7 @@
             </div>
 
             <div class="row-main">
-              <div class="row-title">${esc(match.label)}${issueText}</div>
+              <div class="row-title match-title-with-badges">${esc(match.label)}${matchBadgesHtml(match, matchBadgeMeta)}${issueText}</div>
               <div class="row-sub">${esc(match.competition || "Toutes compétitions")}</div>
             </div>
           </div>
@@ -11295,7 +11407,7 @@
         const rankText = rankSourceText(source);
 
         lines.push(
-          `- ${rankText}${eventIcon(source)} ${assistDataShort(source)} · ${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
+          `- ${rankText}${eventIcon(source)} ${source.match} ${assistDataShort(source)} · ${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
         );
       }
 
