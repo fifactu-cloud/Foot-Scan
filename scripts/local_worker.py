@@ -71,8 +71,8 @@ SCAN_JOB_TTL_SECONDS = int(os.environ.get("SCAN_JOB_TTL_SECONDS", "86400"))
 SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "0.5"))
 PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAGE", "17"))
 
-PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "20"))
-PAGE_LOAD_STEPS = [10, 15, 20]
+PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "40"))
+PAGE_LOAD_STEPS = [10, 15, 20, 30, 40]
 INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM", "15"))
 SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
 MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "100"))
@@ -1737,6 +1737,8 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
         page_targets.append(PAGES_TO_LOAD)
 
     next_page = 0
+    pages_loaded_count = 0
+    pages_attempted_count = 0
     by_id = {}
 
     for target_pages in page_targets:
@@ -1752,6 +1754,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             )
 
             page_path = f"team/{analyzed_team_id}/events/last/{page}"
+            pages_attempted_count = max(pages_attempted_count, page + 1)
 
             try:
                 data = get_json(page_path)
@@ -1795,6 +1798,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
 
             if isinstance(page_events, list) and page_events:
                 pages.extend(page_events)
+                pages_loaded_count = max(pages_loaded_count, page + 1)
             else:
                 update_scan_job(
                     job_id,
@@ -1809,7 +1813,8 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
         by_id = build_finished_matches()
 
         # On démarre avec 10 pages. Si elles ne suffisent pas pour alimenter le scan
-        # progressif après les matchs ignorés, on étend automatiquement à 15 puis 20.
+        # progressif après les matchs ignorés/pondérés, on étend automatiquement
+        # à 15, 20, 30 puis 40 pages.
         if len(by_id) >= skip + MAX_MATCHES_PER_TEAM:
             break
 
@@ -2006,6 +2011,9 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             if total_rank_quantity(all_events) >= max_needed:
                 break
 
+    progression_found = round(total_rank_quantity(all_events), 6)
+    rank_reached = progression_found >= float(max_needed) - 1e-9
+
     issue_count = len(event_data_issues)
 
     # Ne pas afficher tous les matchs administratifs trouvés dans les pages Web :
@@ -2039,6 +2047,8 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
         issue_parts.append(f"⚠️ {issue_count} match(s) sans événements récupérés")
     if administrative_count:
         issue_parts.append(f"🚫 {administrative_count} match(s) administratif(s) ignoré(s)")
+    if not rank_reached:
+        issue_parts.append(f"⛔ progression insuffisante {round(progression_found, 2)}/{max_needed}")
     issue_note = " · " + " · ".join(issue_parts) if issue_parts else ""
 
     update_scan_job(
@@ -2052,6 +2062,11 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
         print(f"⚠️ {team_name}: {issue_count} match(s) sans événements récupérés. Résultat partiel pour cette équipe.")
     if administrative_count:
         print(f"🚫 {team_name}: {administrative_count} match(s) forfait/administratif(s) ignoré(s).")
+    if not rank_reached:
+        print(
+            f"⛔ {team_name}: rang non atteint · progression {round(progression_found, 2)}/{max_needed} "
+            f"après {pages_loaded_count}/{PAGES_TO_LOAD} pages et {len(matches_used)} match(s) utilisé(s)."
+        )
 
     return {
         "events": all_events,
@@ -2060,6 +2075,20 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
         "eventDataIssueCount": issue_count,
         "administrativeMatchesIgnored": administrative_ignored,
         "administrativeMatchCount": administrative_count,
+        "rankCoverage": {
+            "reached": rank_reached,
+            "progressionFound": progression_found,
+            "progressionNeeded": float(max_needed),
+            "missingProgression": round(max(0.0, float(max_needed) - progression_found), 6),
+            "pagesLoaded": pages_loaded_count,
+            "pagesAttempted": pages_attempted_count,
+            "pagesLimit": PAGES_TO_LOAD,
+            "matchesUsed": len(matches_used),
+            "eventsFound": len(all_events),
+        },
+        "pagesLoaded": pages_loaded_count,
+        "pagesAttempted": pages_attempted_count,
+        "pagesLimit": PAGES_TO_LOAD,
         "scanPartial": bool(issue_count),
     }
 
