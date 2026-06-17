@@ -9759,9 +9759,9 @@
               <div class="auto-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title">Base</div>
-                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="15.65625" />
+                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="31.3125" />
                 </div>
-                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="15.65625" />
+                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="31.3125" />
               </div>
 
               <div class="auto-control">
@@ -10045,6 +10045,12 @@
     }
 
     function weightText(source) {
+      const divisor = Number(source?.opponentPastDivisor || 0);
+
+      if (source?.opponentPastWeighted || source?.linkedFromOpponentPast) {
+        return divisor > 1 ? ` · ADV ÷${formatRank(divisor)}` : " · ADV";
+      }
+
       const weight = Number(source?.weight || 0);
 
       if (!weight || weight >= 0.9999) {
@@ -10106,7 +10112,7 @@
 
       const adjustedBase = base;
 
-      const marginUnit = 0.75;
+      const marginUnit = 1.5;
       const marginFinal = marginUnit * changes;
 
       const lowBeforeCards = adjustedBase - marginFinal;
@@ -10243,10 +10249,10 @@
 
       const isFriendly = label === "Pays Amicaux";
       const advancement = "1";
-      const changes = isFriendly ? "6.5" : "3.5";
+      const changes = isFriendly ? "13" : "7";
 
-      $("autoBaseNumber").value = "15.65625";
-      $("autoBaseRange").value = "15.65625";
+      $("autoBaseNumber").value = "31.3125";
+      $("autoBaseRange").value = "31.3125";
 
       $("autoAdvanceNumber").value = advancement;
       $("autoAdvanceRange").value = advancement;
