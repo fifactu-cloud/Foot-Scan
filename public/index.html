@@ -9671,7 +9671,22 @@
         scroll-margin-bottom: 36vh !important;
       }
     }
-</style>
+
+    /* v135 — diagnostic discret si un rang n'est pas atteint */
+    .rank-missing-note {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(251, 113, 133, .24);
+      background: rgba(251, 113, 133, .08);
+      color: #fbcfe8;
+      font-size: 0.78rem;
+      font-weight: 800;
+      line-height: 1.35;
+      letter-spacing: .01em;
+    }
+
+  </style>
 </head>
 
 <body>
@@ -9750,8 +9765,8 @@
                 <span id="activePresetLabel">Libre</span>
               </div>
               <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 CLUBS/PAYS OFFICIELS<small>Base 15,65625 · Progression 1 · Changements 3,5</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 PAYS AMICAUX<small>Base 15,65625 · Progression 1 · Changements 6,5</small></button>
+                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 CLUBS/PAYS OFFICIELS<small>Base 31,3125 · Progression 1 · Changements 7</small></button>
+                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 PAYS AMICAUX<small>Base 31,3125 · Progression 1 · Changements 13</small></button>
               </div>
             </div>
 
@@ -10969,6 +10984,21 @@
       return index ? `${index} · ` : "";
     }
 
+
+    function renderRankMissingDiagnostic(result) {
+      if (!result || result.value != null) return "";
+
+      const target = numberOrNull(result.targetRank);
+      const total = numberOrNull(result.totalQuantity);
+
+      if (target === null || total === null) {
+        return `<div class="rank-missing-note">Rang non atteint · données insuffisantes.</div>`;
+      }
+
+      const missing = Math.max(0, target - total);
+      return `<div class="rank-missing-note">Rang non atteint · progression disponible ${esc(formatRank(total))}/${esc(formatRank(target))} · manque ${esc(formatRank(missing))}</div>`;
+    }
+
     function renderValue(label, result) {
       const value = result?.value;
       const sources = result?.sources || [];
@@ -10978,6 +11008,7 @@
         <div class="rank-card">
           <div class="rank-label">${esc(label)}</div>
           <div class="rank-value ${cls}">${esc(formatValue(value))}</div>
+          ${renderRankMissingDiagnostic(result)}
       `;
 
       if (sources.length) {
