@@ -10145,6 +10145,8 @@
 
     function buildMatchBadgeMeta(events) {
       const meta = new Map();
+      const advOrder = [];
+      const advSeen = new Set();
 
       for (const event of events || []) {
         if (!event || typeof event !== "object") continue;
@@ -10158,6 +10160,8 @@
             matchHasAssists: false,
             hasAdv: false,
             advDivisors: new Set(),
+            advOrdinal: null,
+            advTotal: null,
           });
         }
 
@@ -10174,32 +10178,52 @@
           if (Number.isFinite(divisor) && divisor > 1) {
             entry.advDivisors.add(formatRank(divisor));
           }
+
+          if (!advSeen.has(key)) {
+            advSeen.add(key);
+            advOrder.push(key);
+            entry.advOrdinal = advOrder.length;
+          }
         }
+      }
+
+      const advTotal = advOrder.length;
+      for (const key of advOrder) {
+        const entry = meta.get(key);
+        if (entry) entry.advTotal = advTotal;
       }
 
       return meta;
     }
 
-    function advDataBadgeFromMeta(meta) {
-      if (!meta?.hasAdv) return "";
+    function advReadableText(meta, event) {
+      if (!meta?.hasAdv && !(event?.opponentPastWeighted || event?.linkedFromOpponentPast)) return "";
 
-      const divisors = Array.from(meta.advDivisors || []);
-      const text = divisors.length
-        ? `ADV ÷${divisors.join("/")}`
-        : "ADV";
-
-      return `<span class="adv-weight-badge" title="Événements des adversaires passés · division appliquée seulement sur la progression des rangs">${esc(text)}</span>`;
-    }
-
-    function advDataBadge(event) {
-      if (!(event?.opponentPastWeighted || event?.linkedFromOpponentPast)) return "";
+      if (meta?.advOrdinal && meta?.advTotal) {
+        return `ADV ${meta.advOrdinal}/${meta.advTotal}`;
+      }
 
       const divisor = Number(event?.opponentPastDivisor || 0);
-      const text = Number.isFinite(divisor) && divisor > 1
-        ? `ADV ÷${formatRank(divisor)}`
-        : "ADV";
+      if (Number.isFinite(divisor) && divisor > 1) {
+        return `ADV ÷${formatRank(divisor)}`;
+      }
 
-      return `<span class="adv-weight-badge" title="Événement des adversaires passés · division appliquée seulement sur la progression des rangs">${esc(text)}</span>`;
+      const divisors = Array.from(meta?.advDivisors || []);
+      return divisors.length ? `ADV ÷${divisors.join("/")}` : "ADV";
+    }
+
+    function advDataBadgeFromMeta(meta) {
+      const text = advReadableText(meta, null);
+      if (!text) return "";
+
+      return `<span class="adv-weight-badge" title="Match des adversaires passés · position dans le groupe ADV final · division appliquée seulement sur la progression des rangs">${esc(text)}</span>`;
+    }
+
+    function advDataBadge(event, meta = null) {
+      const text = advReadableText(meta, event);
+      if (!text) return "";
+
+      return `<span class="adv-weight-badge" title="Événement des adversaires passés · position dans le groupe ADV final · division appliquée seulement sur la progression des rangs">${esc(text)}</span>`;
     }
 
     function matchBadgesHtml(match, metaMap) {
@@ -11111,9 +11135,10 @@
       return `<div class="rank-missing-note">Rang non atteint · progression disponible ${esc(formatRank(total))}/${esc(formatRank(target))} · manque ${esc(formatRank(missing))}</div>`;
     }
 
-    function renderValue(label, result) {
+    function renderValue(label, result, matchBadgeMeta = null) {
       const value = result?.value;
       const sources = result?.sources || [];
+      const sourceBadgeMeta = matchBadgeMeta || buildMatchBadgeMeta(sources);
       const cls = valueClass(value || 0);
 
       let html = `
@@ -11133,7 +11158,7 @@
             <div class="source-item">
               <div class="event-icon">${esc(eventIcon(source))}</div>
               <div>
-                <div class="source-match-title">${esc(source.match)}${assistDataBadge(source)}${advDataBadge(source)}</div>
+                <div class="source-match-title">${esc(source.match)}${assistDataBadge(source)}${advDataBadge(source, sourceBadgeMeta.get(matchKey(source)) || null)}</div>
                 <div class="source-small">
                   ${esc(rankText)}${esc(source.minuteLabel)} · ${esc(sideText(source))} · ${esc(LABELS[source.type] || source.type)} · ${esc(formatValue(source.value))}${esc(weightText(source))}
                 </div>
@@ -11296,7 +11321,7 @@
             </div>
 
             <div class="row-main">
-              <div class="row-title event-match-title">${esc(event.match)}${assistDataBadge(event)}${advDataBadge(event)}</div>
+              <div class="row-title event-match-title">${esc(event.match)}${assistDataBadge(event)}${advDataBadge(event, matchBadgeMeta.get(matchKey(event)) || null)}</div>
               <div class="row-sub">
                 <span class="camp-badge ${campClass}">${campText}</span>${esc(label)} · ${esc(event.minuteLabel)}${event.detail ? ` · ${esc(event.detail)}` : ""}
               </div>
@@ -11343,8 +11368,8 @@
           </div>
 
           <div class="rank-grid ${rank2 ? "" : "one"}">
-            ${renderValue(`Performance Rang ${rank1}`, team.r1)}
-            ${rank2 ? renderValue(`Performance Rang ${rank2}`, team.r2) : ""}
+            ${renderValue(`Performance Rang ${rank1}`, team.r1, matchBadgeMeta)}
+            ${rank2 ? renderValue(`Performance Rang ${rank2}`, team.r2, matchBadgeMeta) : ""}
           </div>
 
           ${renderZoneStats(team)}
@@ -11404,11 +11429,15 @@
 
       lines.push("Détail événement :");
 
+      const sourceBadgeMeta = buildMatchBadgeMeta(team?.events || sources);
+
       for (const source of sources) {
         const rankText = rankSourceText(source);
+        const advText = advReadableText(sourceBadgeMeta.get(matchKey(source)) || null, source);
+        const badges = [assistDataShort(source), advText].filter(Boolean).join(" ");
 
         lines.push(
-          `- ${rankText}${eventIcon(source)} ${source.match} ${assistDataShort(source)} · ${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
+          `- ${rankText}${eventIcon(source)} ${source.match} ${badges ? `${badges} · ` : ""}${source.minuteLabel} · ${sideText(source)} · ${LABELS[source.type] || source.type} · ${formatValue(source.value)}${weightText(source)}`
         );
       }
 
