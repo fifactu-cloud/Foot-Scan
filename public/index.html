@@ -9872,7 +9872,7 @@
       box-sizing: border-box !important;
     }
 
-    /* RÉGLAGES : même structure visuelle que RAPPORT DE SESSION, sans changer les bordures globales */
+    /* CONFIGURATION : même structure visuelle que RAPPORT DE SESSION, sans changer les bordures globales */
     section.settings-panel.panel-pad {
       padding: 0 !important;
       overflow: hidden !important;
@@ -9953,45 +9953,65 @@
       }
     }
 
-    /* LEXIQUE : rendu compact stable au déroulement, sans bande parasite ni scroll horizontal */
+    /* LEXIQUE : même logique visuelle que Matchs Utilisés, sans conteneur parasite */
     details.bar-box {
       width: 100% !important;
-      overflow: hidden !important;
-      contain: paint !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      contain: none !important;
+      margin-top: 14px !important;
     }
 
     details.bar-box > summary {
-      min-height: 64px !important;
-      justify-content: center !important;
-      padding: 18px var(--content-pad, 18px) !important;
-      border-bottom: 0 !important;
+      min-height: 58px !important;
+      padding: 13px 15px !important;
+      border-radius: 22px !important;
+      background: linear-gradient(135deg, rgba(56,189,248,.11), rgba(15,23,42,.48)) !important;
+      border: 1px solid rgba(56,189,248,.20) !important;
       box-sizing: border-box !important;
+      justify-content: flex-start !important;
+      gap: 8px !important;
+      text-transform: uppercase !important;
+    }
+
+    details.bar-box > summary:hover {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    details.bar-box > summary .lexique-summary-title {
+      letter-spacing: .12em !important;
+      font-weight: 1000 !important;
+    }
+
+    details.bar-box > summary::after {
+      margin-left: auto !important;
+      flex: 0 0 auto !important;
     }
 
     details.bar-box[open] > summary {
-      border-bottom: 1px solid rgba(148, 163, 184, .14) !important;
-      margin-bottom: 0 !important;
+      margin-bottom: 12px !important;
     }
 
     details.bar-box[open] .bar-grid {
       animation: none !important;
-      padding-top: 20px !important;
+      padding-top: 0 !important;
     }
 
     .bar-grid {
       width: 100% !important;
       box-sizing: border-box !important;
-      padding-left: var(--content-pad, 18px) !important;
-      padding-right: var(--content-pad, 18px) !important;
-      padding-bottom: var(--content-pad, 18px) !important;
+      padding: 0 !important;
       gap: 12px !important;
-      overflow: hidden !important;
+      overflow: visible !important;
     }
 
     .bar-card {
       width: 100% !important;
       box-sizing: border-box !important;
-      padding: 14px !important;
+      padding: 13px 14px !important;
       border-radius: 18px !important;
       overflow: hidden !important;
     }
@@ -10000,23 +10020,23 @@
       display: flex !important;
       align-items: center !important;
       gap: 7px !important;
-      margin-bottom: 12px !important;
+      margin-bottom: 10px !important;
       color: #e5e7eb !important;
-      font-size: clamp(14px, 3.7vw, 17px) !important;
-      line-height: 1.15 !important;
+      font-size: clamp(13px, 3.45vw, 16px) !important;
+      line-height: 1.12 !important;
       font-weight: 1000 !important;
-      letter-spacing: -.025em !important;
+      letter-spacing: -.02em !important;
     }
 
     .bar-line {
       display: grid !important;
-      grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr) !important;
+      grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr) !important;
       align-items: center !important;
       gap: 10px !important;
-      min-height: 34px !important;
-      padding: 5px 0 !important;
-      font-size: clamp(12px, 3.25vw, 14px) !important;
-      line-height: 1.22 !important;
+      min-height: 32px !important;
+      padding: 4px 0 !important;
+      font-size: clamp(11.5px, 3.05vw, 13.5px) !important;
+      line-height: 1.18 !important;
       border-bottom: 1px solid rgba(148, 163, 184, .10) !important;
     }
 
@@ -10041,11 +10061,16 @@
       .bar-line {
         grid-template-columns: .9fr 1.1fr !important;
         gap: 8px !important;
-        font-size: 12px !important;
+        font-size: 11.5px !important;
       }
     }
 
-    /* Menu Matchs Utilisés : sobre, mais plus lisible */
+    /* Menu Matchs Utilisés : mieux intégré et sans sous-blocs colorés parasites */
+    .trend-matches-details {
+      margin-top: 16px !important;
+      overflow: hidden !important;
+    }
+
     details.trend-matches-details > summary.events-summary {
       min-height: 58px !important;
       padding: 13px 15px !important;
@@ -10060,6 +10085,36 @@
       text-transform: uppercase !important;
       font-weight: 1000 !important;
     }
+
+    .trend-matches-details > .section {
+      margin-top: 10px !important;
+      padding: 12px !important;
+      border-radius: 18px !important;
+      background: linear-gradient(180deg, rgba(15,23,42,.54), rgba(15,23,42,.38)) !important;
+      border: 1px solid rgba(56,189,248,.12) !important;
+      overflow: hidden !important;
+    }
+
+    .trend-matches-details .match-list {
+      gap: 10px !important;
+    }
+
+    .trend-matches-details .match-row {
+      border-radius: 16px !important;
+      overflow: hidden !important;
+    }
+
+    .match-number-badge {
+      background: linear-gradient(180deg, rgba(15,23,42,.88), rgba(15,23,42,.72)) !important;
+      border: 1px solid rgba(96,165,250,.18) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.03) !important;
+    }
+
+    .match-count-mini {
+      background: transparent !important;
+      color: rgba(255,255,255,.94) !important;
+    }
+
 
 
   </style>
@@ -10121,7 +10176,7 @@
 
     <section class="panel panel-pad settings-panel">
       <div class="settings-section-head">
-        <div class="report-title">⚙️ RÉGLAGES</div>
+        <div class="report-title">⚙️ CONFIGURATION</div>
       </div>
 
       <div class="form-grid">
@@ -10214,11 +10269,11 @@
         </div>
 
         <div class="bar-card">
-          <div class="bar-card-title">⚙️ Réglages</div>
+          <div class="bar-card-title">⚙️ Configuration</div>
           <div class="bar-line"><span>Curseur</span><strong>Nb. Tendances</strong></div>
           <div class="bar-line"><span>Matchs Utilisés</span><strong>Nb. Tendances + 1</strong></div>
-          <div class="bar-line"><span>Calcul Séparé</span><strong>Attaque Réciproque</strong></div>
-          <div class="bar-line"><span>Calcul Simultané</span><strong>Attaque + Défense</strong></div>
+          <div class="bar-line"><span>Calcul Séparé</span><strong>Attaque (Réciproque)</strong></div>
+          <div class="bar-line"><span>Calcul Simultané</span><strong>Attaque + Défense (Solo)</strong></div>
         </div>
 
         <div class="bar-card">
