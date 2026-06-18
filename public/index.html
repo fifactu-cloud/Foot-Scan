@@ -10721,6 +10721,41 @@
       background-image: linear-gradient(135deg, rgba(56,189,248,.08), rgba(15,23,42,.28)) !important;
     }
 
+
+    /* === v169 : dernières finitions === */
+    .trend-result-inline.plain .trend-result-secondary {
+      display: inline-flex !important;
+      align-items: baseline !important;
+      gap: 0 !important;
+      font-size: 1em !important;
+      margin-left: .06em !important;
+      color: rgba(226,232,240,.72) !important;
+    }
+
+    .trend-result-inline.plain .trend-result-secondary .trend-result-token,
+    .trend-result-inline.plain .trend-result-secondary .trend-result-token.positive,
+    .trend-result-inline.plain .trend-result-secondary .trend-result-token.negative,
+    .trend-result-inline.plain .trend-result-secondary .trend-result-token.neutral,
+    .trend-result-inline.plain .trend-result-secondary .trend-result-paren {
+      color: rgba(226,232,240,.72) !important;
+      font-size: 1em !important;
+    }
+
+    details.bar-box > summary::after {
+      top: 50% !important;
+      right: 15px !important;
+      position: absolute !important;
+      transform: translateY(-50%) rotate(90deg) translateZ(0) !important;
+      transform-origin: center center !important;
+      transition: transform .16s ease, color .16s ease !important;
+      will-change: transform !important;
+      backface-visibility: hidden !important;
+    }
+
+    details.bar-box[open] > summary::after {
+      transform: translateY(-50%) rotate(-90deg) translateZ(0) !important;
+    }
+
   </style>
 </head>
 
