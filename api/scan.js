@@ -118,6 +118,7 @@ module.exports = async function (req, res) {
     const rankEventStep = numeric(b.rankEventStep, 1, 0.0001, 5);
     const rankEventMode = b.rankEventMode === 'performance' ? 'performance' : 'fixed';
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
+    const trendCount = numeric(b.trendCount, rank1 || 4, 1, 100);
 
     if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
@@ -154,6 +155,8 @@ module.exports = async function (req, res) {
         rankEventStep,
         rankEventMode,
         winnerMode,
+        trendMode: bool(b.trendMode) || b.trendCount !== undefined,
+        trendCount,
       },
     };
 
