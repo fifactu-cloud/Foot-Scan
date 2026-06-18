@@ -68,7 +68,7 @@ SCAN_JOB_PREFIX = "footscan:scan:job:"
 CACHE_TTL_SECONDS = int(os.environ.get("SOFA_CACHE_TTL_SECONDS", "86400"))
 ERROR_TTL_SECONDS = int(os.environ.get("SOFA_ERROR_TTL_SECONDS", "60"))
 SCAN_JOB_TTL_SECONDS = int(os.environ.get("SCAN_JOB_TTL_SECONDS", "86400"))
-SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "0.5"))
+SLEEP_SECONDS = float(os.environ.get("WORKER_SLEEP_SECONDS", "2"))
 PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAGE", "17"))
 
 PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "40"))
@@ -185,6 +185,24 @@ def redis_cmd(*cmd):
         raise RuntimeError(f"Upstash error: {data['error']}")
 
     return data.get("result")
+
+
+def is_upstash_quota_error(error):
+    text = str(error).lower()
+    return "max requests limit exceeded" in text or "max daily request" in text or "max request" in text
+
+
+def parse_brpop_result(result):
+    """Retourne (queue_key, value) pour BRPOP, ou (None, None).
+
+    Upstash renvoie normalement [key, value]. On reste tolérant
+    si le format varie légèrement.
+    """
+    if not result:
+        return None, None
+    if isinstance(result, (list, tuple)) and len(result) >= 2:
+        return str(result[0]), result[1]
+    return None, result
 
 
 def read_url(url, headers, impersonate=False, timeout=None):
@@ -3151,29 +3169,49 @@ def main():
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
     while True:
-        scan_job_id = redis_cmd("RPOP", SCAN_QUEUE_KEY)
+        try:
+            # BRPOP évite le polling agressif (anciennement 3 requêtes Redis
+            # toutes les 0,5 s même sans scan). Une seule requête attend
+            # jusqu'à 10 s qu'un job arrive, ce qui protège le quota Upstash.
+            result = redis_cmd(
+                "BRPOP",
+                SCAN_QUEUE_KEY,
+                RAW_QUEUE_KEY,
+                RAW_PREFETCH_QUEUE_KEY,
+                "1" if once else "10",
+            )
+        except RuntimeError as e:
+            if is_upstash_quota_error(e):
+                print("\n❌ Quota Upstash atteint: limite de requêtes dépassée.")
+                print("Le worker ne peut plus lire la file tant que le quota n'est pas réinitialisé ou augmenté.")
+                print("Solution: attendre le reset Upstash, passer l'instance en plan supérieur, ou changer de base Redis.")
+                print("Note: le polling du worker a été optimisé pour éviter de consommer le quota à vide.")
+                break
+            raise
 
-        if scan_job_id:
-            process_scan_job(scan_job_id)
+        queue_key, value = parse_brpop_result(result)
+
+        if not value:
+            if once:
+                print("Aucune requête en attente.")
+                break
             continue
 
-        request_id = redis_cmd("RPOP", RAW_QUEUE_KEY)
-
-        if request_id:
-            process_raw_request(request_id)
+        if queue_key == SCAN_QUEUE_KEY:
+            process_scan_job(value)
             continue
 
-        prefetch_path = redis_cmd("RPOP", RAW_PREFETCH_QUEUE_KEY)
-
-        if prefetch_path:
-            process_prefetch_path(prefetch_path)
+        if queue_key == RAW_QUEUE_KEY:
+            process_raw_request(value)
             continue
 
-        if once:
-            print("Aucune requête en attente.")
-            break
+        if queue_key == RAW_PREFETCH_QUEUE_KEY:
+            process_prefetch_path(value)
+            continue
 
-        time.sleep(SLEEP_SECONDS)
+        # Sécurité: si le provider renvoie un format inattendu, on priorise
+        # l'ancien flux scan pour ne pas perdre le job.
+        process_scan_job(value)
 
 
 if __name__ == "__main__":
