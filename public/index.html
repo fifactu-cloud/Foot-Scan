@@ -10545,6 +10545,182 @@
       right: 16px !important;
     }
 
+
+    /* === v168 : finition ciblée === */
+    .trend-result-inline.plain {
+      display: inline-flex !important;
+      align-items: baseline !important;
+      justify-content: center !important;
+      gap: .12em !important;
+      white-space: nowrap !important;
+      flex-wrap: nowrap !important;
+      line-height: .98 !important;
+    }
+
+    .trend-result-inline.plain .trend-result-token {
+      font-weight: 1000 !important;
+      letter-spacing: -.02em !important;
+    }
+
+    .trend-result-inline.plain .trend-result-primary {
+      font-size: 1em !important;
+    }
+
+    .trend-result-inline.plain .trend-result-secondary {
+      display: inline-flex !important;
+      align-items: baseline !important;
+      gap: 0 !important;
+      font-size: .76em !important;
+      margin-left: .04em !important;
+    }
+
+    .trend-result-inline.plain .trend-result-paren {
+      color: rgba(226,232,240,.72) !important;
+      font-weight: 900 !important;
+    }
+
+    .trend-result-inline.plain .trend-result-token.positive { color: #40c9ff !important; }
+    .trend-result-inline.plain .trend-result-token.negative { color: #fb7185 !important; }
+    .trend-result-inline.plain .trend-result-token.neutral { color: #f8fafc !important; }
+
+    .summary-cell .trend-result-inline.plain,
+    .team-card .trend-result-inline.plain {
+      transform: translateY(.01em) !important;
+    }
+
+    .summary-cell .mini-badge strong .trend-result-inline.plain {
+      font-size: 1.02em !important;
+    }
+
+    .team-card .trend-result-value .trend-result-inline.plain {
+      font-size: .94em !important;
+    }
+
+    .match-hero .kicker {
+      font-size: clamp(12px, 3.2vw, 17px) !important;
+      padding: .68em 1.04em !important;
+    }
+
+    .match-hero .logo-xl {
+      width: clamp(78px, 19vw, 102px) !important;
+      height: clamp(78px, 19vw, 102px) !important;
+    }
+
+    .match-hero .logo-xl img {
+      width: 74% !important;
+      height: 74% !important;
+    }
+
+    .match-hero .match-team-name {
+      font-size: clamp(16px, 4.7vw, 25px) !important;
+    }
+
+    .match-hero .vs-box {
+      width: clamp(48px, 11.8vw, 62px) !important;
+      height: clamp(48px, 11.8vw, 62px) !important;
+      border-radius: 15px !important;
+      font-size: clamp(14px, 3.45vw, 18px) !important;
+      margin-inline: auto !important;
+      justify-self: center !important;
+      align-self: center !important;
+    }
+
+    .match-hero .match-teams {
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+      justify-items: center !important;
+      gap: clamp(10px, 2.7vw, 16px) !important;
+    }
+
+    body .result-shell .summary-head-top {
+      align-items: stretch !important;
+      gap: 10px !important;
+    }
+
+    body .result-shell .summary-head-top .summary-label,
+    body .result-shell .summary-head-top .summary-mode {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding-left: 1.05em !important;
+      padding-right: 1.05em !important;
+      min-height: 2.65em !important;
+    }
+
+    body .result-shell .summary-head-top .summary-mode {
+      margin-left: 0 !important;
+    }
+
+    details.bar-box > summary {
+      display: grid !important;
+      place-items: center !important;
+      justify-content: center !important;
+      align-items: center !important;
+      text-align: center !important;
+      padding-left: 48px !important;
+      padding-right: 48px !important;
+      color: #f8fafc !important;
+    }
+
+    details.bar-box > summary .lexique-summary-title {
+      position: static !important;
+      left: auto !important;
+      transform: none !important;
+      width: auto !important;
+      max-width: none !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: .42em !important;
+      white-space: nowrap !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      padding-right: 0 !important;
+      color: inherit !important;
+    }
+
+    details.bar-box > summary::after {
+      top: 50% !important;
+      right: 15px !important;
+      transform: translateY(-50%) !important;
+      position: absolute !important;
+    }
+
+    .assist-data-badge .assist-glyph {
+      font-size: .8em !important;
+      transform: translateY(-.25px) !important;
+    }
+
+    .assist-data-badge.warn .assist-glyph,
+    .assist-check-missing .assist-glyph {
+      font-size: .72em !important;
+    }
+
+    .trend-matches-details {
+      margin-top: 8px !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    .team-card > .section:last-of-type {
+      padding-bottom: 8px !important;
+    }
+
+    .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      box-shadow: none !important;
+    }
+
+    .team-card-neg .trend-matches-details > summary.events-summary,
+    .summary-cell.cell-neg {
+      background-image: linear-gradient(135deg, rgba(251,113,133,.08), rgba(15,23,42,.28)) !important;
+    }
+
+    .team-card-pos .trend-matches-details > summary.events-summary,
+    .team-card-neutral .trend-matches-details > summary.events-summary {
+      background-image: linear-gradient(135deg, rgba(56,189,248,.08), rgba(15,23,42,.28)) !important;
+    }
+
   </style>
 </head>
 
@@ -11755,32 +11931,31 @@
     }
 
     function renderTrendResultMarkup(profile) {
-      const primary = profile?.primaryResult?.style;
-      const secondary = profile?.secondaryResult?.style;
+      const primary = String(profile?.primaryResult?.style || "").trim().charAt(0).toUpperCase();
+      const secondary = String(profile?.secondaryResult?.style || "").trim().charAt(0).toUpperCase();
 
       if (!primary) {
-        return `<span class="trend-result-inline"><span class="result-code neutral">—</span></span>`;
+        return `<span class="trend-result-inline plain"><span class="trend-result-token neutral">—</span></span>`;
       }
 
       return `
-        <span class="trend-result-inline">
-          ${renderResultCode(primary)}
-          ${secondary ? `<span class="trend-result-separator">/</span>${renderResultCode(secondary)}` : ""}
+        <span class="trend-result-inline plain">
+          <span class="trend-result-primary trend-result-token ${resultCodeTone(primary)}">${esc(primary)}</span>
+          ${secondary ? `<span class="trend-result-secondary"><span class="trend-result-paren">(</span><span class="trend-result-token ${resultCodeTone(secondary)}">${esc(secondary)}</span><span class="trend-result-paren">)</span></span>` : ""}
         </span>
       `;
     }
 
     function renderTrendWinner(result) {
       const winner = result?.trendWinner || {};
-      const isTie = winner.type === "tie";
       const confColors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
       const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
       return `
-        <div class="dominance-box ${isTie ? "" : "dominance-win"}">
+        <div class="dominance-box dominance-win">
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
-          ${isTie ? "" : `<div class="dominance-trophy" aria-hidden="true">🏆</div>`}
+          <div class="dominance-trophy" aria-hidden="true">🏆</div>
           <div class="dominance-label">👑 GAGNANT TENDANCE</div>
           <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
           <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}</div>
@@ -12221,7 +12396,7 @@
         const assistBadge = `
           <span class="assist-data-badge ${assistOk ? "ok" : "warn"}">
             <span class="assist-prefix">A</span>
-            <span class="assist-glyph">${assistOk ? "✔️" : "✕"}</span>
+            <span class="assist-glyph">${assistOk ? "✔️" : "❌️"}</span>
           </span>
         `;
         return `
