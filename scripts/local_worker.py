@@ -2282,6 +2282,428 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
 
     return home_result, away_result, combined_events
 
+
+def trend_result_style(value):
+    """Convertit une tendance numérique en style résultat V/N/D."""
+    try:
+        value = float(value)
+    except Exception:
+        value = 0.0
+    if value > 0:
+        return "V"
+    if value < 0:
+        return "D"
+    return "N"
+
+
+def trend_label_from_style(style):
+    return {"V": "Victoire", "N": "Nul", "D": "Défaite"}.get(style, "—")
+
+
+def trend_average(values):
+    clean = []
+    for value in values or []:
+        try:
+            n = float(value)
+        except Exception:
+            continue
+        if math.isfinite(n):
+            clean.append(n)
+    return sum(clean) / len(clean) if clean else 1.0
+
+
+def trend_match_sample(match, incidents, analyzed_team_id):
+    """Construit le niveau d'un match pour le nouveau système Tendance.
+
+    Niveau = buts marqués - buts encaissés, du point de vue de l'équipe analysée.
+    Les prolongations et tirs au but restent exclus via le filtre minute 1-90.
+    Un 0-0 est représenté comme une occurrence neutre minute 1 pour la moyenne temps.
+    """
+    goals_for = 0
+    goals_against = 0
+    goal_minutes = []
+    match_has_assists = match_contains_goal_assist(incidents)
+
+    for inc in incidents or []:
+        if not isinstance(inc, dict) or inc.get("incidentType") != "goal":
+            continue
+
+        minute = inc.get("time")
+        added = inc.get("addedTime") or 0
+        if minute is None or minute < 1 or minute > 90:
+            continue
+
+        goal_minutes.append(float(minute) + (float(added or 0) / 100.0))
+
+        if is_own_goal_incident(inc):
+            goal_for_team = not own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
+        else:
+            goal_for_team = incident_belongs_to_analyzed_team(inc, match, analyzed_team_id)
+
+        if goal_for_team:
+            goals_for += 1
+        else:
+            goals_against += 1
+
+    # Demande utilisateur : compter un 0-0 comme événement minute 1 pour chaque match.
+    minutes_for_average = goal_minutes[:] if goal_minutes else [1.0]
+    level = goals_for - goals_against
+
+    return {
+        "id": match.get("id"),
+        "label": make_match_label(match),
+        "competition": get_competition_name(match),
+        "startTimestamp": match.get("startTimestamp") or 0,
+        "goalsFor": goals_for,
+        "goalsAgainst": goals_against,
+        "level": level,
+        "resultStyle": trend_result_style(level),
+        "resultLabel": trend_label_from_style(trend_result_style(level)),
+        "goalMinutes": goal_minutes,
+        "minutesForAverage": minutes_for_average,
+        "averageMinute": round(trend_average(minutes_for_average), 4),
+        "matchHasAssists": match_has_assists,
+        "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
+        "eventDataStatus": "ok",
+    }
+
+
+def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span):
+    needed_matches = max(2, int(trend_count) + 1)
+    pages = []
+    stopped_history = False
+    administrative_matches_ignored = {}
+    pages_loaded_count = 0
+    pages_attempted_count = 0
+
+    def build_finished_matches():
+        by_id = {}
+        for match in pages:
+            if not isinstance(match, dict):
+                continue
+            match_id = match.get("id")
+            if not match_id:
+                continue
+            home_id = (match.get("homeTeam") or {}).get("id")
+            away_id = (match.get("awayTeam") or {}).get("id")
+            if home_id != analyzed_team_id and away_id != analyzed_team_id:
+                continue
+            admin_reason = administrative_match_reason(match)
+            if admin_reason:
+                administrative_matches_ignored[match_id] = make_administrative_match_issue(match, admin_reason)
+                continue
+            by_id[match_id] = match
+        return by_id
+
+    page_targets = [step for step in PAGE_LOAD_STEPS if step <= PAGES_TO_LOAD]
+    if PAGES_TO_LOAD not in page_targets:
+        page_targets.append(PAGES_TO_LOAD)
+
+    next_page = 0
+    by_id = {}
+    required = skip + needed_matches
+
+    for target_pages in page_targets:
+        if stopped_history:
+            break
+
+        for page in range(next_page, target_pages):
+            update_scan_job(
+                job_id,
+                status="running",
+                message=f"{team_name} · Tendance · Page {page + 1}/{target_pages}",
+                progress=base_progress + int(progress_span * 0.12 * ((page + 1) / max(1, target_pages))),
+            )
+            pages_attempted_count = max(pages_attempted_count, page + 1)
+            try:
+                data = get_json(f"team/{analyzed_team_id}/events/last/{page}")
+            except Exception as e:
+                error_text = str(e)
+                if "HTTP 404" in error_text or "Not Found" in error_text:
+                    stopped_history = True
+                    break
+                if pages:
+                    stopped_history = True
+                    break
+                raise
+
+            page_events = data.get("events") if isinstance(data, dict) else data
+            if isinstance(page_events, list) and page_events:
+                pages.extend(page_events)
+                pages_loaded_count = max(pages_loaded_count, page + 1)
+            else:
+                stopped_history = True
+                break
+
+        next_page = max(next_page, target_pages)
+        by_id = build_finished_matches()
+        if len(by_id) >= required:
+            break
+
+    sorted_matches = sorted(by_id.values(), key=lambda m: (m.get("startTimestamp") or 0, m.get("id") or 0), reverse=True)
+    selected_matches = sorted_matches[skip:skip + needed_matches]
+
+    if len(selected_matches) < needed_matches:
+        raise RuntimeError(f"{team_name}: pas assez de matchs valides pour {trend_count} tendances ({len(selected_matches)}/{needed_matches}).")
+
+    samples = []
+    event_data_issues = []
+
+    for idx, match in enumerate(selected_matches, start=1):
+        update_scan_job(
+            job_id,
+            status="running",
+            message=f"{team_name} · Tendance · Match {idx}/{needed_matches}",
+            progress=base_progress + int(progress_span * (0.15 + 0.80 * (idx / max(1, needed_matches)))),
+        )
+        data = get_incidents_json(f"event/{match['id']}/incidents")
+        issue = data.get("_footscanIssue") if isinstance(data, dict) else None
+        incidents = data.get("incidents") if isinstance(data, dict) else data
+        if not isinstance(incidents, list):
+            incidents = []
+        if issue:
+            event_data_issues.append({
+                "id": match.get("id"),
+                "label": make_match_label(match),
+                "competition": get_competition_name(match),
+                "startTimestamp": match.get("startTimestamp") or 0,
+                "type": issue.get("type") or "blocked",
+                "reason": issue.get("reason") or issue.get("message") or "Événements non récupérés",
+                "message": issue.get("message") or "Événements non récupérés pour ce match.",
+            })
+        sample = trend_match_sample(match, incidents, analyzed_team_id)
+        if issue:
+            sample["eventDataStatus"] = issue.get("type") or "blocked"
+            sample["eventDataIssue"] = True
+            sample["error"] = issue.get("reason") or issue.get("message") or "Événements non récupérés"
+        samples.append(sample)
+
+    administrative_ignored = sorted(
+        administrative_matches_ignored.values(),
+        key=lambda item: (item.get("startTimestamp") or 0, item.get("id") or 0),
+        reverse=True,
+    )
+
+    return {
+        "trendMatches": samples,
+        "matchesUsed": [
+            {
+                "id": sample.get("id"),
+                "label": sample.get("label"),
+                "count": abs(sample.get("level") or 0),
+                "startTimestamp": sample.get("startTimestamp") or 0,
+                "competition": sample.get("competition") or "Toutes compétitions",
+                "eventDataStatus": sample.get("eventDataStatus") or "ok",
+                "trendLevel": sample.get("level"),
+                "trendAverageMinute": sample.get("averageMinute"),
+                "matchHasAssists": sample.get("matchHasAssists"),
+                "assistDataStatus": sample.get("assistDataStatus"),
+            }
+            for sample in samples
+        ],
+        "events": [],
+        "eventDataIssues": event_data_issues,
+        "eventDataIssueCount": len(event_data_issues),
+        "administrativeMatchesIgnored": administrative_ignored,
+        "administrativeMatchCount": len(administrative_ignored),
+        "pagesLoaded": pages_loaded_count,
+        "pagesAttempted": pages_attempted_count,
+        "pagesLimit": PAGES_TO_LOAD,
+        "scanPartial": bool(event_data_issues),
+    }
+
+
+def build_trend_items(samples, side_key, trend_count):
+    items = []
+    for i in range(int(trend_count)):
+        recent = samples[i]
+        previous = samples[i + 1]
+        trend_value = (recent.get("level") or 0) - (previous.get("level") or 0)
+        minutes = (recent.get("minutesForAverage") or [1]) + (previous.get("minutesForAverage") or [1])
+        avg_minute = trend_average(minutes)
+        style = trend_result_style(trend_value)
+        items.append({
+            "index": i + 1,
+            "side": side_key,
+            "previousMatch": previous,
+            "recentMatch": recent,
+            "previousLevel": previous.get("level") or 0,
+            "recentLevel": recent.get("level") or 0,
+            "value": round(trend_value, 6),
+            "performance": round(trend_value, 6),
+            "resultStyle": style,
+            "resultLabel": trend_label_from_style(style),
+            "averageMinute": round(avg_minute, 4),
+            "minuteBasis": [round(float(x), 4) for x in minutes],
+            "dominant": False,
+        })
+    return items
+
+
+def summarize_trend_items(items):
+    counts = {"V": 0, "N": 0, "D": 0}
+    performance_score = 0.0
+    dominant_count = 0
+
+    for item in items or []:
+        if not item.get("dominant"):
+            continue
+        dominant_count += 1
+        value = float(item.get("value") or 0)
+        performance_score += value
+        style = trend_result_style(value)
+        counts[style] = counts.get(style, 0) + 1
+
+    order = sorted(
+        [{"style": k, "label": trend_label_from_style(k), "count": v} for k, v in counts.items()],
+        key=lambda item: (-item["count"], {"V": 0, "N": 1, "D": 2}.get(item["style"], 9)),
+    )
+    primary = order[0] if order and order[0]["count"] > 0 else None
+    secondary = order[1] if len(order) > 1 and order[1]["count"] > 0 else None
+
+    return {
+        "performanceScore": round(performance_score, 6),
+        "resultCounts": counts,
+        "primaryResult": primary,
+        "secondaryResult": secondary,
+        "dominantCount": dominant_count,
+    }
+
+
+def process_trend_scan_job(job_id, params):
+    match_id = str(params.get("matchId") or "").strip()
+    trend_count = int(float(params.get("trendCount") or params.get("rank1") or 4))
+    trend_count = max(1, min(100, trend_count))
+    skip_home = int(params.get("skipHome") or 0)
+    skip_away = int(params.get("skipAway") or 0)
+    simultaneous_mode = bool(params.get("simultaneousMode"))
+
+    update_scan_job(job_id, status="running", message="Récupération Du Match Principal…", progress=5)
+    match_data = get_json(f"event/{match_id}")
+    match = match_data.get("event") if isinstance(match_data, dict) else match_data
+
+    if not isinstance(match, dict) or not match.get("homeTeam") or not match.get("awayTeam"):
+        raise RuntimeError("Format du match principal inattendu")
+
+    home_team = match["homeTeam"]
+    away_team = match["awayTeam"]
+    needed_matches = trend_count + 1
+
+    update_scan_job(
+        job_id,
+        status="running",
+        message=f"Match trouvé : {home_team.get('name')} vs {away_team.get('name')} · {trend_count} tendances ({needed_matches} matchs)",
+        progress=10,
+    )
+
+    home_scan = fetch_trend_team_matches(job_id, home_team["id"], skip_home, trend_count, home_team.get("name") or "Domicile", 12, 40)
+    away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, trend_count, away_team.get("name") or "Extérieur", 54, 40)
+
+    home_items = build_trend_items(home_scan["trendMatches"], "home", trend_count)
+    away_items = build_trend_items(away_scan["trendMatches"], "away", trend_count)
+    comparisons = []
+
+    for i in range(trend_count):
+        home_item = home_items[i]
+        away_item = away_items[i]
+        hm = float(home_item.get("averageMinute") or 0)
+        am = float(away_item.get("averageMinute") or 0)
+        if abs(hm - am) < 1e-9:
+            dominant = "tie"
+        elif hm > am:
+            dominant = "home"
+            home_item["dominant"] = True
+        else:
+            dominant = "away"
+            away_item["dominant"] = True
+        comparisons.append({
+            "index": i + 1,
+            "dominant": dominant,
+            "home": home_item,
+            "away": away_item,
+            "minuteDiff": round(abs(hm - am), 4),
+        })
+
+    home_summary = summarize_trend_items(home_items)
+    away_summary = summarize_trend_items(away_items)
+
+    def winner():
+        h = home_summary["performanceScore"]
+        a = away_summary["performanceScore"]
+        if h > a:
+            return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(h - a, 6)}
+        if a > h:
+            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(a - h, 6)}
+        return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
+
+    home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
+    away_issue_count = int(away_scan.get("eventDataIssueCount") or 0)
+    total_issue_count = home_issue_count + away_issue_count
+    home_admin_count = int(home_scan.get("administrativeMatchCount") or 0)
+    away_admin_count = int(away_scan.get("administrativeMatchCount") or 0)
+    total_admin_count = home_admin_count + away_admin_count
+
+    result = {
+        "trendMode": True,
+        "trendCount": trend_count,
+        "trendMatchesNeeded": needed_matches,
+        "simultaneousMode": simultaneous_mode,
+        "scanModeLabel": "Tendance simultanée" if simultaneous_mode else "Tendance séparée",
+        "match": {
+            "id": match.get("id"),
+            "homeTeam": home_team,
+            "awayTeam": away_team,
+            "startTimestamp": match.get("startTimestamp"),
+            "label": make_match_label(match),
+        },
+        "home": {
+            **home_team,
+            **home_scan,
+            "trend": {**home_summary, "items": home_items},
+            "r1": {"value": home_summary["performanceScore"], "sources": []},
+            "r2": None,
+            "zoneStats": {"average": None, "count": 0},
+        },
+        "away": {
+            **away_team,
+            **away_scan,
+            "trend": {**away_summary, "items": away_items},
+            "r1": {"value": away_summary["performanceScore"], "sources": []},
+            "r2": None,
+            "zoneStats": {"average": None, "count": 0},
+        },
+        "trendComparisons": comparisons,
+        "trendWinner": winner(),
+        "requestedRank1": trend_count,
+        "requestedRank2": None,
+        "rank1": trend_count,
+        "rank2": None,
+        "dataQuality": {
+            "isPartial": total_issue_count > 0,
+            "eventDataIssueCount": total_issue_count,
+            "homeIssueCount": home_issue_count,
+            "awayIssueCount": away_issue_count,
+            "administrativeMatchCount": total_admin_count,
+            "homeAdministrativeMatchCount": home_admin_count,
+            "awayAdministrativeMatchCount": away_admin_count,
+            "administrativeMatchesIgnored": (home_scan.get("administrativeMatchesIgnored") or []) + (away_scan.get("administrativeMatchesIgnored") or []),
+            "message": (
+                f"⚠️ Scan partiel : {total_issue_count} match(s) sans événements récupérés."
+                if total_issue_count else
+                "Scan complet : aucun match sans événements récupérés."
+            ),
+        },
+        "config": {
+            "trendCount": trend_count,
+            "trendMatchesNeeded": needed_matches,
+            "pagesToLoad": PAGES_TO_LOAD,
+            "system": "trend",
+        },
+    }
+
+    update_scan_job(job_id, status="done", message="📈 Scan tendance terminé.", progress=100, result=result, finishedAt=now_ts())
+    print(f"✅ Scan tendance terminé: {job_id} · {trend_count} tendances · gagnant {result['trendWinner']['label']}")
+
 def process_scan_job(job_id):
     raw = redis_cmd("GET", f"{SCAN_JOB_PREFIX}{job_id}")
 
@@ -2291,6 +2713,14 @@ def process_scan_job(job_id):
 
     job = json.loads(raw)
     params = job.get("params") or {}
+
+    if params.get("trendMode") or params.get("trendCount") is not None:
+        try:
+            process_trend_scan_job(job_id, params)
+        except Exception as e:
+            update_scan_job(job_id, status="error", message="Erreur pendant le scan tendance.", progress=100, error=str(e))
+            print(f"ERREUR scan tendance {job_id}: {e}", file=sys.stderr)
+        return
 
     match_id = str(params.get("matchId") or "").strip()
     rank1 = float(params.get("rank1"))
@@ -2565,7 +2995,7 @@ def main():
     print("Mode séparé: équipe analysée + adversaires passés pondérés par match utilisé.")
     print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Progression des rangs: curseur par job, défaut 1 par événement.")
+    print("Système tendance: curseur 1-100, niveau = buts marqués - buts encaissés, comparaison par moyenne des minutes.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
     print("Préchargement événements: désactivé par défaut pour économiser les requêtes.")
