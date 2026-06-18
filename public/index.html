@@ -10117,6 +10117,223 @@
 
 
 
+  
+
+    /* === v166 : retouches UI ciblées demandées === */
+
+    /* Hiérarchie générale + MATCH ANALYSÉ plus visible */
+    .match-hero .kicker {
+      font-size: clamp(15px, 4.1vw, 22px) !important;
+      padding: .82em 1.25em !important;
+      letter-spacing: .09em !important;
+    }
+
+    .match-hero .match-team-name {
+      font-size: clamp(19px, 5.8vw, 30px) !important;
+      line-height: 1.05 !important;
+      letter-spacing: -.02em !important;
+    }
+
+    .match-hero .hero-text {
+      font-size: clamp(13px, 3.5vw, 17px) !important;
+      line-height: 1.45 !important;
+      max-width: 92% !important;
+    }
+
+    .match-hero .logo-xl {
+      width: clamp(90px, 22vw, 120px) !important;
+      height: clamp(90px, 22vw, 120px) !important;
+    }
+
+    .match-hero .vs-box {
+      min-width: clamp(64px, 17vw, 84px) !important;
+      min-height: clamp(64px, 17vw, 84px) !important;
+    }
+
+    .summary-label {
+      font-size: clamp(11px, 2.9vw, 13px) !important;
+      letter-spacing: .12em !important;
+    }
+
+    .team-meta {
+      font-size: clamp(12.5px, 3.15vw, 15px) !important;
+      line-height: 1.35 !important;
+    }
+
+    .section-title,
+    .events-summary-label {
+      letter-spacing: .08em !important;
+    }
+
+    /* V / N / D colorés */
+    .result-code {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.95em;
+      height: 1.95em;
+      padding: 0 .45em;
+      border-radius: 999px;
+      font-size: .9em;
+      line-height: 1;
+      font-weight: 1000;
+      border: 1px solid rgba(148,163,184,.18);
+      background: rgba(15,23,42,.36);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .result-code.positive {
+      color: #40c9ff !important;
+      border-color: rgba(56,189,248,.24) !important;
+      background: rgba(14,165,233,.10) !important;
+    }
+
+    .result-code.neutral {
+      color: #f8fafc !important;
+      border-color: rgba(148,163,184,.24) !important;
+      background: rgba(148,163,184,.10) !important;
+    }
+
+    .result-code.negative {
+      color: #fb7185 !important;
+      border-color: rgba(251,113,133,.24) !important;
+      background: rgba(251,113,133,.10) !important;
+    }
+
+    .trend-result-inline {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      white-space: nowrap;
+    }
+
+    .trend-result-separator {
+      color: rgba(255,255,255,.34);
+      font-size: .72em;
+      line-height: 1;
+    }
+
+    .trend-result-value .trend-result-inline {
+      gap: .16em;
+    }
+
+    .trend-result-value .result-code {
+      font-size: .55em;
+      min-width: 1.72em;
+      height: 1.72em;
+      padding: 0 .34em;
+      letter-spacing: .02em;
+    }
+
+    .summary-grid .mini-badge span {
+      text-transform: uppercase !important;
+      letter-spacing: .08em !important;
+    }
+
+    .trend-row-title {
+      text-transform: uppercase !important;
+      letter-spacing: .08em !important;
+    }
+
+    /* MATCHS UTILISÉS : rendu plus propre et mieux intégré */
+    .trend-matches-details {
+      margin-top: 16px !important;
+      border-radius: 20px !important;
+      overflow: hidden !important;
+      background: rgba(8, 16, 35, 0.18) !important;
+      border: 1px solid rgba(148,163,184,.10) !important;
+    }
+
+    details.trend-matches-details > summary.events-summary {
+      min-height: 58px !important;
+      margin: 0 !important;
+      border-radius: 20px !important;
+      background: linear-gradient(135deg, rgba(56,189,248,.10), rgba(15,23,42,.42)) !important;
+      border: 0 !important;
+    }
+
+    details.trend-matches-details[open] > summary.events-summary {
+      border-bottom-left-radius: 0 !important;
+      border-bottom-right-radius: 0 !important;
+    }
+
+    .trend-matches-panel {
+      padding: 12px !important;
+      border-top: 1px solid rgba(148,163,184,.10) !important;
+      background: linear-gradient(180deg, rgba(15,23,42,.40), rgba(15,23,42,.22)) !important;
+    }
+
+    .trend-matches-panel .match-list {
+      gap: 10px !important;
+    }
+
+    .assist-data-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      min-width: 42px;
+      height: 20px;
+      padding: 0 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 1000;
+      letter-spacing: .03em;
+      border: 1px solid rgba(255,255,255,.13);
+      background: rgba(15, 23, 42, .54);
+      color: rgba(226,232,240,.90);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+      vertical-align: middle;
+    }
+
+    .assist-data-badge.ok {
+      border-color: rgba(56,189,248,.28);
+      background: rgba(14,165,233,.13);
+      color: #bfdbfe;
+    }
+
+    .assist-data-badge.warn {
+      border-color: rgba(244,114,182,.20);
+      background: rgba(168,85,247,.10);
+      color: #fbcfe8;
+    }
+
+    .assist-data-badge .assist-prefix {
+      opacity: .92;
+    }
+
+    .assist-data-badge .assist-glyph {
+      display: inline-block;
+      line-height: 1;
+      transform: translateY(-.4px);
+    }
+
+    .assist-data-badge.warn .assist-glyph {
+      font-size: .84em;
+    }
+
+    /* LEXIQUE centré */
+    details.bar-box > summary {
+      position: relative !important;
+      justify-content: center !important;
+    }
+
+    details.bar-box > summary .lexique-summary-title {
+      display: block !important;
+      width: 100% !important;
+      text-align: center !important;
+      padding-right: 18px !important;
+    }
+
+    details.bar-box > summary::after {
+      position: absolute !important;
+      right: 16px !important;
+      margin-left: 0 !important;
+    }
+
   </style>
 </head>
 
@@ -10857,10 +11074,15 @@
           });
     }
 
+    
     function renderDominance(result) {
       const dominance = getDominance(result);
       const isEvolution = dominance.mode === "evolution";
       const title = isEvolution ? "Gagnant Par Évolution" : "👑 Gagnant Par Moyenne Des Rangs";
+      const confColors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
+      const confetti = Array.from({ length: 20 }, (_, i) => `
+        <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
+      `).join("");
 
       if (dominance.type === "none") {
         return `
@@ -10875,8 +11097,9 @@
       if (dominance.type === "tie") {
         return `
           <div class="dominance-box">
+            <div class="status-confetti" aria-hidden="true">${confetti}</div>
             <div class="dominance-label">${title}</div>
-            <div class="dominance-team">Égalité</div>
+            <div class="dominance-team">ÉGALITÉ</div>
             <div class="dominance-meta">${isEvolution ? "Même évolution affichée après arrondi." : `Moyenne des deux Rangs : ${esc(formatValue(dominance.average))}`}</div>
           </div>
         `;
@@ -10885,11 +11108,6 @@
       const meta = isEvolution
         ? `Évolution : ${esc(formatValue(dominance.metric))} · Zone ${esc(formatValue(dominance.zoneAverage))} → Rangs ${esc(formatValue(dominance.rankAverage))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`
         : `Moyenne Dominante : ${esc(formatValue(dominance.average))}${dominance.diff !== null ? ` · Écart : ${esc(formatRank(dominance.diff))}` : ""}`;
-
-      const confColors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
-      const confetti = Array.from({ length: 20 }, (_, i) => `
-        <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
-      `).join("");
 
       return `
         <div class="dominance-box dominance-win">
@@ -10901,7 +11119,6 @@
         </div>
       `;
     }
-
 
 
     function renderSelectedRanksStatus() {
@@ -11315,16 +11532,47 @@
       return secondary ? `${primary.style} (${secondary.style})` : `${primary.style}`;
     }
 
+    
+    function resultCodeTone(code) {
+      const key = String(code || "").trim().charAt(0).toUpperCase();
+      if (key === "V") return "positive";
+      if (key === "D") return "negative";
+      return "neutral";
+    }
+
+    function renderResultCode(code) {
+      const key = String(code || "N").trim().charAt(0).toUpperCase() || "N";
+      return `<span class="result-code ${resultCodeTone(key)}">${esc(key)}</span>`;
+    }
+
+    function renderTrendResultMarkup(profile) {
+      const primary = profile?.primaryResult?.style;
+      const secondary = profile?.secondaryResult?.style;
+
+      if (!primary) {
+        return `<span class="trend-result-inline"><span class="result-code neutral">—</span></span>`;
+      }
+
+      return `
+        <span class="trend-result-inline">
+          ${renderResultCode(primary)}
+          ${secondary ? `<span class="trend-result-separator">/</span>${renderResultCode(secondary)}` : ""}
+        </span>
+      `;
+    }
+
+    
     function renderTrendWinner(result) {
       const winner = result?.trendWinner || {};
       const isTie = winner.type === "tie";
       const confColors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
-      const confetti = isTie ? "" : Array.from({ length: 20 }, (_, i) => `
+      const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
+
       return `
         <div class="dominance-box ${isTie ? "" : "dominance-win"}">
-          ${isTie ? "" : `<div class="status-confetti" aria-hidden="true">${confetti}</div>`}
+          <div class="status-confetti" aria-hidden="true">${confetti}</div>
           ${isTie ? "" : `<div class="dominance-trophy" aria-hidden="true">🏆</div>`}
           <div class="dominance-label">👑 GAGNANT TENDANCE</div>
           <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
@@ -11333,10 +11581,13 @@
       `;
     }
 
+
+    
     function renderTrendSummaryCell(team) {
       const trend = team?.trend || {};
       const score = trend.performanceScore;
       const cellTone = Number(score) > 0 ? "cell-pos" : (Number(score) < 0 ? "cell-neg" : "cell-neutral");
+
       return `
         <div class="summary-cell ${cellTone}">
           <div class="summary-team-row">
@@ -11346,13 +11597,23 @@
             <div class="summary-team-name">${esc(String(team.name || "").toUpperCase())}</div>
           </div>
           <div class="mini-values">
-            <div class="mini-badge"><span>Performance</span><strong class="${valueClass(score)}">${esc(formatValue(score))}</strong></div>
-            <div class="mini-badge"><span>Résultat</span><strong>${esc(trendResultText(trend))}</strong></div>
-            <div class="mini-badge"><span>Tendances Prises</span><strong>${esc(trend.dominantCount || 0)}/${esc((team.trend?.items || []).length)}</strong></div>
+            <div class="mini-badge">
+              <span>PERFORMANCE</span>
+              <strong class="${valueClass(score)}">${esc(formatValue(score))}</strong>
+            </div>
+            <div class="mini-badge">
+              <span>RÉSULTAT</span>
+              <strong>${renderTrendResultMarkup(trend)}</strong>
+            </div>
+            <div class="mini-badge">
+              <span>TENDANCES PRISES</span>
+              <strong>${esc(trend.dominantCount || 0)}/${esc((team.trend?.items || []).length)}</strong>
+            </div>
           </div>
         </div>
       `;
     }
+
 
     function renderTrendResult(result) {
       const match = result.match;
@@ -11389,12 +11650,14 @@
       return "neutral";
     }
 
+    
     function renderTrendTeam(team, side) {
       const trend = team?.trend || {};
       const score = Number(trend.performanceScore || 0);
       const tone = score > 0 ? "team-card-pos" : (score < 0 ? "team-card-neg" : "team-card-neutral");
       const items = trend.items || [];
       const sideClass = side === "Domicile" ? "side-home" : "side-away";
+
       return `
         <section class="team-card ${side === "Domicile" ? "team-card-home" : "team-card-away"} ${tone}">
           <div class="team-hero">
@@ -11410,45 +11673,52 @@
               </div>
             </div>
           </div>
-          <div class="rank-grid ${true ? "" : "one"}">
+
+          <div class="rank-grid">
             <div class="rank-card">
-              <div class="rank-label">Performance</div>
+              <div class="rank-label">PERFORMANCE</div>
               <div class="rank-value ${valueClass(score)}">${esc(formatValue(score))}</div>
             </div>
             <div class="rank-card">
-              <div class="rank-label">Résultat</div>
-              <div class="rank-value neutral trend-result-value">${esc(trendResultText(trend))}</div>
+              <div class="rank-label">RÉSULTAT</div>
+              <div class="rank-value trend-result-value">${renderTrendResultMarkup(trend)}</div>
             </div>
           </div>
+
           <div class="section">
-            <div class="section-title">Tendances Comparées</div>
+            <div class="section-title">TENDANCES COMPARÉES</div>
             <div class="trend-comparison-stack">
               ${items.map(renderTrendItem).join("")}
             </div>
           </div>
+
           ${renderTrendMatches(team.matchesUsed || [])}
         </section>
       `;
     }
 
+
+    
     function renderTrendItem(item) {
       const tone = trendItemToneClass(item);
       const dominant = item.dominant ? "is-dominant" : "";
       const domText = item.dominant ? "PREND LE DESSUS" : "COMPARÉE";
+
       return `
         <div class="trend-row">
           <div class="trend-row-head">
-            <div class="trend-row-title">Tendance ${esc(item.index)}</div>
+            <div class="trend-row-title">TENDANCE ${esc(item.index)}</div>
             <div class="trend-row-badge ${tone}">${esc(domText)}</div>
           </div>
           <div class="trend-mini ${dominant} ${tone}">
-            <div class="trend-score-line"><span>${esc(item.resultStyle || "N")}</span><strong class="${tone}">${esc(formatValue(item.value))}</strong></div>
+            <div class="trend-score-line">${renderResultCode(item.resultStyle || "N")}<strong class="${tone}">${esc(formatValue(item.value))}</strong></div>
             <div class="trend-match-line">${esc(item.previousMatch?.label || "Match Précédent")} → ${esc(item.recentMatch?.label || "Match Récent")}</div>
             <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}</div>
           </div>
         </div>
       `;
     }
+
 
     function renderOverallZoneStats(result) {
       return "";
@@ -11753,13 +12023,19 @@
 
 
 
+    
     function renderTrendMatches(matchesUsed) {
       const matchRows = (matchesUsed || []).map((match, index) => {
         const hasIssue = Boolean(match.eventDataIssue);
         const issueText = hasIssue ? `<span class="event-data-issue-label">Événements Non Récupérés</span>` : "";
-        const assistBadge = match.assistDataStatus === "assist-found"
-          ? `<span class="assist-data-badge ok">A✔️</span>`
-          : `<span class="assist-data-badge warn">A❌️</span>`;
+        const assistOk = match.assistDataStatus === "assist-found";
+        const assistBadge = `
+          <span class="assist-data-badge ${assistOk ? "ok" : "warn"}">
+            <span class="assist-prefix">A</span>
+            <span class="assist-glyph">${assistOk ? "✔️" : "❌"}</span>
+          </span>
+        `;
+
         return `
           <div class="match-row ${hasIssue ? "issue" : ""}">
             <div class="row-number match-number-badge">
@@ -11773,18 +12049,20 @@
           </div>
         `;
       }).join("");
+
       return `
         <details class="clean events-details trend-matches-details">
           <summary class="events-summary">
-            <span class="events-summary-label">Matchs Utilisés</span>
+            <span class="events-summary-label">MATCHS UTILISÉS</span>
             <span class="count-pill events-count-pill">${esc((matchesUsed || []).length)}</span>
           </summary>
-          <div class="section">
+          <div class="trend-matches-panel">
             <div class="match-list">${matchRows || "Aucun Match Trouvé."}</div>
           </div>
         </details>
       `;
     }
+
 
     function renderTeam(team, side, rank1, rank2) {
       const events = team.events || [];
