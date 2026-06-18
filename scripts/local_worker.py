@@ -900,7 +900,7 @@ def parse_incidents(incidents, match, analyzed_team_id):
             })
 
     def sort_key(ev):
-        time_value = ev.get("minute", 0) + (ev.get("added", 0) or 0) / 100
+        time_value = ev.get("minute", 0) + (ev.get("added", 0) or 0)
         order = {
             "goalWithAssist": 0,
             "goal": 0,
@@ -2237,7 +2237,7 @@ def apply_simultaneous_match_minute_order(home_scan, away_scan, home_name="Domic
             source_key, original_index, event = item
             minute = event.get("minute") or 0
             added = event.get("added") or 0
-            return (-(minute + added / 100), 0 if source_key == "home" else 1, original_index)
+            return (-(minute + added), 0 if source_key == "home" else 1, original_index)
 
         for source_key, original_index, event in sorted(items, key=sort_key):
             side = event.get("side")
@@ -2339,7 +2339,7 @@ def trend_match_sample(match, incidents, analyzed_team_id, level_mode="full"):
         if minute is None or minute < 1 or minute > 90:
             continue
 
-        event_minute = float(minute) + (float(added or 0) / 100.0)
+        event_minute = float(minute) + float(added or 0)
         all_goal_minutes.append(event_minute)
 
         own_goal = is_own_goal_incident(inc)
@@ -2755,7 +2755,9 @@ def process_trend_scan_job(job_id, params):
         am = float(away_item.get("averageMinute") or 0)
         if abs(hm - am) < 1e-9:
             dominant = "tie"
-        elif hm > am:
+        elif hm < am:
+            # Nouvelle règle: la tendance dominante est la plus ancienne,
+            # donc celle dont la moyenne des minutes est la plus basse.
             dominant = "home"
             home_item["dominant"] = True
         else:
@@ -3142,7 +3144,7 @@ def main():
     print("Mode séparé: équipe analysée + adversaires passés pondérés par match utilisé.")
     print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Système tendance: curseur 1-100, niveau = buts marqués - buts encaissés, comparaison par moyenne des minutes.")
+    print("Système tendance: curseur 1-100, comparaison par moyenne des minutes la plus basse.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
     print("Préchargement événements: désactivé par défaut pour économiser les requêtes.")
