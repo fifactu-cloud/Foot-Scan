@@ -9949,7 +9949,90 @@
       }
     }
 
-  </style>
+  
+
+    /* v154 : retour titres propres, sans bulles d'emojis, et blocs cohérents */
+    .section-title-emoji,
+    .events-summary-emoji {
+      display: inline !important;
+      width: auto !important;
+      min-width: 0 !important;
+      height: auto !important;
+      line-height: inherit !important;
+      font-size: 1em !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      filter: none !important;
+      margin: 0 !important;
+    }
+
+    .settings-panel {
+      padding: 0 !important;
+    }
+
+    .settings-panel .settings-head {
+      justify-content: center !important;
+      text-align: center !important;
+    }
+
+    .settings-panel .settings-body {
+      padding: var(--content-pad, 16px) !important;
+    }
+
+    .settings-section-head {
+      margin: 0 !important;
+    }
+
+    .report-title {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 8px !important;
+      width: 100%;
+      text-align: center !important;
+    }
+
+    .bar-box > summary {
+      width: auto !important;
+      margin: 0 !important;
+      padding: 16px !important;
+      border-radius: 0 !important;
+      border: 0 !important;
+      border-bottom: 1px solid var(--line) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(255, 255, 255, 0.02)) !important;
+      color: #f8fbff !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 8px !important;
+      text-transform: uppercase !important;
+      font-size: var(--title-size, 18px) !important;
+      font-weight: 1000 !important;
+      letter-spacing: 0.04em !important;
+      line-height: 1.15 !important;
+    }
+
+    .bar-box > summary::after {
+      margin-left: 4px !important;
+    }
+
+    details.clean.events-details summary.events-summary {
+      padding: 14px 14px !important;
+      border-radius: 18px !important;
+      background: rgba(10, 22, 52, .74) !important;
+      border-color: rgba(64, 201, 255, .24) !important;
+    }
+
+    .events-summary-label {
+      gap: 0 !important;
+      letter-spacing: .09em !important;
+    }
+
+    .bar-card .bar-line strong {
+      text-align: right;
+    }
+</style>
 </head>
 
 <body>
@@ -10006,11 +10089,14 @@
       </div>
     </section>
 
-    <section class="panel panel-pad settings-panel">
-      <div class="settings-section-head">
-        <div class="report-title"><span class="section-title-emoji" aria-hidden="true">⚙️</span><span>RÉGLAGES</span></div>
+    <section class="panel settings-panel">
+      <div class="report-head settings-head">
+        <div>
+          <div class="report-title">⚙️ RÉGLAGES</div>
+        </div>
       </div>
 
+      <div class="settings-body panel-pad">
       <div class="form-grid">
         <div>
           <label for="matchInput">URL WEB ou Match ID</label>
@@ -10060,12 +10146,13 @@
 
       <div id="statusBox" class="status-box"></div>
       <div id="errorBox" class="error-box"></div>
+      </div>
     </section>
 
     <section class="report-panel" id="reportPanel">
       <div class="report-head">
         <div>
-          <div class="report-title"><span class="section-title-emoji" aria-hidden="true">🗒</span><span>RAPPORT DE SESSION</span></div>
+          <div class="report-title">🗒 RAPPORT DE SESSION</div>
         </div>
       </div>
 
@@ -10090,7 +10177,7 @@
     <div id="result" class="result-shell"></div>
 
     <details class="bar-box">
-      <summary><span class="section-title-emoji" aria-hidden="true">📖</span><span>LEXIQUE</span></summary>
+      <summary>📖 LEXIQUE</summary>
 
       <div class="bar-grid">
         <div class="bar-card">
@@ -10105,7 +10192,7 @@
           <div class="bar-line"><span>Curseur Tendance</span><strong>Nombre De Tendances</strong></div>
           <div class="bar-line"><span>Matchs Utilisés</span><strong>Nombre De Tendances + 1</strong></div>
           <div class="bar-line"><span>Calcul Séparé</span><strong>Attaque (Camp Réciproque)</strong></div>
-          <div class="bar-line"><span>Calcul Simultané</span><strong>Attaque + Défense (Camp Séparé)</strong></div>
+          <div class="bar-line"><span>Calcul Simultané</span><strong>Attaque + Défense (Camp Solo)</strong></div>
         </div>
 
         <div class="bar-card">
@@ -11608,7 +11695,7 @@
       return `
         <details class="clean events-details trend-matches-details">
           <summary class="events-summary">
-            <span class="events-summary-label"><span class="events-summary-emoji" aria-hidden="true">📋</span><span>MATCHS UTILISÉS</span></span>
+            <span class="events-summary-label">MATCHS UTILISÉS</span>
             <span class="count-pill events-count-pill">${esc((matchesUsed || []).length)}</span>
           </summary>
           <div class="section">
