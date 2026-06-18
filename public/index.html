@@ -10337,6 +10337,214 @@
       margin-left: 0 !important;
     }
 
+
+    /* === v167 : ajustements fins UI === */
+    .match-hero .kicker {
+      font-size: clamp(13px, 3.55vw, 19px) !important;
+      padding: .72em 1.12em !important;
+      letter-spacing: .08em !important;
+    }
+
+    .match-hero .match-teams {
+      align-items: center !important;
+      gap: clamp(12px, 3.2vw, 18px) !important;
+    }
+
+    .match-hero .match-team-name {
+      font-size: clamp(17px, 5vw, 27px) !important;
+      line-height: 1.02 !important;
+    }
+
+    .match-hero .hero-text {
+      font-size: clamp(12px, 3vw, 15px) !important;
+      line-height: 1.42 !important;
+      max-width: 88% !important;
+    }
+
+    .match-hero .logo-xl {
+      width: clamp(82px, 20vw, 108px) !important;
+      height: clamp(82px, 20vw, 108px) !important;
+      border-radius: 20px !important;
+    }
+
+    .match-hero .logo-xl img {
+      width: 76% !important;
+      height: 76% !important;
+    }
+
+    .match-hero .vs-box {
+      width: clamp(52px, 13.2vw, 68px) !important;
+      height: clamp(52px, 13.2vw, 68px) !important;
+      border-radius: 16px !important;
+      font-size: clamp(15px, 3.8vw, 20px) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      align-self: center !important;
+      padding: 0 !important;
+    }
+
+    .trend-mini {
+      display: grid !important;
+      grid-template-columns: 58px minmax(0, 1fr) !important;
+      align-items: start !important;
+      column-gap: 12px !important;
+      row-gap: 0 !important;
+      padding: 12px !important;
+    }
+
+    .trend-mini-body {
+      min-width: 0 !important;
+      display: grid !important;
+      gap: 6px !important;
+      align-content: start !important;
+    }
+
+    .trend-split-badge {
+      width: 54px;
+      min-width: 54px;
+      min-height: 72px;
+      padding: 0;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: 1fr 1px 1fr;
+      align-items: center;
+      justify-items: center;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(15,23,42,.90), rgba(15,23,42,.72));
+      border: 1px solid rgba(148,163,184,.16);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+    }
+
+    .trend-split-badge::before {
+      content: "";
+      grid-row: 2;
+      width: 68%;
+      height: 1px;
+      background: rgba(255,255,255,.14);
+    }
+
+    .trend-split-top,
+    .trend-split-bottom {
+      width: 100%;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+      font-weight: 1000;
+      font-family: inherit;
+    }
+
+    .trend-split-top {
+      font-size: 14px;
+      color: rgba(226,232,255,.84);
+    }
+
+    .trend-split-bottom {
+      grid-row: 3;
+      font-size: 15px;
+      color: #ffffff;
+      background: linear-gradient(135deg, rgba(64,201,255,.13), rgba(251,113,133,.10));
+    }
+
+    .trend-split-badge.positive {
+      border-color: rgba(56,189,248,.22);
+    }
+
+    .trend-split-badge.positive .trend-split-top,
+    .trend-split-badge.positive .trend-split-bottom {
+      color: #40c9ff;
+    }
+
+    .trend-split-badge.positive .trend-split-bottom {
+      background: linear-gradient(135deg, rgba(56,189,248,.15), rgba(37,99,235,.08));
+    }
+
+    .trend-split-badge.negative {
+      border-color: rgba(244,114,182,.22);
+    }
+
+    .trend-split-badge.negative .trend-split-top,
+    .trend-split-badge.negative .trend-split-bottom {
+      color: #fb7185;
+    }
+
+    .trend-split-badge.negative .trend-split-bottom {
+      background: linear-gradient(135deg, rgba(251,113,133,.14), rgba(168,85,247,.08));
+    }
+
+    .trend-split-badge.neutral .trend-split-top,
+    .trend-split-badge.neutral .trend-split-bottom {
+      color: #f8fafc;
+    }
+
+    .trend-split-badge.neutral .trend-split-bottom {
+      background: linear-gradient(135deg, rgba(148,163,184,.14), rgba(100,116,139,.08));
+    }
+
+    .trend-match-line {
+      font-size: .8rem !important;
+      line-height: 1.38 !important;
+    }
+
+    .trend-row-sub {
+      font-size: .78rem !important;
+      line-height: 1.42 !important;
+    }
+
+    .trend-score-line {
+      display: none !important;
+    }
+
+    .trend-matches-details {
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+    }
+
+    details.trend-matches-details > summary.events-summary {
+      border: 1px solid rgba(244,114,182,.22) !important;
+      box-shadow: none !important;
+      background: linear-gradient(135deg, rgba(34,197,94,.00), rgba(15,23,42,.42)), linear-gradient(135deg, rgba(251,113,133,.06), rgba(15,23,42,.26)) !important;
+    }
+
+    .trend-matches-panel {
+      margin-top: 0 !important;
+      border: 1px solid rgba(148,163,184,.10) !important;
+      border-top: 0 !important;
+      border-radius: 0 0 20px 20px !important;
+      background: linear-gradient(180deg, rgba(15,23,42,.34), rgba(15,23,42,.18)) !important;
+    }
+
+    .trend-matches-panel .match-list {
+      gap: 12px !important;
+    }
+
+    details.bar-box > summary {
+      justify-content: center !important;
+      padding-left: 54px !important;
+      padding-right: 54px !important;
+    }
+
+    details.bar-box > summary .lexique-summary-title {
+      position: absolute !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      text-align: center !important;
+      width: max-content !important;
+      max-width: calc(100% - 108px) !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      padding-right: 0 !important;
+    }
+
+    details.bar-box > summary::after {
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      right: 16px !important;
+    }
+
   </style>
 </head>
 
@@ -11099,7 +11307,6 @@
       if (dominance.type === "tie") {
         return `
           <div class="dominance-box">
-            <div class="status-confetti" aria-hidden="true">${confetti}</div>
             <div class="dominance-label">${title}</div>
             <div class="dominance-team">ÉGALITÉ</div>
             <div class="dominance-meta">${isEvolution ? "Même évolution affichée après arrondi." : `Moyenne des deux Rangs : ${esc(formatValue(dominance.average))}`}</div>
@@ -11690,9 +11897,14 @@
             <div class="trend-row-badge ${tone}">${esc(domText)}</div>
           </div>
           <div class="trend-mini ${dominant} ${tone}">
-            <div class="trend-score-line">${renderResultCode(item.resultStyle || "N")}<strong class="${tone}">${esc(formatValue(item.value))}</strong></div>
-            <div class="trend-match-line">${esc(item.previousMatch?.label || "Match Précédent")} → ${esc(item.recentMatch?.label || "Match Récent")}</div>
-            <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}</div>
+            <div class="trend-split-badge ${tone}">
+              <span class="trend-split-top">${esc(String(item.resultStyle || "N").toUpperCase())}</span>
+              <span class="trend-split-bottom">${esc(formatValue(item.value))}</span>
+            </div>
+            <div class="trend-mini-body">
+              <div class="trend-match-line">${esc(item.previousMatch?.label || "Match Précédent")} → ${esc(item.recentMatch?.label || "Match Récent")}</div>
+              <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}</div>
+            </div>
           </div>
         </div>
       `;
@@ -12009,7 +12221,7 @@
         const assistBadge = `
           <span class="assist-data-badge ${assistOk ? "ok" : "warn"}">
             <span class="assist-prefix">A</span>
-            <span class="assist-glyph">${assistOk ? "✔️" : "❌️"}</span>
+            <span class="assist-glyph">${assistOk ? "✔️" : "✕"}</span>
           </span>
         `;
         return `
