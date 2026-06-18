@@ -10120,8 +10120,6 @@
   
 
     /* === v166 : retouches UI ciblées demandées === */
-
-    /* Hiérarchie générale + MATCH ANALYSÉ plus visible */
     .match-hero .kicker {
       font-size: clamp(15px, 4.1vw, 22px) !important;
       padding: .82em 1.25em !important;
@@ -10143,11 +10141,19 @@
     .match-hero .logo-xl {
       width: clamp(90px, 22vw, 120px) !important;
       height: clamp(90px, 22vw, 120px) !important;
+      border-radius: 22px !important;
+    }
+
+    .match-hero .logo-xl img {
+      width: 78% !important;
+      height: 78% !important;
     }
 
     .match-hero .vs-box {
-      min-width: clamp(64px, 17vw, 84px) !important;
-      min-height: clamp(64px, 17vw, 84px) !important;
+      width: clamp(58px, 15vw, 76px) !important;
+      height: clamp(58px, 15vw, 76px) !important;
+      border-radius: 18px !important;
+      font-size: clamp(16px, 4.2vw, 22px) !important;
     }
 
     .summary-label {
@@ -10165,7 +10171,6 @@
       letter-spacing: .08em !important;
     }
 
-    /* V / N / D colorés */
     .result-code {
       display: inline-flex;
       align-items: center;
@@ -10215,18 +10220,6 @@
       line-height: 1;
     }
 
-    .trend-result-value .trend-result-inline {
-      gap: .16em;
-    }
-
-    .trend-result-value .result-code {
-      font-size: .55em;
-      min-width: 1.72em;
-      height: 1.72em;
-      padding: 0 .34em;
-      letter-spacing: .02em;
-    }
-
     .summary-grid .mini-badge span {
       text-transform: uppercase !important;
       letter-spacing: .08em !important;
@@ -10237,7 +10230,14 @@
       letter-spacing: .08em !important;
     }
 
-    /* MATCHS UTILISÉS : rendu plus propre et mieux intégré */
+    .trend-score-line {
+      align-items: center !important;
+    }
+
+    .trend-score-line .result-code {
+      font-size: .72em;
+    }
+
     .trend-matches-details {
       margin-top: 16px !important;
       border-radius: 20px !important;
@@ -10269,7 +10269,8 @@
       gap: 10px !important;
     }
 
-    .assist-data-badge {
+    .assist-data-badge,
+    .assist-check-badge {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -10289,33 +10290,35 @@
       vertical-align: middle;
     }
 
-    .assist-data-badge.ok {
-      border-color: rgba(56,189,248,.28);
-      background: rgba(14,165,233,.13);
-      color: #bfdbfe;
+    .assist-data-badge.ok,
+    .assist-check-ok {
+      border-color: rgba(56,189,248,.28) !important;
+      background: rgba(14,165,233,.13) !important;
+      color: #bfdbfe !important;
     }
 
-    .assist-data-badge.warn {
-      border-color: rgba(244,114,182,.20);
-      background: rgba(168,85,247,.10);
-      color: #fbcfe8;
+    .assist-data-badge.warn,
+    .assist-check-missing {
+      border-color: rgba(244,114,182,.20) !important;
+      background: rgba(168,85,247,.10) !important;
+      color: #fbcfe8 !important;
     }
 
-    .assist-data-badge .assist-prefix {
+    .assist-prefix {
       opacity: .92;
     }
 
-    .assist-data-badge .assist-glyph {
+    .assist-glyph {
       display: inline-block;
       line-height: 1;
       transform: translateY(-.4px);
     }
 
-    .assist-data-badge.warn .assist-glyph {
+    .assist-data-badge.warn .assist-glyph,
+    .assist-check-missing .assist-glyph {
       font-size: .84em;
     }
 
-    /* LEXIQUE centré */
     details.bar-box > summary {
       position: relative !important;
       justify-content: center !important;
@@ -10684,7 +10687,7 @@
 
     function assistDataBadge(event) {
       const ok = assistDataState(event);
-      return `<span class="assist-check-badge ${ok ? "assist-check-ok" : "assist-check-missing"}" title="${esc(assistDataTitle(event))}" aria-label="${esc(assistDataTitle(event))}">${esc(assistDataShort(event))}</span>`;
+      return `<span class="assist-check-badge ${ok ? "assist-check-ok" : "assist-check-missing"}" title="${esc(assistDataTitle(event))}" aria-label="${esc(assistDataTitle(event))}"><span class="assist-prefix">A</span><span class="assist-glyph">${ok ? "✔️" : "❌️"}</span></span>`;
     }
 
     function assistDataText(event) {
@@ -11074,7 +11077,6 @@
           });
     }
 
-    
     function renderDominance(result) {
       const dominance = getDominance(result);
       const isEvolution = dominance.mode === "evolution";
@@ -11119,6 +11121,7 @@
         </div>
       `;
     }
+
 
 
     function renderSelectedRanksStatus() {
@@ -11532,7 +11535,6 @@
       return secondary ? `${primary.style} (${secondary.style})` : `${primary.style}`;
     }
 
-    
     function resultCodeTone(code) {
       const key = String(code || "").trim().charAt(0).toUpperCase();
       if (key === "V") return "positive";
@@ -11561,7 +11563,6 @@
       `;
     }
 
-    
     function renderTrendWinner(result) {
       const winner = result?.trendWinner || {};
       const isTie = winner.type === "tie";
@@ -11569,7 +11570,6 @@
       const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
-
       return `
         <div class="dominance-box ${isTie ? "" : "dominance-win"}">
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
@@ -11581,13 +11581,10 @@
       `;
     }
 
-
-    
     function renderTrendSummaryCell(team) {
       const trend = team?.trend || {};
       const score = trend.performanceScore;
       const cellTone = Number(score) > 0 ? "cell-pos" : (Number(score) < 0 ? "cell-neg" : "cell-neutral");
-
       return `
         <div class="summary-cell ${cellTone}">
           <div class="summary-team-row">
@@ -11597,23 +11594,13 @@
             <div class="summary-team-name">${esc(String(team.name || "").toUpperCase())}</div>
           </div>
           <div class="mini-values">
-            <div class="mini-badge">
-              <span>PERFORMANCE</span>
-              <strong class="${valueClass(score)}">${esc(formatValue(score))}</strong>
-            </div>
-            <div class="mini-badge">
-              <span>RÉSULTAT</span>
-              <strong>${renderTrendResultMarkup(trend)}</strong>
-            </div>
-            <div class="mini-badge">
-              <span>TENDANCES PRISES</span>
-              <strong>${esc(trend.dominantCount || 0)}/${esc((team.trend?.items || []).length)}</strong>
-            </div>
+            <div class="mini-badge"><span>PERFORMANCE</span><strong class="${valueClass(score)}">${esc(formatValue(score))}</strong></div>
+            <div class="mini-badge"><span>RÉSULTAT</span><strong>${renderTrendResultMarkup(trend)}</strong></div>
+            <div class="mini-badge"><span>TENDANCES PRISES</span><strong>${esc(trend.dominantCount || 0)}/${esc((team.trend?.items || []).length)}</strong></div>
           </div>
         </div>
       `;
     }
-
 
     function renderTrendResult(result) {
       const match = result.match;
@@ -11650,14 +11637,12 @@
       return "neutral";
     }
 
-    
     function renderTrendTeam(team, side) {
       const trend = team?.trend || {};
       const score = Number(trend.performanceScore || 0);
       const tone = score > 0 ? "team-card-pos" : (score < 0 ? "team-card-neg" : "team-card-neutral");
       const items = trend.items || [];
       const sideClass = side === "Domicile" ? "side-home" : "side-away";
-
       return `
         <section class="team-card ${side === "Domicile" ? "team-card-home" : "team-card-away"} ${tone}">
           <div class="team-hero">
@@ -11673,7 +11658,6 @@
               </div>
             </div>
           </div>
-
           <div class="rank-grid">
             <div class="rank-card">
               <div class="rank-label">PERFORMANCE</div>
@@ -11684,26 +11668,21 @@
               <div class="rank-value trend-result-value">${renderTrendResultMarkup(trend)}</div>
             </div>
           </div>
-
           <div class="section">
             <div class="section-title">TENDANCES COMPARÉES</div>
             <div class="trend-comparison-stack">
               ${items.map(renderTrendItem).join("")}
             </div>
           </div>
-
           ${renderTrendMatches(team.matchesUsed || [])}
         </section>
       `;
     }
 
-
-    
     function renderTrendItem(item) {
       const tone = trendItemToneClass(item);
       const dominant = item.dominant ? "is-dominant" : "";
       const domText = item.dominant ? "PREND LE DESSUS" : "COMPARÉE";
-
       return `
         <div class="trend-row">
           <div class="trend-row-head">
@@ -11718,7 +11697,6 @@
         </div>
       `;
     }
-
 
     function renderOverallZoneStats(result) {
       return "";
@@ -12023,7 +12001,6 @@
 
 
 
-    
     function renderTrendMatches(matchesUsed) {
       const matchRows = (matchesUsed || []).map((match, index) => {
         const hasIssue = Boolean(match.eventDataIssue);
@@ -12032,10 +12009,9 @@
         const assistBadge = `
           <span class="assist-data-badge ${assistOk ? "ok" : "warn"}">
             <span class="assist-prefix">A</span>
-            <span class="assist-glyph">${assistOk ? "✔️" : "❌"}</span>
+            <span class="assist-glyph">${assistOk ? "✔️" : "❌️"}</span>
           </span>
         `;
-
         return `
           <div class="match-row ${hasIssue ? "issue" : ""}">
             <div class="row-number match-number-badge">
@@ -12049,7 +12025,6 @@
           </div>
         `;
       }).join("");
-
       return `
         <details class="clean events-details trend-matches-details">
           <summary class="events-summary">
@@ -12062,7 +12037,6 @@
         </details>
       `;
     }
-
 
     function renderTeam(team, side, rank1, rank2) {
       const events = team.events || [];
