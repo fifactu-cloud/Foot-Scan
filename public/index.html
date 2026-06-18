@@ -10850,6 +10850,66 @@
       text-shadow: 0 0 14px rgba(250, 204, 21, .22) !important;
     }
 
+    /* === v173 : correction propre Matchs Utilisés ===
+       On annule l'effet de remontée qui donnait l'impression que le bloc
+       rentrait dans la bulle précédente. Le fond parasite est supprimé en
+       rendant la section transparente, pas en superposant les blocs. */
+    .team-card > .section:last-of-type {
+      margin-bottom: 0 !important;
+      padding-bottom: 14px !important;
+    }
+
+    .team-card > .section:last-of-type .trend-comparison-stack {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    .team-card .trend-matches-details {
+      margin-top: 14px !important;
+      position: static !important;
+      z-index: auto !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+    }
+
+    .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      border-radius: 20px !important;
+      box-shadow: none !important;
+    }
+
+    .result-shell .team-card > .section {
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+    }
+
+    /* === v174 : bulles équipes Match Analysé plus compactes === */
+    .match-hero .match-team {
+      min-height: clamp(126px, 31vw, 146px) !important;
+      padding-top: 10px !important;
+      padding-bottom: 10px !important;
+      align-content: center !important;
+      gap: 7px !important;
+    }
+
+    .match-hero .logo-xl {
+      width: clamp(74px, 18vw, 96px) !important;
+      height: clamp(74px, 18vw, 96px) !important;
+    }
+
+    .match-hero .match-team-name {
+      margin-top: 0 !important;
+    }
+
+    @media (max-width: 430px) {
+      .match-hero .match-team {
+        min-height: clamp(118px, 30vw, 138px) !important;
+      }
+    }
+
   </style>
 </head>
 
