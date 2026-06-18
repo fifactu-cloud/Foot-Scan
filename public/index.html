@@ -10610,6 +10610,281 @@
         padding-top: 26px !important;
       }
     }
+
+
+    /* v161 : LEXIQUE plus compact et régulier sur mobile */
+    body .bar-box .bar-grid,
+    body .bar-box[open] .bar-grid {
+      gap: 13px !important;
+      padding-top: 22px !important;
+    }
+
+    body .bar-card {
+      border-radius: 20px !important;
+      padding: 15px 16px !important;
+      background: rgba(8, 18, 43, .62) !important;
+      border: 1px solid rgba(148, 163, 184, .17) !important;
+      overflow: hidden !important;
+    }
+
+    body .bar-card-title {
+      display: flex !important;
+      align-items: center !important;
+      min-height: 26px !important;
+      margin-bottom: 11px !important;
+      font-size: clamp(15px, 3.9vw, 18px) !important;
+      line-height: 1.15 !important;
+      letter-spacing: -0.015em !important;
+      color: #f8fbff !important;
+    }
+
+    body .bar-line {
+      display: grid !important;
+      grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr) !important;
+      align-items: center !important;
+      gap: 10px !important;
+      min-height: 30px !important;
+      padding: 7px 0 !important;
+      line-height: 1.22 !important;
+      font-size: clamp(12.5px, 3.35vw, 15px) !important;
+      border-bottom: 1px solid rgba(148, 163, 184, .085) !important;
+    }
+
+    body .bar-line:last-child {
+      border-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    body .bar-line span,
+    body .bar-line strong {
+      min-width: 0 !important;
+      overflow-wrap: normal !important;
+      word-break: normal !important;
+      hyphens: none !important;
+    }
+
+    body .bar-line span {
+      color: rgba(203, 213, 255, .84) !important;
+      font-weight: 800 !important;
+    }
+
+    body .bar-line strong {
+      text-align: right !important;
+      color: rgba(226, 232, 255, .92) !important;
+      font-weight: 950 !important;
+    }
+
+    @media (max-width: 430px) {
+      body .bar-box .bar-grid,
+      body .bar-box[open] .bar-grid {
+        padding: 20px 14px 15px !important;
+        gap: 12px !important;
+      }
+
+      body .bar-card {
+        padding: 14px 13px !important;
+        border-radius: 18px !important;
+      }
+
+      body .bar-line {
+        grid-template-columns: minmax(0, .88fr) minmax(0, 1.12fr) !important;
+        gap: 7px !important;
+        min-height: 28px !important;
+        padding: 6px 0 !important;
+        font-size: clamp(12px, 3.15vw, 13.4px) !important;
+      }
+
+      body .bar-card-title {
+        font-size: clamp(14px, 3.85vw, 16px) !important;
+        margin-bottom: 9px !important;
+      }
+    }
+
+
+    /* v162 : bordures homogènes + correction réelle du décalage horizontal LEXIQUE */
+    :root {
+      --fs-v162-panel-fill: rgba(10, 15, 36, 0.90);
+      --fs-v162-head-fill: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(251, 113, 133, 0.075));
+      --fs-v162-border: linear-gradient(115deg,
+        rgba(244, 63, 94, .55) 0%,
+        rgba(129, 140, 248, .34) 24%,
+        rgba(56, 189, 248, .58) 50%,
+        rgba(129, 140, 248, .34) 76%,
+        rgba(244, 63, 94, .55) 100%);
+      --fs-v162-border-soft: linear-gradient(115deg,
+        rgba(244, 63, 94, .42) 0%,
+        rgba(129, 140, 248, .26) 24%,
+        rgba(56, 189, 248, .45) 50%,
+        rgba(129, 140, 248, .26) 76%,
+        rgba(244, 63, 94, .42) 100%);
+    }
+
+    html,
+    body {
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+      overscroll-behavior-x: none !important;
+    }
+
+    body {
+      position: relative !important;
+      touch-action: pan-y !important;
+    }
+
+    .app {
+      width: min(920px, calc(100vw - 28px)) !important;
+      max-width: calc(100vw - 28px) !important;
+      overflow-x: clip !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+
+    .app > * {
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    body :is(.hero, .report-panel, .settings-panel.report-panel, .panel.notice, .bar-box, .result-shell .summary, .result-shell .team-card) {
+      position: relative !important;
+      border: 2px solid transparent !important;
+      border-radius: 28px !important;
+      overflow: hidden !important;
+      background:
+        linear-gradient(145deg, rgba(12, 18, 42, .94), rgba(10, 15, 36, .90)) padding-box,
+        var(--fs-v162-border-soft) border-box !important;
+      box-shadow: 0 22px 55px rgba(0, 0, 0, .42) !important;
+      transform: none !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    body .panel.notice {
+      background:
+        linear-gradient(145deg, rgba(45, 7, 25, .94), rgba(15, 6, 25, .92)) padding-box,
+        linear-gradient(115deg,
+          rgba(251, 113, 133, .58) 0%,
+          rgba(244, 63, 94, .38) 35%,
+          rgba(190, 24, 93, .52) 50%,
+          rgba(244, 63, 94, .38) 65%,
+          rgba(251, 113, 133, .58) 100%) border-box !important;
+    }
+
+    body :is(.report-panel, .settings-panel.report-panel, .bar-box)::before,
+    body :is(.report-panel, .settings-panel.report-panel, .bar-box)::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    body :is(.report-panel, .settings-panel.report-panel) > :is(.report-head, .settings-head),
+    body .bar-box > summary {
+      border: 0 !important;
+      border-bottom: 1px solid rgba(148, 163, 184, .16) !important;
+      background: var(--fs-v162-head-fill) !important;
+      box-shadow: none !important;
+    }
+
+    body .settings-panel.report-panel > .settings-head,
+    body .report-panel > .report-head,
+    body .bar-box > summary {
+      min-height: 86px !important;
+      padding: 22px var(--content-pad) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    body .settings-panel.report-panel > .settings-head .report-title,
+    body .report-panel > .report-head .report-title,
+    body .bar-box > summary {
+      max-width: 100% !important;
+      min-width: 0 !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+
+    body .bar-box {
+      display: block !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      contain: layout paint !important;
+    }
+
+    body .bar-box > summary {
+      width: 100% !important;
+      max-width: 100% !important;
+      cursor: pointer !important;
+      list-style: none !important;
+      user-select: none !important;
+    }
+
+    body .bar-box > summary::-webkit-details-marker,
+    body .bar-box > summary::marker {
+      display: none !important;
+      content: "" !important;
+    }
+
+    body .bar-box[open] > summary {
+      margin-bottom: 0 !important;
+    }
+
+    body .bar-box .bar-grid,
+    body .bar-box[open] .bar-grid {
+      display: grid !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 20px var(--content-pad) var(--content-pad) !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      animation: none !important;
+      overflow: hidden !important;
+      gap: 12px !important;
+    }
+
+    body .bar-card:first-child { margin-top: 0 !important; }
+
+    body :is(.report-btn, .report-hint, .notice-text, .hero-text, .bar-line, .bar-card, input, button) {
+      max-width: 100% !important;
+      min-width: 0 !important;
+      overflow-wrap: anywhere !important;
+    }
+
+    body .report-btn {
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: normal !important;
+    }
+
+    @media (max-width: 520px) {
+      .app {
+        width: calc(100vw - 28px) !important;
+        max-width: calc(100vw - 28px) !important;
+      }
+
+      body :is(.hero, .report-panel, .settings-panel.report-panel, .panel.notice, .bar-box, .result-shell .summary, .result-shell .team-card) {
+        border-radius: 26px !important;
+      }
+
+      body .settings-panel.report-panel > .settings-head,
+      body .report-panel > .report-head,
+      body .bar-box > summary {
+        min-height: 82px !important;
+        padding: 20px 14px !important;
+      }
+
+      body .bar-box .bar-grid,
+      body .bar-box[open] .bar-grid {
+        padding: 18px 14px 14px !important;
+      }
+    }
 </style>
 </head>
 
@@ -10767,22 +11042,22 @@
 
         <div class="bar-card">
           <div class="bar-card-title">⚙️ Réglages</div>
-          <div class="bar-line"><span>Curseur Tendance</span><strong>Nombre De Tendances</strong></div>
-          <div class="bar-line"><span>Matchs Utilisés</span><strong>Nombre De Tendances + 1</strong></div>
-          <div class="bar-line"><span>Calcul Séparé</span><strong>Attaque (Camp Réciproque)</strong></div>
-          <div class="bar-line"><span>Calcul Simultané</span><strong>Attaque + Défense (Camp Solo)</strong></div>
+          <div class="bar-line"><span>Curseur Tendance</span><strong>Nb. Tendances</strong></div>
+          <div class="bar-line"><span>Matchs Utilisés</span><strong>Nb. Tendances + 1</strong></div>
+          <div class="bar-line"><span>Calcul Séparé</span><strong>Attaque Réciproque</strong></div>
+          <div class="bar-line"><span>Calcul Simultané</span><strong>Attaque + Défense</strong></div>
         </div>
 
         <div class="bar-card">
           <div class="bar-card-title">📈 Tendance</div>
-          <div class="bar-line"><span>Tendance</span><strong>Niveau Récent − Niveau Précédent</strong></div>
+          <div class="bar-line"><span>Tendance</span><strong>Niveau Récent − Précédent</strong></div>
           <div class="bar-line"><span>0-0</span><strong>Minute 1</strong></div>
         </div>
 
         <div class="bar-card">
           <div class="bar-card-title">⏱️ Comparaison</div>
-          <div class="bar-line"><span>Temps</span><strong>Moyenne Des Minutes Des Buts</strong></div>
-          <div class="bar-line"><span>Prend Le Dessus</span><strong>Moyenne Minute La Plus Basse</strong></div>
+          <div class="bar-line"><span>Temps</span><strong>Moy. Minutes Des Buts</strong></div>
+          <div class="bar-line"><span>Prend Le Dessus</span><strong>Moyenne La Plus Basse</strong></div>
         </div>
       </div>
     </details>
@@ -13471,5 +13746,31 @@ setupCalcModeSlider();
   })();
 </script>
 
+
+
+<script>
+  // v162 : empêche le menu LEXIQUE de laisser la page décalée horizontalement sur mobile.
+  (() => {
+    const resetX = () => {
+      try {
+        if (window.scrollX !== 0) window.scrollTo(0, window.scrollY);
+        document.documentElement.scrollLeft = 0;
+        document.body.scrollLeft = 0;
+      } catch (_) {}
+    };
+    window.addEventListener('load', resetX, { passive: true });
+    window.addEventListener('resize', resetX, { passive: true });
+    window.addEventListener('orientationchange', () => setTimeout(resetX, 80), { passive: true });
+    document.addEventListener('toggle', (event) => {
+      if (event.target && event.target.classList && event.target.classList.contains('bar-box')) {
+        requestAnimationFrame(resetX);
+        setTimeout(resetX, 80);
+      }
+    }, true);
+    window.addEventListener('scroll', () => {
+      if (window.scrollX) requestAnimationFrame(resetX);
+    }, { passive: true });
+  })();
+</script>
 </body>
 </html>
