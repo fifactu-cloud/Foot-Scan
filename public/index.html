@@ -10756,6 +10756,100 @@
       transform: translateY(-50%) rotate(-90deg) translateZ(0) !important;
     }
 
+
+    /* === v170 : derniers ajustements visuels === */
+    .match-hero .match-team {
+      width: 100% !important;
+      max-width: 148px !important;
+      min-height: 166px !important;
+      gap: 9px !important;
+      padding: 12px 8px 10px !important;
+      align-content: start !important;
+      justify-items: center !important;
+      box-sizing: border-box !important;
+    }
+
+    .match-hero .logo-xl {
+      width: clamp(76px, 18.5vw, 98px) !important;
+      height: clamp(76px, 18.5vw, 98px) !important;
+      border-radius: 20px !important;
+      flex: 0 0 auto !important;
+    }
+
+    .match-hero .logo-xl img {
+      width: 74% !important;
+      height: 74% !important;
+      object-fit: contain !important;
+    }
+
+    .match-hero .match-team-name {
+      max-width: 132px !important;
+      font-size: clamp(15px, 4.35vw, 23px) !important;
+      line-height: 1.02 !important;
+      letter-spacing: -.03em !important;
+      overflow-wrap: break-word !important;
+      word-break: normal !important;
+      text-wrap: balance !important;
+    }
+
+    .match-hero .match-team-name.match-team-name-long {
+      font-size: clamp(13.5px, 3.95vw, 20px) !important;
+      max-width: 136px !important;
+      letter-spacing: -.035em !important;
+    }
+
+    .match-hero .match-team-name.match-team-name-xlong {
+      font-size: clamp(12.5px, 3.55vw, 18px) !important;
+      max-width: 138px !important;
+      letter-spacing: -.04em !important;
+    }
+
+    .match-hero .match-teams {
+      align-items: center !important;
+      justify-items: center !important;
+      gap: clamp(8px, 2.5vw, 14px) !important;
+    }
+
+    .match-hero .vs-box {
+      width: clamp(44px, 10.8vw, 56px) !important;
+      height: clamp(44px, 10.8vw, 56px) !important;
+      min-width: 44px !important;
+      min-height: 44px !important;
+      border-radius: 14px !important;
+      font-size: clamp(13px, 3.2vw, 17px) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      margin-inline: auto !important;
+    }
+
+    .team-card > .section:last-of-type {
+      padding-bottom: 0 !important;
+      margin-bottom: -6px !important;
+    }
+
+    .team-card > .section:last-of-type .trend-comparison-stack {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    .team-card .trend-matches-details {
+      margin-top: -2px !important;
+      position: relative !important;
+      z-index: 2 !important;
+    }
+
+    .team-card .trend-matches-details > summary.events-summary {
+      box-shadow: none !important;
+      background-clip: padding-box !important;
+    }
+
+    /* === v171 : règle switch gagnant tendance === */
+    .dominance-box.dominance-switch .dominance-label {
+      color: #facc15 !important;
+      text-shadow: 0 0 14px rgba(250, 204, 21, .22) !important;
+    }
+
   </style>
 </head>
 
@@ -11900,6 +11994,10 @@
     function updateHero(match, result = null) {
       if (!match?.homeTeam || !match?.awayTeam) return;
 
+      const homeName = String(match.homeTeam.name || "").toUpperCase();
+      const awayName = String(match.awayTeam.name || "").toUpperCase();
+      const heroNameClass = (name) => name.length >= 14 ? " match-team-name-xlong" : (name.length >= 11 ? " match-team-name-long" : "");
+
       $("hero").innerHTML = `
         <div class="match-hero">
           <div class="kicker">Match Analysé</div>
@@ -11908,7 +12006,7 @@
               <div class="logo-xl">
                 <img src="${logoUrl(match.homeTeam.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${match.homeTeam.id}" onerror="__logoErr(this)" />
               </div>
-              <div class="match-team-name">${esc(String(match.homeTeam.name || "").toUpperCase())}</div>
+              <div class="match-team-name${heroNameClass(homeName)}">${esc(homeName)}</div>
             </div>
 
             <div class="vs-box ${result ? vsEchoToneClass(result) : ""}"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
@@ -11917,7 +12015,7 @@
               <div class="logo-xl">
                 <img src="${logoUrl(match.awayTeam.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${match.awayTeam.id}" onerror="__logoErr(this)" />
               </div>
-              <div class="match-team-name">${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+              <div class="match-team-name${heroNameClass(awayName)}">${esc(awayName)}</div>
             </div>
           </div>
 
@@ -11983,17 +12081,18 @@
 
     function renderTrendWinner(result) {
       const winner = result?.trendWinner || {};
+      const isSwitch = Boolean(winner.switch);
       const confColors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
       const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
       return `
-        <div class="dominance-box dominance-win">
+        <div class="dominance-box dominance-win ${isSwitch ? "dominance-switch" : ""}">
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
           <div class="dominance-trophy" aria-hidden="true">🏆</div>
-          <div class="dominance-label">👑 GAGNANT TENDANCE</div>
+          <div class="dominance-label">👑 GAGNANT TENDANCE${isSwitch ? " (SWITCH)" : ""}</div>
           <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
-          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}</div>
+          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.switch && winner.quantityDiff != null ? ` · Quantité : ${esc(formatValue(winner.quantityDiff))}` : ""}</div>
         </div>
       `;
     }
@@ -13119,8 +13218,9 @@
       if (!winner || winner.type === "tie") {
         return ["👑 GAGNANT TENDANCE : Égalité"];
       }
-      const base = `👑 GAGNANT TENDANCE : ${winner.label || "Indisponible"}`;
-      const meta = `Performance : ${formatValue(winner.score)}${winner.diff != null ? ` · Écart : ${formatValue(winner.diff)}` : ""}`;
+      const switchText = winner.switch ? " (SWITCH)" : "";
+      const base = `👑 GAGNANT TENDANCE${switchText} : ${winner.label || "Indisponible"}`;
+      const meta = `Performance : ${formatValue(winner.score)}${winner.diff != null ? ` · Écart : ${formatValue(winner.diff)}` : ""}${winner.switch && winner.quantityDiff != null ? ` · Quantité : ${formatValue(winner.quantityDiff)}` : ""}`;
       return compact ? [`${base} · ${meta}`] : [base, meta];
     }
 
