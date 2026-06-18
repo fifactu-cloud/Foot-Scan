@@ -2312,16 +2312,22 @@ def trend_average(values):
     return sum(clean) / len(clean) if clean else 1.0
 
 
-def trend_match_sample(match, incidents, analyzed_team_id):
-    """Construit le niveau d'un match pour le nouveau système Tendance.
+def trend_match_sample(match, incidents, analyzed_team_id, level_mode="full"):
+    """Construit le niveau d'un match pour le système Tendance.
 
-    Niveau = buts marqués - buts encaissés, du point de vue de l'équipe analysée.
-    Les prolongations et tirs au but restent exclus via le filtre minute 1-90.
-    Un 0-0 est représenté comme une occurrence neutre minute 1 pour la moyenne temps.
+    level_mode="full" : niveau = buts marqués - buts encaissés.
+    level_mode="attack" : niveau = buts offensifs uniquement, sans défense.
+
+    Important pour le mode séparé : un CSC adverse qui profite à l'équipe
+    n'est pas considéré comme une attaque de cette équipe. Les prolongations
+    et tirs au but restent exclus via le filtre minute 1-90. Un match sans
+    but utile est représenté comme une occurrence neutre minute 1.
     """
     goals_for = 0
     goals_against = 0
-    goal_minutes = []
+    attack_goals_for = 0
+    all_goal_minutes = []
+    attack_goal_minutes = []
     match_has_assists = match_contains_goal_assist(incidents)
 
     for inc in incidents or []:
@@ -2333,9 +2339,11 @@ def trend_match_sample(match, incidents, analyzed_team_id):
         if minute is None or minute < 1 or minute > 90:
             continue
 
-        goal_minutes.append(float(minute) + (float(added or 0) / 100.0))
+        event_minute = float(minute) + (float(added or 0) / 100.0)
+        all_goal_minutes.append(event_minute)
 
-        if is_own_goal_incident(inc):
+        own_goal = is_own_goal_incident(inc)
+        if own_goal:
             goal_for_team = not own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
         else:
             goal_for_team = incident_belongs_to_analyzed_team(inc, match, analyzed_team_id)
@@ -2345,21 +2353,35 @@ def trend_match_sample(match, incidents, analyzed_team_id):
         else:
             goals_against += 1
 
-    # Demande utilisateur : compter un 0-0 comme événement minute 1 pour chaque match.
-    minutes_for_average = goal_minutes[:] if goal_minutes else [1.0]
-    level = goals_for - goals_against
+        # Attaque pure : uniquement les buts non-CSC attribués au camp analysé.
+        if not own_goal and incident_belongs_to_analyzed_team(inc, match, analyzed_team_id):
+            attack_goals_for += 1
+            attack_goal_minutes.append(event_minute)
+
+    if level_mode == "attack":
+        level = attack_goals_for
+        minutes_for_average = attack_goal_minutes[:] if attack_goal_minutes else [1.0]
+    else:
+        level = goals_for - goals_against
+        minutes_for_average = all_goal_minutes[:] if all_goal_minutes else [1.0]
 
     return {
         "id": match.get("id"),
         "label": make_match_label(match),
         "competition": get_competition_name(match),
         "startTimestamp": match.get("startTimestamp") or 0,
+        "homeTeam": match.get("homeTeam") or {},
+        "awayTeam": match.get("awayTeam") or {},
+        "analyzedTeamId": analyzed_team_id,
         "goalsFor": goals_for,
         "goalsAgainst": goals_against,
+        "attackGoalsFor": attack_goals_for,
         "level": level,
+        "levelMode": level_mode,
         "resultStyle": trend_result_style(level),
         "resultLabel": trend_label_from_style(trend_result_style(level)),
-        "goalMinutes": goal_minutes,
+        "goalMinutes": all_goal_minutes,
+        "attackGoalMinutes": attack_goal_minutes,
         "minutesForAverage": minutes_for_average,
         "averageMinute": round(trend_average(minutes_for_average), 4),
         "matchHasAssists": match_has_assists,
@@ -2368,7 +2390,97 @@ def trend_match_sample(match, incidents, analyzed_team_id):
     }
 
 
-def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span):
+def trend_opponent_team_id(match, analyzed_team_id):
+    home_id = ((match.get("homeTeam") or {}).get("id"))
+    away_id = ((match.get("awayTeam") or {}).get("id"))
+    if home_id == analyzed_team_id:
+        return away_id
+    if away_id == analyzed_team_id:
+        return home_id
+    return None
+
+
+def build_separated_offensive_samples(primary_samples, opposite_samples, side_key):
+    """Construit le mode séparé offensif vs offensif aligné par ligne.
+
+    Pour A ligne N : attaque A ligne N + attaque de l'adversaire passé de B ligne N.
+    Pour B ligne N : attaque B ligne N + attaque de l'adversaire passé de A ligne N.
+    Le simultané n'utilise pas cette fonction et reste en attaque + défense.
+    """
+    combined = []
+    total = min(len(primary_samples or []), len(opposite_samples or []))
+
+    for idx in range(total):
+        direct = primary_samples[idx] or {}
+        source = opposite_samples[idx] or {}
+        opponent_attack = source.get("opponentAttack") or {}
+
+        direct_level = float(direct.get("level") or 0)
+        adv_level = float(opponent_attack.get("level") or 0)
+        level = direct_level + adv_level
+
+        direct_minutes = list(direct.get("minutesForAverage") or [1.0])
+        adv_minutes = list(opponent_attack.get("minutesForAverage") or [1.0])
+        minutes_for_average = direct_minutes + adv_minutes
+
+        sample = {
+            **direct,
+            "id": direct.get("id"),
+            "label": direct.get("label"),
+            "competition": direct.get("competition"),
+            "startTimestamp": direct.get("startTimestamp") or 0,
+            "level": round(level, 6),
+            "levelMode": "separated-attack-vs-attack",
+            "resultStyle": trend_result_style(level),
+            "resultLabel": trend_label_from_style(trend_result_style(level)),
+            "minutesForAverage": minutes_for_average,
+            "averageMinute": round(trend_average(minutes_for_average), 4),
+            "directAttackLevel": round(direct_level, 6),
+            "opponentAttackLevel": round(adv_level, 6),
+            "opponentAttackSource": {
+                "id": source.get("id"),
+                "label": source.get("label"),
+                "competition": source.get("competition"),
+                "startTimestamp": source.get("startTimestamp") or 0,
+                "level": round(adv_level, 6),
+                "minutesForAverage": adv_minutes,
+                "averageMinute": round(trend_average(adv_minutes), 4),
+                "matchHasAssists": opponent_attack.get("matchHasAssists", source.get("matchHasAssists")),
+                "assistDataStatus": opponent_attack.get("assistDataStatus", source.get("assistDataStatus")),
+            },
+            "analysisFormula": "attaque équipe + attaque adversaire du camp opposé",
+            "analysisLine": idx + 1,
+            "side": side_key,
+        }
+        combined.append(sample)
+
+    return combined
+
+
+def rebuild_trend_matches_used_from_samples(samples):
+    return [
+        {
+            "id": sample.get("id"),
+            "label": sample.get("label"),
+            "count": abs(sample.get("level") or 0),
+            "startTimestamp": sample.get("startTimestamp") or 0,
+            "competition": sample.get("competition") or "Toutes compétitions",
+            "eventDataStatus": sample.get("eventDataStatus") or "ok",
+            "trendLevel": sample.get("level"),
+            "trendAverageMinute": sample.get("averageMinute"),
+            "matchHasAssists": sample.get("matchHasAssists"),
+            "assistDataStatus": sample.get("assistDataStatus"),
+            "directAttackLevel": sample.get("directAttackLevel"),
+            "opponentAttackLevel": sample.get("opponentAttackLevel"),
+            "opponentAttackSource": sample.get("opponentAttackSource"),
+            "analysisFormula": sample.get("analysisFormula"),
+            "analysisLine": sample.get("analysisLine"),
+        }
+        for sample in samples or []
+    ]
+
+
+def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span, level_mode="full"):
     needed_matches = max(2, int(trend_count) + 1)
     pages = []
     stopped_history = False
@@ -2471,7 +2583,25 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 "reason": issue.get("reason") or issue.get("message") or "Événements non récupérés",
                 "message": issue.get("message") or "Événements non récupérés pour ce match.",
             })
-        sample = trend_match_sample(match, incidents, analyzed_team_id)
+        sample = trend_match_sample(match, incidents, analyzed_team_id, level_mode=level_mode)
+
+        opponent_id = trend_opponent_team_id(match, analyzed_team_id)
+        if opponent_id:
+            opponent_attack = trend_match_sample(match, incidents, opponent_id, level_mode="attack")
+            sample["opponentTeamId"] = opponent_id
+            sample["opponentAttack"] = {
+                "id": opponent_attack.get("id"),
+                "label": opponent_attack.get("label"),
+                "competition": opponent_attack.get("competition"),
+                "startTimestamp": opponent_attack.get("startTimestamp") or 0,
+                "level": opponent_attack.get("level") or 0,
+                "attackGoalsFor": opponent_attack.get("attackGoalsFor") or 0,
+                "minutesForAverage": opponent_attack.get("minutesForAverage") or [1.0],
+                "averageMinute": opponent_attack.get("averageMinute") or 1.0,
+                "matchHasAssists": opponent_attack.get("matchHasAssists"),
+                "assistDataStatus": opponent_attack.get("assistDataStatus"),
+            }
+
         if issue:
             sample["eventDataStatus"] = issue.get("type") or "blocked"
             sample["eventDataIssue"] = True
@@ -2596,8 +2726,23 @@ def process_trend_scan_job(job_id, params):
         progress=10,
     )
 
-    home_scan = fetch_trend_team_matches(job_id, home_team["id"], skip_home, trend_count, home_team.get("name") or "Domicile", 12, 40)
-    away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, trend_count, away_team.get("name") or "Extérieur", 54, 40)
+    level_mode = "full" if simultaneous_mode else "attack"
+
+    home_scan = fetch_trend_team_matches(job_id, home_team["id"], skip_home, trend_count, home_team.get("name") or "Domicile", 12, 40, level_mode=level_mode)
+    away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, trend_count, away_team.get("name") or "Extérieur", 54, 40, level_mode=level_mode)
+
+    if not simultaneous_mode:
+        # Séparé = offensif vs offensif aligné par ligne :
+        # A ligne N = attaque A ligne N + attaque de l'adversaire passé de B ligne N.
+        # B ligne N = attaque B ligne N + attaque de l'adversaire passé de A ligne N.
+        home_combined = build_separated_offensive_samples(home_scan["trendMatches"], away_scan["trendMatches"], "home")
+        away_combined = build_separated_offensive_samples(away_scan["trendMatches"], home_scan["trendMatches"], "away")
+        home_scan["trendMatchesDirect"] = home_scan["trendMatches"]
+        away_scan["trendMatchesDirect"] = away_scan["trendMatches"]
+        home_scan["trendMatches"] = home_combined
+        away_scan["trendMatches"] = away_combined
+        home_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(home_combined)
+        away_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(away_combined)
 
     home_items = build_trend_items(home_scan["trendMatches"], "home", trend_count)
     away_items = build_trend_items(away_scan["trendMatches"], "away", trend_count)
@@ -2648,7 +2793,8 @@ def process_trend_scan_job(job_id, params):
         "trendCount": trend_count,
         "trendMatchesNeeded": needed_matches,
         "simultaneousMode": simultaneous_mode,
-        "scanModeLabel": "Tendance simultanée" if simultaneous_mode else "Tendance séparée",
+        "scanModeLabel": "Tendance Simultanée" if simultaneous_mode else "Tendance Séparée",
+        "trendLevelMode": level_mode,
         "match": {
             "id": match.get("id"),
             "homeTeam": home_team,
@@ -2698,6 +2844,7 @@ def process_trend_scan_job(job_id, params):
             "trendMatchesNeeded": needed_matches,
             "pagesToLoad": PAGES_TO_LOAD,
             "system": "trend",
+            "trendLevelMode": level_mode,
         },
     }
 
