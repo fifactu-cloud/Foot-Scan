@@ -10449,6 +10449,167 @@
       }
     }
 
+
+
+    /* v160 : correction définitive RÉGLAGES + LEXIQUE
+       - RÉGLAGES reprend strictement la même bordure/liseré que RAPPORT DE SESSION.
+       - LEXIQUE ouvert n'ajoute plus de bande parasite ni de décalage horizontal. */
+
+    /* Un seul système de bordure pour tous les panneaux report-panel, y compris RÉGLAGES. */
+    body .report-panel,
+    body .settings-panel.report-panel {
+      position: relative !important;
+      overflow: hidden !important;
+      border: 1px solid rgba(120, 139, 220, .25) !important;
+      border-radius: 24px !important;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+        rgba(10, 15, 36, 0.90) !important;
+      box-shadow: var(--shadow) !important;
+      transform: none !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    body .report-panel::before,
+    body .settings-panel.report-panel::before {
+      content: none !important;
+      display: none !important;
+    }
+
+    body .report-panel::after,
+    body .settings-panel.report-panel::after {
+      content: "" !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 18px !important;
+      right: 18px !important;
+      height: 2px !important;
+      border-radius: 0 0 999px 999px !important;
+      pointer-events: none !important;
+      z-index: 3 !important;
+      opacity: .68 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v113-purple-edge-soft) 0%,
+        var(--fs-v113-purple-edge) 18%,
+        var(--fs-v113-blue-center-soft) 38%,
+        var(--fs-v113-blue-center) 50%,
+        var(--fs-v113-blue-center-soft) 62%,
+        var(--fs-v113-purple-edge) 82%,
+        var(--fs-v113-purple-edge-soft) 100%
+      ) !important;
+    }
+
+    body .report-panel > .report-head,
+    body .settings-panel.report-panel > .settings-head {
+      padding: var(--content-pad) !important;
+      border-bottom: 1px solid var(--line) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(251, 113, 133, 0.075)) !important;
+      box-shadow: none !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+    }
+
+    body .settings-panel.report-panel > .settings-head > div,
+    body .report-panel > .report-head > div {
+      width: 100% !important;
+      display: flex !important;
+      justify-content: center !important;
+      align-items: center !important;
+    }
+
+    body .settings-panel.report-panel .settings-body,
+    body .report-panel .report-body {
+      padding: var(--content-pad) !important;
+    }
+
+    /* LEXIQUE : le bloc ne doit jamais créer de scroll horizontal. */
+    html, body, .app {
+      overflow-x: hidden !important;
+      max-width: 100% !important;
+    }
+
+    body .bar-box {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      border-radius: 24px !important;
+      transform: none !important;
+      contain: paint !important;
+    }
+
+    body .bar-box > summary {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+      margin: 0 !important;
+      padding: var(--content-pad) !important;
+      border: 0 !important;
+      border-bottom: 0 !important;
+      border-radius: 0 !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(255, 255, 255, 0.02)) !important;
+      box-shadow: none !important;
+      display: flex !important;
+      justify-content: center !important;
+      align-items: center !important;
+      gap: 8px !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+    }
+
+    body .bar-box[open] > summary {
+      border-bottom: 0 !important;
+      box-shadow: none !important;
+      margin-bottom: 0 !important;
+    }
+
+    body .bar-box .bar-grid,
+    body .bar-box[open] .bar-grid {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+      margin: 0 !important;
+      padding: 24px var(--content-pad) var(--content-pad) !important;
+      border: 0 !important;
+      border-top: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      gap: 14px !important;
+      animation: none !important;
+      overflow: hidden !important;
+    }
+
+    body .bar-box[open] .bar-card:first-child {
+      margin-top: 0 !important;
+    }
+
+    body .bar-card,
+    body .bar-line,
+    body .bar-line span,
+    body .bar-line strong {
+      min-width: 0 !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+      overflow-wrap: anywhere !important;
+    }
+
+    @media (max-width: 520px) {
+      body .report-panel,
+      body .settings-panel.report-panel,
+      body .bar-box {
+        border-radius: 24px !important;
+      }
+
+      body .bar-box .bar-grid,
+      body .bar-box[open] .bar-grid {
+        padding-top: 26px !important;
+      }
+    }
 </style>
 </head>
 
