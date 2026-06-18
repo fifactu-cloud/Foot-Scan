@@ -2795,11 +2795,56 @@ def process_trend_scan_job(job_id, params):
     def winner():
         h = home_summary["performanceScore"]
         a = away_summary["performanceScore"]
+        score_diff = abs(h - a)
+        quantity_diff = abs(abs(h) - abs(a))
+        switch_threshold = 4
+
+        if h == a:
+            return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0, "quantityDiff": 0}
+
+        # Règle FOOTSCAN v172 :
+        # l'écart est calculé sur la quantité absolue de performance finale,
+        # pas sur l'écart signé de niveau.
+        # Exemples :
+        #   -7 vs 2  => abs(7 - 2) = 5  => switch
+        #   +8 vs -1 => abs(8 - 1) = 7  => switch
+        #   +10 vs +2 => abs(10 - 2) = 8 => switch
+        #   +3 vs -3 => abs(3 - 3) = 0  => pas de switch
+        if quantity_diff > switch_threshold:
+            if h > a:
+                return {
+                    "type": "winner",
+                    "side": "away",
+                    "label": away_team.get("name"),
+                    "score": a,
+                    "diff": round(score_diff, 6),
+                    "quantityDiff": round(quantity_diff, 6),
+                    "switch": True,
+                    "switchThreshold": switch_threshold,
+                    "originalWinnerSide": "home",
+                    "originalWinnerLabel": home_team.get("name"),
+                    "originalWinnerScore": h,
+                }
+
+            return {
+                "type": "winner",
+                "side": "home",
+                "label": home_team.get("name"),
+                "score": h,
+                "diff": round(score_diff, 6),
+                "quantityDiff": round(quantity_diff, 6),
+                "switch": True,
+                "switchThreshold": switch_threshold,
+                "originalWinnerSide": "away",
+                "originalWinnerLabel": away_team.get("name"),
+                "originalWinnerScore": a,
+            }
+
         if h > a:
-            return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(h - a, 6)}
+            return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(h - a, 6), "quantityDiff": round(quantity_diff, 6)}
         if a > h:
-            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(a - h, 6)}
-        return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
+            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(a - h, 6), "quantityDiff": round(quantity_diff, 6)}
+        return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0, "quantityDiff": 0}
 
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
     away_issue_count = int(away_scan.get("eventDataIssueCount") or 0)
