@@ -9843,1049 +9843,226 @@
     }
 
 
-    /* v153 : polish titres, lexique, badges résumé et menu Matchs Utilisés */
-    .section-title-emoji {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.45em;
-      min-width: 1.45em;
-      height: 1.45em;
-      line-height: 1;
-      font-size: .98em;
-      border-radius: 999px;
-      background: rgba(56, 189, 248, 0.13);
-      box-shadow: inset 0 0 0 1px rgba(134, 203, 255, .20);
-      filter: saturate(1.08);
-    }
-
-    .report-title .section-title-emoji,
-    .bar-box > summary .section-title-emoji {
-      margin-right: 2px;
-    }
-
-    .bar-box > summary {
-      width: fit-content !important;
-      margin: 0 auto 12px !important;
-      padding: 7px 13px !important;
-      border-radius: 999px !important;
-      border: 1px solid rgba(64, 201, 255, 0.30) !important;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(59, 107, 255, 0.10)) !important;
-      color: #e0f2fe !important;
-      font-size: 13px !important;
-      letter-spacing: 0.10em !important;
-      line-height: 1.15 !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 8px !important;
-      text-transform: uppercase !important;
-    }
-
-    .bar-box > summary::after {
-      margin-left: 2px !important;
-    }
-
-    details.clean.events-details summary.events-summary {
-      border-radius: 22px !important;
-      padding: 13px 14px !important;
-      background: linear-gradient(135deg, rgba(56, 189, 248, .13), rgba(19, 28, 62, .88) 58%, rgba(236, 72, 153, .08)) !important;
-      border-color: rgba(105, 196, 255, .28) !important;
-    }
-
-    .events-summary-label {
-      display: inline-flex !important;
-      align-items: center !important;
-      gap: 8px !important;
-      letter-spacing: .09em !important;
-    }
-
-    .events-summary-emoji {
-      width: 1.45em;
-      height: 1.45em;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 999px;
-      background: rgba(64, 201, 255, .12);
-      box-shadow: inset 0 0 0 1px rgba(134, 203, 255, .18);
-      font-size: .95em;
-      letter-spacing: 0;
-    }
-
-    body .result-shell .summary-head-top {
-      justify-content: space-between !important;
-      flex-wrap: nowrap !important;
-      gap: 8px !important;
-      padding-inline: clamp(2px, 1vw, 8px) !important;
-    }
-
-    body .result-shell .summary-head-top .summary-label,
-    body .result-shell .summary-head-top .summary-mode {
-      min-width: 0 !important;
-      width: auto !important;
-      max-width: calc(50% - 4px) !important;
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
-      white-space: nowrap !important;
-    }
-
-    @media (max-width: 430px) {
-      body .result-shell .summary-head-top {
-        display: grid !important;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-        gap: 7px !important;
-        padding-inline: 0 !important;
-      }
-
-      body .result-shell .summary-head-top .summary-label,
-      body .result-shell .summary-head-top .summary-mode {
-        max-width: none !important;
-        width: 100% !important;
-        justify-content: center !important;
-        font-size: clamp(9px, 2.55vw, 11px) !important;
-        letter-spacing: .07em !important;
-        padding: .62em .45em !important;
-      }
-    }
-
-  
-
-    /* v154 : retour titres propres, sans bulles d'emojis, et blocs cohérents */
-    .section-title-emoji,
-    .events-summary-emoji {
-      display: inline !important;
-      width: auto !important;
-      min-width: 0 !important;
-      height: auto !important;
-      line-height: inherit !important;
-      font-size: 1em !important;
-      border-radius: 0 !important;
-      background: transparent !important;
-      box-shadow: none !important;
-      filter: none !important;
-      margin: 0 !important;
-    }
-
-    .settings-panel {
-      padding: 0 !important;
-    }
-
-    .settings-panel .settings-head {
-      justify-content: center !important;
-      text-align: center !important;
-    }
-
-    .settings-panel .settings-body {
-      padding: var(--content-pad, 16px) !important;
-    }
-
-    .settings-section-head {
-      margin: 0 !important;
-    }
-
-    .report-title {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 8px !important;
-      width: 100%;
-      text-align: center !important;
-    }
-
-    .bar-box > summary {
-      width: auto !important;
-      margin: 0 !important;
-      padding: 16px !important;
-      border-radius: 0 !important;
-      border: 0 !important;
-      border-bottom: 1px solid var(--line) !important;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(255, 255, 255, 0.02)) !important;
-      color: #f8fbff !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 8px !important;
-      text-transform: uppercase !important;
-      font-size: var(--title-size, 18px) !important;
-      font-weight: 1000 !important;
-      letter-spacing: 0.04em !important;
-      line-height: 1.15 !important;
-    }
-
-    .bar-box > summary::after {
-      margin-left: 4px !important;
-    }
-
-    details.clean.events-details summary.events-summary {
-      padding: 14px 14px !important;
-      border-radius: 18px !important;
-      background: rgba(10, 22, 52, .74) !important;
-      border-color: rgba(64, 201, 255, .24) !important;
-    }
-
-    .events-summary-label {
-      gap: 0 !important;
-      letter-spacing: .09em !important;
-    }
-
-    .bar-card .bar-line strong {
-      text-align: right;
-    }
-
-
-    /* v155 : rendu lexique déroulé + bordure haute Réglages */
-    .settings-panel {
-      position: relative !important;
-      overflow: hidden !important;
-      box-shadow:
-        var(--shadow),
-        inset 0 1px 0 rgba(64, 201, 255, .34) !important;
-    }
-
-    .settings-panel::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 10px;
-      right: 10px;
-      height: 2px;
-      border-radius: 999px;
-      background: linear-gradient(90deg,
-        rgba(236, 72, 153, .36) 0%,
-        rgba(64, 201, 255, .62) 50%,
-        rgba(236, 72, 153, .36) 100%);
-      opacity: .9;
-      pointer-events: none;
-      z-index: 3;
-    }
-
-    .settings-panel .settings-head {
-      border-top: 0 !important;
-      border-bottom: 1px solid rgba(148, 163, 184, .18) !important;
-    }
-
-    .bar-box {
-      overflow: hidden !important;
-    }
-
-    .bar-box > summary {
-      border-bottom: 0 !important;
-      box-shadow: none !important;
-    }
-
-    .bar-box[open] > summary {
-      border-bottom: 1px solid rgba(148, 163, 184, .18) !important;
-    }
-
-    .bar-box[open] .bar-grid {
-      padding-top: 18px !important;
-      padding-bottom: 16px !important;
-      animation: none !important;
-    }
-
-    .bar-box[open] .bar-card:first-child {
-      margin-top: 0 !important;
-    }
-
-    .bar-card {
-      scroll-margin-top: 18px;
-    }
-
-    @media (max-width: 520px) {
-      .bar-box[open] .bar-grid {
-        padding-top: 20px !important;
-        gap: 12px !important;
-      }
-
-      .bar-card {
-        padding: 15px 14px !important;
-      }
-    }
-
-
-
-    /* v156 : correction finale rendu LEXIQUE/RÉGLAGES + anti-débordement horizontal */
-    html,
-    body {
+    /* v164 — reprise propre des demandes post-v152, sans bordures expérimentales */
+    html, body {
+      width: 100% !important;
       max-width: 100% !important;
-      overflow-x: hidden !important;
+      overflow-x: clip !important;
     }
 
+    body, .app {
+      touch-action: pan-y !important;
+    }
+
+    .app {
+      box-sizing: border-box !important;
+      overflow-x: clip !important;
+    }
+
+    .topbar,
+    .topbar-inner,
     .app,
     .hero,
     .panel,
     .report-panel,
-    .summary,
-    .team-card,
     .bar-box,
-    .auto-box,
-    .settings-panel,
-    .settings-body,
-    .report-body,
-    .bar-grid,
-    .bar-card {
+    .summary,
+    .team-card {
       max-width: 100% !important;
       box-sizing: border-box !important;
     }
 
-    .settings-panel {
-      position: relative !important;
+    /* RÉGLAGES : même structure visuelle que RAPPORT DE SESSION, sans changer les bordures globales */
+    section.settings-panel.panel-pad {
+      padding: 0 !important;
       overflow: hidden !important;
     }
 
-    /* RÉGLAGES : même logique de liseré haut que RAPPORT DE SESSION */
-    .settings-panel::before {
-      display: none !important;
-      content: none !important;
+    section.settings-panel .settings-section-head {
+      display: flex !important;
+      justify-content: center !important;
+      align-items: center !important;
+      margin: 0 !important;
+      padding: var(--content-pad, 18px) !important;
+      border-bottom: 1px solid var(--line) !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(251, 113, 133, 0.08)) !important;
     }
 
-    .settings-panel::after {
-      content: "" !important;
-      position: absolute !important;
-      top: 0 !important;
-      left: 22px !important;
-      right: 22px !important;
-      height: 2px !important;
-      border-radius: 0 0 999px 999px !important;
-      pointer-events: none !important;
-      z-index: 4 !important;
-      opacity: .62 !important;
-      filter: saturate(.86) blur(.22px) !important;
-      box-shadow: 0 0 10px rgba(64,201,255,.08), 0 0 12px rgba(251,113,133,.055) !important;
-      background: linear-gradient(90deg,
-        transparent 0%,
-        rgba(236,72,153,.22) 13%,
-        rgba(64,201,255,.50) 50%,
-        rgba(236,72,153,.22) 87%,
-        transparent 100%) !important;
+    section.settings-panel .form-grid {
+      margin: 0 !important;
+      padding: var(--content-pad, 18px) !important;
+      box-sizing: border-box !important;
     }
 
-    .settings-panel .settings-head {
-      border-bottom: 1px solid rgba(148, 163, 184, .18) !important;
+    section.settings-panel #statusBox,
+    section.settings-panel #errorBox {
+      margin-left: var(--content-pad, 18px) !important;
+      margin-right: var(--content-pad, 18px) !important;
+      margin-bottom: var(--content-pad, 18px) !important;
     }
 
-    /* LEXIQUE : état fermé propre, état ouvert plus aéré, sans bande parasite */
-    .bar-box {
-      position: relative !important;
+    .report-title,
+    .bar-box summary,
+    .settings-section-head .report-title {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 9px !important;
+      white-space: nowrap !important;
+      text-align: center !important;
+    }
+
+    /* Résumé Tendance : éviter le dépassement de MODE SCAN sur mobile */
+    body .result-shell .summary-head-top {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      width: 100% !important;
+      margin: 0 0 20px !important;
+      padding: 0 clamp(4px, 1.5vw, 12px) !important;
+      box-sizing: border-box !important;
+    }
+
+    body .result-shell .summary-head-top .summary-label,
+    body .result-shell .summary-head-top .summary-mode {
+      flex: 1 1 0 !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      width: auto !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      text-align: center !important;
+      font-size: clamp(10px, 2.9vw, 13px) !important;
+      line-height: 1 !important;
+      padding: .66em .72em !important;
+      box-sizing: border-box !important;
+    }
+
+    @media (max-width: 390px) {
+      body .result-shell .summary-head-top {
+        gap: 6px !important;
+        padding-inline: 0 !important;
+      }
+      body .result-shell .summary-head-top .summary-label,
+      body .result-shell .summary-head-top .summary-mode {
+        font-size: clamp(9px, 2.65vw, 11px) !important;
+        padding: .62em .55em !important;
+        letter-spacing: .075em !important;
+      }
+    }
+
+    /* LEXIQUE : rendu compact stable au déroulement, sans bande parasite ni scroll horizontal */
+    details.bar-box {
+      width: 100% !important;
       overflow: hidden !important;
       contain: paint !important;
     }
 
-    .bar-box > summary {
-      width: 100% !important;
-      min-height: 74px !important;
-      margin: 0 !important;
-      padding: 18px 18px !important;
-      border: 0 !important;
-      border-bottom: 0 !important;
-      box-shadow: none !important;
-      background: linear-gradient(135deg, rgba(56,189,248,.13), rgba(255,255,255,.018)) !important;
-      display: flex !important;
-      align-items: center !important;
+    details.bar-box > summary {
+      min-height: 64px !important;
       justify-content: center !important;
-      gap: 8px !important;
-      white-space: nowrap !important;
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
+      padding: 18px var(--content-pad, 18px) !important;
+      border-bottom: 0 !important;
+      box-sizing: border-box !important;
     }
 
-    .bar-box > summary::before,
-    .bar-box > summary::after {
-      flex: 0 0 auto !important;
-    }
-
-    .bar-box[open] > summary {
-      border-bottom: 1px solid rgba(148, 163, 184, .16) !important;
+    details.bar-box[open] > summary {
+      border-bottom: 1px solid rgba(148, 163, 184, .14) !important;
       margin-bottom: 0 !important;
-      box-shadow: none !important;
     }
 
-    .bar-box[open] .bar-grid {
-      padding: 26px 16px 18px !important;
-      gap: 14px !important;
-      background: transparent !important;
-      border-top: 0 !important;
-      box-shadow: none !important;
+    details.bar-box[open] .bar-grid {
       animation: none !important;
+      padding-top: 20px !important;
     }
 
-    .bar-box[open] .bar-card:first-child {
-      margin-top: 0 !important;
+    .bar-grid {
+      width: 100% !important;
+      box-sizing: border-box !important;
+      padding-left: var(--content-pad, 18px) !important;
+      padding-right: var(--content-pad, 18px) !important;
+      padding-bottom: var(--content-pad, 18px) !important;
+      gap: 12px !important;
+      overflow: hidden !important;
     }
 
     .bar-card {
-      min-width: 0 !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      padding: 14px !important;
+      border-radius: 18px !important;
       overflow: hidden !important;
+    }
+
+    .bar-card-title {
+      display: flex !important;
+      align-items: center !important;
+      gap: 7px !important;
+      margin-bottom: 12px !important;
+      color: #e5e7eb !important;
+      font-size: clamp(14px, 3.7vw, 17px) !important;
+      line-height: 1.15 !important;
+      font-weight: 1000 !important;
+      letter-spacing: -.025em !important;
     }
 
     .bar-line {
       display: grid !important;
-      grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr) !important;
+      grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr) !important;
       align-items: center !important;
       gap: 10px !important;
-      min-width: 0 !important;
+      min-height: 34px !important;
+      padding: 5px 0 !important;
+      font-size: clamp(12px, 3.25vw, 14px) !important;
+      line-height: 1.22 !important;
+      border-bottom: 1px solid rgba(148, 163, 184, .10) !important;
+    }
+
+    .bar-line:last-child {
+      border-bottom: 0 !important;
     }
 
     .bar-line span,
     .bar-line strong {
       min-width: 0 !important;
-      max-width: 100% !important;
-      white-space: normal !important;
       overflow-wrap: anywhere !important;
       word-break: normal !important;
     }
 
     .bar-line strong {
       text-align: right !important;
+      font-weight: 1000 !important;
     }
 
-    @media (max-width: 520px) {
-      .bar-box > summary {
-        min-height: 72px !important;
-        padding: 17px 14px !important;
-      }
-
-      .bar-box[open] .bar-grid {
-        padding: 28px 14px 18px !important;
-        gap: 14px !important;
-      }
-
+    @media (max-width: 380px) {
+      .bar-card { padding: 12px !important; }
       .bar-line {
-        grid-template-columns: minmax(0, .74fr) minmax(0, 1.26fr) !important;
+        grid-template-columns: .9fr 1.1fr !important;
         gap: 8px !important;
+        font-size: 12px !important;
       }
     }
 
-
-    /* v157 : RÉGLAGES strictement aligné sur RAPPORT + LEXIQUE ouvert sans bande */
-    body .settings-panel {
-      position: relative !important;
-      overflow: hidden !important;
-      box-shadow: var(--shadow) !important;
-    }
-
-    /* On neutralise les anciens liserés spécifiques de RÉGLAGES */
-    body .settings-panel::before {
-      display: none !important;
-      content: none !important;
-    }
-
-    /* RÉGLAGES : exactement le même liseré haut que RAPPORT DE SESSION */
-    body .settings-panel::after {
-      content: "" !important;
-      position: absolute !important;
-      top: 0 !important;
-      left: 18px !important;
-      right: 18px !important;
-      height: 2.5px !important;
-      border-radius: 0 0 999px 999px !important;
-      pointer-events: none !important;
-      z-index: 3 !important;
-      opacity: .66 !important;
-      filter: none !important;
-      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
-      background: linear-gradient(90deg,
-        var(--fs-v113-purple-edge-soft) 0%,
-        var(--fs-v113-purple-edge) 18%,
-        var(--fs-v113-blue-center-soft) 38%,
-        var(--fs-v113-blue-center) 50%,
-        var(--fs-v113-blue-center-soft) 62%,
-        var(--fs-v113-purple-edge) 82%,
-        var(--fs-v113-purple-edge-soft) 100%
-      ) !important;
-    }
-
-    body .settings-panel .settings-head {
-      border-bottom: 1px solid var(--line) !important;
-      box-shadow: none !important;
-    }
-
-    /* LEXIQUE déroulé : pas de bande entre l'en-tête et le contenu, espace propre avant Résultat */
-    body .bar-box[open] > summary {
-      border-bottom: 0 !important;
-      box-shadow: none !important;
-      margin-bottom: 0 !important;
-    }
-
-    body .bar-box[open] .bar-grid {
-      border-top: 0 !important;
-      box-shadow: none !important;
-      background: transparent !important;
-      margin-top: 0 !important;
-      padding-top: 34px !important;
-    }
-
-    body .bar-box[open] .bar-card:first-child {
-      margin-top: 0 !important;
-    }
-
-    @media (max-width: 520px) {
-      body .bar-box[open] .bar-grid {
-        padding-top: 36px !important;
-      }
-    }
-
-
-    /* v159 : RÉGLAGES identique à RAPPORT DE SESSION + LEXIQUE déroulé propre */
-    body .settings-panel.report-panel {
-      position: relative !important;
-      overflow: hidden !important;
-      border: 1px solid var(--line) !important;
-      border-radius: 26px !important;
-      background:
-        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
-        rgba(10, 15, 36, 0.90) !important;
-      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055) !important;
-    }
-
-    /* Même pseudo-liseré que les autres report-panel : mêmes dimensions, même arrondi, même dégradé. */
-    body .settings-panel.report-panel::before {
-      content: none !important;
-      display: none !important;
-    }
-
-    body .settings-panel.report-panel::after {
-      content: "" !important;
-      position: absolute !important;
-      top: 0 !important;
-      left: 22px !important;
-      right: 22px !important;
-      height: 2px !important;
-      border-radius: 0 0 999px 999px !important;
-      pointer-events: none !important;
-      z-index: 3 !important;
-      opacity: .68 !important;
-      filter: none !important;
-      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
-      background: linear-gradient(90deg,
-        var(--fs-v113-purple-edge-soft) 0%,
-        var(--fs-v113-purple-edge) 18%,
-        var(--fs-v113-blue-center-soft) 38%,
-        var(--fs-v113-blue-center) 50%,
-        var(--fs-v113-blue-center-soft) 62%,
-        var(--fs-v113-purple-edge) 82%,
-        var(--fs-v113-purple-edge-soft) 100%
-      ) !important;
-    }
-
-    body .settings-panel.report-panel .settings-head {
-      padding: var(--content-pad) !important;
-      border-bottom: 1px solid var(--line) !important;
-      background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(255, 255, 255, 0.02)) !important;
-      box-shadow: none !important;
-    }
-
-    body .settings-panel.report-panel .settings-body {
-      padding: var(--content-pad) !important;
-    }
-
-    /* LEXIQUE : rendu stable ouvert/fermé, sans bande parasite ni décalage horizontal. */
-    body .bar-box {
-      position: relative !important;
-      overflow: hidden !important;
-      border: 1px solid var(--line) !important;
-      border-radius: 26px !important;
-      max-width: 100% !important;
-      transform: none !important;
-    }
-
-    body .bar-box > summary {
-      min-height: 0 !important;
-      width: 100% !important;
-      margin: 0 !important;
-      padding: var(--content-pad) !important;
-      border: 0 !important;
-      border-bottom: 0 !important;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(255, 255, 255, 0.02)) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 8px !important;
-      text-align: center !important;
-    }
-
-    body .bar-box[open] > summary {
-      border-bottom: 1px solid var(--line) !important;
-      margin-bottom: 0 !important;
-    }
-
-    body .bar-box > summary::after {
-      margin-left: 4px !important;
-    }
-
-    body .bar-box .bar-grid,
-    body .bar-box[open] .bar-grid {
-      margin: 0 !important;
-      padding: 18px var(--content-pad) var(--content-pad) !important;
-      border: 0 !important;
-      border-top: 0 !important;
-      box-shadow: none !important;
-      background: transparent !important;
-      display: grid !important;
-      gap: 14px !important;
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-      animation: none !important;
-    }
-
-    body .bar-box .bar-card,
-    body .bar-box[open] .bar-card:first-child {
-      margin-top: 0 !important;
-    }
-
-    @media (max-width: 520px) {
-      body .settings-panel.report-panel,
-      body .bar-box {
-        border-radius: 24px !important;
-      }
-
-      body .bar-box .bar-grid,
-      body .bar-box[open] .bar-grid {
-        padding-top: 18px !important;
-        gap: 14px !important;
-      }
-    }
-
-
-
-    /* v160 : correction définitive RÉGLAGES + LEXIQUE
-       - RÉGLAGES reprend strictement la même bordure/liseré que RAPPORT DE SESSION.
-       - LEXIQUE ouvert n'ajoute plus de bande parasite ni de décalage horizontal. */
-
-    /* Un seul système de bordure pour tous les panneaux report-panel, y compris RÉGLAGES. */
-    body .report-panel,
-    body .settings-panel.report-panel {
-      position: relative !important;
-      overflow: hidden !important;
-      border: 1px solid rgba(120, 139, 220, .25) !important;
-      border-radius: 24px !important;
-      background:
-        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
-        rgba(10, 15, 36, 0.90) !important;
-      box-shadow: var(--shadow) !important;
-      transform: none !important;
-      max-width: 100% !important;
+    /* Menu Matchs Utilisés : sobre, mais plus lisible */
+    details.trend-matches-details > summary.events-summary {
+      min-height: 58px !important;
+      padding: 13px 15px !important;
+      border-radius: 18px !important;
+      background: linear-gradient(135deg, rgba(56,189,248,.11), rgba(15,23,42,.48)) !important;
+      border: 1px solid rgba(56,189,248,.20) !important;
       box-sizing: border-box !important;
     }
 
-    body .report-panel::before,
-    body .settings-panel.report-panel::before {
-      content: none !important;
-      display: none !important;
-    }
-
-    body .report-panel::after,
-    body .settings-panel.report-panel::after {
-      content: "" !important;
-      position: absolute !important;
-      top: 0 !important;
-      left: 18px !important;
-      right: 18px !important;
-      height: 2px !important;
-      border-radius: 0 0 999px 999px !important;
-      pointer-events: none !important;
-      z-index: 3 !important;
-      opacity: .68 !important;
-      filter: none !important;
-      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
-      background: linear-gradient(90deg,
-        var(--fs-v113-purple-edge-soft) 0%,
-        var(--fs-v113-purple-edge) 18%,
-        var(--fs-v113-blue-center-soft) 38%,
-        var(--fs-v113-blue-center) 50%,
-        var(--fs-v113-blue-center-soft) 62%,
-        var(--fs-v113-purple-edge) 82%,
-        var(--fs-v113-purple-edge-soft) 100%
-      ) !important;
-    }
-
-    body .report-panel > .report-head,
-    body .settings-panel.report-panel > .settings-head {
-      padding: var(--content-pad) !important;
-      border-bottom: 1px solid var(--line) !important;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(251, 113, 133, 0.075)) !important;
-      box-shadow: none !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      text-align: center !important;
-    }
-
-    body .settings-panel.report-panel > .settings-head > div,
-    body .report-panel > .report-head > div {
-      width: 100% !important;
-      display: flex !important;
-      justify-content: center !important;
-      align-items: center !important;
-    }
-
-    body .settings-panel.report-panel .settings-body,
-    body .report-panel .report-body {
-      padding: var(--content-pad) !important;
-    }
-
-    /* LEXIQUE : le bloc ne doit jamais créer de scroll horizontal. */
-    html, body, .app {
-      overflow-x: hidden !important;
-      max-width: 100% !important;
-    }
-
-    body .bar-box {
-      width: 100% !important;
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-      overflow: hidden !important;
-      border-radius: 24px !important;
-      transform: none !important;
-      contain: paint !important;
-    }
-
-    body .bar-box > summary {
-      width: 100% !important;
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-      margin: 0 !important;
-      padding: var(--content-pad) !important;
-      border: 0 !important;
-      border-bottom: 0 !important;
-      border-radius: 0 !important;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(255, 255, 255, 0.02)) !important;
-      box-shadow: none !important;
-      display: flex !important;
-      justify-content: center !important;
-      align-items: center !important;
-      gap: 8px !important;
-      white-space: nowrap !important;
-      overflow: hidden !important;
-    }
-
-    body .bar-box[open] > summary {
-      border-bottom: 0 !important;
-      box-shadow: none !important;
-      margin-bottom: 0 !important;
-    }
-
-    body .bar-box .bar-grid,
-    body .bar-box[open] .bar-grid {
-      width: 100% !important;
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-      margin: 0 !important;
-      padding: 24px var(--content-pad) var(--content-pad) !important;
-      border: 0 !important;
-      border-top: 0 !important;
-      background: transparent !important;
-      box-shadow: none !important;
-      gap: 14px !important;
-      animation: none !important;
-      overflow: hidden !important;
-    }
-
-    body .bar-box[open] .bar-card:first-child {
-      margin-top: 0 !important;
-    }
-
-    body .bar-card,
-    body .bar-line,
-    body .bar-line span,
-    body .bar-line strong {
-      min-width: 0 !important;
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-      overflow-wrap: anywhere !important;
-    }
-
-    @media (max-width: 520px) {
-      body .report-panel,
-      body .settings-panel.report-panel,
-      body .bar-box {
-        border-radius: 24px !important;
-      }
-
-      body .bar-box .bar-grid,
-      body .bar-box[open] .bar-grid {
-        padding-top: 26px !important;
-      }
+    details.trend-matches-details > summary.events-summary .events-summary-label {
+      letter-spacing: .12em !important;
+      text-transform: uppercase !important;
+      font-weight: 1000 !important;
     }
 
 
-    /* v161 : LEXIQUE plus compact et régulier sur mobile */
-    body .bar-box .bar-grid,
-    body .bar-box[open] .bar-grid {
-      gap: 13px !important;
-      padding-top: 22px !important;
-    }
-
-    body .bar-card {
-      border-radius: 20px !important;
-      padding: 15px 16px !important;
-      background: rgba(8, 18, 43, .62) !important;
-      border: 1px solid rgba(148, 163, 184, .17) !important;
-      overflow: hidden !important;
-    }
-
-    body .bar-card-title {
-      display: flex !important;
-      align-items: center !important;
-      min-height: 26px !important;
-      margin-bottom: 11px !important;
-      font-size: clamp(15px, 3.9vw, 18px) !important;
-      line-height: 1.15 !important;
-      letter-spacing: -0.015em !important;
-      color: #f8fbff !important;
-    }
-
-    body .bar-line {
-      display: grid !important;
-      grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr) !important;
-      align-items: center !important;
-      gap: 10px !important;
-      min-height: 30px !important;
-      padding: 7px 0 !important;
-      line-height: 1.22 !important;
-      font-size: clamp(12.5px, 3.35vw, 15px) !important;
-      border-bottom: 1px solid rgba(148, 163, 184, .085) !important;
-    }
-
-    body .bar-line:last-child {
-      border-bottom: 0 !important;
-      padding-bottom: 0 !important;
-    }
-
-    body .bar-line span,
-    body .bar-line strong {
-      min-width: 0 !important;
-      overflow-wrap: normal !important;
-      word-break: normal !important;
-      hyphens: none !important;
-    }
-
-    body .bar-line span {
-      color: rgba(203, 213, 255, .84) !important;
-      font-weight: 800 !important;
-    }
-
-    body .bar-line strong {
-      text-align: right !important;
-      color: rgba(226, 232, 255, .92) !important;
-      font-weight: 950 !important;
-    }
-
-    @media (max-width: 430px) {
-      body .bar-box .bar-grid,
-      body .bar-box[open] .bar-grid {
-        padding: 20px 14px 15px !important;
-        gap: 12px !important;
-      }
-
-      body .bar-card {
-        padding: 14px 13px !important;
-        border-radius: 18px !important;
-      }
-
-      body .bar-line {
-        grid-template-columns: minmax(0, .88fr) minmax(0, 1.12fr) !important;
-        gap: 7px !important;
-        min-height: 28px !important;
-        padding: 6px 0 !important;
-        font-size: clamp(12px, 3.15vw, 13.4px) !important;
-      }
-
-      body .bar-card-title {
-        font-size: clamp(14px, 3.85vw, 16px) !important;
-        margin-bottom: 9px !important;
-      }
-    }
-
-
-    /* v162 : bordures homogènes + correction réelle du décalage horizontal LEXIQUE */
-    :root {
-      --fs-v162-panel-fill: rgba(10, 15, 36, 0.90);
-      --fs-v162-head-fill: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(251, 113, 133, 0.075));
-      --fs-v162-border: linear-gradient(115deg,
-        rgba(244, 63, 94, .55) 0%,
-        rgba(129, 140, 248, .34) 24%,
-        rgba(56, 189, 248, .58) 50%,
-        rgba(129, 140, 248, .34) 76%,
-        rgba(244, 63, 94, .55) 100%);
-      --fs-v162-border-soft: linear-gradient(115deg,
-        rgba(244, 63, 94, .42) 0%,
-        rgba(129, 140, 248, .26) 24%,
-        rgba(56, 189, 248, .45) 50%,
-        rgba(129, 140, 248, .26) 76%,
-        rgba(244, 63, 94, .42) 100%);
-    }
-
-    html,
-    body {
-      width: 100% !important;
-      max-width: 100% !important;
-      overflow-x: hidden !important;
-      overscroll-behavior-x: none !important;
-    }
-
-    body {
-      position: relative !important;
-      touch-action: pan-y !important;
-    }
-
-    .app {
-      width: min(920px, calc(100vw - 28px)) !important;
-      max-width: calc(100vw - 28px) !important;
-      overflow-x: clip !important;
-      margin-left: auto !important;
-      margin-right: auto !important;
-      padding-left: 0 !important;
-      padding-right: 0 !important;
-    }
-
-    .app > * {
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-    }
-
-    body :is(.hero, .report-panel, .settings-panel.report-panel, .panel.notice, .bar-box, .result-shell .summary, .result-shell .team-card) {
-      position: relative !important;
-      border: 2px solid transparent !important;
-      border-radius: 28px !important;
-      overflow: hidden !important;
-      background:
-        linear-gradient(145deg, rgba(12, 18, 42, .94), rgba(10, 15, 36, .90)) padding-box,
-        var(--fs-v162-border-soft) border-box !important;
-      box-shadow: 0 22px 55px rgba(0, 0, 0, .42) !important;
-      transform: none !important;
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-    }
-
-    body .panel.notice {
-      background:
-        linear-gradient(145deg, rgba(45, 7, 25, .94), rgba(15, 6, 25, .92)) padding-box,
-        linear-gradient(115deg,
-          rgba(251, 113, 133, .58) 0%,
-          rgba(244, 63, 94, .38) 35%,
-          rgba(190, 24, 93, .52) 50%,
-          rgba(244, 63, 94, .38) 65%,
-          rgba(251, 113, 133, .58) 100%) border-box !important;
-    }
-
-    body :is(.report-panel, .settings-panel.report-panel, .bar-box)::before,
-    body :is(.report-panel, .settings-panel.report-panel, .bar-box)::after {
-      content: none !important;
-      display: none !important;
-    }
-
-    body :is(.report-panel, .settings-panel.report-panel) > :is(.report-head, .settings-head),
-    body .bar-box > summary {
-      border: 0 !important;
-      border-bottom: 1px solid rgba(148, 163, 184, .16) !important;
-      background: var(--fs-v162-head-fill) !important;
-      box-shadow: none !important;
-    }
-
-    body .settings-panel.report-panel > .settings-head,
-    body .report-panel > .report-head,
-    body .bar-box > summary {
-      min-height: 86px !important;
-      padding: 22px var(--content-pad) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-    }
-
-    body .settings-panel.report-panel > .settings-head .report-title,
-    body .report-panel > .report-head .report-title,
-    body .bar-box > summary {
-      max-width: 100% !important;
-      min-width: 0 !important;
-      text-align: center !important;
-      white-space: nowrap !important;
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
-    }
-
-    body .bar-box {
-      display: block !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      margin-left: auto !important;
-      margin-right: auto !important;
-      contain: layout paint !important;
-    }
-
-    body .bar-box > summary {
-      width: 100% !important;
-      max-width: 100% !important;
-      cursor: pointer !important;
-      list-style: none !important;
-      user-select: none !important;
-    }
-
-    body .bar-box > summary::-webkit-details-marker,
-    body .bar-box > summary::marker {
-      display: none !important;
-      content: "" !important;
-    }
-
-    body .bar-box[open] > summary {
-      margin-bottom: 0 !important;
-    }
-
-    body .bar-box .bar-grid,
-    body .bar-box[open] .bar-grid {
-      display: grid !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      margin: 0 !important;
-      padding: 20px var(--content-pad) var(--content-pad) !important;
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
-      animation: none !important;
-      overflow: hidden !important;
-      gap: 12px !important;
-    }
-
-    body .bar-card:first-child { margin-top: 0 !important; }
-
-    body :is(.report-btn, .report-hint, .notice-text, .hero-text, .bar-line, .bar-card, input, button) {
-      max-width: 100% !important;
-      min-width: 0 !important;
-      overflow-wrap: anywhere !important;
-    }
-
-    body .report-btn {
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
-      white-space: normal !important;
-    }
-
-    @media (max-width: 520px) {
-      .app {
-        width: calc(100vw - 28px) !important;
-        max-width: calc(100vw - 28px) !important;
-      }
-
-      body :is(.hero, .report-panel, .settings-panel.report-panel, .panel.notice, .bar-box, .result-shell .summary, .result-shell .team-card) {
-        border-radius: 26px !important;
-      }
-
-      body .settings-panel.report-panel > .settings-head,
-      body .report-panel > .report-head,
-      body .bar-box > summary {
-        min-height: 82px !important;
-        padding: 20px 14px !important;
-      }
-
-      body .bar-box .bar-grid,
-      body .bar-box[open] .bar-grid {
-        padding: 18px 14px 14px !important;
-      }
-    }
-</style>
+  </style>
 </head>
 
 <body>
@@ -10942,14 +10119,11 @@
       </div>
     </section>
 
-    <section class="report-panel settings-panel">
-      <div class="report-head settings-head">
-        <div>
-          <div class="report-title">⚙️ RÉGLAGES</div>
-        </div>
+    <section class="panel panel-pad settings-panel">
+      <div class="settings-section-head">
+        <div class="report-title">⚙️ RÉGLAGES</div>
       </div>
 
-      <div class="settings-body panel-pad">
       <div class="form-grid">
         <div>
           <label for="matchInput">URL WEB ou Match ID</label>
@@ -10999,7 +10173,6 @@
 
       <div id="statusBox" class="status-box"></div>
       <div id="errorBox" class="error-box"></div>
-      </div>
     </section>
 
     <section class="report-panel" id="reportPanel">
@@ -11030,7 +10203,7 @@
     <div id="result" class="result-shell"></div>
 
     <details class="bar-box">
-      <summary>📖 LEXIQUE</summary>
+      <summary><span class="lexique-summary-title">📖 LEXIQUE</span></summary>
 
       <div class="bar-grid">
         <div class="bar-card">
@@ -11042,7 +10215,7 @@
 
         <div class="bar-card">
           <div class="bar-card-title">⚙️ Réglages</div>
-          <div class="bar-line"><span>Curseur Tendance</span><strong>Nb. Tendances</strong></div>
+          <div class="bar-line"><span>Curseur</span><strong>Nb. Tendances</strong></div>
           <div class="bar-line"><span>Matchs Utilisés</span><strong>Nb. Tendances + 1</strong></div>
           <div class="bar-line"><span>Calcul Séparé</span><strong>Attaque Réciproque</strong></div>
           <div class="bar-line"><span>Calcul Simultané</span><strong>Attaque + Défense</strong></div>
@@ -11050,14 +10223,14 @@
 
         <div class="bar-card">
           <div class="bar-card-title">📈 Tendance</div>
-          <div class="bar-line"><span>Tendance</span><strong>Niveau Récent − Précédent</strong></div>
+          <div class="bar-line"><span>Tendance</span><strong>Niveau Récent − Niveau Précédent</strong></div>
           <div class="bar-line"><span>0-0</span><strong>Minute 1</strong></div>
         </div>
 
         <div class="bar-card">
           <div class="bar-card-title">⏱️ Comparaison</div>
           <div class="bar-line"><span>Temps</span><strong>Moy. Minutes Des Buts</strong></div>
-          <div class="bar-line"><span>Prend Le Dessus</span><strong>Moyenne La Plus Basse</strong></div>
+          <div class="bar-line"><span>Prend Le Dessus</span><strong>Minute Moy. La Plus Basse</strong></div>
         </div>
       </div>
     </details>
@@ -12548,7 +11721,7 @@
       return `
         <details class="clean events-details trend-matches-details">
           <summary class="events-summary">
-            <span class="events-summary-label">MATCHS UTILISÉS</span>
+            <span class="events-summary-label">Matchs Utilisés</span>
             <span class="count-pill events-count-pill">${esc((matchesUsed || []).length)}</span>
           </summary>
           <div class="section">
@@ -13174,202 +12347,7 @@
     }
 
   
-    
-
-    /* v155 : rendu lexique déroulé + bordure haute Réglages */
-    .settings-panel {
-      position: relative !important;
-      overflow: hidden !important;
-      box-shadow:
-        var(--shadow),
-        inset 0 1px 0 rgba(64, 201, 255, .34) !important;
-    }
-
-    .settings-panel::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 10px;
-      right: 10px;
-      height: 2px;
-      border-radius: 999px;
-      background: linear-gradient(90deg,
-        rgba(236, 72, 153, .36) 0%,
-        rgba(64, 201, 255, .62) 50%,
-        rgba(236, 72, 153, .36) 100%);
-      opacity: .9;
-      pointer-events: none;
-      z-index: 3;
-    }
-
-    .settings-panel .settings-head {
-      border-top: 0 !important;
-      border-bottom: 1px solid rgba(148, 163, 184, .18) !important;
-    }
-
-    .bar-box {
-      overflow: hidden !important;
-    }
-
-    .bar-box > summary {
-      border-bottom: 0 !important;
-      box-shadow: none !important;
-    }
-
-    .bar-box[open] > summary {
-      border-bottom: 1px solid rgba(148, 163, 184, .18) !important;
-    }
-
-    .bar-box[open] .bar-grid {
-      padding-top: 18px !important;
-      padding-bottom: 16px !important;
-      animation: none !important;
-    }
-
-    .bar-box[open] .bar-card:first-child {
-      margin-top: 0 !important;
-    }
-
-    .bar-card {
-      scroll-margin-top: 18px;
-    }
-
-    @media (max-width: 520px) {
-      .bar-box[open] .bar-grid {
-        padding-top: 20px !important;
-        gap: 12px !important;
-      }
-
-      .bar-card {
-        padding: 15px 14px !important;
-      }
-    }
-
-
-
-    /* v159 : RÉGLAGES identique à RAPPORT DE SESSION + LEXIQUE déroulé propre */
-    body .settings-panel.report-panel {
-      position: relative !important;
-      overflow: hidden !important;
-      border: 1px solid var(--line) !important;
-      border-radius: 26px !important;
-      background:
-        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
-        rgba(10, 15, 36, 0.90) !important;
-      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055) !important;
-    }
-
-    /* Même pseudo-liseré que les autres report-panel : mêmes dimensions, même arrondi, même dégradé. */
-    body .settings-panel.report-panel::before {
-      content: none !important;
-      display: none !important;
-    }
-
-    body .settings-panel.report-panel::after {
-      content: "" !important;
-      position: absolute !important;
-      top: 0 !important;
-      left: 22px !important;
-      right: 22px !important;
-      height: 2px !important;
-      border-radius: 0 0 999px 999px !important;
-      pointer-events: none !important;
-      z-index: 3 !important;
-      opacity: .68 !important;
-      filter: none !important;
-      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
-      background: linear-gradient(90deg,
-        var(--fs-v113-purple-edge-soft) 0%,
-        var(--fs-v113-purple-edge) 18%,
-        var(--fs-v113-blue-center-soft) 38%,
-        var(--fs-v113-blue-center) 50%,
-        var(--fs-v113-blue-center-soft) 62%,
-        var(--fs-v113-purple-edge) 82%,
-        var(--fs-v113-purple-edge-soft) 100%
-      ) !important;
-    }
-
-    body .settings-panel.report-panel .settings-head {
-      padding: var(--content-pad) !important;
-      border-bottom: 1px solid var(--line) !important;
-      background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(255, 255, 255, 0.02)) !important;
-      box-shadow: none !important;
-    }
-
-    body .settings-panel.report-panel .settings-body {
-      padding: var(--content-pad) !important;
-    }
-
-    /* LEXIQUE : rendu stable ouvert/fermé, sans bande parasite ni décalage horizontal. */
-    body .bar-box {
-      position: relative !important;
-      overflow: hidden !important;
-      border: 1px solid var(--line) !important;
-      border-radius: 26px !important;
-      max-width: 100% !important;
-      transform: none !important;
-    }
-
-    body .bar-box > summary {
-      min-height: 0 !important;
-      width: 100% !important;
-      margin: 0 !important;
-      padding: var(--content-pad) !important;
-      border: 0 !important;
-      border-bottom: 0 !important;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(255, 255, 255, 0.02)) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 8px !important;
-      text-align: center !important;
-    }
-
-    body .bar-box[open] > summary {
-      border-bottom: 1px solid var(--line) !important;
-      margin-bottom: 0 !important;
-    }
-
-    body .bar-box > summary::after {
-      margin-left: 4px !important;
-    }
-
-    body .bar-box .bar-grid,
-    body .bar-box[open] .bar-grid {
-      margin: 0 !important;
-      padding: 18px var(--content-pad) var(--content-pad) !important;
-      border: 0 !important;
-      border-top: 0 !important;
-      box-shadow: none !important;
-      background: transparent !important;
-      display: grid !important;
-      gap: 14px !important;
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-      animation: none !important;
-    }
-
-    body .bar-box .bar-card,
-    body .bar-box[open] .bar-card:first-child {
-      margin-top: 0 !important;
-    }
-
-    @media (max-width: 520px) {
-      body .settings-panel.report-panel,
-      body .bar-box {
-        border-radius: 24px !important;
-      }
-
-      body .bar-box .bar-grid,
-      body .bar-box[open] .bar-grid {
-        padding-top: 18px !important;
-        gap: 14px !important;
-      }
-    }
-
-</style>
+    </style>
 </head>
 <body>
   <pre>${esc(text)}</pre>
@@ -13746,31 +12724,5 @@ setupCalcModeSlider();
   })();
 </script>
 
-
-
-<script>
-  // v162 : empêche le menu LEXIQUE de laisser la page décalée horizontalement sur mobile.
-  (() => {
-    const resetX = () => {
-      try {
-        if (window.scrollX !== 0) window.scrollTo(0, window.scrollY);
-        document.documentElement.scrollLeft = 0;
-        document.body.scrollLeft = 0;
-      } catch (_) {}
-    };
-    window.addEventListener('load', resetX, { passive: true });
-    window.addEventListener('resize', resetX, { passive: true });
-    window.addEventListener('orientationchange', () => setTimeout(resetX, 80), { passive: true });
-    document.addEventListener('toggle', (event) => {
-      if (event.target && event.target.classList && event.target.classList.contains('bar-box')) {
-        requestAnimationFrame(resetX);
-        setTimeout(resetX, 80);
-      }
-    }, true);
-    window.addEventListener('scroll', () => {
-      if (window.scrollX) requestAnimationFrame(resetX);
-    }, { passive: true });
-  })();
-</script>
 </body>
 </html>
