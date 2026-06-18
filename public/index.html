@@ -9821,8 +9821,8 @@
         <div class="auto-box trend-box">
           <div class="auto-head">
             <div>
-              <div class="auto-title">TENDANCE</div>
-              <div class="auto-sub">Nombre de tendances à comparer</div>
+              <div class="auto-title" id="trendBoxTitle">TENDANCES</div>
+              <div class="auto-sub">Nombre De Tendances À Comparer</div>
             </div>
           </div>
 
@@ -9830,7 +9830,7 @@
             <div class="auto-grid trend-only-grid">
               <div class="auto-control trend-control">
                 <div class="auto-control-top">
-                  <div class="auto-control-title">Tendance</div>
+                  <div class="auto-control-title" id="trendControlTitle">Tendance</div>
                   <input id="trendNumber" class="auto-number" type="number" min="1" max="100" step="1" value="4" />
                 </div>
                 <input id="trendRange" type="range" min="1" max="100" step="1" value="4" />
@@ -10333,8 +10333,11 @@
       if ($("trendRange")) $("trendRange").value = String(trend);
       if ($("rank1")) $("rank1").value = String(trend);
       if ($("rank2")) $("rank2").value = "";
+      const trendWord = trend > 1 ? "Tendances" : "Tendance";
+      if ($("trendBoxTitle")) $("trendBoxTitle").textContent = trendWord.toUpperCase();
+      if ($("trendControlTitle")) $("trendControlTitle").textContent = trendWord;
       if ($("trendFormula")) {
-        $("trendFormula").textContent = `${trend} Tendance${trend > 1 ? "s" : ""} · ${trend + 1} Derniers Matchs`;
+        $("trendFormula").textContent = `${trend} ${trendWord} · ${trend + 1} Derniers Matchs`;
       }
       updateRangeGradientFill();
     }
