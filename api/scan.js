@@ -118,6 +118,7 @@ module.exports = async function (req, res) {
     const rankEventStep = numeric(b.rankEventStep, 1, 0.0001, 5);
     const rankEventMode = b.rankEventMode === 'performance' ? 'performance' : 'fixed';
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
+    const isTrendMode = bool(b.trendMode) || b.trendCount !== undefined || b.rankEventMode === 'trend';
     const trendCount = numeric(b.trendCount, rank1 || 4, 1, 100);
 
     if (!/^\d+$/.test(matchId)) {
@@ -125,12 +126,12 @@ module.exports = async function (req, res) {
       return res.end(JSON.stringify({ error: 'Match ID ou URL WEB invalide' }));
     }
 
-    if (!rank1) {
+    if (!isTrendMode && !rank1) {
       res.statusCode = 400;
       return res.end(JSON.stringify({ error: 'Rang 1 invalide' }));
     }
 
-    if (b.rank2 !== undefined && b.rank2 !== '' && !rank2) {
+    if (!isTrendMode && b.rank2 !== undefined && b.rank2 !== null && b.rank2 !== '' && !rank2) {
       res.statusCode = 400;
       return res.end(JSON.stringify({ error: 'Rang 2 invalide' }));
     }
@@ -155,7 +156,7 @@ module.exports = async function (req, res) {
         rankEventStep,
         rankEventMode,
         winnerMode,
-        trendMode: bool(b.trendMode) || b.trendCount !== undefined,
+        trendMode: isTrendMode,
         trendCount,
       },
     };
