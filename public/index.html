@@ -9745,6 +9745,15 @@
     .trend-score-line { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.82rem; font-weight:900; color:#e5e7eb; }
     @media (min-width: 820px) { .trend-pair { grid-template-columns: 1fr 1fr; } }
 
+
+    /* v146 — affichage Tendance : retour aux bases visuelles stables */
+    .trend-result-value { font-size: clamp(2rem, 9vw, 3.6rem) !important; line-height: .98 !important; letter-spacing: .02em !important; }
+    .team-card .rank-grid .rank-card .trend-result-value { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    .trend-matches-details { margin-top: 16px !important; }
+    .trend-matches-details > .section { margin-top: 12px !important; }
+    .trend-row-title, .trend-row-badge, .trend-score-line, .trend-match-line, .trend-row-sub { text-transform: none; }
+    .bar-box summary { text-transform: uppercase; }
+
   </style>
 </head>
 
@@ -9889,21 +9898,28 @@
     <div id="result" class="result-shell"></div>
 
     <details class="bar-box">
-      <summary>BARÈME</summary>
+      <summary>LEXIQUE</summary>
 
       <div class="bar-grid">
         <div class="bar-card">
-          <div class="bar-card-title">✅ Équipe Analysée</div>
-          <div class="bar-line"><span>⚽ But Avec Passeur</span><strong class="positive">+1</strong></div>
-          <div class="bar-line"><span>⚽ But Sans Passeur</span><strong class="positive">+0.6667</strong></div>
-          <div class="bar-line"><span>🥅 CSC / Erreur Adverse</span><strong class="positive">+0.3333</strong></div>
+          <div class="bar-card-title">📘 Résultat</div>
+          <div class="bar-line"><span>V</span><strong class="positive">Victoire</strong></div>
+          <div class="bar-line"><span>N</span><strong class="neutral">Nul</strong></div>
+          <div class="bar-line"><span>D</span><strong class="negative">Défaite</strong></div>
         </div>
 
         <div class="bar-card">
-          <div class="bar-card-title">⚔️ Adversaire</div>
-          <div class="bar-line"><span>⚽ But Adverse Avec Passeur</span><strong class="negative">−1</strong></div>
-          <div class="bar-line"><span>⚽ But Adverse Sans Passeur</span><strong class="negative">−0.6667</strong></div>
-          <div class="bar-line"><span>🥅 CSC / Erreur Équipe Analysée</span><strong class="negative">−0.3333</strong></div>
+          <div class="bar-card-title">📈 Tendance</div>
+          <div class="bar-line"><span>Niveau Match</span><strong>Buts Marqués − Buts Encaissés</strong></div>
+          <div class="bar-line"><span>Tendance</span><strong>Match Récent − Match Précédent</strong></div>
+          <div class="bar-line"><span>0-0</span><strong>Minute 1</strong></div>
+        </div>
+
+        <div class="bar-card">
+          <div class="bar-card-title">⏱️ Comparaison</div>
+          <div class="bar-line"><span>Temps</span><strong>Moyenne Des Minutes Des Buts</strong></div>
+          <div class="bar-line"><span>Prend Le Dessus</span><strong>Tendance La Plus Tardive</strong></div>
+          <div class="bar-line"><span>Tendance X</span><strong>X Tendances · X+1 Matchs</strong></div>
         </div>
       </div>
     </details>
@@ -10927,9 +10943,7 @@
       const primary = profile?.primaryResult;
       const secondary = profile?.secondaryResult;
       if (!primary) return "—";
-      return secondary
-        ? `${primary.style} (${primary.label}) · secondaire ${secondary.style} (${secondary.label})`
-        : `${primary.style} (${primary.label})`;
+      return secondary ? `${primary.style} · ${secondary.style}` : `${primary.style}`;
     }
 
     function renderTrendWinner(result) {
@@ -10939,7 +10953,7 @@
         <div class="dominance-box ${isTie ? "" : "dominance-win"}">
           <div class="dominance-label">👑 Gagnant Tendance</div>
           <div class="dominance-team">${esc(winner.label || "Indisponible")}</div>
-          <div class="dominance-meta">Score performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · écart ${esc(formatValue(winner.diff))}` : ""}</div>
+          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · écart ${esc(formatValue(winner.diff))}` : ""}</div>
         </div>
       `;
     }
@@ -10959,7 +10973,7 @@
           <div class="mini-values">
             <div class="mini-badge"><span>Performance</span><strong class="${valueClass(score)}">${esc(formatValue(score))}</strong></div>
             <div class="mini-badge"><span>Résultat</span><strong>${esc(trendResultText(trend))}</strong></div>
-            <div class="mini-badge"><span>Tendances prises</span><strong>${esc(trend.dominantCount || 0)}/${esc((team.trend?.items || []).length)}</strong></div>
+            <div class="mini-badge"><span>Tendances Prises</span><strong>${esc(trend.dominantCount || 0)}/${esc((team.trend?.items || []).length)}</strong></div>
           </div>
         </div>
       `;
@@ -10971,8 +10985,8 @@
         <section class="summary">
           <div class="summary-head">
             <div class="summary-head-top">
-              <div class="summary-label">Résumé tendance</div>
-              <div class="summary-label summary-mode">Mode scan : ${esc(result.simultaneousMode ? "Simultané" : "Séparé")}</div>
+              <div class="summary-label">Résumé Tendance</div>
+              <div class="summary-label summary-mode">Mode Scan : ${esc(result.simultaneousMode ? "Simultané" : "Séparé")}</div>
             </div>
             <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
           </div>
@@ -11001,29 +11015,34 @@
       const score = Number(trend.performanceScore || 0);
       const tone = score > 0 ? "team-card-pos" : (score < 0 ? "team-card-neg" : "team-card-neutral");
       const items = trend.items || [];
+      const sideClass = side === "Domicile" ? "side-home" : "side-away";
       return `
-        <section class="team-card ${tone}">
-          <div class="team-head">
-            <div class="team-logo"><img src="${logoUrl(team.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${team.id}" onerror="__logoErr(this)" /></div>
-            <div>
-              <div class="team-side">${esc(side)}</div>
-              <div class="team-name">${esc(team.name || "—")}</div>
-              <div class="team-meta">${esc(items.length)} tendance${items.length > 1 ? "s" : ""} · ${esc((team.trendMatches || []).length)} matchs</div>
+        <section class="team-card ${side === "Domicile" ? "team-card-home" : "team-card-away"} ${tone}">
+          <div class="team-hero">
+            <div class="side-pill ${sideClass}">${esc(String(side || "").toUpperCase())}</div>
+            <div class="team-header-line">
+              <div class="logo-m">
+                <img src="${logoUrl(team.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${team.id}" onerror="__logoErr(this)" />
+              </div>
+              <div>
+                <div class="team-name">${esc(String(team.name || "—").toUpperCase())}</div>
+                <div class="team-meta">${esc(items.length)} Tendance${items.length > 1 ? "s" : ""} · ${esc((team.trendMatches || []).length)} Matchs</div>
+                ${renderTeamDataIssueWarning(team)}
+              </div>
             </div>
           </div>
-          ${renderTeamDataIssueWarning(team)}
-          <div class="rank-grid one">
+          <div class="rank-grid ${true ? "" : "one"}">
             <div class="rank-card">
-              <div class="rank-label">Score Performance</div>
+              <div class="rank-label">Performance</div>
               <div class="rank-value ${valueClass(score)}">${esc(formatValue(score))}</div>
             </div>
             <div class="rank-card">
-              <div class="rank-label">Score Résultat</div>
-              <div class="rank-value neutral">${esc(trendResultText(trend))}</div>
+              <div class="rank-label">Résultat</div>
+              <div class="rank-value neutral trend-result-value">${esc(trendResultText(trend))}</div>
             </div>
           </div>
           <div class="section">
-            <div class="section-title">Tendances comparées</div>
+            <div class="section-title">Tendances Comparées</div>
             <div class="trend-comparison-stack">
               ${items.map(renderTrendItem).join("")}
             </div>
@@ -11036,7 +11055,7 @@
     function renderTrendItem(item) {
       const tone = trendItemToneClass(item);
       const dominant = item.dominant ? "is-dominant" : "";
-      const domText = item.dominant ? "PREND LE DESSUS" : "comparée";
+      const domText = item.dominant ? "PREND LE DESSUS" : "COMPARÉE";
       return `
         <div class="trend-row">
           <div class="trend-row-head">
@@ -11044,9 +11063,9 @@
             <div class="trend-row-badge ${tone}">${esc(domText)}</div>
           </div>
           <div class="trend-mini ${dominant} ${tone}">
-            <div class="trend-score-line"><span>${esc(item.resultStyle)} · ${esc(item.resultLabel)}</span><strong class="${tone}">${esc(formatValue(item.value))}</strong></div>
-            <div class="trend-match-line">${esc(item.previousMatch?.label || "Match précédent")} → ${esc(item.recentMatch?.label || "Match récent")}</div>
-            <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · moyenne minutes ${esc(formatRank(item.averageMinute))}</div>
+            <div class="trend-score-line"><span>${esc(item.resultStyle || "N")}</span><strong class="${tone}">${esc(formatValue(item.value))}</strong></div>
+            <div class="trend-match-line">${esc(item.previousMatch?.label || "Match Précédent")} → ${esc(item.recentMatch?.label || "Match Récent")}</div>
+            <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}</div>
           </div>
         </div>
       `;
@@ -11098,7 +11117,7 @@
           <div class="summary-head">
             <div class="summary-head-top">
               <div class="summary-label">Résumé rapide</div>
-              <div class="summary-label summary-mode">Mode scan : ${result.simultaneousMode ? "Simultané" : "Séparé"}</div>
+              <div class="summary-label summary-mode">Mode Scan : ${result.simultaneousMode ? "Simultané" : "Séparé"}</div>
             </div>
             <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
           </div>
@@ -11354,7 +11373,7 @@
     function renderTrendMatches(matchesUsed) {
       const matchRows = (matchesUsed || []).map((match, index) => {
         const hasIssue = Boolean(match.eventDataIssue);
-        const issueText = hasIssue ? `<span class="event-data-issue-label">événements non récupérés</span>` : "";
+        const issueText = hasIssue ? `<span class="event-data-issue-label">Événements Non Récupérés</span>` : "";
         const assistBadge = match.assistDataStatus === "assist-found"
           ? `<span class="assist-data-badge ok">A✔️</span>`
           : `<span class="assist-data-badge warn">A❌️</span>`;
@@ -11366,16 +11385,21 @@
             </div>
             <div class="row-main">
               <div class="row-title match-title-with-badges">${esc(match.label)}${assistBadge}${issueText}</div>
-              <div class="row-sub">${esc(match.competition || "Toutes compétitions")} · niveau ${esc(formatValue(match.trendLevel))} · moyenne minute ${esc(formatRank(match.trendAverageMinute))}</div>
+              <div class="row-sub">${esc(match.competition || "Toutes Compétitions")} · Niveau ${esc(formatValue(match.trendLevel))} · Moyenne Minute ${esc(formatRank(match.trendAverageMinute))}</div>
             </div>
           </div>
         `;
       }).join("");
       return `
-        <div class="section">
-          <div class="section-title">Matchs Utilisés <span class="count-pill">${esc((matchesUsed || []).length)}</span></div>
-          <div class="match-list">${matchRows || "Aucun match trouvé."}</div>
-        </div>
+        <details class="clean events-details trend-matches-details">
+          <summary class="events-summary">
+            <span class="events-summary-label">Matchs Utilisés</span>
+            <span class="count-pill events-count-pill">${esc((matchesUsed || []).length)}</span>
+          </summary>
+          <div class="section">
+            <div class="match-list">${matchRows || "Aucun Match Trouvé."}</div>
+          </div>
+        </details>
       `;
     }
 
@@ -11595,7 +11619,7 @@
       const lines = [];
 
       lines.push("VALEUR DE RECHERCHE");
-      lines.push(`Mode scan : ${entry.result?.scanModeLabel || (entry.result?.simultaneousMode ? "simultané lié: mêmes rangs" : "standard")}`);
+      lines.push(`Mode Scan : ${entry.result?.scanModeLabel || (entry.result?.simultaneousMode ? "simultané lié: mêmes rangs" : "standard")}`);
 
       if (!calc) {
         lines.push("Calculateur : non enregistré sur cette analyse.");
