@@ -9754,7 +9754,77 @@
     .trend-row-title, .trend-row-badge, .trend-score-line, .trend-match-line, .trend-row-sub { text-transform: none; }
     .bar-box summary { text-transform: uppercase; }
 
-  </style>
+  
+
+    /* v151 : résumé tendance — labels gauche/droite + VS parfaitement centré */
+    body .result-shell .summary-head-top {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 10px !important;
+      width: 100% !important;
+      margin: 0 0 20px !important;
+      padding: 0 clamp(6px, 1.8vw, 14px) !important;
+    }
+
+    body .result-shell .summary-head-top .summary-label,
+    body .result-shell .summary-head-top .summary-mode {
+      margin: 0 !important;
+      width: auto !important;
+      max-width: 48% !important;
+      flex: 0 1 auto !important;
+      white-space: nowrap !important;
+      text-align: center !important;
+      font-size: clamp(11px, 3.05vw, 14px) !important;
+      line-height: 1 !important;
+      padding: .68em 1.05em !important;
+    }
+
+    body .result-shell .summary-head-top .summary-mode {
+      margin-left: auto !important;
+    }
+
+    body .result-shell .summary-title.summary-title-stacked {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 9px !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 auto !important;
+      padding: 0 8px !important;
+      text-align: center !important;
+      overflow: visible !important;
+    }
+
+    body .result-shell .summary-team-title {
+      display: block !important;
+      width: 100% !important;
+      text-align: center !important;
+      line-height: .96 !important;
+      letter-spacing: -0.045em !important;
+    }
+
+    body .result-shell .summary-title.summary-title-stacked .vs-echo {
+      align-self: center !important;
+      justify-self: center !important;
+      margin: 0 auto !important;
+      transform: translateX(0) !important;
+      left: auto !important;
+      right: auto !important;
+      text-align: center !important;
+    }
+
+    @media (max-width: 390px) {
+      body .result-shell .summary-head-top { gap: 7px !important; padding-inline: 2px !important; }
+      body .result-shell .summary-head-top .summary-label,
+      body .result-shell .summary-head-top .summary-mode {
+        font-size: clamp(10px, 2.78vw, 12px) !important;
+        padding: .62em .78em !important;
+      }
+    }
+</style>
 </head>
 
 <body>
@@ -10952,11 +11022,17 @@
     function renderTrendWinner(result) {
       const winner = result?.trendWinner || {};
       const isTie = winner.type === "tie";
+      const confColors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
+      const confetti = isTie ? "" : Array.from({ length: 20 }, (_, i) => `
+        <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
+      `).join("");
       return `
         <div class="dominance-box ${isTie ? "" : "dominance-win"}">
-          <div class="dominance-label">👑 Gagnant Tendance</div>
-          <div class="dominance-team">${esc(winner.label || "Indisponible")}</div>
-          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · écart ${esc(formatValue(winner.diff))}` : ""}</div>
+          ${isTie ? "" : `<div class="status-confetti" aria-hidden="true">${confetti}</div>`}
+          ${isTie ? "" : `<div class="dominance-trophy" aria-hidden="true">🏆</div>`}
+          <div class="dominance-label">👑 GAGNANT TENDANCE</div>
+          <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
+          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}</div>
         </div>
       `;
     }
@@ -10991,7 +11067,11 @@
               <div class="summary-label">Résumé Tendance</div>
               <div class="summary-label summary-mode">Mode Scan : ${esc(result.simultaneousMode ? "Simultané" : "Séparé")}</div>
             </div>
-            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+            <div class="summary-title summary-title-stacked">
+              <span class="summary-team-title summary-team-title-home">${esc(String(match.homeTeam.name || "").toUpperCase())}</span>
+              <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span>
+              <span class="summary-team-title summary-team-title-away">${esc(String(match.awayTeam.name || "").toUpperCase())}</span>
+            </div>
           </div>
           ${renderTrendWinner(result)}
           <div class="summary-grid">
@@ -11122,7 +11202,11 @@
               <div class="summary-label">Résumé rapide</div>
               <div class="summary-label summary-mode">Mode Scan : ${result.simultaneousMode ? "Simultané" : "Séparé"}</div>
             </div>
-            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+            <div class="summary-title summary-title-stacked">
+              <span class="summary-team-title summary-team-title-home">${esc(String(match.homeTeam.name || "").toUpperCase())}</span>
+              <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span>
+              <span class="summary-team-title summary-team-title-away">${esc(String(match.awayTeam.name || "").toUpperCase())}</span>
+            </div>
           </div>
 
           ${renderDominance(result)}
@@ -12043,6 +12127,163 @@
       updateReportCount();
       $("reportHint").textContent = "Rapport vidé.";
     }
+
+
+    /* v151 : Rapport De Session compatible système Tendance */
+    const __fsOldSearchValueLinesV151 = searchValueLines;
+    const __fsOldDominanceLinesV151 = dominanceLines;
+    const __fsOldTeamCompactLineV151 = teamCompactLine;
+    const __fsOldEntryToSimpleTextV151 = entryToSimpleText;
+    const __fsOldEntryToTextV151 = entryToText;
+
+    function trendResultLettersV151(profile) {
+      return trendResultText(profile || {});
+    }
+
+    function trendModeLabelV151(result) {
+      return result?.scanModeLabel || (result?.simultaneousMode ? "Tendance Simultanée" : "Tendance Séparée");
+    }
+
+    function trendWinnerLinesV151(result, compact = false) {
+      const winner = result?.trendWinner || {};
+      if (!winner || winner.type === "tie") {
+        return ["👑 GAGNANT TENDANCE : Égalité"];
+      }
+      const base = `👑 GAGNANT TENDANCE : ${winner.label || "Indisponible"}`;
+      const meta = `Performance : ${formatValue(winner.score)}${winner.diff != null ? ` · Écart : ${formatValue(winner.diff)}` : ""}`;
+      return compact ? [`${base} · ${meta}`] : [base, meta];
+    }
+
+    function trendConfigLinesV151(entry, compact = false) {
+      const result = entry?.result || {};
+      const trendCount = Number(result.trendCount || entry?.autoSearch?.trendCount || 0);
+      const matchesNeeded = Number(result.trendMatchesNeeded || entry?.autoSearch?.matchesNeeded || (trendCount + 1));
+      if (compact) {
+        return [`Tendance : ${trendCount} · Matchs nécessaires : ${matchesNeeded} · Mode : ${trendModeLabelV151(result)}`];
+      }
+      return [
+        "VALEUR DE RECHERCHE",
+        `Mode Scan : ${trendModeLabelV151(result)}`,
+        `Tendances : ${trendCount}`,
+        `Derniers Matchs : ${matchesNeeded}`,
+        `Ignorer Domicile : ${entry.skipHome}`,
+        `Ignorer Extérieur : ${entry.skipAway}`,
+      ];
+    }
+
+    searchValueLines = function(entry, compact = false) {
+      if (entry?.result?.trendMode) {
+        return trendConfigLinesV151(entry, compact);
+      }
+      return __fsOldSearchValueLinesV151(entry, compact);
+    };
+
+    dominanceLines = function(result, compact = false) {
+      if (result?.trendMode) {
+        return trendWinnerLinesV151(result, compact);
+      }
+      return __fsOldDominanceLinesV151(result, compact);
+    };
+
+    function trendTeamLineV151(team, side, compact = false) {
+      const trend = team?.trend || {};
+      const perf = formatValue(trend.performanceScore);
+      const res = trendResultLettersV151(trend);
+      const taken = `${trend.dominantCount || 0}/${(trend.items || []).length}`;
+      if (compact) {
+        return `${side} : ${team?.name || "—"} · Performance ${perf} · Résultat ${res} · Tendances prises ${taken}`;
+      }
+      return [
+        `${String(side || "").toUpperCase()} — ${team?.name || "—"}`,
+        `Performance : ${perf}`,
+        `Résultat : ${res}`,
+        `Tendances prises : ${taken}`,
+        `Matchs utilisés : ${(team?.matchesUsed || []).length}`,
+      ];
+    }
+
+    teamCompactLine = function(team, rank1, rank2) {
+      if (team?.trend) {
+        return trendTeamLineV151(team, "Équipe", true).replace(/^Équipe : /, "");
+      }
+      return __fsOldTeamCompactLineV151(team, rank1, rank2);
+    };
+
+    function trendItemsLinesV151(team) {
+      const items = team?.trend?.items || [];
+      if (!items.length) return ["Tendances comparées : aucune tendance affichée."];
+      const lines = ["Tendances comparées :"];
+      for (const item of items) {
+        const state = item.dominant ? "prise" : "comparée";
+        lines.push(`- Tendance ${item.index} · ${state} · ${item.resultStyle || "N"} · ${formatValue(item.value)} · ${item.previousMatch?.label || "Match précédent"} → ${item.recentMatch?.label || "Match récent"} · Moyenne Minutes ${formatRank(item.averageMinute)}`);
+      }
+      return lines;
+    }
+
+    function trendMatchesLinesV151(team) {
+      const matches = team?.matchesUsed || [];
+      if (!matches.length) return ["Matchs utilisés : aucun match affiché."];
+      const lines = [`Matchs utilisés : ${matches.length}`];
+      matches.forEach((match, index) => {
+        const assist = match.assistDataStatus === "assist-found" ? "A✔️" : "A❌️";
+        lines.push(`- ${index + 1}. ${match.label || "Match"} · ${assist} · Niveau ${formatValue(match.trendLevel)} · Moyenne Minute ${formatRank(match.trendAverageMinute)} · ${match.competition || "Toutes Compétitions"}`);
+      });
+      return lines;
+    }
+
+    entryToSimpleText = function(entry, index) {
+      const result = entry?.result;
+      if (!result?.trendMode) return __fsOldEntryToSimpleTextV151(entry, index);
+
+      const match = result.match;
+      const date = new Date(entry.createdAt).toLocaleString("fr-FR");
+      const lines = [];
+      lines.push(`ANALYSE ${index + 1}`);
+      lines.push(`${date}`);
+      lines.push(`${match.homeTeam.name} vs ${match.awayTeam.name}`);
+      lines.push(...trendConfigLinesV151(entry, true));
+      lines.push(...trendWinnerLinesV151(result, true));
+      lines.push(trendTeamLineV151(result.home, "Domicile", true));
+      lines.push(trendTeamLineV151(result.away, "Extérieur", true));
+      lines.push("────────────────────────");
+      lines.push("");
+      return lines.join("\n");
+    };
+
+    entryToText = function(entry, index) {
+      const result = entry?.result;
+      if (!result?.trendMode) return __fsOldEntryToTextV151(entry, index);
+
+      const match = result.match;
+      const date = new Date(entry.createdAt).toLocaleString("fr-FR");
+      const lines = [];
+      lines.push(`ANALYSE ${index + 1}`);
+      lines.push(`Date : ${date}`);
+      lines.push(`Match : ${match.homeTeam.name} vs ${match.awayTeam.name}`);
+      lines.push("");
+      lines.push(...trendConfigLinesV151(entry));
+      lines.push("");
+      lines.push(...trendWinnerLinesV151(result));
+      lines.push("");
+      lines.push(...trendTeamLineV151(result.home, "Domicile"));
+      lines.push(...trendItemsLinesV151(result.home));
+      lines.push(...trendMatchesLinesV151(result.home));
+      lines.push("");
+      lines.push(...trendTeamLineV151(result.away, "Extérieur"));
+      lines.push(...trendItemsLinesV151(result.away));
+      lines.push(...trendMatchesLinesV151(result.away));
+      lines.push("");
+      lines.push("LEXIQUE");
+      lines.push("V = Victoire · N = Nul · D = Défaite");
+      lines.push("Performance = somme exacte des tendances prises.");
+      lines.push("Tendance = niveau du match récent - niveau du match précédent.");
+      lines.push("Comparaison = la moyenne minute la plus basse prend le dessus.");
+      lines.push("0-0 = événement neutre à la minute 1.");
+      lines.push("");
+      lines.push("────────────────────────");
+      lines.push("");
+      return lines.join("\n");
+    };
 
     async function handleScan() {
       const button = $("scanBtn");
