@@ -9828,7 +9828,7 @@
               </div>
             </div>
 
-            <div class="auto-formula" id="trendFormula">4 tendances · 5 derniers matchs</div>
+            <div class="auto-formula" id="trendFormula">4 Tendances · 5 Derniers Matchs</div>
 
             <input id="simultaneousMode" type="checkbox" hidden />
             <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de calcul">
@@ -10318,7 +10318,7 @@
       if ($("rank1")) $("rank1").value = String(trend);
       if ($("rank2")) $("rank2").value = "";
       if ($("trendFormula")) {
-        $("trendFormula").textContent = `${trend} tendance${trend > 1 ? "s" : ""} · ${trend + 1} derniers matchs`;
+        $("trendFormula").textContent = `${trend} Tendance${trend > 1 ? "s" : ""} · ${trend + 1} Derniers Matchs`;
       }
       updateRangeGradientFill();
     }
@@ -10343,7 +10343,7 @@
 
     function formulaTextForCalc(calc) {
       const trend = Number(calc?.trendCount || getTrendCount());
-      return `${trend} tendance${trend > 1 ? "s" : ""} · ${trend + 1} derniers matchs`;
+      return `${trend} Tendance${trend > 1 ? "s" : ""} · ${trend + 1} Derniers Matchs`;
     }
 
     function updateAutoCalculator() {
@@ -10529,7 +10529,7 @@
       box.innerHTML = `
         <div class="status-selection-wrap">
           <div class="status-selection-label">TENDANCE SÉLECTIONNÉE</div>
-          <div class="status-selection-value">${esc(trend)} tendance${trend > 1 ? "s" : ""} · ${esc(trend + 1)} matchs</div>
+          <div class="status-selection-value">${esc(trend)} Tendance${trend > 1 ? "s" : ""} · ${esc(trend + 1)} Matchs</div>
         </div>
       `;
     }
