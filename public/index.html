@@ -10256,6 +10256,75 @@
         gap: 8px !important;
       }
     }
+
+
+    /* v157 : RÉGLAGES strictement aligné sur RAPPORT + LEXIQUE ouvert sans bande */
+    body .settings-panel {
+      position: relative !important;
+      overflow: hidden !important;
+      box-shadow: var(--shadow) !important;
+    }
+
+    /* On neutralise les anciens liserés spécifiques de RÉGLAGES */
+    body .settings-panel::before {
+      display: none !important;
+      content: none !important;
+    }
+
+    /* RÉGLAGES : exactement le même liseré haut que RAPPORT DE SESSION */
+    body .settings-panel::after {
+      content: "" !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 18px !important;
+      right: 18px !important;
+      height: 2.5px !important;
+      border-radius: 0 0 999px 999px !important;
+      pointer-events: none !important;
+      z-index: 3 !important;
+      opacity: .66 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v113-purple-edge-soft) 0%,
+        var(--fs-v113-purple-edge) 18%,
+        var(--fs-v113-blue-center-soft) 38%,
+        var(--fs-v113-blue-center) 50%,
+        var(--fs-v113-blue-center-soft) 62%,
+        var(--fs-v113-purple-edge) 82%,
+        var(--fs-v113-purple-edge-soft) 100%
+      ) !important;
+    }
+
+    body .settings-panel .settings-head {
+      border-bottom: 1px solid var(--line) !important;
+      box-shadow: none !important;
+    }
+
+    /* LEXIQUE déroulé : pas de bande entre l'en-tête et le contenu, espace propre avant Résultat */
+    body .bar-box[open] > summary {
+      border-bottom: 0 !important;
+      box-shadow: none !important;
+      margin-bottom: 0 !important;
+    }
+
+    body .bar-box[open] .bar-grid {
+      border-top: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      margin-top: 0 !important;
+      padding-top: 34px !important;
+    }
+
+    body .bar-box[open] .bar-card:first-child {
+      margin-top: 0 !important;
+    }
+
+    @media (max-width: 520px) {
+      body .bar-box[open] .bar-grid {
+        padding-top: 36px !important;
+      }
+    }
 </style>
 </head>
 
