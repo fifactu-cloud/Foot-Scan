@@ -10103,6 +10103,159 @@
       }
     }
 
+
+
+    /* v156 : correction finale rendu LEXIQUE/RÉGLAGES + anti-débordement horizontal */
+    html,
+    body {
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+    }
+
+    .app,
+    .hero,
+    .panel,
+    .report-panel,
+    .summary,
+    .team-card,
+    .bar-box,
+    .auto-box,
+    .settings-panel,
+    .settings-body,
+    .report-body,
+    .bar-grid,
+    .bar-card {
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    .settings-panel {
+      position: relative !important;
+      overflow: hidden !important;
+    }
+
+    /* RÉGLAGES : même logique de liseré haut que RAPPORT DE SESSION */
+    .settings-panel::before {
+      display: none !important;
+      content: none !important;
+    }
+
+    .settings-panel::after {
+      content: "" !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 22px !important;
+      right: 22px !important;
+      height: 2px !important;
+      border-radius: 0 0 999px 999px !important;
+      pointer-events: none !important;
+      z-index: 4 !important;
+      opacity: .62 !important;
+      filter: saturate(.86) blur(.22px) !important;
+      box-shadow: 0 0 10px rgba(64,201,255,.08), 0 0 12px rgba(251,113,133,.055) !important;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(236,72,153,.22) 13%,
+        rgba(64,201,255,.50) 50%,
+        rgba(236,72,153,.22) 87%,
+        transparent 100%) !important;
+    }
+
+    .settings-panel .settings-head {
+      border-bottom: 1px solid rgba(148, 163, 184, .18) !important;
+    }
+
+    /* LEXIQUE : état fermé propre, état ouvert plus aéré, sans bande parasite */
+    .bar-box {
+      position: relative !important;
+      overflow: hidden !important;
+      contain: paint !important;
+    }
+
+    .bar-box > summary {
+      width: 100% !important;
+      min-height: 74px !important;
+      margin: 0 !important;
+      padding: 18px 18px !important;
+      border: 0 !important;
+      border-bottom: 0 !important;
+      box-shadow: none !important;
+      background: linear-gradient(135deg, rgba(56,189,248,.13), rgba(255,255,255,.018)) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 8px !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+
+    .bar-box > summary::before,
+    .bar-box > summary::after {
+      flex: 0 0 auto !important;
+    }
+
+    .bar-box[open] > summary {
+      border-bottom: 1px solid rgba(148, 163, 184, .16) !important;
+      margin-bottom: 0 !important;
+      box-shadow: none !important;
+    }
+
+    .bar-box[open] .bar-grid {
+      padding: 26px 16px 18px !important;
+      gap: 14px !important;
+      background: transparent !important;
+      border-top: 0 !important;
+      box-shadow: none !important;
+      animation: none !important;
+    }
+
+    .bar-box[open] .bar-card:first-child {
+      margin-top: 0 !important;
+    }
+
+    .bar-card {
+      min-width: 0 !important;
+      overflow: hidden !important;
+    }
+
+    .bar-line {
+      display: grid !important;
+      grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr) !important;
+      align-items: center !important;
+      gap: 10px !important;
+      min-width: 0 !important;
+    }
+
+    .bar-line span,
+    .bar-line strong {
+      min-width: 0 !important;
+      max-width: 100% !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+      word-break: normal !important;
+    }
+
+    .bar-line strong {
+      text-align: right !important;
+    }
+
+    @media (max-width: 520px) {
+      .bar-box > summary {
+        min-height: 72px !important;
+        padding: 17px 14px !important;
+      }
+
+      .bar-box[open] .bar-grid {
+        padding: 28px 14px 18px !important;
+        gap: 14px !important;
+      }
+
+      .bar-line {
+        grid-template-columns: minmax(0, .74fr) minmax(0, 1.26fr) !important;
+        gap: 8px !important;
+      }
+    }
 </style>
 </head>
 
