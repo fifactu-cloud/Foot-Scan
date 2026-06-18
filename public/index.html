@@ -9725,6 +9725,26 @@
       letter-spacing: .01em;
     }
 
+
+    /* v144 — nouveau système Tendance */
+    .trend-only-grid { grid-template-columns: 1fr !important; }
+    .trend-control { max-width: 100%; }
+    .trend-comparison-stack { display: grid; gap: 12px; margin-top: 16px; }
+    .trend-row { border: 1px solid rgba(148, 163, 184, .20); background: rgba(15, 23, 42, .54); border-radius: 18px; padding: 12px; }
+    .trend-row-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:10px; }
+    .trend-row-title { font-weight: 950; letter-spacing: .05em; color: #e5e7eb; }
+    .trend-row-badge { font-size:.74rem; font-weight:950; padding:6px 9px; border-radius:999px; background: rgba(59,130,246,.14); border: 1px solid rgba(59,130,246,.24); color:#bfdbfe; white-space:nowrap; }
+    .trend-row-badge.negative { background: rgba(244,63,94,.13); border-color: rgba(244,63,94,.24); color:#fecdd3; }
+    .trend-row-badge.neutral { background: rgba(148,163,184,.12); border-color: rgba(148,163,184,.20); color:#cbd5e1; }
+    .trend-row-sub { font-size:.79rem; color:#cbd5e1; line-height:1.45; }
+    .trend-pair { display:grid; gap:8px; }
+    .trend-mini { display:grid; gap:5px; padding:10px; border-radius:16px; background:rgba(2,6,23,.28); border:1px solid rgba(148,163,184,.14); }
+    .trend-mini.is-dominant { border-color: rgba(59,130,246,.34); box-shadow: 0 0 0 1px rgba(59,130,246,.12) inset; }
+    .trend-mini.negative.is-dominant { border-color: rgba(244,63,94,.32); box-shadow: 0 0 0 1px rgba(244,63,94,.10) inset; }
+    .trend-match-line { color:#cbd5e1; font-size:.78rem; line-height:1.35; }
+    .trend-score-line { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.82rem; font-weight:900; color:#e5e7eb; }
+    @media (min-width: 820px) { .trend-pair { grid-template-columns: 1fr 1fr; } }
+
   </style>
 </head>
 
@@ -9789,104 +9809,38 @@
           <input id="matchInput" placeholder="Ex: 14023959 ou lien WEB" />
         </div>
 
-        <div class="auto-box">
+        <div class="auto-box trend-box">
           <div class="auto-head">
             <div>
-              <div class="auto-title">CALCUL GUIDÉ DES RANGS</div>
-              <div class="auto-sub" aria-hidden="true"></div>
+              <div class="auto-title">TENDANCE</div>
+              <div class="auto-sub">Nombre de tendances à comparer</div>
             </div>
           </div>
 
           <div class="auto-body">
-            <div class="preset-box">
-              <div class="preset-title">
-                <span>Présélections</span>
-                <span id="activePresetLabel">Libre</span>
-              </div>
-              <div class="preset-actions">
-                <button class="preset-btn official" id="officialPresetBtn" type="button">🏆 CLUBS/PAYS OFFICIELS<small>Base 62,625 · Progression 1 · Changements 7</small></button>
-                <button class="preset-btn friendly" id="friendlyPresetBtn" type="button">🤝 PAYS AMICAUX<small>Base 62,625 · Progression 1 · Changements 13</small></button>
+            <div class="auto-grid trend-only-grid">
+              <div class="auto-control trend-control">
+                <div class="auto-control-top">
+                  <div class="auto-control-title">Tendance</div>
+                  <input id="trendNumber" class="auto-number" type="number" min="1" max="100" step="1" value="4" />
+                </div>
+                <input id="trendRange" type="range" min="1" max="100" step="1" value="4" />
               </div>
             </div>
 
-            <div class="auto-grid">
-              <div class="auto-control">
-                <div class="auto-control-top">
-                  <div class="auto-control-title">Base</div>
-                  <input id="autoBaseNumber" class="auto-number" type="number" min="0" max="1000" step="0.0001" value="62.625" />
-                </div>
-                <input id="autoBaseRange" type="range" min="0" max="1000" step="0.0001" value="62.625" />
-              </div>
+            <div class="auto-formula" id="trendFormula">4 tendances · 5 derniers matchs</div>
 
-              <div class="auto-control">
-                <div class="auto-control-top">
-                  <div class="auto-control-title">Progression</div>
-                  <input id="autoAdvanceNumber" class="auto-number" type="number" min="0.0001" max="5" step="0.0001" value="1" />
-                </div>
-                <input id="autoAdvanceRange" type="range" min="0.0001" max="5" step="0.0001" value="1" />
-              </div>
-
-              <div class="auto-control">
-                <div class="auto-control-top">
-                  <div class="auto-control-title">Changements</div>
-                  <input id="autoChangeNumber" class="auto-number" type="number" min="0" max="22" step="0.5" value="3" />
-                </div>
-                <input id="autoChangeRange" type="range" min="0" max="22" step="0.5" value="3" />
-              </div>
-            </div>
-
+            <input id="simultaneousMode" type="checkbox" hidden />
             <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de calcul">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
               <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">CALCUL SÉPARÉ</button>
               <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">CALCUL SIMULTANÉ</button>
             </div>
-
-            <div class="auto-result">
-              <div class="auto-result-card">
-                <div class="auto-result-label">Rang Bas</div>
-                <div class="auto-result-value" id="autoLow">13.40625</div>
-              </div>
-
-              <div class="auto-result-card">
-                <div class="auto-result-label">Rang Haut</div>
-                <div class="auto-result-value" id="autoHigh">17.90625</div>
-              </div>
-            </div>
-
-            <div class="auto-formula" id="autoFormula"></div>
-
-            <label class="mode-toggle" for="simultaneousMode">
-              <input id="simultaneousMode" type="checkbox" />
-              <span>Calcul Simultané : les deux équipes sont parcourues en parallèle, match par match puis minute par minute.</span>
-            </label>
-
-            <label class="mode-toggle" for="performanceAdvanceMode">
-              <input id="performanceAdvanceMode" type="checkbox" />
-              <span>Progression = Valeur De Performance : But Avec Passeur 1, But Sans Passeur 0,6667, CSC / Erreur 0,3333.</span>
-            </label>
-
-            <label class="mode-toggle" for="evolutionWinnerMode">
-              <input id="evolutionWinnerMode" type="checkbox" />
-              <span>Gagnant Par Meilleure Évolution : comparaison de la Moyenne De Zone vers la Moyenne Des Deux Rangs.</span>
-            </label>
-
-            <button class="auto-apply-btn" id="applyAutoRanksBtn" type="button">
-              APPLIQUER LES RANGS
-            </button>
           </div>
         </div>
 
-        <div class="two">
-          <div>
-            <label for="rank1">Rang 1</label>
-            <input id="rank1" placeholder="Ex: 51" inputmode="decimal" />
-          </div>
-
-          <div>
-            <label for="rank2">Rang 2 Optionnel</label>
-            <input id="rank2" placeholder="Ex: 75 ou vide" inputmode="decimal" />
-          </div>
-        </div>
+        <input id="rank1" type="hidden" value="4" />
+        <input id="rank2" type="hidden" value="" />
 
         <div class="two">
           <div>
@@ -10351,79 +10305,61 @@
       return `${formatRank(step)} Par Événement`;
     }
 
+    function getTrendCount() {
+      const raw = Number(String($("trendNumber")?.value || $("trendRange")?.value || "4").replace(",", "."));
+      if (!Number.isFinite(raw)) return 4;
+      return Math.max(1, Math.min(100, Math.round(raw)));
+    }
+
+    function updateTrendUI() {
+      const trend = getTrendCount();
+      if ($("trendNumber")) $("trendNumber").value = String(trend);
+      if ($("trendRange")) $("trendRange").value = String(trend);
+      if ($("rank1")) $("rank1").value = String(trend);
+      if ($("rank2")) $("rank2").value = "";
+      if ($("trendFormula")) {
+        $("trendFormula").textContent = `${trend} tendance${trend > 1 ? "s" : ""} · ${trend + 1} derniers matchs`;
+      }
+      updateRangeGradientFill();
+    }
+
     function calculateAutoRanks() {
+      const trend = getTrendCount();
       return {
-        ...calculateRanksFromValues(getAutoValues()),
-        mode: "single",
-        presetLabel: activePreset,
-        rankEventMode: isPerformanceAdvanceMode() ? "performance" : "fixed",
-        winnerMode: isEvolutionWinnerMode() ? "evolution" : "dominance",
+        mode: "trend",
+        presetLabel: "Tendance",
+        trendMode: true,
+        trendCount: trend,
+        matchesNeeded: trend + 1,
+        base: trend,
+        advancement: 1,
+        changes: trend,
+        low: trend,
+        high: null,
+        rankEventMode: "trend",
+        winnerMode: "trend",
       };
     }
 
     function formulaTextForCalc(calc) {
-      const modeText = isPerformanceAdvanceMode()
-        ? "Progression : Valeur De Performance"
-        : `Progression : ${formatRank(calc.advancement)} Par Événement`;
-
-      return (
-        `Base : ${formatRank(calc.base)} · ` +
-        `${modeText} · ` +
-        `Marge : ${calc.marginUnit} × ${calc.changes} = ${formatRank(calc.marginFinal)} · ` +
-        `Rangs : ${formatRank(calc.low)} / ${formatRank(calc.high)}`
-      );
+      const trend = Number(calc?.trendCount || getTrendCount());
+      return `${trend} tendance${trend > 1 ? "s" : ""} · ${trend + 1} derniers matchs`;
     }
 
     function updateAutoCalculator() {
-      const calc = calculateAutoRanks();
-      writeCalculatorValues("auto", calc);
-
-      if ($("activePresetLabel")) {
-        $("activePresetLabel").textContent = activePreset;
-      }
-
-      if ($("officialPresetBtn")) {
-        $("officialPresetBtn").classList.toggle("active", activePreset === "Clubs/Pays Officiels");
-      }
-
-      if ($("friendlyPresetBtn")) {
-        $("friendlyPresetBtn").classList.toggle("active", activePreset === "Pays Amicaux");
-      }
-
-      $("autoLow").textContent = formatRank(calc.low);
-      $("autoHigh").textContent = formatRank(calc.high);
-      $("autoFormula").textContent = formulaTextForCalc(calc);
+      updateTrendUI();
     }
 
-    function applyPreset(label) {
-      activePreset = label;
-
-      const isFriendly = label === "Pays Amicaux";
-      const advancement = "1";
-      const changes = isFriendly ? "13" : "7";
-
-      $("autoBaseNumber").value = "62.625";
-      $("autoBaseRange").value = "62.625";
-
-      $("autoAdvanceNumber").value = advancement;
-      $("autoAdvanceRange").value = advancement;
-
-      $("autoChangeNumber").value = changes;
-      $("autoChangeRange").value = changes;
-
-      updateAutoCalculator();
+    function applyPreset(_label) {
+      updateTrendUI();
     }
 
     function markPresetAsCustom() {
-      activePreset = "Libre";
+      activePreset = "Tendance";
     }
 
     function applyAutoRanks() {
-      const calc = calculateAutoRanks();
-
-      $("rank1").value = formatRank(calc.low);
-      $("rank2").value = formatRank(calc.high);
-
+      updateTrendUI();
       renderSelectedRanksStatus();
     }
 
@@ -10585,25 +10521,15 @@
 
     function renderSelectedRanksStatus() {
       const box = $("statusBox");
-      const rank1 = String($("rank1")?.value || "").trim();
-      const rank2 = String($("rank2")?.value || "").trim();
-
-      if (!rank1 && !rank2) {
-        box.classList.remove("status-selection");
-        box.innerHTML = "";
-        box.style.display = "none";
-        return;
-      }
-
-      const value = rank1 && rank2 ? `${rank1} / ${rank2}` : (rank1 || rank2);
+      const trend = getTrendCount();
 
       box.style.display = "grid";
       box.classList.remove("status-done", "status-loading", "status-fade-out");
       box.classList.add("status-selection");
       box.innerHTML = `
         <div class="status-selection-wrap">
-          <div class="status-selection-label">RANGS SÉLECTIONNÉS</div>
-          <div class="status-selection-value">${esc(value)}</div>
+          <div class="status-selection-label">TENDANCE SÉLECTIONNÉE</div>
+          <div class="status-selection-value">${esc(trend)} tendance${trend > 1 ? "s" : ""} · ${esc(trend + 1)} matchs</div>
         </div>
       `;
     }
@@ -10811,17 +10737,12 @@
 
     async function startScanJob() {
       const matchId = extractMatchId($("matchInput").value);
-      const rank1 = parseFloat(String($("rank1").value).replace(",", "."));
-      const rank2Raw = String($("rank2").value || "").trim();
-      const rank2 = rank2Raw ? parseFloat(rank2Raw.replace(",", ".")) : null;
+      const trendCount = getTrendCount();
+      const rank1 = trendCount;
+      const rank2 = null;
 
-      if (!matchId || !rank1 || rank1 <= 0) {
-        setError("Mets un Match ID ou une URL WEB, puis un rang 1 supérieur à 0.");
-        return;
-      }
-
-      if (rank2 !== null && (!rank2 || rank2 <= 0)) {
-        setError("Le rang 2 doit être vide ou supérieur à 0.");
+      if (!matchId) {
+        setError("Mets un Match ID ou une URL WEB.");
         return;
       }
 
@@ -10846,9 +10767,11 @@
           skipHome: skipHomeValue,
           skipAway: skipAwayValue,
           simultaneousMode: isSimultaneousMode(),
-          rankEventStep: scanCalc.advancement,
-          rankEventMode,
-          winnerMode,
+          rankEventStep: 1,
+          rankEventMode: "trend",
+          winnerMode: "trend",
+          trendMode: true,
+          trendCount,
         }),
       });
 
@@ -10987,11 +10910,145 @@
 
       updateHero(result.match, result);
 
+      if (result.trendMode) {
+        $("result").innerHTML = renderTrendResult(result);
+        return;
+      }
+
       $("result").innerHTML = `
         ${renderSummary(result)}
         ${renderTeam(result.home, "Domicile", result.rank1, result.rank2)}
         <div class="vs-divider ${vsEchoToneClass(result)}"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
         ${renderTeam(result.away, "Extérieur", result.rank1, result.rank2)}
+      `;
+    }
+
+    function trendResultText(profile) {
+      const primary = profile?.primaryResult;
+      const secondary = profile?.secondaryResult;
+      if (!primary) return "—";
+      return secondary
+        ? `${primary.style} (${primary.label}) · secondaire ${secondary.style} (${secondary.label})`
+        : `${primary.style} (${primary.label})`;
+    }
+
+    function renderTrendWinner(result) {
+      const winner = result?.trendWinner || {};
+      const isTie = winner.type === "tie";
+      return `
+        <div class="dominance-box ${isTie ? "" : "dominance-win"}">
+          <div class="dominance-label">👑 Gagnant Tendance</div>
+          <div class="dominance-team">${esc(winner.label || "Indisponible")}</div>
+          <div class="dominance-meta">Score performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · écart ${esc(formatValue(winner.diff))}` : ""}</div>
+        </div>
+      `;
+    }
+
+    function renderTrendSummaryCell(team) {
+      const trend = team?.trend || {};
+      const score = trend.performanceScore;
+      const cellTone = Number(score) > 0 ? "cell-pos" : (Number(score) < 0 ? "cell-neg" : "cell-neutral");
+      return `
+        <div class="summary-cell ${cellTone}">
+          <div class="summary-team-row">
+            <div class="logo-s">
+              <img src="${logoUrl(team.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${team.id}" onerror="__logoErr(this)" />
+            </div>
+            <div class="summary-team-name">${esc(String(team.name || "").toUpperCase())}</div>
+          </div>
+          <div class="mini-values">
+            <div class="mini-badge"><span>Performance</span><strong class="${valueClass(score)}">${esc(formatValue(score))}</strong></div>
+            <div class="mini-badge"><span>Résultat</span><strong>${esc(trendResultText(trend))}</strong></div>
+            <div class="mini-badge"><span>Tendances prises</span><strong>${esc(trend.dominantCount || 0)}/${esc((team.trend?.items || []).length)}</strong></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTrendResult(result) {
+      const match = result.match;
+      return `
+        <section class="summary">
+          <div class="summary-head">
+            <div class="summary-head-top">
+              <div class="summary-label">Résumé tendance</div>
+              <div class="summary-label summary-mode">Mode scan : ${esc(result.simultaneousMode ? "Simultané" : "Séparé")}</div>
+            </div>
+            <div class="summary-title">${esc(String(match.homeTeam.name || "").toUpperCase())} <span class="vs-echo ${vsEchoToneClass(result)}" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span> ${esc(String(match.awayTeam.name || "").toUpperCase())}</div>
+          </div>
+          ${renderTrendWinner(result)}
+          <div class="summary-grid">
+            ${renderTrendSummaryCell(result.home)}
+            ${renderTrendSummaryCell(result.away)}
+          </div>
+          ${renderDataQualityWarning(result)}
+        </section>
+        ${renderTrendTeam(result.home, "Domicile")}
+        <div class="vs-divider ${vsEchoToneClass(result)}"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
+        ${renderTrendTeam(result.away, "Extérieur")}
+      `;
+    }
+
+    function trendItemToneClass(item) {
+      const value = Number(item?.value || 0);
+      if (value > 0) return "positive";
+      if (value < 0) return "negative";
+      return "neutral";
+    }
+
+    function renderTrendTeam(team, side) {
+      const trend = team?.trend || {};
+      const score = Number(trend.performanceScore || 0);
+      const tone = score > 0 ? "team-card-pos" : (score < 0 ? "team-card-neg" : "team-card-neutral");
+      const items = trend.items || [];
+      return `
+        <section class="team-card ${tone}">
+          <div class="team-head">
+            <div class="team-logo"><img src="${logoUrl(team.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${team.id}" onerror="__logoErr(this)" /></div>
+            <div>
+              <div class="team-side">${esc(side)}</div>
+              <div class="team-name">${esc(team.name || "—")}</div>
+              <div class="team-meta">${esc(items.length)} tendance${items.length > 1 ? "s" : ""} · ${esc((team.trendMatches || []).length)} matchs</div>
+            </div>
+          </div>
+          ${renderTeamDataIssueWarning(team)}
+          <div class="rank-grid one">
+            <div class="rank-card">
+              <div class="rank-label">Score Performance</div>
+              <div class="rank-value ${valueClass(score)}">${esc(formatValue(score))}</div>
+            </div>
+            <div class="rank-card">
+              <div class="rank-label">Score Résultat</div>
+              <div class="rank-value neutral">${esc(trendResultText(trend))}</div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">Tendances comparées</div>
+            <div class="trend-comparison-stack">
+              ${items.map(renderTrendItem).join("")}
+            </div>
+          </div>
+          ${renderTrendMatches(team.matchesUsed || [])}
+        </section>
+      `;
+    }
+
+    function renderTrendItem(item) {
+      const tone = trendItemToneClass(item);
+      const dominant = item.dominant ? "is-dominant" : "";
+      const domText = item.dominant ? "PREND LE DESSUS" : "comparée";
+      return `
+        <div class="trend-row">
+          <div class="trend-row-head">
+            <div class="trend-row-title">Tendance ${esc(item.index)}</div>
+            <div class="trend-row-badge ${tone}">${esc(domText)}</div>
+          </div>
+          <div class="trend-mini ${dominant} ${tone}">
+            <div class="trend-score-line"><span>${esc(item.resultStyle)} · ${esc(item.resultLabel)}</span><strong class="${tone}">${esc(formatValue(item.value))}</strong></div>
+            <div class="trend-match-line">${esc(item.previousMatch?.label || "Match précédent")} → ${esc(item.recentMatch?.label || "Match récent")}</div>
+            <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · moyenne minutes ${esc(formatRank(item.averageMinute))}</div>
+          </div>
+        </div>
       `;
     }
 
@@ -11290,6 +11347,36 @@
 
     function renderZoneStats(team) {
       return "";
+    }
+
+
+
+    function renderTrendMatches(matchesUsed) {
+      const matchRows = (matchesUsed || []).map((match, index) => {
+        const hasIssue = Boolean(match.eventDataIssue);
+        const issueText = hasIssue ? `<span class="event-data-issue-label">événements non récupérés</span>` : "";
+        const assistBadge = match.assistDataStatus === "assist-found"
+          ? `<span class="assist-data-badge ok">A✔️</span>`
+          : `<span class="assist-data-badge warn">A❌️</span>`;
+        return `
+          <div class="match-row ${hasIssue ? "issue" : ""}">
+            <div class="row-number match-number-badge">
+              <span class="match-index">${index + 1}</span>
+              <span class="match-count-mini">${esc(formatValue(match.trendLevel))}</span>
+            </div>
+            <div class="row-main">
+              <div class="row-title match-title-with-badges">${esc(match.label)}${assistBadge}${issueText}</div>
+              <div class="row-sub">${esc(match.competition || "Toutes compétitions")} · niveau ${esc(formatValue(match.trendLevel))} · moyenne minute ${esc(formatRank(match.trendAverageMinute))}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+      return `
+        <div class="section">
+          <div class="section-title">Matchs Utilisés <span class="count-pill">${esc((matchesUsed || []).length)}</span></div>
+          <div class="match-list">${matchRows || "Aucun match trouvé."}</div>
+        </div>
+      `;
     }
 
     function renderTeam(team, side, rank1, rank2) {
@@ -12016,21 +12103,16 @@
       });
     }
 
-    bindCalculatorInput("autoBaseRange", "autoBaseNumber");
-    bindCalculatorInput("autoAdvanceRange", "autoAdvanceNumber");
-    bindCalculatorInput("autoChangeRange", "autoChangeNumber");
+    if ($("trendRange") && $("trendNumber")) {
+      bindRangeAndNumber("trendRange", "trendNumber", () => {
+        markPresetAsCustom();
+        updateAutoCalculator();
+        if (!currentJobId) renderSelectedRanksStatus();
+      });
+    }
 
-    $("officialPresetBtn").addEventListener("click", () => applyPreset("Clubs/Pays Officiels"));
-    $("friendlyPresetBtn").addEventListener("click", () => applyPreset("Pays Amicaux"));
-
-    $("simultaneousMode").addEventListener("change", updateAutoCalculator);
-    $("performanceAdvanceMode").addEventListener("change", updateAutoCalculator);
-    $("evolutionWinnerMode").addEventListener("change", updateAutoCalculator);
-    $("applyAutoRanksBtn").addEventListener("click", applyAutoRanks);
-    $("rank1").addEventListener("input", () => {
-      if (!currentJobId) renderSelectedRanksStatus();
-    });
-    $("rank2").addEventListener("input", () => {
+    if ($("simultaneousMode")) $("simultaneousMode").addEventListener("change", updateAutoCalculator);
+    if ($("rank1")) $("rank1").addEventListener("input", () => {
       if (!currentJobId) renderSelectedRanksStatus();
     });
 
