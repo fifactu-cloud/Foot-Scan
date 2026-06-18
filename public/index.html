@@ -10325,6 +10325,130 @@
         padding-top: 36px !important;
       }
     }
+
+
+    /* v159 : RÉGLAGES identique à RAPPORT DE SESSION + LEXIQUE déroulé propre */
+    body .settings-panel.report-panel {
+      position: relative !important;
+      overflow: hidden !important;
+      border: 1px solid var(--line) !important;
+      border-radius: 26px !important;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+        rgba(10, 15, 36, 0.90) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055) !important;
+    }
+
+    /* Même pseudo-liseré que les autres report-panel : mêmes dimensions, même arrondi, même dégradé. */
+    body .settings-panel.report-panel::before {
+      content: none !important;
+      display: none !important;
+    }
+
+    body .settings-panel.report-panel::after {
+      content: "" !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 22px !important;
+      right: 22px !important;
+      height: 2px !important;
+      border-radius: 0 0 999px 999px !important;
+      pointer-events: none !important;
+      z-index: 3 !important;
+      opacity: .68 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v113-purple-edge-soft) 0%,
+        var(--fs-v113-purple-edge) 18%,
+        var(--fs-v113-blue-center-soft) 38%,
+        var(--fs-v113-blue-center) 50%,
+        var(--fs-v113-blue-center-soft) 62%,
+        var(--fs-v113-purple-edge) 82%,
+        var(--fs-v113-purple-edge-soft) 100%
+      ) !important;
+    }
+
+    body .settings-panel.report-panel .settings-head {
+      padding: var(--content-pad) !important;
+      border-bottom: 1px solid var(--line) !important;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(255, 255, 255, 0.02)) !important;
+      box-shadow: none !important;
+    }
+
+    body .settings-panel.report-panel .settings-body {
+      padding: var(--content-pad) !important;
+    }
+
+    /* LEXIQUE : rendu stable ouvert/fermé, sans bande parasite ni décalage horizontal. */
+    body .bar-box {
+      position: relative !important;
+      overflow: hidden !important;
+      border: 1px solid var(--line) !important;
+      border-radius: 26px !important;
+      max-width: 100% !important;
+      transform: none !important;
+    }
+
+    body .bar-box > summary {
+      min-height: 0 !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: var(--content-pad) !important;
+      border: 0 !important;
+      border-bottom: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(255, 255, 255, 0.02)) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 8px !important;
+      text-align: center !important;
+    }
+
+    body .bar-box[open] > summary {
+      border-bottom: 1px solid var(--line) !important;
+      margin-bottom: 0 !important;
+    }
+
+    body .bar-box > summary::after {
+      margin-left: 4px !important;
+    }
+
+    body .bar-box .bar-grid,
+    body .bar-box[open] .bar-grid {
+      margin: 0 !important;
+      padding: 18px var(--content-pad) var(--content-pad) !important;
+      border: 0 !important;
+      border-top: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      display: grid !important;
+      gap: 14px !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+      animation: none !important;
+    }
+
+    body .bar-box .bar-card,
+    body .bar-box[open] .bar-card:first-child {
+      margin-top: 0 !important;
+    }
+
+    @media (max-width: 520px) {
+      body .settings-panel.report-panel,
+      body .bar-box {
+        border-radius: 24px !important;
+      }
+
+      body .bar-box .bar-grid,
+      body .bar-box[open] .bar-grid {
+        padding-top: 18px !important;
+        gap: 14px !important;
+      }
+    }
+
 </style>
 </head>
 
@@ -10382,7 +10506,7 @@
       </div>
     </section>
 
-    <section class="panel settings-panel">
+    <section class="report-panel settings-panel">
       <div class="report-head settings-head">
         <div>
           <div class="report-title">⚙️ RÉGLAGES</div>
@@ -12682,6 +12806,130 @@
 
       .bar-card {
         padding: 15px 14px !important;
+      }
+    }
+
+
+
+    /* v159 : RÉGLAGES identique à RAPPORT DE SESSION + LEXIQUE déroulé propre */
+    body .settings-panel.report-panel {
+      position: relative !important;
+      overflow: hidden !important;
+      border: 1px solid var(--line) !important;
+      border-radius: 26px !important;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+        rgba(10, 15, 36, 0.90) !important;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.055) !important;
+    }
+
+    /* Même pseudo-liseré que les autres report-panel : mêmes dimensions, même arrondi, même dégradé. */
+    body .settings-panel.report-panel::before {
+      content: none !important;
+      display: none !important;
+    }
+
+    body .settings-panel.report-panel::after {
+      content: "" !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 22px !important;
+      right: 22px !important;
+      height: 2px !important;
+      border-radius: 0 0 999px 999px !important;
+      pointer-events: none !important;
+      z-index: 3 !important;
+      opacity: .68 !important;
+      filter: none !important;
+      box-shadow: 0 0 8px rgba(64,201,255,.045), 0 0 8px rgba(164,85,235,.04) !important;
+      background: linear-gradient(90deg,
+        var(--fs-v113-purple-edge-soft) 0%,
+        var(--fs-v113-purple-edge) 18%,
+        var(--fs-v113-blue-center-soft) 38%,
+        var(--fs-v113-blue-center) 50%,
+        var(--fs-v113-blue-center-soft) 62%,
+        var(--fs-v113-purple-edge) 82%,
+        var(--fs-v113-purple-edge-soft) 100%
+      ) !important;
+    }
+
+    body .settings-panel.report-panel .settings-head {
+      padding: var(--content-pad) !important;
+      border-bottom: 1px solid var(--line) !important;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(255, 255, 255, 0.02)) !important;
+      box-shadow: none !important;
+    }
+
+    body .settings-panel.report-panel .settings-body {
+      padding: var(--content-pad) !important;
+    }
+
+    /* LEXIQUE : rendu stable ouvert/fermé, sans bande parasite ni décalage horizontal. */
+    body .bar-box {
+      position: relative !important;
+      overflow: hidden !important;
+      border: 1px solid var(--line) !important;
+      border-radius: 26px !important;
+      max-width: 100% !important;
+      transform: none !important;
+    }
+
+    body .bar-box > summary {
+      min-height: 0 !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: var(--content-pad) !important;
+      border: 0 !important;
+      border-bottom: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.13), rgba(255, 255, 255, 0.02)) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 8px !important;
+      text-align: center !important;
+    }
+
+    body .bar-box[open] > summary {
+      border-bottom: 1px solid var(--line) !important;
+      margin-bottom: 0 !important;
+    }
+
+    body .bar-box > summary::after {
+      margin-left: 4px !important;
+    }
+
+    body .bar-box .bar-grid,
+    body .bar-box[open] .bar-grid {
+      margin: 0 !important;
+      padding: 18px var(--content-pad) var(--content-pad) !important;
+      border: 0 !important;
+      border-top: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      display: grid !important;
+      gap: 14px !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+      animation: none !important;
+    }
+
+    body .bar-box .bar-card,
+    body .bar-box[open] .bar-card:first-child {
+      margin-top: 0 !important;
+    }
+
+    @media (max-width: 520px) {
+      body .settings-panel.report-panel,
+      body .bar-box {
+        border-radius: 24px !important;
+      }
+
+      body .bar-box .bar-grid,
+      body .bar-box[open] .bar-grid {
+        padding-top: 18px !important;
+        gap: 14px !important;
       }
     }
 
