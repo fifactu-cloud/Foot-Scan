@@ -2684,8 +2684,71 @@ def build_trend_items(samples, side_key, trend_count):
             "averageMinute": round(avg_minute, 4),
             "minuteBasis": [round(float(x), 4) for x in minutes],
             "dominant": False,
+            "selectedOldest": False,
+            "selectionRank": None,
         })
     return items
+
+
+def select_global_oldest_trend_items(home_items, away_items):
+    """Sélectionne la moitié la plus ancienne sur l'ensemble A+B.
+
+    La mesure d'ancienneté est la moyenne minute la plus basse.
+    La sélection se fait globalement, donc pas moitié par équipe et pas moitié
+    ligne par ligne. En pratique, avec 9 tendances par équipe, il y a 18 items
+    et on garde les 9 plus anciennes au total.
+    """
+    combined = []
+
+    for side_key, items in (("home", home_items or []), ("away", away_items or [])):
+        for item in items:
+            item["dominant"] = False
+            item["selectedOldest"] = False
+            item["selectionRank"] = None
+            combined.append({
+                "side": side_key,
+                "item": item,
+                "averageMinute": float(item.get("averageMinute") or 9999),
+                "index": int(item.get("index") or 0),
+            })
+
+    total = len(combined)
+    if total <= 0:
+        return {
+            "method": "global_oldest_half_average_minute",
+            "totalTrendItems": 0,
+            "selectedTrendItems": 0,
+            "cutoffAverageMinute": None,
+        }
+
+    selected_count = max(1, (total + 1) // 2)
+    side_order = {"home": 0, "away": 1}
+    ordered = sorted(
+        combined,
+        key=lambda entry: (
+            entry["averageMinute"],
+            entry["index"],
+            side_order.get(entry["side"], 9),
+        ),
+    )
+
+    selected = ordered[:selected_count]
+
+    for rank, entry in enumerate(selected, start=1):
+        entry["item"]["dominant"] = True
+        entry["item"]["selectedOldest"] = True
+        entry["item"]["selectionRank"] = rank
+
+    cutoff = selected[-1]["averageMinute"] if selected else None
+
+    return {
+        "method": "global_oldest_half_average_minute",
+        "totalTrendItems": total,
+        "selectedTrendItems": selected_count,
+        "cutoffAverageMinute": round(cutoff, 4) if cutoff is not None else None,
+        "homeSelectedTrendItems": sum(1 for item in home_items or [] if item.get("selectedOldest")),
+        "awaySelectedTrendItems": sum(1 for item in away_items or [] if item.get("selectedOldest")),
+    }
 
 
 def summarize_trend_items(items):
@@ -2764,6 +2827,10 @@ def process_trend_scan_job(job_id, params):
 
     home_items = build_trend_items(home_scan["trendMatches"], "home", trend_count)
     away_items = build_trend_items(away_scan["trendMatches"], "away", trend_count)
+
+    # Technique v177 : on sélectionne la moitié la plus ancienne sur l'ensemble
+    # des tendances A+B, indépendamment du mode séparé/simultané.
+    trend_selection = select_global_oldest_trend_items(home_items, away_items)
     comparisons = []
 
     for i in range(trend_count):
@@ -2771,16 +2838,18 @@ def process_trend_scan_job(job_id, params):
         away_item = away_items[i]
         hm = float(home_item.get("averageMinute") or 0)
         am = float(away_item.get("averageMinute") or 0)
-        if abs(hm - am) < 1e-9:
-            dominant = "tie"
-        elif hm < am:
-            # Nouvelle règle: la tendance dominante est la plus ancienne,
-            # donc celle dont la moyenne des minutes est la plus basse.
+        home_selected = bool(home_item.get("selectedOldest"))
+        away_selected = bool(away_item.get("selectedOldest"))
+
+        if home_selected and away_selected:
+            dominant = "both"
+        elif home_selected:
             dominant = "home"
-            home_item["dominant"] = True
-        else:
+        elif away_selected:
             dominant = "away"
-            away_item["dominant"] = True
+        else:
+            dominant = "none"
+
         comparisons.append({
             "index": i + 1,
             "dominant": dominant,
@@ -2860,6 +2929,7 @@ def process_trend_scan_job(job_id, params):
         "simultaneousMode": simultaneous_mode,
         "scanModeLabel": "Tendance Simultanée" if simultaneous_mode else "Tendance Séparée",
         "trendLevelMode": level_mode,
+        "trendSelection": trend_selection,
         "match": {
             "id": match.get("id"),
             "homeTeam": home_team,
@@ -2910,6 +2980,8 @@ def process_trend_scan_job(job_id, params):
             "pagesToLoad": PAGES_TO_LOAD,
             "system": "trend",
             "trendLevelMode": level_mode,
+            "trendSelectionMethod": trend_selection.get("method"),
+            "trendSelection": trend_selection,
         },
     }
 
