@@ -2732,7 +2732,7 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
     - top_line : on compare A contre B ligne par ligne et on garde la progression la plus forte.
     """
     normalized_mode = str(selection_mode or "top_half").strip().lower()
-    if normalized_mode in {"line", "topline", "top_ligne", "confrontation", "head_to_head"}:
+    if normalized_mode in {"top_line", "line", "topline", "top_ligne", "confrontation", "head_to_head"}:
         normalized_mode = "top_line"
     else:
         normalized_mode = "top_half"
