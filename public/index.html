@@ -12514,11 +12514,11 @@
           <div class="trend-mini ${dominant} ${tone}">
             <div class="trend-split-badge ${tone}">
               <span class="trend-split-top">${esc(String(item.resultStyle || "N").toUpperCase())}</span>
-              <span class="trend-split-bottom">${esc(formatValue(item.value))}</span>
+              <span class="trend-split-bottom">${esc(formatValue(item.value))}${item.trendLimited ? "*" : ""}</span>
             </div>
             <div class="trend-mini-body">
               <div class="trend-match-line">${esc(item.previousMatch?.label || "Match Précédent")} → ${esc(item.recentMatch?.label || "Match Récent")}</div>
-              <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}</div>
+              <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}${item.trendLimited ? ` · Limité depuis ${esc(formatValue(item.rawValue))}` : ""}</div>
             </div>
           </div>
         </div>
