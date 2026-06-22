@@ -2670,7 +2670,12 @@ def build_trend_items(samples, side_key, trend_count):
         recent = samples[i]
         previous = samples[i + 1]
         trend_value = (recent.get("level") or 0) - (previous.get("level") or 0)
-        minutes = (recent.get("minutesForAverage") or [1]) + (previous.get("minutesForAverage") or [1])
+        previous_minutes = previous.get("minutesForAverage") or [1]
+        recent_minutes = recent.get("minutesForAverage") or [1]
+        previous_avg_minute = trend_average(previous_minutes)
+        recent_avg_minute = trend_average(recent_minutes)
+        average_minute_progression = recent_avg_minute - previous_avg_minute
+        minutes = recent_minutes + previous_minutes
         avg_minute = trend_average(minutes)
         style = trend_result_style(trend_value)
         items.append({
@@ -2685,25 +2690,28 @@ def build_trend_items(samples, side_key, trend_count):
             "resultStyle": style,
             "resultLabel": trend_label_from_style(style),
             "averageMinute": round(avg_minute, 4),
+            "previousAverageMinute": round(previous_avg_minute, 4),
+            "recentAverageMinute": round(recent_avg_minute, 4),
+            "averageMinuteProgression": round(average_minute_progression, 4),
             "minuteBasis": [round(float(x), 4) for x in minutes],
             "dominant": False,
             "selectedOldest": False,
+            "selectedTrend": False,
             "selectionRank": None,
         })
     return items
 
 
 def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"):
-    """Sélectionne les tendances selon la technique FOOTSCAN.
+    """Sélectionne les tendances par progression moyenne la plus forte.
 
-    Base commune :
-    - on prend les minutes de tous les buts contenus dans les tendances A+B ;
-    - on calcule une moyenne minute globale ;
-    - chaque tendance est évaluée par sa distance à cette moyenne.
+    Une tendance = match précédent -> match récent.
+    Progression moyenne = moyenne minute du match récent - moyenne minute du
+    match précédent. Plus cette valeur augmente, plus la progression est forte.
 
     Modes :
-    - top_half : on garde la moitié des tendances A+B les plus proches ;
-    - top_line : on compare A contre B ligne par ligne et on garde la plus proche.
+    - top_half : on garde la moitié des tendances A+B avec la plus forte progression ;
+    - top_line : on compare A contre B ligne par ligne et on garde la progression la plus forte.
     """
     normalized_mode = str(selection_mode or "top_half").strip().lower()
     if normalized_mode in {"line", "topline", "top_ligne", "confrontation", "head_to_head"}:
@@ -2712,7 +2720,6 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         normalized_mode = "top_half"
 
     combined = []
-    all_minutes = []
 
     for side_key, items in (("home", home_items or []), ("away", away_items or [])):
         for item in items:
@@ -2721,41 +2728,32 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             item["selectedOldest"] = False
             item["selectionRank"] = None
             item["selectionMode"] = normalized_mode
-            item["selectionDistance"] = None
 
-            minutes = []
-            for minute in item.get("minuteBasis") or []:
-                try:
-                    value = float(minute)
-                except (TypeError, ValueError):
-                    continue
-                if value > 0:
-                    minutes.append(value)
-                    all_minutes.append(value)
+            try:
+                progression = float(item.get("averageMinuteProgression"))
+            except (TypeError, ValueError):
+                recent_avg = trend_average((item.get("recentMatch") or {}).get("minutesForAverage") or [1])
+                previous_avg = trend_average((item.get("previousMatch") or {}).get("minutesForAverage") or [1])
+                progression = recent_avg - previous_avg
+                item["averageMinuteProgression"] = round(progression, 4)
+                item["recentAverageMinute"] = round(recent_avg, 4)
+                item["previousAverageMinute"] = round(previous_avg, 4)
 
-            average_minute = float(item.get("averageMinute") or (trend_average(minutes) if minutes else 9999))
             combined.append({
                 "side": side_key,
                 "item": item,
-                "averageMinute": average_minute,
-                "minutes": minutes,
+                "progression": progression,
                 "index": int(item.get("index") or 0),
             })
 
     total = len(combined)
-    global_average = trend_average(all_minutes) if all_minutes else 1.0
-
-    for entry in combined:
-        distance = abs(float(entry["averageMinute"]) - float(global_average))
-        entry["distance"] = distance
-        entry["item"]["globalAverageMinute"] = round(global_average, 4)
-        entry["item"]["selectionDistance"] = round(distance, 4)
 
     def mark_selected(entry, rank):
         entry["item"]["dominant"] = True
         entry["item"]["selectedTrend"] = True
         entry["item"]["selectedOldest"] = True
         entry["item"]["selectionRank"] = rank
+        entry["item"]["selectionProgression"] = round(float(entry.get("progression") or 0), 4)
 
     selected = []
     side_order = {"home": 0, "away": 1}
@@ -2764,10 +2762,10 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         return {
             "method": normalized_mode,
             "label": "Top Moitié" if normalized_mode == "top_half" else "Top Ligne",
+            "selectionMetric": "average_minute_progression",
             "totalTrendItems": 0,
             "selectedTrendItems": 0,
-            "globalAverageMinute": round(global_average, 4),
-            "cutoffDistance": None,
+            "cutoffProgression": None,
             "homeSelectedTrendItems": 0,
             "awaySelectedTrendItems": 0,
         }
@@ -2783,20 +2781,23 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             for side_key, source in (("home", home_by_index.get(index)), ("away", away_by_index.get(index))):
                 if not source:
                     continue
+                try:
+                    progression = float(source.get("averageMinuteProgression") or 0)
+                except (TypeError, ValueError):
+                    progression = 0.0
                 candidates.append({
                     "side": side_key,
                     "item": source,
-                    "distance": float(source.get("selectionDistance") or 9999),
-                    "averageMinute": float(source.get("averageMinute") or 9999),
+                    "progression": progression,
                     "index": index,
                 })
 
             if not candidates:
                 continue
 
-            candidates.sort(key=lambda entry: (entry["distance"], entry["averageMinute"], side_order.get(entry["side"], 9)))
-            best_distance = candidates[0]["distance"]
-            winners = [entry for entry in candidates if abs(entry["distance"] - best_distance) < 1e-9]
+            candidates.sort(key=lambda entry: (-entry["progression"], side_order.get(entry["side"], 9)))
+            best_progression = candidates[0]["progression"]
+            winners = [entry for entry in candidates if abs(entry["progression"] - best_progression) < 1e-9]
 
             for entry in winners:
                 mark_selected(entry, rank)
@@ -2808,8 +2809,7 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         ordered = sorted(
             combined,
             key=lambda entry: (
-                entry["distance"],
-                entry["averageMinute"],
+                -entry["progression"],
                 entry["index"],
                 side_order.get(entry["side"], 9),
             ),
@@ -2819,15 +2819,15 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         for rank, entry in enumerate(selected, start=1):
             mark_selected(entry, rank)
 
-    cutoff = max((float(entry.get("distance") or 0) for entry in selected), default=None)
+    cutoff = min((float(entry.get("progression") or 0) for entry in selected), default=None)
 
     return {
         "method": normalized_mode,
         "label": "Top Moitié" if normalized_mode == "top_half" else "Top Ligne",
+        "selectionMetric": "average_minute_progression",
         "totalTrendItems": total,
         "selectedTrendItems": len(selected),
-        "globalAverageMinute": round(global_average, 4),
-        "cutoffDistance": round(cutoff, 4) if cutoff is not None else None,
+        "cutoffProgression": round(cutoff, 4) if cutoff is not None else None,
         "homeSelectedTrendItems": sum(1 for item in home_items or [] if item.get("selectedTrend")),
         "awaySelectedTrendItems": sum(1 for item in away_items or [] if item.get("selectedTrend")),
     }
@@ -2914,8 +2914,8 @@ def process_trend_scan_job(job_id, params):
     home_items = build_trend_items(home_scan["trendMatches"], "home", trend_count)
     away_items = build_trend_items(away_scan["trendMatches"], "away", trend_count)
 
-    # Technique v178 : moyenne minute globale de tous les buts A+B, puis sélection
-    # selon le mode choisi : Top Moitié ou Top Ligne.
+    # Technique v180 : sélection par progression moyenne la plus forte.
+    # Top Moitié = moitié A+B la plus forte ; Top Ligne = confrontation ligne par ligne.
     trend_selection = select_trend_items_by_mode(home_items, away_items, trend_selection_mode)
     comparisons = []
 
@@ -2950,56 +2950,15 @@ def process_trend_scan_job(job_id, params):
     def winner():
         h = home_summary["performanceScore"]
         a = away_summary["performanceScore"]
-        score_diff = abs(h - a)
-        quantity_diff = abs(abs(h) - abs(a))
-        switch_threshold = 4
 
         if h == a:
-            return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0, "quantityDiff": 0}
-
-        # Règle FOOTSCAN v172 :
-        # l'écart est calculé sur la quantité absolue de performance finale,
-        # pas sur l'écart signé de niveau.
-        # Exemples :
-        #   -7 vs 2  => abs(7 - 2) = 5  => switch
-        #   +8 vs -1 => abs(8 - 1) = 7  => switch
-        #   +10 vs +2 => abs(10 - 2) = 8 => switch
-        #   +3 vs -3 => abs(3 - 3) = 0  => pas de switch
-        if quantity_diff > switch_threshold:
-            if h > a:
-                return {
-                    "type": "winner",
-                    "side": "away",
-                    "label": away_team.get("name"),
-                    "score": a,
-                    "diff": round(score_diff, 6),
-                    "quantityDiff": round(quantity_diff, 6),
-                    "switch": True,
-                    "switchThreshold": switch_threshold,
-                    "originalWinnerSide": "home",
-                    "originalWinnerLabel": home_team.get("name"),
-                    "originalWinnerScore": h,
-                }
-
-            return {
-                "type": "winner",
-                "side": "home",
-                "label": home_team.get("name"),
-                "score": h,
-                "diff": round(score_diff, 6),
-                "quantityDiff": round(quantity_diff, 6),
-                "switch": True,
-                "switchThreshold": switch_threshold,
-                "originalWinnerSide": "away",
-                "originalWinnerLabel": away_team.get("name"),
-                "originalWinnerScore": a,
-            }
+            return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
 
         if h > a:
-            return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(h - a, 6), "quantityDiff": round(quantity_diff, 6)}
+            return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(h - a, 6)}
         if a > h:
-            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(a - h, 6), "quantityDiff": round(quantity_diff, 6)}
-        return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0, "quantityDiff": 0}
+            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(a - h, 6)}
+        return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
 
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
     away_issue_count = int(away_scan.get("eventDataIssueCount") or 0)
