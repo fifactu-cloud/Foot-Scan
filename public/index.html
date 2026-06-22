@@ -10984,6 +10984,48 @@
       padding-bottom: 0 !important;
     }
 
+    /* === v178 : sélection tendance + finition Matchs Utilisés === */
+    .trend-selection-slider {
+      margin-top: 10px !important;
+    }
+
+    .trend-selection-slider .calc-mode-opt {
+      font-size: clamp(10.5px, 2.8vw, 12px) !important;
+      letter-spacing: .045em !important;
+    }
+
+    .team-card .trend-matches-details {
+      margin-top: 10px !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+    }
+
+    .team-card .trend-matches-details::before {
+      content: "";
+      display: block;
+      height: 8px;
+      margin: 0 24px;
+      border: 0 !important;
+      background: linear-gradient(180deg, rgba(15,23,42,.18), rgba(15,23,42,0)) !important;
+      opacity: .55 !important;
+      pointer-events: none;
+    }
+
+    .result-shell .team-card > .section:last-of-type {
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      padding-bottom: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      box-shadow: none !important;
+    }
+
   </style>
 </head>
 
@@ -11067,10 +11109,17 @@
             <div class="auto-formula" id="trendFormula">4 Tendances · 5 Derniers Matchs</div>
 
             <input id="simultaneousMode" type="checkbox" hidden />
-            <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de calcul">
+            <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de camp">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">CALCUL SÉPARÉ</button>
-              <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">CALCUL SIMULTANÉ</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">CAMP COMBINÉ</button>
+              <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">CAMP SÉPARÉ</button>
+            </div>
+
+            <input id="trendSelectionMode" type="checkbox" hidden checked />
+            <div class="calc-mode-slider trend-selection-slider sim" id="trendSelectionSlider" role="tablist" aria-label="Mode de sélection tendance">
+              <span class="calc-mode-thumb" aria-hidden="true"></span>
+              <button type="button" class="calc-mode-opt" data-mode="line" role="tab">TOP LIGNE</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="half" role="tab">TOP MOITIÉ</button>
             </div>
           </div>
         </div>
@@ -11139,8 +11188,10 @@
           <div class="bar-card-title">⚙️ Configuration</div>
           <div class="bar-line"><span>Curseur</span><strong>Nb. Tendances</strong></div>
           <div class="bar-line"><span>Matchs Utilisés</span><strong>Nb. Tendances + 1</strong></div>
-          <div class="bar-line"><span>Calcul Séparé</span><strong>Attaque (Réciproque)</strong></div>
-          <div class="bar-line"><span>Calcul Simultané</span><strong>Attaque + Défense (Solo)</strong></div>
+          <div class="bar-line"><span>Camp Combiné</span><strong>Attaque Réciproque</strong></div>
+          <div class="bar-line"><span>Camp Séparé</span><strong>Attaque + Défense Solo</strong></div>
+          <div class="bar-line"><span>Top Ligne</span><strong>Confrontation Ligne Par Ligne</strong></div>
+          <div class="bar-line"><span>Top Moitié</span><strong>Moitié La Plus Proche</strong></div>
         </div>
 
         <div class="bar-card">
@@ -11152,7 +11203,7 @@
         <div class="bar-card">
           <div class="bar-card-title">⏱️ Comparaison</div>
           <div class="bar-line"><span>Temps</span><strong>Moy. Minutes Des Buts</strong></div>
-          <div class="bar-line"><span>Prend Le Dessus</span><strong>Minute Moy. La Plus Basse</strong></div>
+          <div class="bar-line"><span>Prend Le Dessus</span><strong>Plus Proche De La Moyenne</strong></div>
         </div>
       </div>
     </details>
@@ -11535,6 +11586,57 @@
         if (typeof navigator.vibrate === "function") navigator.vibrate(8);
       }));
       sync();
+    }
+
+    function setupTrendSelectionSlider() {
+      const slider = document.getElementById("trendSelectionSlider");
+      const box = document.getElementById("trendSelectionMode");
+      if (!slider || !box) return;
+      const opts = slider.querySelectorAll(".calc-mode-opt");
+      const positionThumb = () => {
+        const active = slider.querySelector(".calc-mode-opt.is-active");
+        if (!active) return;
+        const pad = 4;
+        const inset = 2;
+        const sliderW = slider.clientWidth;
+        let left = active.offsetLeft + inset;
+        let width = active.offsetWidth - inset * 2;
+        const maxRight = sliderW - pad;
+        if (left < pad) left = pad;
+        if (left + width > maxRight) width = maxRight - left;
+        slider.style.setProperty("--thumb-left", left + "px");
+        slider.style.setProperty("--thumb-width", width + "px");
+      };
+      const sync = () => {
+        const topHalf = Boolean(box.checked);
+        slider.classList.toggle("sim", topHalf);
+        opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "half") === topHalf));
+        requestAnimationFrame(positionThumb);
+      };
+      window.addEventListener("resize", () => requestAnimationFrame(positionThumb));
+      setTimeout(positionThumb, 80);
+      setTimeout(positionThumb, 350);
+      opts.forEach((o) => o.addEventListener("click", () => {
+        box.checked = (o.dataset.mode === "half");
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+        sync();
+        if (typeof navigator.vibrate === "function") navigator.vibrate(8);
+      }));
+      sync();
+    }
+
+    function getTrendSelectionMode() {
+      return $("trendSelectionMode")?.checked ? "top_half" : "top_line";
+    }
+
+    function trendSelectionModeLabel(result = null) {
+      const mode = result?.trendSelectionMode || result?.trendSelection?.method || getTrendSelectionMode();
+      return String(mode).includes("line") ? "Top Ligne" : "Top Moitié";
+    }
+
+    function campModeLabel(result = null) {
+      const sim = Boolean(result?.simultaneousMode ?? isSimultaneousMode());
+      return sim ? "Camp Séparé" : "Camp Combiné";
     }
 
     function isSimultaneousMode() {
@@ -12018,6 +12120,7 @@
           skipHome: skipHomeValue,
           skipAway: skipAwayValue,
           simultaneousMode: isSimultaneousMode(),
+          trendSelectionMode: getTrendSelectionMode(),
           rankEventStep: 1,
           rankEventMode: "trend",
           winnerMode: "trend",
@@ -12062,6 +12165,7 @@
             rankEventStep: Number(job.result?.rankEventStep ?? calculateAutoRanks().advancement),
             rankEventMode: job.result?.rankEventMode || (isPerformanceAdvanceMode() ? "performance" : "fixed"),
             winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
+            trendSelectionMode: job.result?.trendSelectionMode || getTrendSelectionMode(),
           };
 
           lastResult = {
@@ -12071,6 +12175,7 @@
             autoSearch: {
               ...calculateAutoRanks(),
               simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
+              trendSelectionMode: resultWithOptions.trendSelectionMode || getTrendSelectionMode(),
               rankEventStep: resultWithOptions.rankEventStep,
               rankEventMode: resultWithOptions.rankEventMode,
               winnerMode: resultWithOptions.winnerMode,
@@ -12259,7 +12364,7 @@
           <div class="summary-head">
             <div class="summary-head-top">
               <div class="summary-label">Résumé Tendance</div>
-              <div class="summary-label summary-mode">Mode Scan : ${esc(result.simultaneousMode ? "Simultané" : "Séparé")}</div>
+              <div class="summary-label summary-mode">Mode Scan : ${esc(campModeLabel(result))} · ${esc(trendSelectionModeLabel(result))}</div>
             </div>
             <div class="summary-title summary-title-stacked">
               <span class="summary-team-title summary-team-title-home">${esc(String(match.homeTeam.name || "").toUpperCase())}</span>
@@ -12399,7 +12504,7 @@
           <div class="summary-head">
             <div class="summary-head-top">
               <div class="summary-label">Résumé rapide</div>
-              <div class="summary-label summary-mode">Mode Scan : ${result.simultaneousMode ? "Simultané" : "Séparé"}</div>
+              <div class="summary-label summary-mode">Mode Scan : ${campModeLabel(result)}</div>
             </div>
             <div class="summary-title summary-title-stacked">
               <span class="summary-team-title summary-team-title-home">${esc(String(match.homeTeam.name || "").toUpperCase())}</span>
@@ -13344,7 +13449,8 @@
     }
 
     function trendModeLabelV151(result) {
-      return result?.scanModeLabel || (result?.simultaneousMode ? "Tendance Simultanée" : "Tendance Séparée");
+      const camp = result?.scanModeLabel || (result?.simultaneousMode ? "Camp Séparé" : "Camp Combiné");
+      return `${camp} · ${trendSelectionModeLabel(result)}`;
     }
 
     function trendWinnerLinesV151(result, compact = false) {
@@ -13481,7 +13587,7 @@
       lines.push("V = Victoire · N = Nul · D = Défaite");
       lines.push("Performance = somme exacte des tendances prises.");
       lines.push("Tendance = niveau du match récent - niveau du match précédent.");
-      lines.push("Comparaison = la moyenne minute la plus basse prend le dessus.");
+      lines.push("Comparaison = sélection selon la proximité avec la moyenne minute globale.");
       lines.push("0-0 = événement neutre à la minute 1.");
       lines.push("");
       lines.push("────────────────────────");
@@ -13636,6 +13742,7 @@
     }, { passive: true });
 
 setupCalcModeSlider();
+    setupTrendSelectionSlider();
     initMobileNavigationEffects();
     updateReportCount();
     updateAutoCalculator();
