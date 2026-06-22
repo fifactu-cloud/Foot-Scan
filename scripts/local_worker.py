@@ -2720,16 +2720,16 @@ def build_trend_items(samples, side_key, trend_count, trend_limit_enabled=False)
     return items
 
 
-def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"):
-    """Sélectionne les tendances par progression moyenne la plus forte.
-
-    Une tendance = match précédent -> match récent.
-    Progression moyenne = moyenne minute du match récent - moyenne minute du
-    match précédent. Plus cette valeur augmente, plus la progression est forte.
+def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half", selection_metric="progression"):
+    """Sélectionne les tendances selon le mode et la métrique choisis.
 
     Modes :
-    - top_half : on garde la moitié des tendances A+B avec la plus forte progression ;
-    - top_line : on compare A contre B ligne par ligne et on garde la progression la plus forte.
+    - top_half : garde la moitié des tendances A+B ;
+    - top_line : compare A contre B ligne par ligne.
+
+    Métriques :
+    - progression : progression moyenne minute la plus forte ;
+    - global_average_minute : ancienne méthode, proximité avec la moyenne minute globale.
     """
     normalized_mode = str(selection_mode or "top_half").strip().lower()
     if normalized_mode in {"top_line", "line", "topline", "top_ligne", "confrontation", "head_to_head"}:
@@ -2737,7 +2737,14 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
     else:
         normalized_mode = "top_half"
 
+    normalized_metric = str(selection_metric or "progression").strip().lower()
+    if normalized_metric in {"global", "global_average", "global_average_minute", "moyenne", "moyenne_globale", "moyenne_minute_globale"}:
+        normalized_metric = "global_average_minute"
+    else:
+        normalized_metric = "progression"
+
     combined = []
+    all_minutes = []
 
     for side_key, items in (("home", home_items or []), ("away", away_items or [])):
         for item in items:
@@ -2746,6 +2753,10 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             item["selectedOldest"] = False
             item["selectionRank"] = None
             item["selectionMode"] = normalized_mode
+            item["selectionMetric"] = normalized_metric
+            item["selectionProgression"] = None
+            item["selectionDistance"] = None
+            item["globalAverageMinute"] = None
 
             try:
                 progression = float(item.get("averageMinuteProgression"))
@@ -2757,65 +2768,91 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
                 item["recentAverageMinute"] = round(recent_avg, 4)
                 item["previousAverageMinute"] = round(previous_avg, 4)
 
+            minutes = []
+            for minute in item.get("minuteBasis") or []:
+                try:
+                    value = float(minute)
+                except (TypeError, ValueError):
+                    continue
+                if math.isfinite(value):
+                    minutes.append(value)
+                    all_minutes.append(value)
+
+            average_minute = float(item.get("averageMinute") or (trend_average(minutes) if minutes else 1.0))
+
             combined.append({
                 "side": side_key,
                 "item": item,
                 "progression": progression,
+                "averageMinute": average_minute,
                 "index": int(item.get("index") or 0),
             })
 
     total = len(combined)
+    global_average = trend_average(all_minutes) if all_minutes else 1.0
+
+    for entry in combined:
+        distance = abs(float(entry.get("averageMinute") or 0) - float(global_average))
+        entry["distance"] = distance
+        entry["item"]["globalAverageMinute"] = round(global_average, 4)
+        entry["item"]["selectionDistance"] = round(distance, 4)
+
+    def score_key(entry):
+        if normalized_metric == "global_average_minute":
+            # Plus la distance à la moyenne globale est faible, plus la tendance est prioritaire.
+            return (float(entry.get("distance") or 9999), float(entry.get("averageMinute") or 9999))
+        # Plus la progression est élevée, plus la tendance est prioritaire.
+        return (-float(entry.get("progression") or 0), float(entry.get("averageMinute") or 9999))
+
+    def same_best(a, b):
+        if normalized_metric == "global_average_minute":
+            return abs(float(a.get("distance") or 9999) - float(b.get("distance") or 9999)) < 1e-9
+        return abs(float(a.get("progression") or 0) - float(b.get("progression") or 0)) < 1e-9
 
     def mark_selected(entry, rank):
         entry["item"]["dominant"] = True
         entry["item"]["selectedTrend"] = True
         entry["item"]["selectedOldest"] = True
         entry["item"]["selectionRank"] = rank
+        entry["item"]["selectionMetric"] = normalized_metric
         entry["item"]["selectionProgression"] = round(float(entry.get("progression") or 0), 4)
+        entry["item"]["selectionDistance"] = round(float(entry.get("distance") or 0), 4)
 
     selected = []
     side_order = {"home": 0, "away": 1}
+    label = "Top Moitié" if normalized_mode == "top_half" else "Top Ligne"
 
     if total <= 0:
         return {
             "method": normalized_mode,
-            "label": "Top Moitié" if normalized_mode == "top_half" else "Top Ligne",
-            "selectionMetric": "average_minute_progression",
+            "label": label,
+            "selectionMetric": normalized_metric,
+            "selectionMetricLabel": "Moyenne Minute Globale" if normalized_metric == "global_average_minute" else "Progression Moyenne",
             "totalTrendItems": 0,
             "selectedTrendItems": 0,
+            "globalAverageMinute": round(global_average, 4),
             "cutoffProgression": None,
+            "cutoffDistance": None,
             "homeSelectedTrendItems": 0,
             "awaySelectedTrendItems": 0,
         }
 
     if normalized_mode == "top_line":
-        home_by_index = {int(item.get("index") or 0): item for item in home_items or []}
-        away_by_index = {int(item.get("index") or 0): item for item in away_items or []}
-        indexes = sorted(set(home_by_index.keys()) | set(away_by_index.keys()))
+        by_index = {}
+        for entry in combined:
+            by_index.setdefault(entry["index"], []).append(entry)
 
         rank = 1
-        for index in indexes:
-            candidates = []
-            for side_key, source in (("home", home_by_index.get(index)), ("away", away_by_index.get(index))):
-                if not source:
-                    continue
-                try:
-                    progression = float(source.get("averageMinuteProgression") or 0)
-                except (TypeError, ValueError):
-                    progression = 0.0
-                candidates.append({
-                    "side": side_key,
-                    "item": source,
-                    "progression": progression,
-                    "index": index,
-                })
-
+        for index in sorted(by_index.keys()):
+            candidates = sorted(
+                by_index[index],
+                key=lambda entry: (*score_key(entry), side_order.get(entry["side"], 9)),
+            )
             if not candidates:
                 continue
 
-            candidates.sort(key=lambda entry: (-entry["progression"], side_order.get(entry["side"], 9)))
-            best_progression = candidates[0]["progression"]
-            winners = [entry for entry in candidates if abs(entry["progression"] - best_progression) < 1e-9]
+            best = candidates[0]
+            winners = [entry for entry in candidates if same_best(entry, best)]
 
             for entry in winners:
                 mark_selected(entry, rank)
@@ -2826,30 +2863,29 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         selected_count = max(1, (total + 1) // 2)
         ordered = sorted(
             combined,
-            key=lambda entry: (
-                -entry["progression"],
-                entry["index"],
-                side_order.get(entry["side"], 9),
-            ),
+            key=lambda entry: (*score_key(entry), entry["index"], side_order.get(entry["side"], 9)),
         )
         selected = ordered[:selected_count]
 
         for rank, entry in enumerate(selected, start=1):
             mark_selected(entry, rank)
 
-    cutoff = min((float(entry.get("progression") or 0) for entry in selected), default=None)
+    cutoff_progression = min((float(entry.get("progression") or 0) for entry in selected), default=None)
+    cutoff_distance = max((float(entry.get("distance") or 0) for entry in selected), default=None)
 
     return {
         "method": normalized_mode,
-        "label": "Top Moitié" if normalized_mode == "top_half" else "Top Ligne",
-        "selectionMetric": "average_minute_progression",
+        "label": label,
+        "selectionMetric": normalized_metric,
+        "selectionMetricLabel": "Moyenne Minute Globale" if normalized_metric == "global_average_minute" else "Progression Moyenne",
         "totalTrendItems": total,
         "selectedTrendItems": len(selected),
-        "cutoffProgression": round(cutoff, 4) if cutoff is not None else None,
+        "globalAverageMinute": round(global_average, 4),
+        "cutoffProgression": round(cutoff_progression, 4) if cutoff_progression is not None else None,
+        "cutoffDistance": round(cutoff_distance, 4) if cutoff_distance is not None else None,
         "homeSelectedTrendItems": sum(1 for item in home_items or [] if item.get("selectedTrend")),
         "awaySelectedTrendItems": sum(1 for item in away_items or [] if item.get("selectedTrend")),
     }
-
 
 
 def summarize_trend_items(items):
@@ -2893,6 +2929,9 @@ def process_trend_scan_job(job_id, params):
     trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
         trend_selection_mode = "top_half"
+    trend_selection_metric = str(params.get("trendSelectionMetric") or "progression").strip()
+    if trend_selection_metric not in {"progression", "global_average_minute"}:
+        trend_selection_metric = "progression"
 
     update_scan_job(job_id, status="running", message="Récupération Du Match Principal…", progress=5)
     match_data = get_json(f"event/{match_id}")
@@ -2933,9 +2972,9 @@ def process_trend_scan_job(job_id, params):
     home_items = build_trend_items(home_scan["trendMatches"], "home", trend_count, trend_limit_enabled=trend_limit_enabled)
     away_items = build_trend_items(away_scan["trendMatches"], "away", trend_count, trend_limit_enabled=trend_limit_enabled)
 
-    # Technique v180 : sélection par progression moyenne la plus forte.
-    # Top Moitié = moitié A+B la plus forte ; Top Ligne = confrontation ligne par ligne.
-    trend_selection = select_trend_items_by_mode(home_items, away_items, trend_selection_mode)
+    # Technique v184 : sélection configurable.
+    # Par défaut = progression moyenne la plus forte ; option = ancienne moyenne minute globale.
+    trend_selection = select_trend_items_by_mode(home_items, away_items, trend_selection_mode, trend_selection_metric)
     comparisons = []
 
     for i in range(trend_count):
@@ -2996,6 +3035,7 @@ def process_trend_scan_job(job_id, params):
         "trendLimitEnabled": trend_limit_enabled,
         "trendLimitRange": [-2, 2] if trend_limit_enabled else None,
         "trendSelectionMode": trend_selection_mode,
+        "trendSelectionMetric": trend_selection_metric,
         "trendSelection": trend_selection,
         "match": {
             "id": match.get("id"),
@@ -3050,6 +3090,7 @@ def process_trend_scan_job(job_id, params):
             "trendLimitEnabled": trend_limit_enabled,
             "trendLimitRange": [-2, 2] if trend_limit_enabled else None,
             "trendSelectionMode": trend_selection_mode,
+            "trendSelectionMetric": trend_selection_metric,
             "trendSelectionMethod": trend_selection.get("method"),
             "trendSelection": trend_selection,
         },
