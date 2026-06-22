@@ -11036,6 +11036,60 @@
       letter-spacing: .045em !important;
     }
 
+    /* === v184 : option ancienne sélection moyenne minute globale === */
+    .metric-check-row {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 9px !important;
+      margin: 10px auto 0 !important;
+      padding: 10px 12px !important;
+      border-radius: 18px !important;
+      border: 1px solid rgba(56,189,248,.20) !important;
+      background: rgba(15,23,42,.30) !important;
+      color: #cfe8ff !important;
+      font-size: 11px !important;
+      font-weight: 900 !important;
+      letter-spacing: .055em !important;
+      text-align: center !important;
+      user-select: none !important;
+    }
+
+    .metric-check-row input {
+      position: absolute !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    .metric-check-box {
+      width: 18px !important;
+      height: 18px !important;
+      border-radius: 6px !important;
+      border: 1px solid rgba(148,163,184,.46) !important;
+      background: rgba(15,23,42,.55) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06) !important;
+      position: relative !important;
+      flex: 0 0 auto !important;
+    }
+
+    .metric-check-row input:checked + .metric-check-box {
+      border-color: rgba(56,189,248,.72) !important;
+      background: linear-gradient(135deg,#38bdf8,#2563eb) !important;
+      box-shadow: 0 8px 18px rgba(56,189,248,.22) !important;
+    }
+
+    .metric-check-row input:checked + .metric-check-box::after {
+      content: "✓";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 1000;
+    }
+
   </style>
 </head>
 
@@ -11132,6 +11186,12 @@
               <button type="button" class="calc-mode-opt is-active" data-mode="half" role="tab">TOP MOITIÉ</button>
             </div>
 
+            <label class="metric-check-row" for="trendGlobalAverageEnabled">
+              <input id="trendGlobalAverageEnabled" type="checkbox" />
+              <span class="metric-check-box" aria-hidden="true"></span>
+              <span class="metric-check-text">MOYENNE MINUTE GLOBALE</span>
+            </label>
+
             <input id="trendLimitEnabled" type="checkbox" hidden />
             <div class="calc-mode-slider trend-limit-slider" id="trendLimitSlider" role="tablist" aria-label="Limitation tendance">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
@@ -11207,8 +11267,9 @@
           <div class="bar-line"><span>Matchs Utilisés</span><strong>Nb. Tendances + 1</strong></div>
           <div class="bar-line"><span>Camp Combiné</span><strong>Attaque Réciproque</strong></div>
           <div class="bar-line"><span>Camp Séparé</span><strong>Attaque + Défense Solo</strong></div>
-          <div class="bar-line"><span>Top Ligne</span><strong>Plus Forte Progression Ligne</strong></div>
-          <div class="bar-line"><span>Top Moitié</span><strong>Moitié Plus Forte Progression</strong></div>
+          <div class="bar-line"><span>Top Ligne</span><strong>Confrontation Ligne Par Ligne</strong></div>
+          <div class="bar-line"><span>Top Moitié</span><strong>Moitié Des Tendances A+B</strong></div>
+          <div class="bar-line"><span>Moy. Globale</span><strong>Ancienne Sélection Par Proximité</strong></div>
           <div class="bar-line"><span>Limite -2/+2</span><strong>Bloque Chaque Tendance Entre -2 Et 2</strong></div>
         </div>
 
@@ -11221,7 +11282,8 @@
         <div class="bar-card">
           <div class="bar-card-title">⏱️ Comparaison</div>
           <div class="bar-line"><span>Temps</span><strong>Moy. Minutes Des Buts</strong></div>
-          <div class="bar-line"><span>Prend Le Dessus</span><strong>Progression Moy. La Plus Forte</strong></div>
+          <div class="bar-line"><span>Défaut</span><strong>Progression Moy. La Plus Forte</strong></div>
+          <div class="bar-line"><span>Option</span><strong>Plus Proche Moy. Globale</strong></div>
         </div>
       </div>
     </details>
@@ -11650,6 +11712,15 @@
     function trendSelectionModeLabel(result = null) {
       const mode = result?.trendSelectionMode || result?.trendSelection?.method || getTrendSelectionMode();
       return String(mode).includes("line") ? "Top Ligne" : "Top Moitié";
+    }
+
+    function getTrendSelectionMetric() {
+      return $("trendGlobalAverageEnabled")?.checked ? "global_average_minute" : "progression";
+    }
+
+    function trendSelectionMetricLabel(result = null) {
+      const metric = result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || getTrendSelectionMetric();
+      return String(metric).includes("global") ? "Moy. Globale" : "Progression";
     }
 
     function campModeLabel(result = null) {
@@ -12231,6 +12302,7 @@
             rankEventMode: job.result?.rankEventMode || (isPerformanceAdvanceMode() ? "performance" : "fixed"),
             winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
             trendSelectionMode: job.result?.trendSelectionMode || getTrendSelectionMode(),
+            trendSelectionMetric: job.result?.trendSelectionMetric || getTrendSelectionMetric(),
             trendLimitEnabled: Boolean(job.result?.trendLimitEnabled ?? isTrendLimitEnabled()),
           };
 
@@ -12242,6 +12314,7 @@
               ...calculateAutoRanks(),
               simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
               trendSelectionMode: resultWithOptions.trendSelectionMode || getTrendSelectionMode(),
+              trendSelectionMetric: resultWithOptions.trendSelectionMetric || getTrendSelectionMetric(),
               trendLimitEnabled: Boolean(resultWithOptions.trendLimitEnabled),
               rankEventStep: resultWithOptions.rankEventStep,
               rankEventMode: resultWithOptions.rankEventMode,
