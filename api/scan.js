@@ -120,6 +120,8 @@ module.exports = async function (req, res) {
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
     const isTrendMode = bool(b.trendMode) || b.trendCount !== undefined || b.rankEventMode === 'trend';
     const trendCount = numeric(b.trendCount, rank1 || 4, 1, 100);
+    const trendSelectionMode = b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half';
+    const trendLimitEnabled = bool(b.trendLimitEnabled);
 
     if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
@@ -158,6 +160,8 @@ module.exports = async function (req, res) {
         winnerMode,
         trendMode: isTrendMode,
         trendCount,
+        trendSelectionMode,
+        trendLimitEnabled,
       },
     };
 
