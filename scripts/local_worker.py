@@ -2690,65 +2690,145 @@ def build_trend_items(samples, side_key, trend_count):
     return items
 
 
-def select_global_oldest_trend_items(home_items, away_items):
-    """Sélectionne la moitié la plus ancienne sur l'ensemble A+B.
+def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"):
+    """Sélectionne les tendances selon la technique FOOTSCAN.
 
-    La mesure d'ancienneté est la moyenne minute la plus basse.
-    La sélection se fait globalement, donc pas moitié par équipe et pas moitié
-    ligne par ligne. En pratique, avec 9 tendances par équipe, il y a 18 items
-    et on garde les 9 plus anciennes au total.
+    Base commune :
+    - on prend les minutes de tous les buts contenus dans les tendances A+B ;
+    - on calcule une moyenne minute globale ;
+    - chaque tendance est évaluée par sa distance à cette moyenne.
+
+    Modes :
+    - top_half : on garde la moitié des tendances A+B les plus proches ;
+    - top_line : on compare A contre B ligne par ligne et on garde la plus proche.
     """
+    normalized_mode = str(selection_mode or "top_half").strip().lower()
+    if normalized_mode in {"line", "topline", "top_ligne", "confrontation", "head_to_head"}:
+        normalized_mode = "top_line"
+    else:
+        normalized_mode = "top_half"
+
     combined = []
+    all_minutes = []
 
     for side_key, items in (("home", home_items or []), ("away", away_items or [])):
         for item in items:
             item["dominant"] = False
+            item["selectedTrend"] = False
             item["selectedOldest"] = False
             item["selectionRank"] = None
+            item["selectionMode"] = normalized_mode
+            item["selectionDistance"] = None
+
+            minutes = []
+            for minute in item.get("minuteBasis") or []:
+                try:
+                    value = float(minute)
+                except (TypeError, ValueError):
+                    continue
+                if value > 0:
+                    minutes.append(value)
+                    all_minutes.append(value)
+
+            average_minute = float(item.get("averageMinute") or (trend_average(minutes) if minutes else 9999))
             combined.append({
                 "side": side_key,
                 "item": item,
-                "averageMinute": float(item.get("averageMinute") or 9999),
+                "averageMinute": average_minute,
+                "minutes": minutes,
                 "index": int(item.get("index") or 0),
             })
 
     total = len(combined)
-    if total <= 0:
-        return {
-            "method": "global_oldest_half_average_minute",
-            "totalTrendItems": 0,
-            "selectedTrendItems": 0,
-            "cutoffAverageMinute": None,
-        }
+    global_average = trend_average(all_minutes) if all_minutes else 1.0
 
-    selected_count = max(1, (total + 1) // 2)
-    side_order = {"home": 0, "away": 1}
-    ordered = sorted(
-        combined,
-        key=lambda entry: (
-            entry["averageMinute"],
-            entry["index"],
-            side_order.get(entry["side"], 9),
-        ),
-    )
+    for entry in combined:
+        distance = abs(float(entry["averageMinute"]) - float(global_average))
+        entry["distance"] = distance
+        entry["item"]["globalAverageMinute"] = round(global_average, 4)
+        entry["item"]["selectionDistance"] = round(distance, 4)
 
-    selected = ordered[:selected_count]
-
-    for rank, entry in enumerate(selected, start=1):
+    def mark_selected(entry, rank):
         entry["item"]["dominant"] = True
+        entry["item"]["selectedTrend"] = True
         entry["item"]["selectedOldest"] = True
         entry["item"]["selectionRank"] = rank
 
-    cutoff = selected[-1]["averageMinute"] if selected else None
+    selected = []
+    side_order = {"home": 0, "away": 1}
+
+    if total <= 0:
+        return {
+            "method": normalized_mode,
+            "label": "Top Moitié" if normalized_mode == "top_half" else "Top Ligne",
+            "totalTrendItems": 0,
+            "selectedTrendItems": 0,
+            "globalAverageMinute": round(global_average, 4),
+            "cutoffDistance": None,
+            "homeSelectedTrendItems": 0,
+            "awaySelectedTrendItems": 0,
+        }
+
+    if normalized_mode == "top_line":
+        home_by_index = {int(item.get("index") or 0): item for item in home_items or []}
+        away_by_index = {int(item.get("index") or 0): item for item in away_items or []}
+        indexes = sorted(set(home_by_index.keys()) | set(away_by_index.keys()))
+
+        rank = 1
+        for index in indexes:
+            candidates = []
+            for side_key, source in (("home", home_by_index.get(index)), ("away", away_by_index.get(index))):
+                if not source:
+                    continue
+                candidates.append({
+                    "side": side_key,
+                    "item": source,
+                    "distance": float(source.get("selectionDistance") or 9999),
+                    "averageMinute": float(source.get("averageMinute") or 9999),
+                    "index": index,
+                })
+
+            if not candidates:
+                continue
+
+            candidates.sort(key=lambda entry: (entry["distance"], entry["averageMinute"], side_order.get(entry["side"], 9)))
+            best_distance = candidates[0]["distance"]
+            winners = [entry for entry in candidates if abs(entry["distance"] - best_distance) < 1e-9]
+
+            for entry in winners:
+                mark_selected(entry, rank)
+                selected.append(entry)
+                rank += 1
+
+    else:
+        selected_count = max(1, (total + 1) // 2)
+        ordered = sorted(
+            combined,
+            key=lambda entry: (
+                entry["distance"],
+                entry["averageMinute"],
+                entry["index"],
+                side_order.get(entry["side"], 9),
+            ),
+        )
+        selected = ordered[:selected_count]
+
+        for rank, entry in enumerate(selected, start=1):
+            mark_selected(entry, rank)
+
+    cutoff = max((float(entry.get("distance") or 0) for entry in selected), default=None)
 
     return {
-        "method": "global_oldest_half_average_minute",
+        "method": normalized_mode,
+        "label": "Top Moitié" if normalized_mode == "top_half" else "Top Ligne",
         "totalTrendItems": total,
-        "selectedTrendItems": selected_count,
-        "cutoffAverageMinute": round(cutoff, 4) if cutoff is not None else None,
-        "homeSelectedTrendItems": sum(1 for item in home_items or [] if item.get("selectedOldest")),
-        "awaySelectedTrendItems": sum(1 for item in away_items or [] if item.get("selectedOldest")),
+        "selectedTrendItems": len(selected),
+        "globalAverageMinute": round(global_average, 4),
+        "cutoffDistance": round(cutoff, 4) if cutoff is not None else None,
+        "homeSelectedTrendItems": sum(1 for item in home_items or [] if item.get("selectedTrend")),
+        "awaySelectedTrendItems": sum(1 for item in away_items or [] if item.get("selectedTrend")),
     }
+
 
 
 def summarize_trend_items(items):
@@ -2788,6 +2868,9 @@ def process_trend_scan_job(job_id, params):
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = bool(params.get("simultaneousMode"))
+    trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
+    if trend_selection_mode not in {"top_line", "top_half"}:
+        trend_selection_mode = "top_half"
 
     update_scan_job(job_id, status="running", message="Récupération Du Match Principal…", progress=5)
     match_data = get_json(f"event/{match_id}")
@@ -2828,9 +2911,9 @@ def process_trend_scan_job(job_id, params):
     home_items = build_trend_items(home_scan["trendMatches"], "home", trend_count)
     away_items = build_trend_items(away_scan["trendMatches"], "away", trend_count)
 
-    # Technique v177 : on sélectionne la moitié la plus ancienne sur l'ensemble
-    # des tendances A+B, indépendamment du mode séparé/simultané.
-    trend_selection = select_global_oldest_trend_items(home_items, away_items)
+    # Technique v178 : moyenne minute globale de tous les buts A+B, puis sélection
+    # selon le mode choisi : Top Moitié ou Top Ligne.
+    trend_selection = select_trend_items_by_mode(home_items, away_items, trend_selection_mode)
     comparisons = []
 
     for i in range(trend_count):
@@ -2838,8 +2921,8 @@ def process_trend_scan_job(job_id, params):
         away_item = away_items[i]
         hm = float(home_item.get("averageMinute") or 0)
         am = float(away_item.get("averageMinute") or 0)
-        home_selected = bool(home_item.get("selectedOldest"))
-        away_selected = bool(away_item.get("selectedOldest"))
+        home_selected = bool(home_item.get("selectedTrend"))
+        away_selected = bool(away_item.get("selectedTrend"))
 
         if home_selected and away_selected:
             dominant = "both"
@@ -2927,8 +3010,9 @@ def process_trend_scan_job(job_id, params):
         "trendCount": trend_count,
         "trendMatchesNeeded": needed_matches,
         "simultaneousMode": simultaneous_mode,
-        "scanModeLabel": "Tendance Simultanée" if simultaneous_mode else "Tendance Séparée",
+        "scanModeLabel": "Camp Séparé" if simultaneous_mode else "Camp Combiné",
         "trendLevelMode": level_mode,
+        "trendSelectionMode": trend_selection_mode,
         "trendSelection": trend_selection,
         "match": {
             "id": match.get("id"),
@@ -2980,6 +3064,7 @@ def process_trend_scan_job(job_id, params):
             "pagesToLoad": PAGES_TO_LOAD,
             "system": "trend",
             "trendLevelMode": level_mode,
+            "trendSelectionMode": trend_selection_mode,
             "trendSelectionMethod": trend_selection.get("method"),
             "trendSelection": trend_selection,
         },
