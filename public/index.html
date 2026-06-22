@@ -11026,6 +11026,16 @@
       box-shadow: none !important;
     }
 
+    /* === v181 : option limitation tendance -2/+2 === */
+    .trend-limit-slider {
+      margin-top: 10px !important;
+    }
+
+    .trend-limit-slider .calc-mode-opt {
+      font-size: clamp(10.5px, 2.75vw, 12px) !important;
+      letter-spacing: .045em !important;
+    }
+
   </style>
 </head>
 
@@ -11121,6 +11131,13 @@
               <button type="button" class="calc-mode-opt" data-mode="line" role="tab">TOP LIGNE</button>
               <button type="button" class="calc-mode-opt is-active" data-mode="half" role="tab">TOP MOITIÉ</button>
             </div>
+
+            <input id="trendLimitEnabled" type="checkbox" hidden />
+            <div class="calc-mode-slider trend-limit-slider" id="trendLimitSlider" role="tablist" aria-label="Limitation tendance">
+              <span class="calc-mode-thumb" aria-hidden="true"></span>
+              <button type="button" class="calc-mode-opt is-active" data-mode="free" role="tab">LIBRE</button>
+              <button type="button" class="calc-mode-opt" data-mode="limit" role="tab">LIMITE -2/+2</button>
+            </div>
           </div>
         </div>
 
@@ -11192,6 +11209,7 @@
           <div class="bar-line"><span>Camp Séparé</span><strong>Attaque + Défense Solo</strong></div>
           <div class="bar-line"><span>Top Ligne</span><strong>Plus Forte Progression Ligne</strong></div>
           <div class="bar-line"><span>Top Moitié</span><strong>Moitié Plus Forte Progression</strong></div>
+          <div class="bar-line"><span>Limite -2/+2</span><strong>Bloque Chaque Tendance Entre -2 Et 2</strong></div>
         </div>
 
         <div class="bar-card">
@@ -11637,6 +11655,52 @@
     function campModeLabel(result = null) {
       const sim = Boolean(result?.simultaneousMode ?? isSimultaneousMode());
       return sim ? "Camp Séparé" : "Camp Combiné";
+    }
+
+    function setupTrendLimitSlider() {
+      const slider = document.getElementById("trendLimitSlider");
+      const box = document.getElementById("trendLimitEnabled");
+      if (!slider || !box) return;
+      const opts = slider.querySelectorAll(".calc-mode-opt");
+      const positionThumb = () => {
+        const active = slider.querySelector(".calc-mode-opt.is-active");
+        if (!active) return;
+        const pad = 4;
+        const inset = 2;
+        const sliderW = slider.clientWidth;
+        let left = active.offsetLeft + inset;
+        let width = active.offsetWidth - inset * 2;
+        const maxRight = sliderW - pad;
+        if (left < pad) left = pad;
+        if (left + width > maxRight) width = maxRight - left;
+        slider.style.setProperty("--thumb-left", left + "px");
+        slider.style.setProperty("--thumb-width", width + "px");
+      };
+      const sync = () => {
+        const limited = Boolean(box.checked);
+        slider.classList.toggle("sim", limited);
+        opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "limit") === limited));
+        requestAnimationFrame(positionThumb);
+      };
+      window.addEventListener("resize", () => requestAnimationFrame(positionThumb));
+      setTimeout(positionThumb, 80);
+      setTimeout(positionThumb, 350);
+      opts.forEach((o) => o.addEventListener("click", () => {
+        box.checked = (o.dataset.mode === "limit");
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+        sync();
+        if (typeof navigator.vibrate === "function") navigator.vibrate(8);
+      }));
+      sync();
+    }
+
+    function isTrendLimitEnabled(result = null) {
+      if (result && Object.prototype.hasOwnProperty.call(result, "trendLimitEnabled")) return Boolean(result.trendLimitEnabled);
+      return Boolean($("trendLimitEnabled")?.checked);
+    }
+
+    function trendLimitLabel(result = null) {
+      return isTrendLimitEnabled(result) ? "Limite -2/+2" : "Libre";
     }
 
     function isSimultaneousMode() {
@@ -12121,6 +12185,7 @@
           skipAway: skipAwayValue,
           simultaneousMode: isSimultaneousMode(),
           trendSelectionMode: getTrendSelectionMode(),
+          trendLimitEnabled: isTrendLimitEnabled(),
           rankEventStep: 1,
           rankEventMode: "trend",
           winnerMode: "trend",
@@ -12166,6 +12231,7 @@
             rankEventMode: job.result?.rankEventMode || (isPerformanceAdvanceMode() ? "performance" : "fixed"),
             winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
             trendSelectionMode: job.result?.trendSelectionMode || getTrendSelectionMode(),
+            trendLimitEnabled: Boolean(job.result?.trendLimitEnabled ?? isTrendLimitEnabled()),
           };
 
           lastResult = {
@@ -12176,6 +12242,7 @@
               ...calculateAutoRanks(),
               simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
               trendSelectionMode: resultWithOptions.trendSelectionMode || getTrendSelectionMode(),
+              trendLimitEnabled: Boolean(resultWithOptions.trendLimitEnabled),
               rankEventStep: resultWithOptions.rankEventStep,
               rankEventMode: resultWithOptions.rankEventMode,
               winnerMode: resultWithOptions.winnerMode,
@@ -12364,7 +12431,7 @@
           <div class="summary-head">
             <div class="summary-head-top">
               <div class="summary-label">Résumé Tendance</div>
-              <div class="summary-label summary-mode">Mode Scan : ${esc(campModeLabel(result))} · ${esc(trendSelectionModeLabel(result))}</div>
+              <div class="summary-label summary-mode">Mode Scan : ${esc(campModeLabel(result))} · ${esc(trendSelectionModeLabel(result))} · ${esc(trendLimitLabel(result))}</div>
             </div>
             <div class="summary-title summary-title-stacked">
               <span class="summary-team-title summary-team-title-home">${esc(String(match.homeTeam.name || "").toUpperCase())}</span>
@@ -13450,7 +13517,7 @@
 
     function trendModeLabelV151(result) {
       const camp = result?.scanModeLabel || (result?.simultaneousMode ? "Camp Séparé" : "Camp Combiné");
-      return `${camp} · ${trendSelectionModeLabel(result)}`;
+      return `${camp} · ${trendSelectionModeLabel(result)} · ${trendLimitLabel(result)}`;
     }
 
     function trendWinnerLinesV151(result, compact = false) {
@@ -13475,6 +13542,7 @@
         `Mode Scan : ${trendModeLabelV151(result)}`,
         `Tendances : ${trendCount}`,
         `Derniers Matchs : ${matchesNeeded}`,
+        `Limitation Tendance : ${trendLimitLabel(result)}`,
         `Ignorer Domicile : ${entry.skipHome}`,
         `Ignorer Extérieur : ${entry.skipAway}`,
       ];
@@ -13584,7 +13652,7 @@
       lines.push("");
       lines.push("LEXIQUE");
       lines.push("V = Victoire · N = Nul · D = Défaite");
-      lines.push("Performance = somme exacte des tendances prises.");
+      lines.push("Performance = somme exacte des tendances prises, avec limite -2/+2 si activée.");
       lines.push("Tendance = niveau du match récent - niveau du match précédent.");
       lines.push("Comparaison = sélection selon la progression moyenne la plus forte.");
       lines.push("0-0 = score initial à la minute 1 dans chaque match.");
@@ -13742,6 +13810,7 @@
 
 setupCalcModeSlider();
     setupTrendSelectionSlider();
+    setupTrendLimitSlider();
     initMobileNavigationEffects();
     updateReportCount();
     updateAutoCalculator();
