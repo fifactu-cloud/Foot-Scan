@@ -2376,12 +2376,15 @@ def trend_match_sample(match, incidents, analyzed_team_id, level_mode="full"):
             attack_goals_for += 1
             attack_goal_minutes.append(event_minute)
 
+    # Technique v179 : chaque score existant compte dans la moyenne minute.
+    # Le score initial 0-0 existe dans tous les matchs à la minute 1.
+    # On l'ajoute donc systématiquement, même quand il y a ensuite des buts.
     if level_mode == "attack":
         level = attack_goals_for
-        minutes_for_average = attack_goal_minutes[:] if attack_goal_minutes else [1.0]
+        minutes_for_average = [1.0] + attack_goal_minutes[:]
     else:
         level = goals_for - goals_against
-        minutes_for_average = all_goal_minutes[:] if all_goal_minutes else [1.0]
+        minutes_for_average = [1.0] + all_goal_minutes[:]
 
     return {
         "id": match.get("id"),
