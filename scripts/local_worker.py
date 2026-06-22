@@ -2330,6 +2330,16 @@ def trend_average(values):
     return sum(clean) / len(clean) if clean else 1.0
 
 
+def truthy_param(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value == 1
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on", "oui"}
+    return False
+
+
 def trend_match_sample(match, incidents, analyzed_team_id, level_mode="full"):
     """Construit le niveau d'un match pour le système Tendance.
 
@@ -2878,8 +2888,8 @@ def process_trend_scan_job(job_id, params):
     trend_count = max(1, min(100, trend_count))
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
-    simultaneous_mode = bool(params.get("simultaneousMode"))
-    trend_limit_enabled = bool(params.get("trendLimitEnabled"))
+    simultaneous_mode = truthy_param(params.get("simultaneousMode"))
+    trend_limit_enabled = truthy_param(params.get("trendLimitEnabled"))
     trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
         trend_selection_mode = "top_half"
