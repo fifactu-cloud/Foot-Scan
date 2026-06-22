@@ -11090,6 +11090,12 @@
       font-weight: 1000;
     }
 
+    /* === v185 : option Moyenne Minute Globale sous Libre/Limite === */
+    .trend-limit-slider + .metric-check-row {
+      margin-top: 12px !important;
+      margin-bottom: 0 !important;
+    }
+
   </style>
 </head>
 
@@ -11186,18 +11192,19 @@
               <button type="button" class="calc-mode-opt is-active" data-mode="half" role="tab">TOP MOITIÉ</button>
             </div>
 
-            <label class="metric-check-row" for="trendGlobalAverageEnabled">
-              <input id="trendGlobalAverageEnabled" type="checkbox" />
-              <span class="metric-check-box" aria-hidden="true"></span>
-              <span class="metric-check-text">MOYENNE MINUTE GLOBALE</span>
-            </label>
-
             <input id="trendLimitEnabled" type="checkbox" hidden />
             <div class="calc-mode-slider trend-limit-slider" id="trendLimitSlider" role="tablist" aria-label="Limitation tendance">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
               <button type="button" class="calc-mode-opt is-active" data-mode="free" role="tab">LIBRE</button>
               <button type="button" class="calc-mode-opt" data-mode="limit" role="tab">LIMITE -2/+2</button>
             </div>
+
+            <label class="metric-check-row" for="trendGlobalAverageEnabled">
+              <input id="trendGlobalAverageEnabled" type="checkbox" />
+              <span class="metric-check-box" aria-hidden="true"></span>
+              <span class="metric-check-text">MOYENNE MINUTE GLOBALE</span>
+            </label>
+
           </div>
         </div>
 
