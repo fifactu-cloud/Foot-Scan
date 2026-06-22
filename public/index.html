@@ -11096,6 +11096,47 @@
       margin-bottom: 0 !important;
     }
 
+    /* === v186 : Mode Scan lisible dans Résumé Tendance === */
+    .result-shell .summary-head-top {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      justify-items: center !important;
+      gap: 8px !important;
+      margin-bottom: 10px !important;
+    }
+
+    .result-shell .summary-head-top .summary-label {
+      max-width: 100% !important;
+      width: auto !important;
+      justify-content: center !important;
+      text-align: center !important;
+      white-space: normal !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+    }
+
+    .result-shell .summary-head-top .summary-mode {
+      width: 100% !important;
+      max-width: 100% !important;
+      justify-content: center !important;
+      text-align: center !important;
+      line-height: 1.2 !important;
+      padding-left: 10px !important;
+      padding-right: 10px !important;
+      font-size: clamp(9px, 2.55vw, 11px) !important;
+      letter-spacing: .06em !important;
+    }
+
+    /* === v187 : slider Temps Futur / Temps Passé === */
+    .trend-time-slider {
+      margin-top: 10px !important;
+    }
+
+    .trend-time-slider .calc-mode-opt {
+      font-size: clamp(10.5px, 2.8vw, 12px) !important;
+      letter-spacing: .045em !important;
+    }
+
   </style>
 </head>
 
@@ -11176,7 +11217,7 @@
               </div>
             </div>
 
-            <div class="auto-formula" id="trendFormula">4 Tendances · 5 Derniers Matchs</div>
+            <div class="auto-formula" id="trendFormula">4 Tendances · 9 Derniers Matchs</div>
 
             <input id="simultaneousMode" type="checkbox" hidden />
             <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de camp">
@@ -11190,6 +11231,13 @@
               <span class="calc-mode-thumb" aria-hidden="true"></span>
               <button type="button" class="calc-mode-opt" data-mode="line" role="tab">TOP LIGNE</button>
               <button type="button" class="calc-mode-opt is-active" data-mode="half" role="tab">TOP MOITIÉ</button>
+            </div>
+
+            <input id="trendTimeMode" type="checkbox" hidden />
+            <div class="calc-mode-slider trend-time-slider" id="trendTimeSlider" role="tablist" aria-label="Zone temps">
+              <span class="calc-mode-thumb" aria-hidden="true"></span>
+              <button type="button" class="calc-mode-opt is-active" data-mode="future" role="tab">TEMPS FUTUR</button>
+              <button type="button" class="calc-mode-opt" data-mode="past" role="tab">TEMPS PASSÉ</button>
             </div>
 
             <input id="trendLimitEnabled" type="checkbox" hidden />
@@ -11271,12 +11319,14 @@
         <div class="bar-card">
           <div class="bar-card-title">⚙️ Configuration</div>
           <div class="bar-line"><span>Curseur</span><strong>Nb. Tendances</strong></div>
-          <div class="bar-line"><span>Matchs Utilisés</span><strong>Nb. Tendances + 1</strong></div>
+          <div class="bar-line"><span>Matchs Utilisés</span><strong>Nb. Tendances × 2 + 1</strong></div>
           <div class="bar-line"><span>Camp Combiné</span><strong>Attaque Réciproque</strong></div>
           <div class="bar-line"><span>Camp Séparé</span><strong>Attaque + Défense Solo</strong></div>
           <div class="bar-line"><span>Top Ligne</span><strong>Confrontation Ligne Par Ligne</strong></div>
-          <div class="bar-line"><span>Top Moitié</span><strong>Moitié Des Tendances A+B</strong></div>
-          <div class="bar-line"><span>Moy. Globale</span><strong>Ancienne Sélection Par Proximité</strong></div>
+          <div class="bar-line"><span>Top Moitié</span><strong>Moitié Sur La Zone Temps</strong></div>
+          <div class="bar-line"><span>Temps Futur</span><strong>Temps 1→N · Perf N+1→2N</strong></div>
+          <div class="bar-line"><span>Temps Passé</span><strong>Temps N+1→2N · Perf 1→N</strong></div>
+          <div class="bar-line"><span>Moy. Globale</span><strong>Sélection Par Proximité</strong></div>
           <div class="bar-line"><span>Limite -2/+2</span><strong>Bloque Chaque Tendance Entre -2 Et 2</strong></div>
         </div>
 
@@ -11730,6 +11780,52 @@
       return String(metric).includes("global") ? "Moy. Globale" : "Progression";
     }
 
+    function setupTrendTimeSlider() {
+      const slider = document.getElementById("trendTimeSlider");
+      const box = document.getElementById("trendTimeMode");
+      if (!slider || !box) return;
+      const opts = slider.querySelectorAll(".calc-mode-opt");
+      const positionThumb = () => {
+        const active = slider.querySelector(".calc-mode-opt.is-active");
+        if (!active) return;
+        const pad = 4;
+        const inset = 2;
+        const sliderW = slider.clientWidth;
+        let left = active.offsetLeft + inset;
+        let width = active.offsetWidth - inset * 2;
+        const maxRight = sliderW - pad;
+        if (left < pad) left = pad;
+        if (left + width > maxRight) width = maxRight - left;
+        slider.style.setProperty("--thumb-left", left + "px");
+        slider.style.setProperty("--thumb-width", width + "px");
+      };
+      const sync = () => {
+        const past = Boolean(box.checked);
+        slider.classList.toggle("sim", past);
+        opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "past") === past));
+        requestAnimationFrame(positionThumb);
+      };
+      window.addEventListener("resize", () => requestAnimationFrame(positionThumb));
+      setTimeout(positionThumb, 80);
+      setTimeout(positionThumb, 350);
+      opts.forEach((o) => o.addEventListener("click", () => {
+        box.checked = (o.dataset.mode === "past");
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+        sync();
+        if (typeof navigator.vibrate === "function") navigator.vibrate(8);
+      }));
+      sync();
+    }
+
+    function getTrendTimeMode() {
+      return $("trendTimeMode")?.checked ? "past" : "future";
+    }
+
+    function trendTimeModeLabel(result = null) {
+      const mode = result?.trendTimeMode || result?.trendSelection?.timeMode || getTrendTimeMode();
+      return String(mode).includes("past") ? "Temps Passé" : "Temps Futur";
+    }
+
     function campModeLabel(result = null) {
       const sim = Boolean(result?.simultaneousMode ?? isSimultaneousMode());
       return sim ? "Camp Séparé" : "Camp Combiné";
@@ -11814,7 +11910,7 @@
       if ($("trendBoxTitle")) $("trendBoxTitle").textContent = trendWord.toUpperCase();
       if ($("trendControlTitle")) $("trendControlTitle").textContent = trendWord;
       if ($("trendFormula")) {
-        $("trendFormula").textContent = `${trend} ${trendWord} · ${trend + 1} Derniers Matchs`;
+        $("trendFormula").textContent = `${trend} ${trendWord} · ${trend * 2 + 1} Derniers Matchs`;
       }
       updateRangeGradientFill();
     }
@@ -11826,7 +11922,8 @@
         presetLabel: "Tendance",
         trendMode: true,
         trendCount: trend,
-        matchesNeeded: trend + 1,
+        matchesNeeded: trend * 2 + 1,
+        calculationTrendCount: trend * 2,
         base: trend,
         advancement: 1,
         changes: trend,
@@ -11839,7 +11936,7 @@
 
     function formulaTextForCalc(calc) {
       const trend = Number(calc?.trendCount || getTrendCount());
-      return `${trend} Tendance${trend > 1 ? "s" : ""} · ${trend + 1} Derniers Matchs`;
+      return `${trend} Tendance${trend > 1 ? "s" : ""} · ${trend * 2 + 1} Derniers Matchs`;
     }
 
     function updateAutoCalculator() {
@@ -12263,6 +12360,8 @@
           skipAway: skipAwayValue,
           simultaneousMode: isSimultaneousMode(),
           trendSelectionMode: getTrendSelectionMode(),
+          trendSelectionMetric: getTrendSelectionMetric(),
+          trendTimeMode: getTrendTimeMode(),
           trendLimitEnabled: isTrendLimitEnabled(),
           rankEventStep: 1,
           rankEventMode: "trend",
@@ -12310,6 +12409,7 @@
             winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
             trendSelectionMode: job.result?.trendSelectionMode || getTrendSelectionMode(),
             trendSelectionMetric: job.result?.trendSelectionMetric || getTrendSelectionMetric(),
+            trendTimeMode: job.result?.trendTimeMode || getTrendTimeMode(),
             trendLimitEnabled: Boolean(job.result?.trendLimitEnabled ?? isTrendLimitEnabled()),
           };
 
@@ -12322,6 +12422,7 @@
               simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
               trendSelectionMode: resultWithOptions.trendSelectionMode || getTrendSelectionMode(),
               trendSelectionMetric: resultWithOptions.trendSelectionMetric || getTrendSelectionMetric(),
+              trendTimeMode: resultWithOptions.trendTimeMode || getTrendTimeMode(),
               trendLimitEnabled: Boolean(resultWithOptions.trendLimitEnabled),
               rankEventStep: resultWithOptions.rankEventStep,
               rankEventMode: resultWithOptions.rankEventMode,
@@ -12511,7 +12612,7 @@
           <div class="summary-head">
             <div class="summary-head-top">
               <div class="summary-label">Résumé Tendance</div>
-              <div class="summary-label summary-mode">Mode Scan : ${esc(campModeLabel(result))} · ${esc(trendSelectionModeLabel(result))} · ${esc(trendLimitLabel(result))}</div>
+              <div class="summary-label summary-mode">Mode Scan : ${esc(campModeLabel(result))} · ${esc(trendSelectionModeLabel(result))} · ${esc(trendTimeModeLabel(result))} · ${esc(trendSelectionMetricLabel(result))} · ${esc(trendLimitLabel(result))}</div>
             </div>
             <div class="summary-title summary-title-stacked">
               <span class="summary-team-title summary-team-title-home">${esc(String(match.homeTeam.name || "").toUpperCase())}</span>
@@ -12598,7 +12699,7 @@
             </div>
             <div class="trend-mini-body">
               <div class="trend-match-line">${esc(item.previousMatch?.label || "Match Précédent")} → ${esc(item.recentMatch?.label || "Match Récent")}</div>
-              <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}${item.trendLimited ? ` · Limité depuis ${esc(formatValue(item.rawValue))}` : ""}</div>
+              <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}${item.timeSourceIndex ? ` · Temps T${esc(item.timeSourceIndex)} ${item.timeSourceProgression != null ? `(${esc(formatValue(item.timeSourceProgression))})` : ""}` : ""}${item.trendLimited ? ` · Limité depuis ${esc(formatValue(item.rawValue))}` : ""}</div>
             </div>
           </div>
         </div>
@@ -13597,7 +13698,7 @@
 
     function trendModeLabelV151(result) {
       const camp = result?.scanModeLabel || (result?.simultaneousMode ? "Camp Séparé" : "Camp Combiné");
-      return `${camp} · ${trendSelectionModeLabel(result)} · ${trendLimitLabel(result)}`;
+      return `${camp} · ${trendSelectionModeLabel(result)} · ${trendTimeModeLabel(result)} · ${trendSelectionMetricLabel(result)} · ${trendLimitLabel(result)}`;
     }
 
     function trendWinnerLinesV151(result, compact = false) {
@@ -13734,7 +13835,7 @@
       lines.push("V = Victoire · N = Nul · D = Défaite");
       lines.push("Performance = somme exacte des tendances prises, avec limite -2/+2 si activée.");
       lines.push("Tendance = niveau du match récent - niveau du match précédent.");
-      lines.push("Comparaison = sélection selon la progression moyenne la plus forte.");
+      lines.push("Comparaison = la zone temps sélectionne une position, puis la performance est prise dans la zone opposée.");
       lines.push("0-0 = score initial à la minute 1 dans chaque match.");
       lines.push("");
       lines.push("────────────────────────");
@@ -13890,6 +13991,7 @@
 
 setupCalcModeSlider();
     setupTrendSelectionSlider();
+    setupTrendTimeSlider();
     setupTrendLimitSlider();
     initMobileNavigationEffects();
     updateReportCount();
