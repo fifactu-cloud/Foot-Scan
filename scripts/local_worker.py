@@ -2664,12 +2664,14 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
     }
 
 
-def build_trend_items(samples, side_key, trend_count):
+def build_trend_items(samples, side_key, trend_count, trend_limit_enabled=False):
     items = []
     for i in range(int(trend_count)):
         recent = samples[i]
         previous = samples[i + 1]
-        trend_value = (recent.get("level") or 0) - (previous.get("level") or 0)
+        raw_trend_value = (recent.get("level") or 0) - (previous.get("level") or 0)
+        trend_value = max(-2.0, min(2.0, float(raw_trend_value))) if trend_limit_enabled else raw_trend_value
+        trend_was_limited = bool(trend_limit_enabled and float(raw_trend_value) != float(trend_value))
         previous_minutes = previous.get("minutesForAverage") or [1]
         recent_minutes = recent.get("minutesForAverage") or [1]
         previous_avg_minute = trend_average(previous_minutes)
@@ -2686,7 +2688,13 @@ def build_trend_items(samples, side_key, trend_count):
             "previousLevel": previous.get("level") or 0,
             "recentLevel": recent.get("level") or 0,
             "value": round(trend_value, 6),
+            "rawValue": round(raw_trend_value, 6),
             "performance": round(trend_value, 6),
+            "rawPerformance": round(raw_trend_value, 6),
+            "trendLimitEnabled": bool(trend_limit_enabled),
+            "trendLimited": trend_was_limited,
+            "trendLimitMin": -2,
+            "trendLimitMax": 2,
             "resultStyle": style,
             "resultLabel": trend_label_from_style(style),
             "averageMinute": round(avg_minute, 4),
@@ -2871,6 +2879,7 @@ def process_trend_scan_job(job_id, params):
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = bool(params.get("simultaneousMode"))
+    trend_limit_enabled = bool(params.get("trendLimitEnabled"))
     trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
         trend_selection_mode = "top_half"
@@ -2911,8 +2920,8 @@ def process_trend_scan_job(job_id, params):
         home_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(home_combined)
         away_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(away_combined)
 
-    home_items = build_trend_items(home_scan["trendMatches"], "home", trend_count)
-    away_items = build_trend_items(away_scan["trendMatches"], "away", trend_count)
+    home_items = build_trend_items(home_scan["trendMatches"], "home", trend_count, trend_limit_enabled=trend_limit_enabled)
+    away_items = build_trend_items(away_scan["trendMatches"], "away", trend_count, trend_limit_enabled=trend_limit_enabled)
 
     # Technique v180 : sélection par progression moyenne la plus forte.
     # Top Moitié = moitié A+B la plus forte ; Top Ligne = confrontation ligne par ligne.
@@ -2974,6 +2983,8 @@ def process_trend_scan_job(job_id, params):
         "simultaneousMode": simultaneous_mode,
         "scanModeLabel": "Camp Séparé" if simultaneous_mode else "Camp Combiné",
         "trendLevelMode": level_mode,
+        "trendLimitEnabled": trend_limit_enabled,
+        "trendLimitRange": [-2, 2] if trend_limit_enabled else None,
         "trendSelectionMode": trend_selection_mode,
         "trendSelection": trend_selection,
         "match": {
@@ -3026,6 +3037,8 @@ def process_trend_scan_job(job_id, params):
             "pagesToLoad": PAGES_TO_LOAD,
             "system": "trend",
             "trendLevelMode": level_mode,
+            "trendLimitEnabled": trend_limit_enabled,
+            "trendLimitRange": [-2, 2] if trend_limit_enabled else None,
             "trendSelectionMode": trend_selection_mode,
             "trendSelectionMethod": trend_selection.get("method"),
             "trendSelection": trend_selection,
