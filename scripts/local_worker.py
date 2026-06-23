@@ -3014,13 +3014,13 @@ def process_trend_scan_job(job_id, params):
     trend_limit_enabled = truthy_param(params.get("trendLimitEnabled"))
     trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
-        trend_selection_mode = "top_half"
+        trend_selection_mode = "top_line"
     trend_selection_metric = str(params.get("trendSelectionMetric") or "global_average_minute").strip()
     if trend_selection_metric not in {"progression", "global_average_minute"}:
-        trend_selection_metric = "progression"
+        trend_selection_metric = "global_average_minute"
     trend_time_mode = str(params.get("trendTimeMode") or "past").strip()
     if trend_time_mode not in {"future", "past"}:
-        trend_time_mode = "future"
+        trend_time_mode = "past"
 
     calculation_trend_count = trend_count * 2
 
@@ -3111,13 +3111,15 @@ def process_trend_scan_job(job_id, params):
             return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
 
         normal_side = "home" if h > a else "away"
-        home_taken = int(home_summary.get("dominantCount") or 0)
-        away_taken = int(away_summary.get("dominantCount") or 0)
-        zero_team_has_most_taken = (
-            (h == 0 and home_taken > away_taken)
-            or (a == 0 and away_taken > home_taken)
-        )
-        switched = zero_team_has_most_taken
+        home_taken_trends = int(trend_selection.get("homeSelectedTrendItems") or 0)
+        away_taken_trends = int(trend_selection.get("awaySelectedTrendItems") or 0)
+        zero_side = "home" if h == 0 else ("away" if a == 0 else None)
+        more_taken_side = None
+        if home_taken_trends > away_taken_trends:
+            more_taken_side = "home"
+        elif away_taken_trends > home_taken_trends:
+            more_taken_side = "away"
+        switched = bool(zero_side and zero_side == more_taken_side)
         side = ("away" if normal_side == "home" else "home") if switched else normal_side
 
         if side == "home":
@@ -3128,10 +3130,7 @@ def process_trend_scan_job(job_id, params):
         if switched:
             result_winner.update({
                 "switch": True,
-                "switchReason": "zero_performance_most_taken",
-                "zeroPerformanceSide": "home" if h == 0 else "away",
-                "zeroPerformanceTakenCount": home_taken if h == 0 else away_taken,
-                "otherTakenCount": away_taken if h == 0 else home_taken,
+                "switchReason": "zero_performance",
                 "originalWinnerSide": normal_side,
                 "originalWinnerLabel": home_team.get("name") if normal_side == "home" else away_team.get("name"),
                 "originalWinnerScore": h if normal_side == "home" else a,
