@@ -11608,6 +11608,160 @@
       50% { transform: scale(1.09); }
     }
 
+
+    /* === v195 : Termux sans bulle + halo clignotant, Matchs Trouvés sans bande vide === */
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon,
+    html body .panel.notice .notice-inline-icon {
+      position: relative !important;
+      width: auto !important;
+      height: auto !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      margin: 0 7px 0 0 !important;
+      border: 0 !important;
+      outline: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      isolation: isolate !important;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
+      font-size: 1.23em !important;
+      line-height: 1 !important;
+      color: inherit !important;
+      text-shadow: none !important;
+      transform-origin: center center !important;
+      filter: drop-shadow(0 0 7px rgba(251,113,133,.68)) !important;
+      animation: fsTermuxEmojiBeatV195 1.08s ease-in-out infinite !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::before,
+    html body .panel.notice .notice-inline-icon::before {
+      content: "" !important;
+      display: block !important;
+      position: absolute !important;
+      inset: -7px -8px !important;
+      width: auto !important;
+      height: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1.5px solid rgba(251,113,133,.20) !important;
+      outline: 0 !important;
+      border-radius: 999px !important;
+      background: transparent !important;
+      box-shadow: 0 0 8px rgba(251,113,133,.34), 0 0 18px rgba(251,113,133,.18) !important;
+      opacity: .58 !important;
+      transform: scale(.88) !important;
+      animation: fsTermuxHaloV195 1.08s ease-in-out infinite !important;
+      pointer-events: none !important;
+      z-index: -1 !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::after,
+    html body .panel.notice .notice-inline-icon::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    @keyframes fsTermuxHaloV195 {
+      0%, 100% {
+        opacity: .38;
+        transform: scale(.84);
+        border-color: rgba(251,113,133,.18);
+        box-shadow: 0 0 6px rgba(251,113,133,.24), 0 0 12px rgba(251,113,133,.10);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.20);
+        border-color: rgba(251,113,133,.72);
+        box-shadow: 0 0 13px rgba(251,113,133,.78), 0 0 28px rgba(251,113,133,.44);
+      }
+    }
+
+    @keyframes fsTermuxEmojiBeatV195 {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    .result-shell .team-card > .section:last-of-type {
+      padding-bottom: 0 !important;
+      margin-bottom: 0 !important;
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+    }
+
+    .result-shell .team-card > .section:last-of-type .trend-comparison-stack {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    .result-shell .team-card > .section:last-of-type .trend-comparison-stack .trend-row:last-child,
+    .result-shell .team-card > .section:last-of-type .trend-comparison-stack .trend-row:last-child .trend-mini {
+      margin-bottom: 0 !important;
+    }
+
+    .result-shell .team-card .trend-matches-details {
+      margin-top: 10px !important;
+      padding-top: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      position: relative !important;
+      isolation: isolate !important;
+    }
+
+    .result-shell .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      min-height: 60px !important;
+      padding: 13px 17px !important;
+      border-radius: 21px !important;
+      border: 1px solid rgba(56,189,248,.30) !important;
+      background:
+        linear-gradient(135deg, rgba(56,189,248,.14), rgba(15,23,42,.88) 60%, rgba(30,41,80,.74)) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.06),
+        0 8px 18px rgba(2,6,23,.14) !important;
+      background-clip: border-box !important;
+      color: #f8fbff !important;
+    }
+
+    .result-shell .team-card.team-card-neg .trend-matches-details > summary.events-summary {
+      border-color: rgba(251,113,133,.30) !important;
+      background:
+        linear-gradient(135deg, rgba(251,113,133,.14), rgba(15,23,42,.88) 60%, rgba(45,18,48,.72)) !important;
+    }
+
+    .result-shell .team-card.team-card-neutral .trend-matches-details > summary.events-summary {
+      border-color: rgba(148,163,184,.26) !important;
+      background:
+        linear-gradient(135deg, rgba(148,163,184,.12), rgba(15,23,42,.88) 60%, rgba(30,41,59,.72)) !important;
+    }
+
+    .result-shell .team-card .trend-matches-details[open] > summary.events-summary {
+      border-bottom-left-radius: 17px !important;
+      border-bottom-right-radius: 17px !important;
+    }
+
+    .result-shell .team-card .trend-matches-panel {
+      margin-top: 8px !important;
+      padding: 0 !important;
+      border-top: 0 !important;
+      background: transparent !important;
+    }
+
   </style>
 </head>
 
@@ -11633,7 +11787,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v100</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v195</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -14462,7 +14616,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v100 chargé");
+    console.log("FOOTSCAN v195 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
