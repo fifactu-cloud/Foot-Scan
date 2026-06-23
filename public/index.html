@@ -11529,6 +11529,85 @@
       }
     }
 
+    /* === v194 : lumière rouge clignotante autour de l'emoji Termux === */
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon,
+    html body .panel.notice .notice-inline-icon {
+      position: relative !important;
+      width: 34px !important;
+      height: 34px !important;
+      min-width: 34px !important;
+      min-height: 34px !important;
+      flex: 0 0 34px !important;
+      display: inline-grid !important;
+      place-items: center !important;
+      padding: 0 !important;
+      margin: 0 7px 0 0 !important;
+      border: 0 !important;
+      outline: 0 !important;
+      border-radius: 999px !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      isolation: isolate !important;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
+      font-size: 1.18em !important;
+      line-height: 1 !important;
+      transform-origin: center center !important;
+      animation: fsTermuxEmojiBeatV194 1.08s ease-in-out infinite !important;
+      filter: drop-shadow(0 0 7px rgba(251,113,133,.70)) !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::before,
+    html body .panel.notice .notice-inline-icon::before {
+      content: "" !important;
+      display: block !important;
+      position: absolute !important;
+      inset: 1px !important;
+      width: auto !important;
+      height: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1px solid rgba(251,113,133,.38) !important;
+      outline: 0 !important;
+      border-radius: 999px !important;
+      background: radial-gradient(circle, rgba(251,113,133,.20) 0%, rgba(251,113,133,.08) 42%, rgba(251,113,133,0) 72%) !important;
+      box-shadow: 0 0 8px rgba(251,113,133,.40), 0 0 18px rgba(251,113,133,.18) !important;
+      opacity: .72 !important;
+      transform: scale(.86) !important;
+      animation: fsTermuxRedLightV194 1.08s ease-in-out infinite !important;
+      pointer-events: none !important;
+      z-index: -1 !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::after,
+    html body .panel.notice .notice-inline-icon::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    @keyframes fsTermuxRedLightV194 {
+      0%, 100% {
+        opacity: .45;
+        transform: scale(.82);
+        box-shadow: 0 0 6px rgba(251,113,133,.32), 0 0 12px rgba(251,113,133,.14);
+        border-color: rgba(251,113,133,.28);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.16);
+        box-shadow: 0 0 12px rgba(251,113,133,.78), 0 0 26px rgba(251,113,133,.46);
+        border-color: rgba(251,113,133,.82);
+      }
+    }
+
+    @keyframes fsTermuxEmojiBeatV194 {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.09); }
+    }
+
   </style>
 </head>
 
