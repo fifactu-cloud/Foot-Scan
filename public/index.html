@@ -11458,6 +11458,77 @@
       }
     }
 
+    /* === v193 : correction prioritaire icône Termux ===
+       Les anciennes règles très spécifiques remettaient encore un carré.
+       Ici on cible exactement le bloc et on force l'emoji seul + animation. */
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-icon,
+    html body .panel.notice.panel-pad .notice-inline-icon,
+    html body .panel.notice .notice-inline-icon {
+      width: auto !important;
+      height: auto !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      margin: 0 7px 0 0 !important;
+      border: 0 !important;
+      outline: 0 !important;
+      border-radius: 0 !important;
+      background: none !important;
+      background-color: transparent !important;
+      box-shadow: none !important;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
+      font-size: 1.24em !important;
+      line-height: 1 !important;
+      opacity: 1 !important;
+      color: inherit !important;
+      text-shadow: none !important;
+      transform-origin: center center !important;
+      filter: drop-shadow(0 0 7px rgba(251,113,133,.65)) !important;
+      animation: fsTermuxEmojiPulseV193 1.05s ease-in-out infinite !important;
+      overflow: visible !important;
+      isolation: auto !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::after,
+    html body .panel.notice .notice-inline-icon::before,
+    html body .panel.notice .notice-inline-icon::after {
+      content: none !important;
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 0 !important;
+      outline: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      opacity: 0 !important;
+      animation: none !important;
+    }
+
+    @keyframes fsTermuxEmojiPulseV193 {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 5px rgba(251,113,133,.46));
+      }
+      50% {
+        transform: scale(1.18);
+        filter: drop-shadow(0 0 17px rgba(251,113,133,.95));
+      }
+    }
+
   </style>
 </head>
 
