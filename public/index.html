@@ -11266,11 +11266,12 @@
     }
 
 
-    /* Retouche v189 : section Termux sans bordure/liseré en haut. */
+    /* Retouche v190 : Termux sans liseré haut, avec bordure fine complète + halo animé. */
     body .panel.notice,
     body .panel.notice.fx-card,
     body .panel.notice.fx-card.is-visible {
-      border-top-color: transparent !important;
+      border: 1px solid rgba(244, 63, 94, 0.28) !important;
+      border-color: rgba(244, 63, 94, 0.28) !important;
       box-shadow: var(--shadow) !important;
     }
 
@@ -11281,6 +11282,23 @@
       opacity: 0 !important;
       background: none !important;
       box-shadow: none !important;
+    }
+
+    @keyframes stopGlowV190 {
+      0%, 100% {
+        filter: drop-shadow(0 0 3px rgba(244, 63, 94, 0.44)) drop-shadow(0 0 7px rgba(244, 63, 94, 0.18));
+      }
+      50% {
+        filter: drop-shadow(0 0 7px rgba(255, 75, 120, 0.95)) drop-shadow(0 0 18px rgba(255, 75, 120, 0.55));
+      }
+    }
+
+    body .panel.notice .notice-inline-icon,
+    body .panel.notice .notice-inline-icon.fx-card,
+    body .panel.notice .notice-inline-icon.is-visible {
+      filter: drop-shadow(0 0 5px rgba(244, 63, 94, 0.46)) !important;
+      animation: stopGlowV190 1.35s ease-in-out infinite !important;
+      will-change: filter !important;
     }
 
   </style>
