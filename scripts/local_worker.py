@@ -3012,15 +3012,15 @@ def process_trend_scan_job(job_id, params):
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = truthy_param(params.get("simultaneousMode"))
     trend_limit_enabled = truthy_param(params.get("trendLimitEnabled"))
-    trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
+    trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
-        trend_selection_mode = "top_half"
-    trend_selection_metric = str(params.get("trendSelectionMetric") or "progression").strip()
+        trend_selection_mode = "top_line"
+    trend_selection_metric = str(params.get("trendSelectionMetric") or "global_average_minute").strip()
     if trend_selection_metric not in {"progression", "global_average_minute"}:
-        trend_selection_metric = "progression"
-    trend_time_mode = str(params.get("trendTimeMode") or "future").strip()
+        trend_selection_metric = "global_average_minute"
+    trend_time_mode = str(params.get("trendTimeMode") or "past").strip()
     if trend_time_mode not in {"future", "past"}:
-        trend_time_mode = "future"
+        trend_time_mode = "past"
 
     calculation_trend_count = trend_count * 2
 
@@ -3110,11 +3110,25 @@ def process_trend_scan_job(job_id, params):
         if h == a:
             return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
 
-        if h > a:
-            return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(h - a, 6)}
-        if a > h:
-            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(a - h, 6)}
-        return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
+        normal_side = "home" if h > a else "away"
+        switched = (h == 0 or a == 0)
+        side = ("away" if normal_side == "home" else "home") if switched else normal_side
+
+        if side == "home":
+            result_winner = {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(abs(h - a), 6)}
+        else:
+            result_winner = {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(abs(h - a), 6)}
+
+        if switched:
+            result_winner.update({
+                "switch": True,
+                "switchReason": "zero_performance",
+                "originalWinnerSide": normal_side,
+                "originalWinnerLabel": home_team.get("name") if normal_side == "home" else away_team.get("name"),
+                "originalWinnerScore": h if normal_side == "home" else a,
+            })
+
+        return result_winner
 
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
     away_issue_count = int(away_scan.get("eventDataIssueCount") or 0)
