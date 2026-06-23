@@ -11385,6 +11385,152 @@
     }
 
 
+    /* Retouche v193 : espacement Matchs Utilisés, header lumineux animé, halo 🛑 pulsant. */
+    @keyframes headerBorderV193 {
+      0% {
+        background-position: 0% 50%;
+        filter: drop-shadow(0 0 7px rgba(64, 201, 255, .34)) drop-shadow(0 0 9px rgba(251, 113, 133, .18));
+      }
+      50% {
+        background-position: 100% 50%;
+        filter: drop-shadow(0 0 10px rgba(251, 113, 133, .34)) drop-shadow(0 0 9px rgba(64, 201, 255, .22));
+      }
+      100% {
+        background-position: 0% 50%;
+        filter: drop-shadow(0 0 7px rgba(64, 201, 255, .34)) drop-shadow(0 0 9px rgba(251, 113, 133, .18));
+      }
+    }
+
+    body .topbar {
+      border-bottom-color: rgba(64, 201, 255, .42) !important;
+    }
+
+    body .topbar::after {
+      content: "" !important;
+      position: absolute !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: -1px !important;
+      height: 3px !important;
+      opacity: .98 !important;
+      background: linear-gradient(90deg,
+        rgba(64, 201, 255, .95) 0%,
+        rgba(59, 107, 255, .72) 20%,
+        rgba(251, 113, 133, .92) 45%,
+        rgba(124, 92, 255, .72) 67%,
+        rgba(64, 201, 255, .95) 100%
+      ) !important;
+      background-size: 300% 100% !important;
+      animation: headerBorderV193 2.8s ease-in-out infinite !important;
+      box-shadow: 0 0 11px rgba(64, 201, 255, .23), 0 0 12px rgba(251, 113, 133, .17) !important;
+      pointer-events: none !important;
+    }
+
+    body .result-shell .team-card > .section:last-of-type {
+      padding-bottom: 6px !important;
+      margin-bottom: 0 !important;
+      overflow: visible !important;
+    }
+
+    body .result-shell .team-card > .section:last-of-type .trend-comparison-stack {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+      overflow: visible !important;
+    }
+
+    body .result-shell .team-card > .section:last-of-type .trend-comparison-stack .trend-row:last-child {
+      margin-bottom: 0 !important;
+      padding-bottom: 6px !important;
+    }
+
+    body .result-shell .team-card .trend-matches-details {
+      margin-top: 8px !important;
+      padding-top: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      position: relative !important;
+      z-index: 2 !important;
+    }
+
+    body .result-shell .team-card .trend-matches-details::before,
+    body .result-shell .team-card .trend-matches-details::after {
+      content: none !important;
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      background: none !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    body .result-shell .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      border-radius: 20px !important;
+      background-clip: border-box !important;
+      overflow: hidden !important;
+      clip-path: none !important;
+      box-shadow: none !important;
+    }
+
+    @keyframes stopHaloV193 {
+      0%, 100% {
+        opacity: .36;
+        transform: translate(-50%, -50%) scale(.76);
+        filter: blur(5px);
+      }
+      50% {
+        opacity: .95;
+        transform: translate(-50%, -50%) scale(1.18);
+        filter: blur(8px);
+      }
+    }
+
+    @keyframes stopIconPulseV193 {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 5px rgba(244, 63, 94, .58)) drop-shadow(0 0 10px rgba(244, 63, 94, .20));
+      }
+      50% {
+        transform: scale(1.08);
+        filter: drop-shadow(0 0 9px rgba(255, 75, 120, 1)) drop-shadow(0 0 22px rgba(255, 75, 120, .62));
+      }
+    }
+
+    body .panel.notice .notice-inline-icon,
+    body .panel.notice .notice-inline-icon.fx-card,
+    body .panel.notice .notice-inline-icon.is-visible {
+      position: relative !important;
+      isolation: isolate !important;
+      overflow: visible !important;
+      animation: stopIconPulseV193 1.25s ease-in-out infinite !important;
+      will-change: transform, filter !important;
+      filter: drop-shadow(0 0 6px rgba(244, 63, 94, .62)) !important;
+    }
+
+    body .panel.notice .notice-inline-icon::after {
+      content: "" !important;
+      display: block !important;
+      position: absolute !important;
+      left: 50% !important;
+      top: 50% !important;
+      width: 30px !important;
+      height: 30px !important;
+      border-radius: 999px !important;
+      background: radial-gradient(circle,
+        rgba(255, 75, 120, .78) 0%,
+        rgba(244, 63, 94, .42) 42%,
+        rgba(244, 63, 94, 0) 72%
+      ) !important;
+      box-shadow: 0 0 15px rgba(244, 63, 94, .48), 0 0 24px rgba(244, 63, 94, .22) !important;
+      transform: translate(-50%, -50%) scale(.82) !important;
+      animation: stopHaloV193 1.25s ease-in-out infinite !important;
+      z-index: -1 !important;
+      pointer-events: none !important;
+    }
+
+
   </style>
 </head>
 
