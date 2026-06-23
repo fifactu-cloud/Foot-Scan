@@ -11301,6 +11301,90 @@
       will-change: filter !important;
     }
 
+    /* Retouche v192 : lexique + header + séparation Matchs Utilisés. */
+    @keyframes headerBorderV192 {
+      0%, 100% {
+        background-position: 0% 50%;
+        opacity: .72;
+      }
+      50% {
+        background-position: 100% 50%;
+        opacity: .96;
+      }
+    }
+
+    body .topbar {
+      border-bottom-color: rgba(64, 201, 255, .24) !important;
+    }
+
+    body .topbar::after {
+      content: "" !important;
+      position: absolute !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: -1px !important;
+      height: 2px !important;
+      background: linear-gradient(90deg,
+        rgba(64, 201, 255, .42) 0%,
+        rgba(124, 92, 255, .36) 24%,
+        rgba(251, 113, 133, .48) 50%,
+        rgba(124, 92, 255, .36) 76%,
+        rgba(64, 201, 255, .42) 100%
+      ) !important;
+      background-size: 240% 100% !important;
+      animation: headerBorderV192 4.4s ease-in-out infinite !important;
+      filter: drop-shadow(0 0 7px rgba(64, 201, 255, .12)) drop-shadow(0 0 7px rgba(251, 113, 133, .10)) !important;
+      box-shadow: none !important;
+      pointer-events: none !important;
+    }
+
+    body .result-shell .team-card > .section:last-of-type {
+      padding-bottom: 16px !important;
+      margin-bottom: 0 !important;
+      overflow: visible !important;
+    }
+
+    body .result-shell .team-card > .section:last-of-type .trend-comparison-stack {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+      overflow: visible !important;
+    }
+
+    body .result-shell .team-card > .section:last-of-type .trend-comparison-stack .trend-row:last-child {
+      margin-bottom: 0 !important;
+      padding-bottom: 12px !important;
+    }
+
+    body .result-shell .team-card .trend-matches-details {
+      margin-top: 16px !important;
+      padding-top: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+    }
+
+    body .result-shell .team-card .trend-matches-details::before,
+    body .result-shell .team-card .trend-matches-details::after {
+      content: none !important;
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      background: none !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    body .result-shell .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      border-radius: 20px !important;
+      background-clip: border-box !important;
+      overflow: hidden !important;
+      clip-path: none !important;
+      box-shadow: none !important;
+    }
+
+
   </style>
 </head>
 
@@ -11478,6 +11562,7 @@
           <div class="bar-line"><span>V</span><strong class="positive">Victoire</strong></div>
           <div class="bar-line"><span>N</span><strong class="neutral">Nul</strong></div>
           <div class="bar-line"><span>D</span><strong class="negative">Défaite</strong></div>
+          <div class="bar-line"><span>Switch</span><strong>Perf. Finale 0 Côté + Tendances Prises</strong></div>
         </div>
 
         <div class="bar-card">
@@ -14024,6 +14109,7 @@
       lines.push("");
       lines.push("LEXIQUE");
       lines.push("V = Victoire · N = Nul · D = Défaite");
+      lines.push("Switch = performance finale 0 du côté de l'équipe avec le plus de tendances prises.");
       lines.push("Performance = somme exacte des tendances prises, avec limite -2/+2 si activée.");
       lines.push("Tendance = niveau du match récent - niveau du match précédent.");
       lines.push("Comparaison = la zone temps sélectionne une position, puis la performance est prise dans la zone opposée.");
