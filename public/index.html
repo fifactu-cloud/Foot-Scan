@@ -11265,147 +11265,22 @@
       background-clip: padding-box !important;
     }
 
-    /* === v189 : Matchs Utilisés plus propre + Termux sans bordure haute === */
-    body .panel.notice {
-      border: 1px solid rgba(251,113,133,.22) !important;
+
+    /* Retouche v189 : section Termux sans bordure/liseré en haut. */
+    body .panel.notice,
+    body .panel.notice.fx-card,
+    body .panel.notice.fx-card.is-visible {
+      border-top-color: transparent !important;
       box-shadow: var(--shadow) !important;
-      background:
-        linear-gradient(135deg, rgba(251,113,133,.075), rgba(244,63,110,.035)),
-        rgba(13,11,24,.92) !important;
     }
 
-    body .panel.notice::before,
     body .panel.notice::after {
-      display: none !important;
       content: none !important;
-    }
-
-    body .panel.notice .notice-title {
-      border-color: rgba(251,113,133,.24) !important;
-      box-shadow: none !important;
-    }
-
-    /* On ne cherche plus à raccorder Matchs Utilisés avec la dernière bulle :
-       on le remet en bloc indépendant, neutre/bleu, avec une vraie respiration. */
-    .result-shell .team-card > .section:last-of-type {
-      background: transparent !important;
-      border-color: transparent !important;
-      box-shadow: none !important;
-      padding-bottom: 16px !important;
-      margin-bottom: 0 !important;
-    }
-
-    .result-shell .team-card > .section:last-of-type .trend-comparison-stack {
-      margin-bottom: 0 !important;
-      padding-bottom: 0 !important;
-    }
-
-    .result-shell .team-card .trend-matches-details {
-      margin-top: 18px !important;
-      padding-top: 0 !important;
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
-      overflow: visible !important;
-      position: relative !important;
-      isolation: isolate !important;
-    }
-
-    .result-shell .team-card .trend-matches-details::before,
-    .result-shell .team-card .trend-matches-details::after {
       display: none !important;
-      content: none !important;
-    }
-
-    .result-shell .team-card .trend-matches-details > summary.events-summary {
-      margin-top: 0 !important;
-      min-height: 64px !important;
-      padding: 14px 18px !important;
-      border-radius: 22px !important;
-      border: 1px solid rgba(56,189,248,.32) !important;
-      background:
-        linear-gradient(135deg, rgba(56,189,248,.13), rgba(15,23,42,.84) 58%, rgba(30,41,80,.72)) !important;
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.06),
-        0 10px 24px rgba(2,6,23,.18) !important;
-      color: #f8fbff !important;
-      background-clip: border-box !important;
-    }
-
-    .result-shell .team-card .trend-matches-details > summary.events-summary .events-summary-label {
-      color: #ffffff !important;
-      text-shadow: none !important;
-    }
-
-    .result-shell .team-card .trend-matches-details > summary.events-summary .events-count-pill {
-      border-color: rgba(56,189,248,.35) !important;
-      background: rgba(15,23,42,.42) !important;
-      color: #ffffff !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.06) !important;
-    }
-
-    .result-shell .team-card .trend-matches-details[open] > summary.events-summary {
-      border-bottom-left-radius: 18px !important;
-      border-bottom-right-radius: 18px !important;
-    }
-
-    /* === v190 : Termux vraiment sans bordure haute décorative === */
-    html body main.app section.panel.notice.panel-pad,
-    html body main.app section.panel.notice.panel-pad.fx-card,
-    html body main.app section.panel.notice.panel-pad.is-visible {
-      border: 1px solid rgba(251,113,133,.22) !important;
-      border-top: 1px solid rgba(251,113,133,.22) !important;
-      box-shadow: none !important;
-      outline: 0 !important;
-      background:
-        linear-gradient(135deg, rgba(251,113,133,.065), rgba(244,63,110,.030)),
-        rgba(13,11,24,.92) !important;
-      overflow: hidden !important;
-    }
-
-    html body main.app section.panel.notice.panel-pad::before,
-    html body main.app section.panel.notice.panel-pad::after,
-    html body main.app section.panel.notice.panel-pad.fx-card::before,
-    html body main.app section.panel.notice.panel-pad.fx-card::after,
-    html body main.app section.panel.notice.panel-pad.is-visible::before,
-    html body main.app section.panel.notice.panel-pad.is-visible::after {
-      display: none !important;
-      content: none !important;
-      opacity: 0 !important;
-      width: 0 !important;
       height: 0 !important;
-      border: 0 !important;
-      box-shadow: none !important;
-      background: transparent !important;
-    }
-
-    html body main.app section.panel.notice.panel-pad .notice-title,
-    html body main.app section.panel.notice.panel-pad .notice-title.fx-card,
-    html body main.app section.panel.notice.panel-pad .notice-title.is-visible {
-      border: 1px solid rgba(251,113,133,.20) !important;
-      border-top: 1px solid rgba(251,113,133,.20) !important;
-      box-shadow: none !important;
-      outline: 0 !important;
-      background: rgba(80, 12, 39, .28) !important;
-    }
-
-    html body main.app section.panel.notice.panel-pad .notice-title::before,
-    html body main.app section.panel.notice.panel-pad .notice-title::after,
-    html body main.app section.panel.notice.panel-pad .notice-inline-icon::before,
-    html body main.app section.panel.notice.panel-pad .notice-inline-icon::after {
-      display: none !important;
-      content: none !important;
       opacity: 0 !important;
-      border: 0 !important;
+      background: none !important;
       box-shadow: none !important;
-      background: transparent !important;
-    }
-
-    html body main.app section.panel.notice.panel-pad .notice-inline-icon,
-    html body main.app section.panel.notice.panel-pad .notice-icon {
-      border: 1px solid rgba(251,113,133,.22) !important;
-      box-shadow: none !important;
-      outline: 0 !important;
     }
 
   </style>
