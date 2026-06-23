@@ -11137,6 +11137,134 @@
       letter-spacing: .045em !important;
     }
 
+    /* === v188 : Résumé + pastilles mode scan === */
+    .result-shell .summary-head-top {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+      align-items: center !important;
+      justify-items: stretch !important;
+      gap: 10px !important;
+      width: 100% !important;
+      margin: 0 0 16px !important;
+      padding: 0 clamp(6px, 1.8vw, 14px) !important;
+    }
+
+    .result-shell .summary-head-top .summary-label,
+    .result-shell .summary-head-top .summary-mode {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-height: 38px !important;
+      padding: 0 10px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+    }
+
+    .result-shell .summary-main-chip {
+      font-size: clamp(12px, 3.2vw, 14px) !important;
+      letter-spacing: .075em !important;
+      line-height: 1 !important;
+    }
+
+    .result-shell .summary-mode-dots {
+      line-height: 1 !important;
+    }
+
+    .mode-dotbar {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: clamp(7px, 2.1vw, 10px) !important;
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+
+    .mode-dot {
+      width: clamp(11px, 3vw, 14px) !important;
+      height: clamp(11px, 3vw, 14px) !important;
+      border-radius: 999px !important;
+      flex: 0 0 auto !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 0 12px rgba(255,255,255,.08) !important;
+    }
+
+    .mode-dot.blue {
+      background: linear-gradient(135deg,#38bdf8,#2563eb) !important;
+      box-shadow: 0 0 12px rgba(56,189,248,.25) !important;
+    }
+
+    .mode-dot.pink {
+      background: linear-gradient(135deg,#fb7185,#db2777) !important;
+      box-shadow: 0 0 12px rgba(251,113,133,.25) !important;
+    }
+
+    .mode-check {
+      width: clamp(12px, 3.15vw, 15px) !important;
+      height: clamp(12px, 3.15vw, 15px) !important;
+      border-radius: 5px !important;
+      flex: 0 0 auto !important;
+      border: 1px solid rgba(148,163,184,.58) !important;
+      background: rgba(15,23,42,.55) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05) !important;
+      position: relative !important;
+    }
+
+    .mode-check.checked {
+      border-color: rgba(56,189,248,.72) !important;
+      background: linear-gradient(135deg,#38bdf8,#2563eb) !important;
+      box-shadow: 0 0 12px rgba(56,189,248,.24) !important;
+    }
+
+    .mode-check.checked::after {
+      content: "✓";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 1000;
+      transform: translateY(-.5px);
+    }
+
+    /* === v188 : supprime définitivement le raccord de couleur avant Matchs Utilisés === */
+    .result-shell .team-card > .section:last-of-type {
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      padding-bottom: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    .result-shell .team-card > .section:last-of-type .trend-comparison-stack,
+    .result-shell .team-card > .section:last-of-type .trend-comparison-stack .trend-row:last-child {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    .result-shell .team-card .trend-matches-details {
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+    }
+
+    .result-shell .team-card .trend-matches-details::before {
+      display: none !important;
+      content: none !important;
+    }
+
+    .result-shell .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      box-shadow: none !important;
+      background-clip: padding-box !important;
+    }
+
   </style>
 </head>
 
@@ -11226,18 +11354,18 @@
               <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">CAMP SÉPARÉ</button>
             </div>
 
-            <input id="trendSelectionMode" type="checkbox" hidden checked />
-            <div class="calc-mode-slider trend-selection-slider sim" id="trendSelectionSlider" role="tablist" aria-label="Mode de sélection tendance">
+            <input id="trendSelectionMode" type="checkbox" hidden />
+            <div class="calc-mode-slider trend-selection-slider" id="trendSelectionSlider" role="tablist" aria-label="Mode de sélection tendance">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt" data-mode="line" role="tab">TOP LIGNE</button>
-              <button type="button" class="calc-mode-opt is-active" data-mode="half" role="tab">TOP MOITIÉ</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="line" role="tab">TOP LIGNE</button>
+              <button type="button" class="calc-mode-opt" data-mode="half" role="tab">TOP MOITIÉ</button>
             </div>
 
-            <input id="trendTimeMode" type="checkbox" hidden />
-            <div class="calc-mode-slider trend-time-slider" id="trendTimeSlider" role="tablist" aria-label="Zone temps">
+            <input id="trendTimeMode" type="checkbox" hidden checked />
+            <div class="calc-mode-slider trend-time-slider sim" id="trendTimeSlider" role="tablist" aria-label="Zone temps">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt is-active" data-mode="future" role="tab">TEMPS FUTUR</button>
-              <button type="button" class="calc-mode-opt" data-mode="past" role="tab">TEMPS PASSÉ</button>
+              <button type="button" class="calc-mode-opt" data-mode="future" role="tab">TEMPS FUTUR</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="past" role="tab">TEMPS PASSÉ</button>
             </div>
 
             <input id="trendLimitEnabled" type="checkbox" hidden />
@@ -11248,7 +11376,7 @@
             </div>
 
             <label class="metric-check-row" for="trendGlobalAverageEnabled">
-              <input id="trendGlobalAverageEnabled" type="checkbox" />
+              <input id="trendGlobalAverageEnabled" type="checkbox" checked />
               <span class="metric-check-box" aria-hidden="true"></span>
               <span class="metric-check-text">MOYENNE MINUTE GLOBALE</span>
             </label>
@@ -11875,6 +12003,32 @@
 
     function trendLimitLabel(result = null) {
       return isTrendLimitEnabled(result) ? "Limite -2/+2" : "Libre";
+    }
+
+    function renderModeScanDots(result) {
+      const campSeparate = Boolean(result?.simultaneousMode ?? isSimultaneousMode());
+      const topHalf = String(result?.trendSelectionMode || result?.trendSelection?.method || getTrendSelectionMode()).includes("half");
+      const timePast = String(result?.trendTimeMode || result?.trendSelection?.timeMode || getTrendTimeMode()).includes("past");
+      const limited = isTrendLimitEnabled(result);
+      const metricGlobal = String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || getTrendSelectionMetric()).includes("global");
+
+      const modeTitle = [
+        campSeparate ? "Camp Séparé" : "Camp Combiné",
+        topHalf ? "Top Moitié" : "Top Ligne",
+        timePast ? "Temps Passé" : "Temps Futur",
+        limited ? "Limite -2/+2" : "Libre",
+        metricGlobal ? "Moyenne Minute Globale activée" : "Moyenne Minute Globale désactivée",
+      ].join(" · ");
+
+      return `
+        <div class="mode-dotbar" title="${esc(modeTitle)}" aria-label="${esc(modeTitle)}">
+          <span class="mode-dot ${campSeparate ? "pink" : "blue"}" title="${esc(campSeparate ? "Camp Séparé" : "Camp Combiné")}"></span>
+          <span class="mode-dot ${topHalf ? "pink" : "blue"}" title="${esc(topHalf ? "Top Moitié" : "Top Ligne")}"></span>
+          <span class="mode-dot ${timePast ? "pink" : "blue"}" title="${esc(timePast ? "Temps Passé" : "Temps Futur")}"></span>
+          <span class="mode-dot ${limited ? "pink" : "blue"}" title="${esc(limited ? "Limite -2/+2" : "Libre")}"></span>
+          <span class="mode-check ${metricGlobal ? "checked" : "empty"}" title="${esc(metricGlobal ? "Moyenne Minute Globale activée" : "Moyenne Minute Globale désactivée")}"></span>
+        </div>
+      `;
     }
 
     function isSimultaneousMode() {
@@ -12568,16 +12722,16 @@
 
     function renderTrendWinner(result) {
       const winner = result?.trendWinner || {};
-      const isSwitch = false;
+      const isSwitch = Boolean(winner.switch);
       const confColors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
       const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
       return `
-        <div class="dominance-box dominance-win">
+        <div class="dominance-box dominance-win ${isSwitch ? "dominance-switch" : ""}">
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
           <div class="dominance-trophy" aria-hidden="true">🏆</div>
-          <div class="dominance-label">👑 GAGNANT TENDANCE</div>
+          <div class="dominance-label">👑 GAGNANT TENDANCE${isSwitch ? " (SWITCH)" : ""}</div>
           <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
           <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}</div>
         </div>
@@ -12611,8 +12765,8 @@
         <section class="summary">
           <div class="summary-head">
             <div class="summary-head-top">
-              <div class="summary-label">Résumé Tendance</div>
-              <div class="summary-label summary-mode">Mode Scan : ${esc(campModeLabel(result))} · ${esc(trendSelectionModeLabel(result))} · ${esc(trendTimeModeLabel(result))} · ${esc(trendSelectionMetricLabel(result))} · ${esc(trendLimitLabel(result))}</div>
+              <div class="summary-label summary-main-chip">RÉSUMÉ</div>
+              <div class="summary-label summary-mode summary-mode-dots">${renderModeScanDots(result)}</div>
             </div>
             <div class="summary-title summary-title-stacked">
               <span class="summary-team-title summary-team-title-home">${esc(String(match.homeTeam.name || "").toUpperCase())}</span>
@@ -13706,7 +13860,8 @@
       if (!winner || winner.type === "tie") {
         return ["👑 GAGNANT TENDANCE : Égalité"];
       }
-      const base = `👑 GAGNANT TENDANCE : ${winner.label || "Indisponible"}`;
+      const switchText = winner.switch ? " (SWITCH)" : "";
+      const base = `👑 GAGNANT TENDANCE${switchText} : ${winner.label || "Indisponible"}`;
       const meta = `Performance : ${formatValue(winner.score)}${winner.diff != null ? ` · Écart : ${formatValue(winner.diff)}` : ""}`;
       return compact ? [`${base} · ${meta}`] : [base, meta];
     }
