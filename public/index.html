@@ -11874,6 +11874,77 @@
     }
 
 
+    /* === v198 : ralentit l'animation Termux + répare la jonction avant Matchs Utilisés === */
+    body .panel.notice .notice-title .termux-alert-v197::before {
+      animation: fsTermuxHaloBlinkV197 1.65s ease-in-out infinite !important;
+    }
+
+    body .panel.notice .notice-title .termux-alert-v197::after {
+      animation: fsTermuxHaloFlashV197 1.65s ease-in-out infinite !important;
+    }
+
+    body .panel.notice .notice-title .termux-alert-v197 .termux-halo-v197 {
+      animation: fsTermuxHaloOuterV197 1.65s ease-in-out infinite !important;
+    }
+
+    body .panel.notice .notice-title .termux-alert-v197 .termux-emoji-v197 {
+      animation: fsTermuxEmojiBeatV197 1.65s ease-in-out infinite !important;
+    }
+
+    .result-shell .team-card > .section:last-of-type {
+      padding-bottom: 14px !important;
+      margin-bottom: 0 !important;
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+    }
+
+    .result-shell .team-card > .section:last-of-type .trend-comparison-stack {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+      gap: 12px !important;
+    }
+
+    .result-shell .team-card > .section:last-of-type .trend-row:last-child {
+      margin-bottom: 0 !important;
+      overflow: visible !important;
+    }
+
+    .result-shell .team-card > .section:last-of-type .trend-row:last-child .trend-mini {
+      margin-bottom: 0 !important;
+      overflow: visible !important;
+    }
+
+    .result-shell .team-card .trend-matches-details {
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      position: relative !important;
+      isolation: isolate !important;
+    }
+
+    .result-shell .team-card .trend-matches-details::before,
+    .result-shell .team-card .trend-matches-details::after {
+      display: none !important;
+      content: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      opacity: 0 !important;
+    }
+
+    .result-shell .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+    }
+
+
   </style>
 </head>
 
@@ -11899,7 +11970,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v197</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v198</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
