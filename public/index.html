@@ -11349,6 +11349,65 @@
       border-bottom-right-radius: 18px !important;
     }
 
+    /* === v190 : Termux vraiment sans bordure haute décorative === */
+    html body main.app section.panel.notice.panel-pad,
+    html body main.app section.panel.notice.panel-pad.fx-card,
+    html body main.app section.panel.notice.panel-pad.is-visible {
+      border: 1px solid rgba(251,113,133,.22) !important;
+      border-top: 1px solid rgba(251,113,133,.22) !important;
+      box-shadow: none !important;
+      outline: 0 !important;
+      background:
+        linear-gradient(135deg, rgba(251,113,133,.065), rgba(244,63,110,.030)),
+        rgba(13,11,24,.92) !important;
+      overflow: hidden !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad::before,
+    html body main.app section.panel.notice.panel-pad::after,
+    html body main.app section.panel.notice.panel-pad.fx-card::before,
+    html body main.app section.panel.notice.panel-pad.fx-card::after,
+    html body main.app section.panel.notice.panel-pad.is-visible::before,
+    html body main.app section.panel.notice.panel-pad.is-visible::after {
+      display: none !important;
+      content: none !important;
+      opacity: 0 !important;
+      width: 0 !important;
+      height: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title,
+    html body main.app section.panel.notice.panel-pad .notice-title.fx-card,
+    html body main.app section.panel.notice.panel-pad .notice-title.is-visible {
+      border: 1px solid rgba(251,113,133,.20) !important;
+      border-top: 1px solid rgba(251,113,133,.20) !important;
+      box-shadow: none !important;
+      outline: 0 !important;
+      background: rgba(80, 12, 39, .28) !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title::before,
+    html body main.app section.panel.notice.panel-pad .notice-title::after,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::after {
+      display: none !important;
+      content: none !important;
+      opacity: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-icon {
+      border: 1px solid rgba(251,113,133,.22) !important;
+      box-shadow: none !important;
+      outline: 0 !important;
+    }
+
   </style>
 </head>
 
