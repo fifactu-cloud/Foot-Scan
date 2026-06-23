@@ -11408,6 +11408,56 @@
       outline: 0 !important;
     }
 
+
+    /* === v192 : icône Termux sans carré + animation restaurée === */
+    body .panel.notice .notice-inline-icon,
+    body .panel.notice .notice-inline-icon.fx-card,
+    body .panel.notice .notice-inline-icon.is-visible {
+      width: auto !important;
+      height: auto !important;
+      min-width: 0 !important;
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      margin: 0 6px 0 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      font-size: 1.18em !important;
+      line-height: 1 !important;
+      opacity: 1 !important;
+      transform-origin: center center !important;
+      filter: drop-shadow(0 0 7px rgba(251,113,133,.62)) !important;
+      animation: fsTermuxEmojiPulseV192 1.05s ease-in-out infinite !important;
+    }
+
+    body .panel.notice .notice-inline-icon::before,
+    body .panel.notice .notice-inline-icon::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    @keyframes fsTermuxEmojiPulseV192 {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 5px rgba(251,113,133,.46));
+      }
+      50% {
+        transform: scale(1.15);
+        filter: drop-shadow(0 0 15px rgba(251,113,133,.92));
+      }
+    }
+
+    @media (max-width: 380px) {
+      body .panel.notice .notice-inline-icon {
+        font-size: 1.12em !important;
+        margin-right: 5px !important;
+      }
+    }
+
   </style>
 </head>
 
