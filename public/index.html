@@ -11609,6 +11609,751 @@
     }
 
 
+    /* === v196 : halo Termux clairement animé + correctif Matchs Trouvés conservé === */
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon,
+    html body .panel.notice .notice-inline-icon {
+      position: relative !important;
+      width: auto !important;
+      height: auto !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      margin: 0 7px 0 0 !important;
+      border: 0 !important;
+      outline: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
+      font-size: 1.23em !important;
+      line-height: 1 !important;
+      color: inherit !important;
+      text-shadow:
+        0 0 4px rgba(251,113,133,.42),
+        0 0 10px rgba(251,113,133,.24) !important;
+      filter: saturate(1.04) !important;
+      transform-origin: center center !important;
+      z-index: 0 !important;
+      animation: fsTermuxEmojiBeatV196 1.15s ease-in-out infinite !important;
+      will-change: transform, text-shadow, filter !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::before,
+    html body .panel.notice .notice-inline-icon::before {
+      content: "" !important;
+      display: block !important;
+      position: absolute !important;
+      left: 50% !important;
+      top: 50% !important;
+      width: 1.72em !important;
+      height: 1.72em !important;
+      transform: translate(-50%, -50%) scale(.72) !important;
+      border-radius: 999px !important;
+      border: 1.6px solid rgba(251,113,133,.56) !important;
+      background: transparent !important;
+      box-shadow:
+        0 0 0 1px rgba(251,113,133,.10) inset,
+        0 0 8px rgba(251,113,133,.42),
+        0 0 18px rgba(251,113,133,.22) !important;
+      opacity: .42 !important;
+      pointer-events: none !important;
+      z-index: -1 !important;
+      animation: fsTermuxHaloPulseV196 1.15s cubic-bezier(.4, 0, .2, 1) infinite !important;
+      will-change: transform, opacity, box-shadow, border-color !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::after,
+    html body .panel.notice .notice-inline-icon::after {
+      content: "" !important;
+      display: block !important;
+      position: absolute !important;
+      left: 50% !important;
+      top: 50% !important;
+      width: 2.08em !important;
+      height: 2.08em !important;
+      transform: translate(-50%, -50%) scale(.60) !important;
+      border-radius: 999px !important;
+      border: 0 !important;
+      background: radial-gradient(circle, rgba(251,113,133,.24) 0%, rgba(251,113,133,.12) 34%, rgba(251,113,133,.05) 48%, rgba(251,113,133,0) 72%) !important;
+      filter: blur(5px) !important;
+      opacity: .18 !important;
+      pointer-events: none !important;
+      z-index: -2 !important;
+      animation: fsTermuxHaloBloomV196 1.15s ease-out infinite !important;
+      will-change: transform, opacity, filter !important;
+    }
+
+    @keyframes fsTermuxHaloPulseV196 {
+      0%, 100% {
+        opacity: .34;
+        transform: translate(-50%, -50%) scale(.68);
+        border-color: rgba(251,113,133,.34);
+        box-shadow:
+          0 0 0 1px rgba(251,113,133,.08) inset,
+          0 0 5px rgba(251,113,133,.24),
+          0 0 10px rgba(251,113,133,.12);
+      }
+      48% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.24);
+        border-color: rgba(251,113,133,.92);
+        box-shadow:
+          0 0 0 1px rgba(251,113,133,.18) inset,
+          0 0 12px rgba(251,113,133,.82),
+          0 0 24px rgba(251,113,133,.42),
+          0 0 34px rgba(251,113,133,.20);
+      }
+      78% {
+        opacity: .56;
+        transform: translate(-50%, -50%) scale(1.42);
+        border-color: rgba(251,113,133,.20);
+        box-shadow:
+          0 0 0 1px rgba(251,113,133,.04) inset,
+          0 0 8px rgba(251,113,133,.20),
+          0 0 20px rgba(251,113,133,.10);
+      }
+    }
+
+    @keyframes fsTermuxHaloBloomV196 {
+      0%, 100% {
+        opacity: .12;
+        transform: translate(-50%, -50%) scale(.52);
+        filter: blur(4px);
+      }
+      50% {
+        opacity: .36;
+        transform: translate(-50%, -50%) scale(1.18);
+        filter: blur(7px);
+      }
+      80% {
+        opacity: .16;
+        transform: translate(-50%, -50%) scale(1.42);
+        filter: blur(8px);
+      }
+    }
+
+    @keyframes fsTermuxEmojiBeatV196 {
+      0%, 100% {
+        transform: scale(1);
+        text-shadow:
+          0 0 4px rgba(251,113,133,.38),
+          0 0 9px rgba(251,113,133,.18);
+      }
+      50% {
+        transform: scale(1.08);
+        text-shadow:
+          0 0 8px rgba(251,113,133,.78),
+          0 0 18px rgba(251,113,133,.36);
+      }
+    }
+
+    .result-shell .team-card > .section:last-of-type {
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      padding-bottom: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      box-shadow: none !important;
+    }
+
+    /* === v181 : option limitation tendance -2/+2 === */
+    .trend-limit-slider {
+      margin-top: 10px !important;
+    }
+
+    .trend-limit-slider .calc-mode-opt {
+      font-size: clamp(10.5px, 2.75vw, 12px) !important;
+      letter-spacing: .045em !important;
+    }
+
+    /* === v184 : option ancienne sélection moyenne minute globale === */
+    .metric-check-row {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 9px !important;
+      margin: 10px auto 0 !important;
+      padding: 10px 12px !important;
+      border-radius: 18px !important;
+      border: 1px solid rgba(56,189,248,.20) !important;
+      background: rgba(15,23,42,.30) !important;
+      color: #cfe8ff !important;
+      font-size: 11px !important;
+      font-weight: 900 !important;
+      letter-spacing: .055em !important;
+      text-align: center !important;
+      user-select: none !important;
+    }
+
+    .metric-check-row input {
+      position: absolute !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    .metric-check-box {
+      width: 18px !important;
+      height: 18px !important;
+      border-radius: 6px !important;
+      border: 1px solid rgba(148,163,184,.46) !important;
+      background: rgba(15,23,42,.55) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06) !important;
+      position: relative !important;
+      flex: 0 0 auto !important;
+    }
+
+    .metric-check-row input:checked + .metric-check-box {
+      border-color: rgba(56,189,248,.72) !important;
+      background: linear-gradient(135deg,#38bdf8,#2563eb) !important;
+      box-shadow: 0 8px 18px rgba(56,189,248,.22) !important;
+    }
+
+    .metric-check-row input:checked + .metric-check-box::after {
+      content: "✓";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 1000;
+    }
+
+    /* === v185 : option Moyenne Minute Globale sous Libre/Limite === */
+    .trend-limit-slider + .metric-check-row {
+      margin-top: 12px !important;
+      margin-bottom: 0 !important;
+    }
+
+    /* === v186 : Mode Scan lisible dans Résumé Tendance === */
+    .result-shell .summary-head-top {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      justify-items: center !important;
+      gap: 8px !important;
+      margin-bottom: 10px !important;
+    }
+
+    .result-shell .summary-head-top .summary-label {
+      max-width: 100% !important;
+      width: auto !important;
+      justify-content: center !important;
+      text-align: center !important;
+      white-space: normal !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+    }
+
+    .result-shell .summary-head-top .summary-mode {
+      width: 100% !important;
+      max-width: 100% !important;
+      justify-content: center !important;
+      text-align: center !important;
+      line-height: 1.2 !important;
+      padding-left: 10px !important;
+      padding-right: 10px !important;
+      font-size: clamp(9px, 2.55vw, 11px) !important;
+      letter-spacing: .06em !important;
+    }
+
+    /* === v187 : slider Temps Futur / Temps Passé === */
+    .trend-time-slider {
+      margin-top: 10px !important;
+    }
+
+    .trend-time-slider .calc-mode-opt {
+      font-size: clamp(10.5px, 2.8vw, 12px) !important;
+      letter-spacing: .045em !important;
+    }
+
+    /* === v188 : Résumé + pastilles mode scan === */
+    .result-shell .summary-head-top {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+      align-items: center !important;
+      justify-items: stretch !important;
+      gap: 10px !important;
+      width: 100% !important;
+      margin: 0 0 16px !important;
+      padding: 0 clamp(6px, 1.8vw, 14px) !important;
+    }
+
+    .result-shell .summary-head-top .summary-label,
+    .result-shell .summary-head-top .summary-mode {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-height: 38px !important;
+      padding: 0 10px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+    }
+
+    .result-shell .summary-main-chip {
+      font-size: clamp(12px, 3.2vw, 14px) !important;
+      letter-spacing: .075em !important;
+      line-height: 1 !important;
+    }
+
+    .result-shell .summary-mode-dots {
+      line-height: 1 !important;
+    }
+
+    .mode-dotbar {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: clamp(7px, 2.1vw, 10px) !important;
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+
+    .mode-dot {
+      width: clamp(11px, 3vw, 14px) !important;
+      height: clamp(11px, 3vw, 14px) !important;
+      border-radius: 999px !important;
+      flex: 0 0 auto !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 0 12px rgba(255,255,255,.08) !important;
+    }
+
+    .mode-dot.blue {
+      background: linear-gradient(135deg,#38bdf8,#2563eb) !important;
+      box-shadow: 0 0 12px rgba(56,189,248,.25) !important;
+    }
+
+    .mode-dot.pink {
+      background: linear-gradient(135deg,#fb7185,#db2777) !important;
+      box-shadow: 0 0 12px rgba(251,113,133,.25) !important;
+    }
+
+    .mode-check {
+      width: clamp(12px, 3.15vw, 15px) !important;
+      height: clamp(12px, 3.15vw, 15px) !important;
+      border-radius: 5px !important;
+      flex: 0 0 auto !important;
+      border: 1px solid rgba(148,163,184,.58) !important;
+      background: rgba(15,23,42,.55) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05) !important;
+      position: relative !important;
+    }
+
+    .mode-check.checked {
+      border-color: rgba(56,189,248,.72) !important;
+      background: linear-gradient(135deg,#38bdf8,#2563eb) !important;
+      box-shadow: 0 0 12px rgba(56,189,248,.24) !important;
+    }
+
+    .mode-check.checked::after {
+      content: "✓";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 1000;
+      transform: translateY(-.5px);
+    }
+
+    /* === v188 : supprime définitivement le raccord de couleur avant Matchs Utilisés === */
+    .result-shell .team-card > .section:last-of-type {
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      padding-bottom: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    .result-shell .team-card > .section:last-of-type .trend-comparison-stack,
+    .result-shell .team-card > .section:last-of-type .trend-comparison-stack .trend-row:last-child {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    .result-shell .team-card .trend-matches-details {
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+    }
+
+    .result-shell .team-card .trend-matches-details::before {
+      display: none !important;
+      content: none !important;
+    }
+
+    .result-shell .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      box-shadow: none !important;
+      background-clip: padding-box !important;
+    }
+
+    /* === v189 : Matchs Utilisés plus propre + Termux sans bordure haute === */
+    body .panel.notice {
+      border: 1px solid rgba(251,113,133,.22) !important;
+      box-shadow: var(--shadow) !important;
+      background:
+        linear-gradient(135deg, rgba(251,113,133,.075), rgba(244,63,110,.035)),
+        rgba(13,11,24,.92) !important;
+    }
+
+    body .panel.notice::before,
+    body .panel.notice::after {
+      display: none !important;
+      content: none !important;
+    }
+
+    body .panel.notice .notice-title {
+      border-color: rgba(251,113,133,.24) !important;
+      box-shadow: none !important;
+    }
+
+    /* On ne cherche plus à raccorder Matchs Utilisés avec la dernière bulle :
+       on le remet en bloc indépendant, neutre/bleu, avec une vraie respiration. */
+    .result-shell .team-card > .section:last-of-type {
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      padding-bottom: 16px !important;
+      margin-bottom: 0 !important;
+    }
+
+    .result-shell .team-card > .section:last-of-type .trend-comparison-stack {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    .result-shell .team-card .trend-matches-details {
+      margin-top: 18px !important;
+      padding-top: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      position: relative !important;
+      isolation: isolate !important;
+    }
+
+    .result-shell .team-card .trend-matches-details::before,
+    .result-shell .team-card .trend-matches-details::after {
+      display: none !important;
+      content: none !important;
+    }
+
+    .result-shell .team-card .trend-matches-details > summary.events-summary {
+      margin-top: 0 !important;
+      min-height: 64px !important;
+      padding: 14px 18px !important;
+      border-radius: 22px !important;
+      border: 1px solid rgba(56,189,248,.32) !important;
+      background:
+        linear-gradient(135deg, rgba(56,189,248,.13), rgba(15,23,42,.84) 58%, rgba(30,41,80,.72)) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.06),
+        0 10px 24px rgba(2,6,23,.18) !important;
+      color: #f8fbff !important;
+      background-clip: border-box !important;
+    }
+
+    .result-shell .team-card .trend-matches-details > summary.events-summary .events-summary-label {
+      color: #ffffff !important;
+      text-shadow: none !important;
+    }
+
+    .result-shell .team-card .trend-matches-details > summary.events-summary .events-count-pill {
+      border-color: rgba(56,189,248,.35) !important;
+      background: rgba(15,23,42,.42) !important;
+      color: #ffffff !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06) !important;
+    }
+
+    .result-shell .team-card .trend-matches-details[open] > summary.events-summary {
+      border-bottom-left-radius: 18px !important;
+      border-bottom-right-radius: 18px !important;
+    }
+
+    /* === v190 : Termux vraiment sans bordure haute décorative === */
+    html body main.app section.panel.notice.panel-pad,
+    html body main.app section.panel.notice.panel-pad.fx-card,
+    html body main.app section.panel.notice.panel-pad.is-visible {
+      border: 1px solid rgba(251,113,133,.22) !important;
+      border-top: 1px solid rgba(251,113,133,.22) !important;
+      box-shadow: none !important;
+      outline: 0 !important;
+      background:
+        linear-gradient(135deg, rgba(251,113,133,.065), rgba(244,63,110,.030)),
+        rgba(13,11,24,.92) !important;
+      overflow: hidden !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad::before,
+    html body main.app section.panel.notice.panel-pad::after,
+    html body main.app section.panel.notice.panel-pad.fx-card::before,
+    html body main.app section.panel.notice.panel-pad.fx-card::after,
+    html body main.app section.panel.notice.panel-pad.is-visible::before,
+    html body main.app section.panel.notice.panel-pad.is-visible::after {
+      display: none !important;
+      content: none !important;
+      opacity: 0 !important;
+      width: 0 !important;
+      height: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title,
+    html body main.app section.panel.notice.panel-pad .notice-title.fx-card,
+    html body main.app section.panel.notice.panel-pad .notice-title.is-visible {
+      border: 1px solid rgba(251,113,133,.20) !important;
+      border-top: 1px solid rgba(251,113,133,.20) !important;
+      box-shadow: none !important;
+      outline: 0 !important;
+      background: rgba(80, 12, 39, .28) !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title::before,
+    html body main.app section.panel.notice.panel-pad .notice-title::after,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::after {
+      display: none !important;
+      content: none !important;
+      opacity: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-icon {
+      border: 1px solid rgba(251,113,133,.22) !important;
+      box-shadow: none !important;
+      outline: 0 !important;
+    }
+
+
+    /* === v192 : icône Termux sans carré + animation restaurée === */
+    body .panel.notice .notice-inline-icon,
+    body .panel.notice .notice-inline-icon.fx-card,
+    body .panel.notice .notice-inline-icon.is-visible {
+      width: auto !important;
+      height: auto !important;
+      min-width: 0 !important;
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      margin: 0 6px 0 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      font-size: 1.18em !important;
+      line-height: 1 !important;
+      opacity: 1 !important;
+      transform-origin: center center !important;
+      filter: drop-shadow(0 0 7px rgba(251,113,133,.62)) !important;
+      animation: fsTermuxEmojiPulseV192 1.05s ease-in-out infinite !important;
+    }
+
+    body .panel.notice .notice-inline-icon::before,
+    body .panel.notice .notice-inline-icon::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    @keyframes fsTermuxEmojiPulseV192 {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 5px rgba(251,113,133,.46));
+      }
+      50% {
+        transform: scale(1.15);
+        filter: drop-shadow(0 0 15px rgba(251,113,133,.92));
+      }
+    }
+
+    @media (max-width: 380px) {
+      body .panel.notice .notice-inline-icon {
+        font-size: 1.12em !important;
+        margin-right: 5px !important;
+      }
+    }
+
+    /* === v193 : correction prioritaire icône Termux ===
+       Les anciennes règles très spécifiques remettaient encore un carré.
+       Ici on cible exactement le bloc et on force l'emoji seul + animation. */
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-icon,
+    html body .panel.notice.panel-pad .notice-inline-icon,
+    html body .panel.notice .notice-inline-icon {
+      width: auto !important;
+      height: auto !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      flex: 0 0 auto !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 !important;
+      margin: 0 7px 0 0 !important;
+      border: 0 !important;
+      outline: 0 !important;
+      border-radius: 0 !important;
+      background: none !important;
+      background-color: transparent !important;
+      box-shadow: none !important;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
+      font-size: 1.24em !important;
+      line-height: 1 !important;
+      opacity: 1 !important;
+      color: inherit !important;
+      text-shadow: none !important;
+      transform-origin: center center !important;
+      filter: drop-shadow(0 0 7px rgba(251,113,133,.65)) !important;
+      animation: fsTermuxEmojiPulseV193 1.05s ease-in-out infinite !important;
+      overflow: visible !important;
+      isolation: auto !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-inline-icon::after,
+    html body .panel.notice .notice-inline-icon::before,
+    html body .panel.notice .notice-inline-icon::after {
+      content: none !important;
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 0 !important;
+      outline: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      opacity: 0 !important;
+      animation: none !important;
+    }
+
+    @keyframes fsTermuxEmojiPulseV193 {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 5px rgba(251,113,133,.46));
+      }
+      50% {
+        transform: scale(1.18);
+        filter: drop-shadow(0 0 17px rgba(251,113,133,.95));
+      }
+    }
+
+    /* === v194 : lumière rouge clignotante autour de l'emoji Termux === */
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon,
+    html body .panel.notice .notice-inline-icon {
+      position: relative !important;
+      width: 34px !important;
+      height: 34px !important;
+      min-width: 34px !important;
+      min-height: 34px !important;
+      flex: 0 0 34px !important;
+      display: inline-grid !important;
+      place-items: center !important;
+      padding: 0 !important;
+      margin: 0 7px 0 0 !important;
+      border: 0 !important;
+      outline: 0 !important;
+      border-radius: 999px !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      isolation: isolate !important;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
+      font-size: 1.18em !important;
+      line-height: 1 !important;
+      transform-origin: center center !important;
+      animation: fsTermuxEmojiBeatV194 1.08s ease-in-out infinite !important;
+      filter: drop-shadow(0 0 7px rgba(251,113,133,.70)) !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::before,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::before,
+    html body .panel.notice .notice-inline-icon::before {
+      content: "" !important;
+      display: block !important;
+      position: absolute !important;
+      inset: 1px !important;
+      width: auto !important;
+      height: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1px solid rgba(251,113,133,.38) !important;
+      outline: 0 !important;
+      border-radius: 999px !important;
+      background: radial-gradient(circle, rgba(251,113,133,.20) 0%, rgba(251,113,133,.08) 42%, rgba(251,113,133,0) 72%) !important;
+      box-shadow: 0 0 8px rgba(251,113,133,.40), 0 0 18px rgba(251,113,133,.18) !important;
+      opacity: .72 !important;
+      transform: scale(.86) !important;
+      animation: fsTermuxRedLightV194 1.08s ease-in-out infinite !important;
+      pointer-events: none !important;
+      z-index: -1 !important;
+    }
+
+    html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon::after,
+    html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon::after,
+    html body .panel.notice .notice-inline-icon::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    @keyframes fsTermuxRedLightV194 {
+      0%, 100% {
+        opacity: .45;
+        transform: scale(.82);
+        box-shadow: 0 0 6px rgba(251,113,133,.32), 0 0 12px rgba(251,113,133,.14);
+        border-color: rgba(251,113,133,.28);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.16);
+        box-shadow: 0 0 12px rgba(251,113,133,.78), 0 0 26px rgba(251,113,133,.46);
+        border-color: rgba(251,113,133,.82);
+      }
+    }
+
+    @keyframes fsTermuxEmojiBeatV194 {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.09); }
+    }
+
+
     /* === v195 : Termux sans bulle + halo clignotant, Matchs Trouvés sans bande vide === */
     html body main.app section.panel.notice.panel-pad .notice-title > span.notice-inline-icon,
     html body main.app section.panel.notice.panel-pad .notice-title .notice-inline-icon,
@@ -11787,7 +12532,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-title">FOOTSCAN<span class="ver-tag">v195</span></div>
+          <div class="brand-title">FOOTSCAN<span class="ver-tag">v196</span></div>
           <div class="brand-subtitle">Performance scanner</div>
         </div>
       </div>
@@ -14616,7 +15361,7 @@
       items.forEach((item) => observer.observe(item));
     }
 
-    console.log("FOOTSCAN v195 chargé");
+    console.log("FOOTSCAN v196 chargé");
 
     // Retouche v58 : interactions festives sur les blocs de résultats
     document.addEventListener("click", (e) => {
