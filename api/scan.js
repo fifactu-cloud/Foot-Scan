@@ -122,7 +122,6 @@ module.exports = async function (req, res) {
     const trendCount = numeric(b.trendCount, rank1 || 4, 1, 100);
     const trendSelectionMode = b.trendSelectionMode === 'top_half' ? 'top_half' : 'top_line';
     const trendSelectionMetric = b.trendSelectionMetric === 'progression' ? 'progression' : 'global_average_minute';
-    const trendTimeMode = b.trendTimeMode === 'future' ? 'future' : 'past';
     const trendLimitEnabled = bool(b.trendLimitEnabled);
 
     if (!/^\d+$/.test(matchId)) {
@@ -164,7 +163,6 @@ module.exports = async function (req, res) {
         trendCount,
         trendSelectionMode,
         trendSelectionMetric,
-        trendTimeMode,
         trendLimitEnabled,
       },
     };
