@@ -11036,7 +11036,7 @@
       letter-spacing: .045em !important;
     }
 
-    /* === v184 : option ancienne sélection moyenne minute globale === */
+    /* === v202 : option sélection moyenne minute haute === */
     .metric-check-row {
       display: flex !important;
       align-items: center !important;
@@ -11090,7 +11090,7 @@
       font-weight: 1000;
     }
 
-    /* === v185 : option Moyenne Minute Globale sous Libre/Limite === */
+    /* === v202 : option Moyenne Minute Haute sous Libre/Limite === */
     .trend-limit-slider + .metric-check-row {
       margin-top: 12px !important;
       margin-bottom: 0 !important;
@@ -11634,7 +11634,7 @@
             <label class="metric-check-row" for="trendGlobalAverageEnabled">
               <input id="trendGlobalAverageEnabled" type="checkbox" checked />
               <span class="metric-check-box" aria-hidden="true"></span>
-              <span class="metric-check-text">MOYENNE MINUTE GLOBALE</span>
+              <span class="metric-check-text">MOYENNE MINUTE HAUTE</span>
             </label>
 
           </div>
@@ -11709,7 +11709,7 @@
           <div class="bar-line"><span>Camp Séparé</span><strong>Attaque + Défense Solo</strong></div>
           <div class="bar-line"><span>Top Ligne</span><strong>Confrontation Ligne Par Ligne</strong></div>
           <div class="bar-line"><span>Top Moitié</span><strong>Moitié Sur La Zone Temps</strong></div>
-          <div class="bar-line"><span>Moy. Globale</span><strong>Sélection Par Proximité</strong></div>
+          <div class="bar-line"><span>Moy. Haute</span><strong>Moy. Minute La Plus Forte</strong></div>
           <div class="bar-line"><span>Limite -2/+2</span><strong>Bloque Chaque Tendance Entre -2 Et 2</strong></div>
         </div>
 
@@ -11723,7 +11723,7 @@
           <div class="bar-card-title">⏱️ Comparaison</div>
           <div class="bar-line"><span>Temps</span><strong>Moy. Minutes Des Buts</strong></div>
           <div class="bar-line"><span>Défaut</span><strong>Progression Moy. La Plus Forte</strong></div>
-          <div class="bar-line"><span>Option</span><strong>Plus Proche Moy. Globale</strong></div>
+          <div class="bar-line"><span>Option</span><strong>Moy. Minute La Plus Haute</strong></div>
         </div>
       </div>
     </details>
@@ -12155,12 +12155,12 @@
     }
 
     function getTrendSelectionMetric() {
-      return $("trendGlobalAverageEnabled")?.checked ? "global_average_minute" : "progression";
+      return $("trendGlobalAverageEnabled")?.checked ? "high_average_minute" : "progression";
     }
 
     function trendSelectionMetricLabel(result = null) {
       const metric = result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || getTrendSelectionMetric();
-      return String(metric).includes("global") ? "Moy. Globale" : "Progression";
+      return (String(metric).includes("high") || String(metric).includes("global")) ? "Moy. Haute" : "Progression";
     }
 
 
@@ -12219,13 +12219,13 @@
       const campSeparate = Boolean(result?.simultaneousMode ?? isSimultaneousMode());
       const topHalf = String(result?.trendSelectionMode || result?.trendSelection?.method || getTrendSelectionMode()).includes("half");
       const limited = isTrendLimitEnabled(result);
-      const metricGlobal = String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || getTrendSelectionMetric()).includes("global");
+      const metricGlobal = (String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || getTrendSelectionMetric()).includes("high") || String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || getTrendSelectionMetric()).includes("global"));
 
       const modeTitle = [
         campSeparate ? "Camp Séparé" : "Camp Combiné",
         topHalf ? "Top Moitié" : "Top Ligne",
         limited ? "Limite -2/+2" : "Libre",
-        metricGlobal ? "Moyenne Minute Globale activée" : "Moyenne Minute Globale désactivée",
+        metricGlobal ? "Moyenne Minute Haute activée" : "Moyenne Minute Haute désactivée",
       ].join(" · ");
 
       return `
@@ -12233,7 +12233,7 @@
           <span class="mode-dot ${campSeparate ? "pink" : "blue"}" title="${esc(campSeparate ? "Camp Séparé" : "Camp Combiné")}"></span>
           <span class="mode-dot ${topHalf ? "pink" : "blue"}" title="${esc(topHalf ? "Top Moitié" : "Top Ligne")}"></span>
           <span class="mode-dot ${limited ? "pink" : "blue"}" title="${esc(limited ? "Limite -2/+2" : "Libre")}"></span>
-          <span class="mode-check ${metricGlobal ? "checked" : "empty"}" title="${esc(metricGlobal ? "Moyenne Minute Globale activée" : "Moyenne Minute Globale désactivée")}"></span>
+          <span class="mode-check ${metricGlobal ? "checked" : "empty"}" title="${esc(metricGlobal ? "Moyenne Minute Haute activée" : "Moyenne Minute Haute désactivée")}"></span>
         </div>
       `;
     }
