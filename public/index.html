@@ -10844,11 +10844,6 @@
       background-clip: padding-box !important;
     }
 
-    /* === v171 : règle switch gagnant tendance === */
-    .dominance-box.dominance-switch .dominance-label {
-      color: #facc15 !important;
-      text-shadow: 0 0 14px rgba(250, 204, 21, .22) !important;
-    }
 
     /* === v173 : correction propre Matchs Utilisés ===
        On annule l'effet de remontée qui donnait l'impression que le bloc
@@ -11698,7 +11693,6 @@
           <div class="bar-line"><span>V</span><strong class="positive">Victoire</strong></div>
           <div class="bar-line"><span>N</span><strong class="neutral">Nul</strong></div>
           <div class="bar-line"><span>D</span><strong class="negative">Défaite</strong></div>
-          <div class="bar-line"><span>Switch</span><strong>Perf. Finale 0 Côté + Tendances Prises</strong></div>
         </div>
 
         <div class="bar-card">
@@ -12926,16 +12920,15 @@
 
     function renderTrendWinner(result) {
       const winner = result?.trendWinner || {};
-      const isSwitch = Boolean(winner.switch);
       const confColors = ["#40c9ff", "#fb7185", "#22c55e", "#facc15", "#ffffff"];
       const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
       return `
-        <div class="dominance-box dominance-win ${isSwitch ? "dominance-switch" : ""}">
+        <div class="dominance-box dominance-win">
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
           <div class="dominance-trophy" aria-hidden="true">🏆</div>
-          <div class="dominance-label">👑 GAGNANT TENDANCE${isSwitch ? " (SWITCH)" : ""}</div>
+          <div class="dominance-label">👑 GAGNANT TENDANCE</div>
           <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
           <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}</div>
         </div>
@@ -14094,8 +14087,7 @@
       if (!winner || winner.type === "tie") {
         return ["👑 GAGNANT TENDANCE : Égalité"];
       }
-      const switchText = winner.switch ? " (SWITCH)" : "";
-      const base = `👑 GAGNANT TENDANCE${switchText} : ${winner.label || "Indisponible"}`;
+      const base = `👑 GAGNANT TENDANCE : ${winner.label || "Indisponible"}`;
       const meta = `Performance : ${formatValue(winner.score)}${winner.diff != null ? ` · Écart : ${formatValue(winner.diff)}` : ""}`;
       return compact ? [`${base} · ${meta}`] : [base, meta];
     }
@@ -14227,7 +14219,6 @@
       lines.push("");
       lines.push("LEXIQUE");
       lines.push("V = Victoire · N = Nul · D = Défaite");
-      lines.push("Switch = performance finale 0 du côté de l'équipe avec le plus de tendances prises.");
       lines.push("Performance = somme exacte des tendances prises, avec limite -2/+2 si activée.");
       lines.push("Tendance = niveau du match récent - niveau du match précédent.");
       lines.push("Comparaison = la zone temps sélectionne une position, puis la performance est prise dans la zone opposée.");
