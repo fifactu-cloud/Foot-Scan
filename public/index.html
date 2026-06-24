@@ -11602,13 +11602,13 @@
               <div class="auto-control trend-control">
                 <div class="auto-control-top">
                   <div class="auto-control-title" id="trendControlTitle">Tendances</div>
-                  <input id="trendNumber" class="auto-number" type="number" min="1" max="100" step="1" value="4" />
+                  <input id="trendNumber" class="auto-number" type="number" min="1" max="100" step="1" value="9" />
                 </div>
-                <input id="trendRange" type="range" min="1" max="100" step="1" value="4" />
+                <input id="trendRange" type="range" min="1" max="100" step="1" value="9" />
               </div>
             </div>
 
-            <div class="auto-formula" id="trendFormula">4 Tendances · 5 Derniers Matchs</div>
+            <div class="auto-formula" id="trendFormula">9 Tendances · 10 Derniers Matchs</div>
 
             <input id="simultaneousMode" type="checkbox" hidden />
             <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de camp">
@@ -11617,11 +11617,11 @@
               <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">CAMP SÉPARÉ</button>
             </div>
 
-            <input id="trendSelectionMode" type="checkbox" hidden />
-            <div class="calc-mode-slider trend-selection-slider" id="trendSelectionSlider" role="tablist" aria-label="Mode de sélection tendance">
+            <input id="trendSelectionMode" type="checkbox" hidden checked />
+            <div class="calc-mode-slider trend-selection-slider sim" id="trendSelectionSlider" role="tablist" aria-label="Mode de sélection tendance">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt is-active" data-mode="line" role="tab">TOP LIGNE</button>
-              <button type="button" class="calc-mode-opt" data-mode="half" role="tab">TOP MOITIÉ</button>
+              <button type="button" class="calc-mode-opt" data-mode="line" role="tab">TOP LIGNE</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="half" role="tab">TOP MOITIÉ</button>
             </div>
 
             <input id="trendLimitEnabled" type="checkbox" hidden />
@@ -11640,7 +11640,7 @@
           </div>
         </div>
 
-        <input id="rank1" type="hidden" value="4" />
+        <input id="rank1" type="hidden" value="9" />
         <input id="rank2" type="hidden" value="" />
 
         <div class="two">
@@ -12256,8 +12256,8 @@
     }
 
     function getTrendCount() {
-      const raw = Number(String($("trendNumber")?.value || $("trendRange")?.value || "4").replace(",", "."));
-      if (!Number.isFinite(raw)) return 4;
+      const raw = Number(String($("trendNumber")?.value || $("trendRange")?.value || "9").replace(",", "."));
+      if (!Number.isFinite(raw)) return 9;
       return Math.max(1, Math.min(100, Math.round(raw)));
     }
 
