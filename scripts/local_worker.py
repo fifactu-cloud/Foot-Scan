@@ -2381,6 +2381,51 @@ def trend_goal_minute_label(minute, added=0):
     return f"{minute_value}+{added_value}'" if added_value else f"{minute_value}'"
 
 
+def safe_score_value(value):
+    try:
+        if value is None or value == "":
+            return None
+        return int(float(value))
+    except Exception:
+        return None
+
+
+def match_score_pair(match):
+    """Retourne le score final fiable du match source quand il existe.
+
+    On privilégie le score de temps réglementaire quand SofaScore le fournit,
+    sinon le score courant/final. Ce score sert uniquement à vérifier qu'un
+    0-0 est réel et que les incidents récupérés contiennent les buts du match.
+    """
+    home_score = match.get("homeScore") or {}
+    away_score = match.get("awayScore") or {}
+
+    for key in ("normaltime", "current", "display"):
+        home = safe_score_value(home_score.get(key))
+        away = safe_score_value(away_score.get(key))
+        if home is not None and away is not None:
+            return home, away
+
+    return None, None
+
+
+def match_score_total(match):
+    home, away = match_score_pair(match)
+    if home is None or away is None:
+        return None
+    return max(0, home) + max(0, away)
+
+
+def reconstruction_source_is_complete(source_record):
+    if not isinstance(source_record, dict):
+        return False
+    if source_record.get("eventDataIssue"):
+        return False
+    if source_record.get("reconstructionGoalsIncomplete"):
+        return False
+    return True
+
+
 def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
     """Prépare les buts d'un match source pour la reconstitution diagonale.
 
@@ -2393,6 +2438,9 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
     match_id = match.get("id")
     competition = get_competition_name(match)
     start_timestamp = match.get("startTimestamp") or 0
+    final_home_score, final_away_score = match_score_pair(match)
+    final_score_total = match_score_total(match)
+    true_zero_zero = final_score_total == 0 if final_score_total is not None else False
     match_has_assists = match_contains_goal_assist(incidents)
     goals = []
 
@@ -2437,6 +2485,9 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
         })
 
     goals.sort(key=lambda item: item.get("chronoKey") or (0, 0, 0))
+    goal_data_complete = True
+    if final_score_total is not None and final_score_total > len(goals):
+        goal_data_complete = False
 
     zero_zero = {
         "isZeroZero": True,
@@ -2466,26 +2517,32 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
         "startTimestamp": start_timestamp,
         "goals": goals,
         "zeroZero": zero_zero,
+        "trueZeroZero": bool(true_zero_zero),
+        "finalHomeScore": final_home_score,
+        "finalAwayScore": final_away_score,
+        "finalScoreTotal": final_score_total,
+        "reconstructionGoalsIncomplete": not goal_data_complete,
         "matchHasAssists": match_has_assists,
         "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
     }
 
 
 def reconstruction_source_is_true_zero_zero(source_record):
-    if not isinstance(source_record, dict):
+    if not reconstruction_source_is_complete(source_record):
         return False
-    if source_record.get("eventDataIssue"):
-        return False
-    return len(source_record.get("goals") or []) == 0
+    return bool(source_record.get("trueZeroZero"))
 
 
-def reconstruction_source_entry(source_record, source_index):
+def reconstruction_source_entry(source_record, goal_index_from_end):
+    if not reconstruction_source_is_complete(source_record):
+        return None
+
     goals = source_record.get("goals") or []
-    needed_from_end = int(source_index) + 1
+    needed_from_end = max(1, int(goal_index_from_end or 1))
 
     if len(goals) >= needed_from_end:
         entry = dict(goals[-needed_from_end])
-    elif reconstruction_source_is_true_zero_zero(source_record):
+    elif needed_from_end == 1 and reconstruction_source_is_true_zero_zero(source_record):
         entry = dict(source_record.get("zeroZero") or {})
     else:
         return None
@@ -2612,12 +2669,26 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
 
 
 def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode="full"):
+    """Reconstruit des matchs uniquement à partir de vrais matchs source.
+
+    Règles appliquées pour chaque camp et chaque mode de calcul :
+    - un nouveau match reconstitué démarre avec un vrai dernier but source ;
+    - la suite utilise l'avant-dernier but du match source suivant, puis le
+      troisième depuis la fin, etc. ;
+    - si le but trouvé casse la chronologie réelle, le match en cours est
+      clôturé et ce but démarre le match suivant ;
+    - un vrai 0-0 démarre et clôture immédiatement un match ;
+    - un match dont les buts ne sont pas récupérés complètement n'est pas
+      utilisé pour fabriquer un faux N 0.
+    """
     samples = []
     current = []
     previous_entry = None
+    source_index = 0
+    goal_index_from_end = 1
 
     def close_current():
-        nonlocal current, previous_entry
+        nonlocal current, previous_entry, goal_index_from_end
         if current:
             samples.append(build_reconstructed_trend_sample(
                 current,
@@ -2627,31 +2698,62 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
             ))
         current = []
         previous_entry = None
+        goal_index_from_end = 1
 
-    for source_index, source_record in enumerate(source_records or []):
-        entry = reconstruction_source_entry(source_record, source_index)
-        if not entry:
+    records = list(source_records or [])
+
+    while source_index < len(records):
+        source_record = records[source_index]
+
+        if not reconstruction_source_is_complete(source_record):
+            close_current()
+            source_index += 1
             continue
 
-        starts_new_match = bool(entry.get("isZeroZero"))
+        if reconstruction_source_is_true_zero_zero(source_record):
+            close_current()
+            zero_entry = reconstruction_source_entry(source_record, 1)
+            if zero_entry:
+                samples.append(build_reconstructed_trend_sample(
+                    [zero_entry],
+                    analyzed_team_id,
+                    level_mode=level_mode,
+                    index=len(samples) + 1,
+                ))
+            source_index += 1
+            goal_index_from_end = 1
+            continue
 
-        if current and not starts_new_match:
-            starts_new_match = not reconstruction_entry_keeps_reverse_chronology(previous_entry, entry)
+        entry = reconstruction_source_entry(source_record, goal_index_from_end)
 
-        if starts_new_match:
+        if not entry:
+            # Le match source n'a pas le but demandé. On clôture le match en
+            # cours puis on repart de ce même match source avec son dernier but,
+            # afin de rester sur des vrais matchs au lieu d'inventer un 0-0.
+            if current:
+                close_current()
+                continue
+            source_index += 1
+            goal_index_from_end = 1
+            continue
+
+        if current and not reconstruction_entry_keeps_reverse_chronology(previous_entry, entry):
+            # Le but existe mais casse l'ordre chronologique : il clôture le
+            # match en cours et devient le début du match suivant.
             close_current()
             current = [entry]
             previous_entry = entry
-            if entry.get("isZeroZero"):
-                close_current()
+            source_index += 1
+            goal_index_from_end = 2
             continue
 
         current.append(entry)
         previous_entry = entry
+        source_index += 1
+        goal_index_from_end += 1
 
     close_current()
     return samples
-
 
 def truthy_param(value):
     if isinstance(value, bool):
@@ -2959,6 +3061,19 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 source_record["eventDataStatus"] = issue.get("type") or "blocked"
                 source_record["eventDataIssue"] = True
                 source_record["error"] = issue.get("reason") or issue.get("message") or "Événements non récupérés"
+            elif source_record.get("reconstructionGoalsIncomplete"):
+                source_record["eventDataStatus"] = "incomplete-goals"
+                source_record["eventDataIssue"] = True
+                source_record["error"] = "Buts du match incomplets pour la reconstitution"
+                event_data_issues.append({
+                    "id": match.get("id"),
+                    "label": make_match_label(match),
+                    "competition": get_competition_name(match),
+                    "startTimestamp": match.get("startTimestamp") or 0,
+                    "type": "incomplete-goals",
+                    "reason": "Buts du match incomplets pour la reconstitution",
+                    "message": "Match ignoré pour la reconstitution: le score indique plus de buts que les incidents récupérés.",
+                })
             source_records.append(source_record)
 
         reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode)
