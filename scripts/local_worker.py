@@ -2330,6 +2330,315 @@ def trend_average(values):
     return sum(clean) / len(clean) if clean else 1.0
 
 
+def trend_goal_chrono_key(minute, added=0):
+    """Clé de chronologie réelle d'un but pour la reconstitution.
+
+    On compare d'abord la période, puis la minute et enfin le temps additionnel.
+    Ainsi 45+3 reste avant 46, car toute la 1re mi-temps reste avant la 2e.
+    """
+    try:
+        minute_value = int(minute)
+    except Exception:
+        minute_value = 0
+
+    try:
+        added_value = int(added or 0)
+    except Exception:
+        added_value = 0
+
+    if minute_value <= 0:
+        return (0, 0, 0)
+
+    period = 1 if minute_value <= 45 else 2
+    return (period, minute_value, added_value)
+
+
+def trend_goal_average_minute(minute, added=0):
+    try:
+        minute_value = float(minute)
+    except Exception:
+        minute_value = 1.0
+
+    try:
+        added_value = float(added or 0)
+    except Exception:
+        added_value = 0.0
+
+    return minute_value + added_value
+
+
+def trend_goal_minute_label(minute, added=0):
+    try:
+        minute_value = int(minute)
+    except Exception:
+        minute_value = 0
+
+    try:
+        added_value = int(added or 0)
+    except Exception:
+        added_value = 0
+
+    return f"{minute_value}+{added_value}'" if added_value else f"{minute_value}'"
+
+
+def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
+    """Prépare les buts d'un match source pour la reconstitution diagonale.
+
+    Chaque match source fournit ensuite un seul élément selon sa position dans
+    l'historique: dernier but, avant-dernier but, etc. Si cet élément n'existe
+    pas, on utilise l'état 0-0 du match source.
+    """
+    match_label = make_match_label(match)
+    match_id = match.get("id")
+    competition = get_competition_name(match)
+    start_timestamp = match.get("startTimestamp") or 0
+    match_has_assists = match_contains_goal_assist(incidents)
+    goals = []
+
+    for inc in incidents or []:
+        if not isinstance(inc, dict) or inc.get("incidentType") != "goal":
+            continue
+
+        minute = inc.get("time")
+        added = inc.get("addedTime") or 0
+        if minute is None or minute < 1 or minute > 90:
+            continue
+
+        own_goal = is_own_goal_incident(inc)
+        if own_goal:
+            goal_for_team = not own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
+            attack_delta = 0
+            opponent_attack_delta = 0
+        else:
+            scorer_is_analyzed = incident_belongs_to_analyzed_team(inc, match, analyzed_team_id)
+            goal_for_team = scorer_is_analyzed
+            attack_delta = 1 if scorer_is_analyzed else 0
+            opponent_attack_delta = 0 if scorer_is_analyzed else 1
+
+        goals.append({
+            "isZeroZero": False,
+            "minute": int(minute),
+            "added": int(added or 0),
+            "minuteLabel": trend_goal_minute_label(minute, added),
+            "averageMinute": trend_goal_average_minute(minute, added),
+            "chronoKey": trend_goal_chrono_key(minute, added),
+            "goalDelta": 1 if goal_for_team else -1,
+            "attackDelta": attack_delta,
+            "opponentAttackDelta": opponent_attack_delta,
+            "goalForTeam": bool(goal_for_team),
+            "ownGoal": bool(own_goal),
+            "sourceMatchId": match_id,
+            "sourceLabel": match_label,
+            "sourceCompetition": competition,
+            "sourceStartTimestamp": start_timestamp,
+            "matchHasAssists": match_has_assists,
+            "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
+        })
+
+    goals.sort(key=lambda item: item.get("chronoKey") or (0, 0, 0))
+
+    zero_zero = {
+        "isZeroZero": True,
+        "minute": 1,
+        "added": 0,
+        "minuteLabel": "0-0",
+        "averageMinute": 1.0,
+        "chronoKey": (0, 1, 0),
+        "goalDelta": 0,
+        "attackDelta": 0,
+        "opponentAttackDelta": 0,
+        "goalForTeam": None,
+        "ownGoal": False,
+        "sourceMatchId": match_id,
+        "sourceLabel": match_label,
+        "sourceCompetition": competition,
+        "sourceStartTimestamp": start_timestamp,
+        "matchHasAssists": match_has_assists,
+        "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
+    }
+
+    return {
+        "match": match,
+        "id": match_id,
+        "label": match_label,
+        "competition": competition,
+        "startTimestamp": start_timestamp,
+        "goals": goals,
+        "zeroZero": zero_zero,
+        "matchHasAssists": match_has_assists,
+        "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
+    }
+
+
+def reconstruction_source_entry(source_record, source_index):
+    goals = source_record.get("goals") or []
+    needed_from_end = int(source_index) + 1
+
+    if len(goals) >= needed_from_end:
+        entry = dict(goals[-needed_from_end])
+    else:
+        entry = dict(source_record.get("zeroZero") or {})
+
+    entry["reconstructionSourceIndex"] = needed_from_end
+    entry["reconstructionSourceGoalCount"] = len(goals)
+    return entry
+
+
+def reconstruction_entry_keeps_reverse_chronology(previous_entry, next_entry):
+    """La reconstitution remonte le match: le prochain but doit être antérieur.
+
+    Une minute de 1re mi-temps en temps additionnel reste donc valide après un
+    but de 2e mi-temps, par exemple 46 puis 45+3.
+    """
+    if not previous_entry or not next_entry:
+        return True
+
+    previous_key = previous_entry.get("chronoKey") or (0, 0, 0)
+    next_key = next_entry.get("chronoKey") or (0, 0, 0)
+    return next_key <= previous_key
+
+
+def compact_reconstruction_label(entries):
+    usable = [entry for entry in entries or [] if isinstance(entry, dict)]
+    if not usable:
+        return "Match reconstitué"
+
+    first = usable[0].get("sourceLabel") or "Match"
+    last = usable[-1].get("sourceLabel") or first
+
+    if first == last:
+        return first
+
+    return f"{last} → {first}"
+
+
+def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full", index=1):
+    clean_entries = [entry for entry in entries or [] if isinstance(entry, dict)]
+    zero_only = len(clean_entries) == 1 and bool(clean_entries[0].get("isZeroZero"))
+    non_zero_entries = [entry for entry in clean_entries if not entry.get("isZeroZero")]
+
+    goals_for = sum(1 for entry in non_zero_entries if entry.get("goalDelta") == 1)
+    goals_against = sum(1 for entry in non_zero_entries if entry.get("goalDelta") == -1)
+    attack_goals_for = sum(int(entry.get("attackDelta") or 0) for entry in non_zero_entries)
+    opponent_attack_goals = sum(int(entry.get("opponentAttackDelta") or 0) for entry in non_zero_entries)
+
+    all_goal_minutes = [float(entry.get("averageMinute") or 1.0) for entry in non_zero_entries]
+    attack_goal_minutes = [float(entry.get("averageMinute") or 1.0) for entry in non_zero_entries if int(entry.get("attackDelta") or 0) > 0]
+    opponent_attack_minutes = [float(entry.get("averageMinute") or 1.0) for entry in non_zero_entries if int(entry.get("opponentAttackDelta") or 0) > 0]
+
+    if level_mode == "attack":
+        level = attack_goals_for
+        minutes_for_average = attack_goal_minutes[:] if attack_goal_minutes else [1.0]
+    else:
+        level = goals_for - goals_against
+        minutes_for_average = all_goal_minutes[:] if all_goal_minutes else [1.0]
+
+    label = compact_reconstruction_label(clean_entries)
+    first_entry = clean_entries[0] if clean_entries else {}
+    last_entry = clean_entries[-1] if clean_entries else first_entry
+    source_ids = [str(entry.get("sourceMatchId")) for entry in clean_entries if entry.get("sourceMatchId") is not None]
+    sample_id = f"reconstitution-{analyzed_team_id}-{index}-" + "-".join(source_ids[:4])
+
+    match_has_assists = any(bool(entry.get("matchHasAssists")) for entry in clean_entries)
+    assist_status = "assist-found" if match_has_assists else "no-assist-found"
+    opponent_minutes_for_average = opponent_attack_minutes[:] if opponent_attack_minutes else [1.0]
+
+    return {
+        "id": sample_id,
+        "label": label,
+        "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
+        "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
+        "homeTeam": {},
+        "awayTeam": {},
+        "analyzedTeamId": analyzed_team_id,
+        "goalsFor": goals_for,
+        "goalsAgainst": goals_against,
+        "attackGoalsFor": attack_goals_for,
+        "level": level,
+        "levelMode": level_mode,
+        "resultStyle": trend_result_style(level),
+        "resultLabel": trend_label_from_style(trend_result_style(level)),
+        "goalMinutes": all_goal_minutes,
+        "attackGoalMinutes": attack_goal_minutes,
+        "minutesForAverage": minutes_for_average,
+        "averageMinute": round(trend_average(minutes_for_average), 4),
+        "matchHasAssists": match_has_assists,
+        "assistDataStatus": assist_status,
+        "eventDataStatus": "ok",
+        "reconstructedMatch": True,
+        "reconstructionMethod": "diagonal_last_goal_reverse_chronology",
+        "reconstructionIndex": index,
+        "reconstructionZeroOnly": zero_only,
+        "reconstructionEntries": [
+            {
+                "sourceMatchId": entry.get("sourceMatchId"),
+                "sourceLabel": entry.get("sourceLabel"),
+                "minuteLabel": entry.get("minuteLabel"),
+                "minute": entry.get("minute"),
+                "added": entry.get("added"),
+                "isZeroZero": bool(entry.get("isZeroZero")),
+                "goalDelta": entry.get("goalDelta"),
+                "attackDelta": entry.get("attackDelta"),
+                "opponentAttackDelta": entry.get("opponentAttackDelta"),
+                "reconstructionSourceIndex": entry.get("reconstructionSourceIndex"),
+            }
+            for entry in clean_entries
+        ],
+        "opponentAttack": {
+            "id": f"{sample_id}-opponent-attack",
+            "label": label,
+            "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
+            "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
+            "level": opponent_attack_goals,
+            "attackGoalsFor": opponent_attack_goals,
+            "minutesForAverage": opponent_minutes_for_average,
+            "averageMinute": round(trend_average(opponent_minutes_for_average), 4),
+            "matchHasAssists": match_has_assists,
+            "assistDataStatus": assist_status,
+            "reconstructedMatch": True,
+        },
+    }
+
+
+def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode="full"):
+    samples = []
+    current = []
+    previous_entry = None
+
+    def close_current():
+        nonlocal current, previous_entry
+        if current:
+            samples.append(build_reconstructed_trend_sample(
+                current,
+                analyzed_team_id,
+                level_mode=level_mode,
+                index=len(samples) + 1,
+            ))
+        current = []
+        previous_entry = None
+
+    for source_index, source_record in enumerate(source_records or []):
+        entry = reconstruction_source_entry(source_record, source_index)
+        starts_new_match = bool(entry.get("isZeroZero"))
+
+        if current and not starts_new_match:
+            starts_new_match = not reconstruction_entry_keeps_reverse_chronology(previous_entry, entry)
+
+        if starts_new_match:
+            close_current()
+            current = [entry]
+            previous_entry = entry
+            if entry.get("isZeroZero"):
+                close_current()
+            continue
+
+        current.append(entry)
+        previous_entry = entry
+
+    close_current()
+    return samples
+
+
 def truthy_param(value):
     if isinstance(value, bool):
         return value
@@ -2544,7 +2853,8 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
 
     next_page = 0
     by_id = {}
-    required = skip + needed_matches
+    reconstruction_source_buffer = max(12, min(60, needed_matches))
+    required = skip + needed_matches + reconstruction_source_buffer
 
     for target_pages in page_targets:
         if stopped_history:
@@ -2584,20 +2894,21 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             break
 
     sorted_matches = sorted(by_id.values(), key=lambda m: (m.get("startTimestamp") or 0, m.get("id") or 0), reverse=True)
-    selected_matches = sorted_matches[skip:skip + needed_matches]
+    selected_matches = sorted_matches[skip:skip + required]
 
     if len(selected_matches) < needed_matches:
         raise RuntimeError(f"{team_name}: pas assez de matchs valides pour {trend_count} tendances ({len(selected_matches)}/{needed_matches}).")
 
-    samples = []
     event_data_issues = []
+    source_records = []
+    total_sources = len(selected_matches)
 
     for idx, match in enumerate(selected_matches, start=1):
         update_scan_job(
             job_id,
             status="running",
-            message=f"{team_name} · Tendance · Match {idx}/{needed_matches}",
-            progress=base_progress + int(progress_span * (0.15 + 0.80 * (idx / max(1, needed_matches)))),
+            message=f"{team_name} · Tendance · Source {idx}/{total_sources}",
+            progress=base_progress + int(progress_span * (0.15 + 0.80 * (idx / max(1, total_sources)))),
         )
         data = get_incidents_json(f"event/{match['id']}/incidents")
         issue = data.get("_footscanIssue") if isinstance(data, dict) else None
@@ -2614,30 +2925,19 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 "reason": issue.get("reason") or issue.get("message") or "Événements non récupérés",
                 "message": issue.get("message") or "Événements non récupérés pour ce match.",
             })
-        sample = trend_match_sample(match, incidents, analyzed_team_id, level_mode=level_mode)
 
-        opponent_id = trend_opponent_team_id(match, analyzed_team_id)
-        if opponent_id:
-            opponent_attack = trend_match_sample(match, incidents, opponent_id, level_mode="attack")
-            sample["opponentTeamId"] = opponent_id
-            sample["opponentAttack"] = {
-                "id": opponent_attack.get("id"),
-                "label": opponent_attack.get("label"),
-                "competition": opponent_attack.get("competition"),
-                "startTimestamp": opponent_attack.get("startTimestamp") or 0,
-                "level": opponent_attack.get("level") or 0,
-                "attackGoalsFor": opponent_attack.get("attackGoalsFor") or 0,
-                "minutesForAverage": opponent_attack.get("minutesForAverage") or [1.0],
-                "averageMinute": opponent_attack.get("averageMinute") or 1.0,
-                "matchHasAssists": opponent_attack.get("matchHasAssists"),
-                "assistDataStatus": opponent_attack.get("assistDataStatus"),
-            }
-
+        source_record = collect_reconstruction_goal_entries(match, incidents, analyzed_team_id)
         if issue:
-            sample["eventDataStatus"] = issue.get("type") or "blocked"
-            sample["eventDataIssue"] = True
-            sample["error"] = issue.get("reason") or issue.get("message") or "Événements non récupérés"
-        samples.append(sample)
+            source_record["eventDataStatus"] = issue.get("type") or "blocked"
+            source_record["eventDataIssue"] = True
+            source_record["error"] = issue.get("reason") or issue.get("message") or "Événements non récupérés"
+        source_records.append(source_record)
+
+    reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode)
+    samples = reconstructed_samples[:needed_matches]
+
+    if len(samples) < needed_matches:
+        raise RuntimeError(f"{team_name}: pas assez de matchs reconstitués pour {trend_count} tendances ({len(samples)}/{needed_matches}).")
 
     administrative_ignored = sorted(
         administrative_matches_ignored.values(),
