@@ -14152,7 +14152,12 @@
       const lines = ["Tendances comparées :"];
       for (const item of items) {
         const state = item.dominant ? "prise" : "comparée";
-        lines.push(`- Tendance ${item.index} · ${state} · ${item.resultStyle || "N"} · ${formatValue(item.value)} · ${item.previousMatch?.label || "Match précédent"} → ${item.recentMatch?.label || "Match récent"} · Moyenne Minutes ${formatRank(item.averageMinute)}`);
+        const previousLabel = reconstructionLabel(item.previousMatch || {}, "Reconstitution précédente");
+        const recentLabel = reconstructionLabel(item.recentMatch || {}, "Reconstitution récente");
+        const previousScore = reconstructionScore(item.previousMatch || {});
+        const recentScore = reconstructionScore(item.recentMatch || {});
+        const progression = item.averageMinuteProgression != null ? ` · Progression Minute ${formatValue(item.averageMinuteProgression)}` : "";
+        lines.push(`- Tendance ${item.index} · ${state} · ${item.resultStyle || "N"} · ${formatValue(item.value)} · ${previousLabel} → ${recentLabel} · Score ${previousScore} → ${recentScore} · Niveau ${formatValue(item.previousLevel)} → ${formatValue(item.recentLevel)} · Moyenne Minutes ${formatRank(item.averageMinute)}${progression}`);
       }
       return lines;
     }
