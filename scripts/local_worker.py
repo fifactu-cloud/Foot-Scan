@@ -2441,6 +2441,7 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
     final_home_score, final_away_score = match_score_pair(match)
     final_score_total = match_score_total(match)
     true_zero_zero = final_score_total == 0 if final_score_total is not None else False
+    source_score_label = f"{final_home_score}-{final_away_score}" if final_home_score is not None and final_away_score is not None else "Score inconnu"
     match_has_assists = match_contains_goal_assist(incidents)
     goals = []
 
@@ -2480,6 +2481,9 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
             "sourceLabel": match_label,
             "sourceCompetition": competition,
             "sourceStartTimestamp": start_timestamp,
+            "sourceScoreLabel": source_score_label,
+            "finalHomeScore": final_home_score,
+            "finalAwayScore": final_away_score,
             "matchHasAssists": match_has_assists,
             "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
         })
@@ -2505,6 +2509,9 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
         "sourceLabel": match_label,
         "sourceCompetition": competition,
         "sourceStartTimestamp": start_timestamp,
+        "sourceScoreLabel": source_score_label,
+        "finalHomeScore": final_home_score,
+        "finalAwayScore": final_away_score,
         "matchHasAssists": match_has_assists,
         "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
     }
@@ -2610,10 +2617,18 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
     match_has_assists = any(bool(entry.get("matchHasAssists")) for entry in clean_entries)
     assist_status = "assist-found" if match_has_assists else "no-assist-found"
     opponent_minutes_for_average = opponent_attack_minutes[:] if opponent_attack_minutes else [1.0]
+    reconstruction_score_label = f"{goals_for}-{goals_against}"
+    reconstruction_attack_score_label = f"Attaque {attack_goals_for}"
+    opponent_attack_score_label = f"Attaque adverse {opponent_attack_goals}"
+    reconstruction_display_label = f"Reconstitution {index} · {reconstruction_score_label}"
 
     return {
         "id": sample_id,
         "label": label,
+        "reconstructionLabel": label,
+        "reconstructionDisplayLabel": reconstruction_display_label,
+        "reconstructionScoreLabel": reconstruction_score_label,
+        "reconstructionAttackScoreLabel": reconstruction_attack_score_label,
         "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
         "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
         "homeTeam": {},
@@ -2641,6 +2656,13 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
             {
                 "sourceMatchId": entry.get("sourceMatchId"),
                 "sourceLabel": entry.get("sourceLabel"),
+                "sourceCompetition": entry.get("sourceCompetition"),
+                "sourceStartTimestamp": entry.get("sourceStartTimestamp") or 0,
+                "sourceScoreLabel": entry.get("sourceScoreLabel"),
+                "finalHomeScore": entry.get("finalHomeScore"),
+                "finalAwayScore": entry.get("finalAwayScore"),
+                "matchHasAssists": entry.get("matchHasAssists"),
+                "assistDataStatus": entry.get("assistDataStatus"),
                 "minuteLabel": entry.get("minuteLabel"),
                 "minute": entry.get("minute"),
                 "added": entry.get("added"),
@@ -2655,6 +2677,9 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
         "opponentAttack": {
             "id": f"{sample_id}-opponent-attack",
             "label": label,
+            "reconstructionLabel": label,
+            "reconstructionDisplayLabel": reconstruction_display_label,
+            "reconstructionScoreLabel": opponent_attack_score_label,
             "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
             "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
             "level": opponent_attack_goals,
@@ -2664,6 +2689,21 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
             "matchHasAssists": match_has_assists,
             "assistDataStatus": assist_status,
             "reconstructedMatch": True,
+            "reconstructionEntries": [
+                {
+                    "sourceMatchId": entry.get("sourceMatchId"),
+                    "sourceLabel": entry.get("sourceLabel"),
+                    "sourceCompetition": entry.get("sourceCompetition"),
+                    "sourceStartTimestamp": entry.get("sourceStartTimestamp") or 0,
+                    "sourceScoreLabel": entry.get("sourceScoreLabel"),
+                    "minuteLabel": entry.get("minuteLabel"),
+                    "isZeroZero": bool(entry.get("isZeroZero")),
+                    "opponentAttackDelta": entry.get("opponentAttackDelta"),
+                    "matchHasAssists": entry.get("matchHasAssists"),
+                    "assistDataStatus": entry.get("assistDataStatus"),
+                }
+                for entry in clean_entries
+            ],
         },
     }
 
@@ -2879,10 +2919,19 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
         adv_minutes = list(opponent_attack.get("minutesForAverage") or [1.0])
         minutes_for_average = direct_minutes + adv_minutes
 
+        direct_score_label = direct.get("reconstructionAttackScoreLabel") or direct.get("reconstructionScoreLabel") or format(level, ".6g")
+        opponent_score_label = opponent_attack.get("reconstructionScoreLabel") or f"Attaque adverse {format(adv_level, '.6g')}"
+        combined_score_label = f"{direct_score_label} + {opponent_score_label}"
+
         sample = {
             **direct,
             "id": direct.get("id"),
             "label": direct.get("label"),
+            "reconstructionLabel": direct.get("reconstructionLabel") or direct.get("label"),
+            "reconstructionDisplayLabel": direct.get("reconstructionDisplayLabel") or direct.get("label"),
+            "reconstructionScoreLabel": combined_score_label,
+            "directReconstructionScoreLabel": direct_score_label,
+            "opponentReconstructionScoreLabel": opponent_score_label,
             "competition": direct.get("competition"),
             "startTimestamp": direct.get("startTimestamp") or 0,
             "level": round(level, 6),
@@ -2896,6 +2945,9 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
             "opponentAttackSource": {
                 "id": source.get("id"),
                 "label": source.get("label"),
+                "reconstructionLabel": source.get("reconstructionLabel") or source.get("label"),
+                "reconstructionDisplayLabel": source.get("reconstructionDisplayLabel") or source.get("label"),
+                "reconstructionScoreLabel": opponent_score_label,
                 "competition": source.get("competition"),
                 "startTimestamp": source.get("startTimestamp") or 0,
                 "level": round(adv_level, 6),
@@ -2903,6 +2955,7 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
                 "averageMinute": round(trend_average(adv_minutes), 4),
                 "matchHasAssists": opponent_attack.get("matchHasAssists", source.get("matchHasAssists")),
                 "assistDataStatus": opponent_attack.get("assistDataStatus", source.get("assistDataStatus")),
+                "reconstructionEntries": opponent_attack.get("reconstructionEntries") or source.get("reconstructionEntries") or [],
             },
             "analysisFormula": "attaque équipe + attaque adversaire du camp opposé",
             "analysisLine": idx + 1,
@@ -2913,7 +2966,78 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
     return combined
 
 
+def _source_match_rows_from_reconstruction_entries(entries, role_label=None):
+    rows = []
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        match_id = entry.get("sourceMatchId")
+        label = entry.get("sourceLabel") or "Match source"
+        key = str(match_id) if match_id is not None else f"{label}-{entry.get('sourceStartTimestamp') or 0}"
+        rows.append({
+            "key": key,
+            "id": match_id,
+            "label": label,
+            "competition": entry.get("sourceCompetition") or "Toutes compétitions",
+            "startTimestamp": entry.get("sourceStartTimestamp") or 0,
+            "sourceScoreLabel": entry.get("sourceScoreLabel") or "Score inconnu",
+            "minuteLabel": entry.get("minuteLabel") or ("0-0" if entry.get("isZeroZero") else "—"),
+            "isZeroZero": bool(entry.get("isZeroZero")),
+            "matchHasAssists": entry.get("matchHasAssists"),
+            "assistDataStatus": entry.get("assistDataStatus"),
+            "roleLabel": role_label or "Reconstitution",
+        })
+    return rows
+
+
+def build_reconstruction_source_matches_used(samples):
+    """Liste les vrais matchs source utilisés, pas les reconstitutions affichées."""
+    grouped = {}
+    order = []
+    for sample in samples or []:
+        if not isinstance(sample, dict):
+            continue
+        rows = _source_match_rows_from_reconstruction_entries(sample.get("reconstructionEntries") or [], role_label="Reconstitution directe")
+        opponent_source = sample.get("opponentAttackSource") or {}
+        rows.extend(_source_match_rows_from_reconstruction_entries(opponent_source.get("reconstructionEntries") or [], role_label="Reconstitution opposée"))
+        for row in rows:
+            key = row.get("key")
+            if key not in grouped:
+                grouped[key] = {
+                    "id": row.get("id"),
+                    "label": row.get("label"),
+                    "count": 0,
+                    "usedCount": 0,
+                    "startTimestamp": row.get("startTimestamp") or 0,
+                    "competition": row.get("competition") or "Toutes compétitions",
+                    "eventDataStatus": "ok",
+                    "sourceScoreLabel": row.get("sourceScoreLabel") or "Score inconnu",
+                    "minutesUsed": [],
+                    "roles": [],
+                    "matchHasAssists": row.get("matchHasAssists"),
+                    "assistDataStatus": row.get("assistDataStatus"),
+                    "usedInReconstruction": True,
+                }
+                order.append(key)
+            item = grouped[key]
+            item["count"] += 1
+            item["usedCount"] += 1
+            minute_label = row.get("minuteLabel")
+            if minute_label and minute_label not in item["minutesUsed"]:
+                item["minutesUsed"].append(minute_label)
+            role_label = row.get("roleLabel")
+            if role_label and role_label not in item["roles"]:
+                item["roles"].append(role_label)
+            if item.get("assistDataStatus") != "assist-found" and row.get("assistDataStatus") == "assist-found":
+                item["assistDataStatus"] = "assist-found"
+                item["matchHasAssists"] = True
+    return sorted((grouped[key] for key in order), key=lambda item: (item.get("startTimestamp") or 0, item.get("id") or 0), reverse=True)
+
+
 def rebuild_trend_matches_used_from_samples(samples):
+    source_matches = build_reconstruction_source_matches_used(samples)
+    if source_matches:
+        return source_matches
     return [
         {
             "id": sample.get("id"),
@@ -3045,7 +3169,8 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             incidents = data.get("incidents") if isinstance(data, dict) else data
             if not isinstance(incidents, list):
                 incidents = []
-            if issue:
+            source_record = collect_reconstruction_goal_entries(match, incidents, analyzed_team_id)
+            if issue and not source_record.get("trueZeroZero"):
                 event_data_issues.append({
                     "id": match.get("id"),
                     "label": make_match_label(match),
@@ -3055,12 +3180,14 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                     "reason": issue.get("reason") or issue.get("message") or "Événements non récupérés",
                     "message": issue.get("message") or "Événements non récupérés pour ce match.",
                 })
-
-            source_record = collect_reconstruction_goal_entries(match, incidents, analyzed_team_id)
-            if issue:
+            if issue and not source_record.get("trueZeroZero"):
                 source_record["eventDataStatus"] = issue.get("type") or "blocked"
                 source_record["eventDataIssue"] = True
                 source_record["error"] = issue.get("reason") or issue.get("message") or "Événements non récupérés"
+            elif issue and source_record.get("trueZeroZero"):
+                # Un vrai 0-0 n'a aucun but à récupérer: il reste valide même si
+                # l'endpoint incidents ne renvoie rien d'exploitable.
+                source_record["eventDataStatus"] = "ok-zero-zero"
             elif source_record.get("reconstructionGoalsIncomplete"):
                 source_record["eventDataStatus"] = "incomplete-goals"
                 source_record["eventDataIssue"] = True
@@ -3098,30 +3225,18 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
 
     return {
         "trendMatches": samples,
-        "matchesUsed": [
-            {
-                "id": sample.get("id"),
-                "label": sample.get("label"),
-                "count": abs(sample.get("level") or 0),
-                "startTimestamp": sample.get("startTimestamp") or 0,
-                "competition": sample.get("competition") or "Toutes compétitions",
-                "eventDataStatus": sample.get("eventDataStatus") or "ok",
-                "trendLevel": sample.get("level"),
-                "trendAverageMinute": sample.get("averageMinute"),
-                "matchHasAssists": sample.get("matchHasAssists"),
-                "assistDataStatus": sample.get("assistDataStatus"),
-            }
-            for sample in samples
-        ],
+        "matchesUsed": build_reconstruction_source_matches_used(samples),
         "events": [],
-        "eventDataIssues": event_data_issues,
-        "eventDataIssueCount": len(event_data_issues),
+        "eventDataIssues": [],
+        "eventDataIssueCount": 0,
+        "ignoredSourceIssues": event_data_issues,
+        "ignoredSourceIssueCount": len(event_data_issues),
         "administrativeMatchesIgnored": administrative_ignored,
         "administrativeMatchCount": len(administrative_ignored),
         "pagesLoaded": pages_loaded_count,
         "pagesAttempted": pages_attempted_count,
         "pagesLimit": PAGES_TO_LOAD,
-        "scanPartial": bool(event_data_issues),
+        "scanPartial": False,
     }
 
 def build_trend_items(samples, side_key, trend_count, trend_limit_enabled=False):
@@ -3566,6 +3681,9 @@ def process_trend_scan_job(job_id, params):
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
     away_issue_count = int(away_scan.get("eventDataIssueCount") or 0)
     total_issue_count = home_issue_count + away_issue_count
+    home_ignored_issue_count = int(home_scan.get("ignoredSourceIssueCount") or 0)
+    away_ignored_issue_count = int(away_scan.get("ignoredSourceIssueCount") or 0)
+    total_ignored_issue_count = home_ignored_issue_count + away_ignored_issue_count
     home_admin_count = int(home_scan.get("administrativeMatchCount") or 0)
     away_admin_count = int(away_scan.get("administrativeMatchCount") or 0)
     total_admin_count = home_admin_count + away_admin_count
@@ -3621,10 +3739,14 @@ def process_trend_scan_job(job_id, params):
             "homeAdministrativeMatchCount": home_admin_count,
             "awayAdministrativeMatchCount": away_admin_count,
             "administrativeMatchesIgnored": (home_scan.get("administrativeMatchesIgnored") or []) + (away_scan.get("administrativeMatchesIgnored") or []),
+            "ignoredSourceIssueCount": total_ignored_issue_count,
+            "homeIgnoredSourceIssueCount": home_ignored_issue_count,
+            "awayIgnoredSourceIssueCount": away_ignored_issue_count,
+            "ignoredSourceIssues": (home_scan.get("ignoredSourceIssues") or []) + (away_scan.get("ignoredSourceIssues") or []),
             "message": (
-                f"⚠️ Scan partiel : {total_issue_count} match(s) sans événements récupérés."
+                f"⚠️ Scan partiel : {total_issue_count} match(s) utilisé(s) sans événements récupérés."
                 if total_issue_count else
-                "Scan complet : aucun match sans événements récupérés."
+                "Scan complet : reconstitutions valides. Les matchs incomplets éventuels ont été ignorés et remplacés."
             ),
         },
         "config": {
