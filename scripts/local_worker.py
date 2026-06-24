@@ -3265,7 +3265,9 @@ def build_trend_items(samples, side_key, trend_count, trend_limit_enabled=False)
         previous_avg_minute = trend_average(previous_minutes)
         recent_avg_minute = trend_average(recent_minutes)
         average_minute_progression = recent_avg_minute - previous_avg_minute
-        minutes = recent_minutes + previous_minutes
+        # Moyenne minute de la tendance = moyenne des 2 reconstitutions comparées.
+        # Chaque reconstitution garde le même poids, peu importe son nombre de buts.
+        minutes = [recent_avg_minute, previous_avg_minute]
         avg_minute = trend_average(minutes)
         style = trend_result_style(trend_value)
         items.append({
@@ -3336,8 +3338,8 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         normalized_mode = "top_half"
 
     normalized_metric = str(selection_metric or "progression").strip().lower()
-    if normalized_metric in {"global", "global_average", "global_average_minute", "moyenne", "moyenne_globale", "moyenne_minute_globale"}:
-        normalized_metric = "global_average_minute"
+    if normalized_metric in {"high", "haute", "high_average", "high_average_minute", "moyenne_haute", "moyenne_minute_haute", "global", "global_average", "global_average_minute", "moyenne", "moyenne_globale", "moyenne_minute_globale"}:
+        normalized_metric = "high_average_minute"
     else:
         normalized_metric = "progression"
 
@@ -3423,13 +3425,13 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         entry["item"]["selectionDistance"] = round(distance, 4)
 
     def score_key(entry):
-        if normalized_metric == "global_average_minute":
-            return (float(entry.get("distance") or 9999), float(entry.get("averageMinute") or 9999))
+        if normalized_metric == "high_average_minute":
+            return (-float(entry.get("averageMinute") or 0), float(entry.get("sourceIndex") or 9999))
         return (-float(entry.get("progression") or 0), float(entry.get("averageMinute") or 9999))
 
     def same_best(a, b):
-        if normalized_metric == "global_average_minute":
-            return abs(float(a.get("distance") or 9999) - float(b.get("distance") or 9999)) < 1e-9
+        if normalized_metric == "high_average_minute":
+            return abs(float(a.get("averageMinute") or 0) - float(b.get("averageMinute") or 0)) < 1e-9
         return abs(float(a.get("progression") or 0) - float(b.get("progression") or 0)) < 1e-9
 
     def mark_selected(entry, rank, weight=1.0, tie=False):
@@ -3461,7 +3463,7 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             "method": normalized_mode,
             "label": label,
             "selectionMetric": normalized_metric,
-            "selectionMetricLabel": "Moyenne Minute Globale" if normalized_metric == "global_average_minute" else "Progression Moyenne",
+            "selectionMetricLabel": "Moyenne Minute Haute" if normalized_metric == "high_average_minute" else "Progression Moyenne",
             "requestedTrendCount": n,
             "calculationTrendCount": n,
             "totalTrendItems": 0,
@@ -3518,7 +3520,7 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         "method": normalized_mode,
         "label": label,
         "selectionMetric": normalized_metric,
-        "selectionMetricLabel": "Moyenne Minute Globale" if normalized_metric == "global_average_minute" else "Progression Moyenne",
+        "selectionMetricLabel": "Moyenne Minute Haute" if normalized_metric == "high_average_minute" else "Progression Moyenne",
         "requestedTrendCount": n,
         "calculationTrendCount": n,
         "totalTrendItems": total,
@@ -3573,9 +3575,9 @@ def process_trend_scan_job(job_id, params):
     trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
         trend_selection_mode = "top_line"
-    trend_selection_metric = str(params.get("trendSelectionMetric") or "global_average_minute").strip()
-    if trend_selection_metric not in {"progression", "global_average_minute"}:
-        trend_selection_metric = "global_average_minute"
+    trend_selection_metric = str(params.get("trendSelectionMetric") or "high_average_minute").strip()
+    if trend_selection_metric not in {"progression", "high_average_minute"}:
+        trend_selection_metric = "high_average_minute"
 
     calculation_trend_count = trend_count
 
