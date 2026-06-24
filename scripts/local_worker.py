@@ -3665,33 +3665,11 @@ def process_trend_scan_job(job_id, params):
         if h == a:
             return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
 
-        normal_side = "home" if h > a else "away"
-        home_taken_trends = float(trend_selection.get("homeSelectedTrendItems") or 0)
-        away_taken_trends = float(trend_selection.get("awaySelectedTrendItems") or 0)
-        zero_side = "home" if h == 0 else ("away" if a == 0 else None)
-        more_taken_side = None
-        if home_taken_trends > away_taken_trends:
-            more_taken_side = "home"
-        elif away_taken_trends > home_taken_trends:
-            more_taken_side = "away"
-        switched = bool(zero_side and zero_side == more_taken_side)
-        side = ("away" if normal_side == "home" else "home") if switched else normal_side
+        side = "home" if h > a else "away"
 
         if side == "home":
-            result_winner = {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(abs(h - a), 6)}
-        else:
-            result_winner = {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(abs(h - a), 6)}
-
-        if switched:
-            result_winner.update({
-                "switch": True,
-                "switchReason": "zero_performance",
-                "originalWinnerSide": normal_side,
-                "originalWinnerLabel": home_team.get("name") if normal_side == "home" else away_team.get("name"),
-                "originalWinnerScore": h if normal_side == "home" else a,
-            })
-
-        return result_winner
+            return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(abs(h - a), 6)}
+        return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(abs(h - a), 6)}
 
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
     away_issue_count = int(away_scan.get("eventDataIssueCount") or 0)
