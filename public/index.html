@@ -13048,14 +13048,24 @@
       return sample?.reconstructionScoreLabel || formatValue(sample?.level ?? 0);
     }
 
+    function reconstructionLineLabel(sample, fallback) {
+      const label = String(reconstructionLabel(sample, fallback) || fallback || "Reconstitution").trim();
+      const score = String(reconstructionScore(sample) || "").trim();
+
+      if (!score) return label;
+      if (label.includes(score)) return label;
+
+      return `${label} : ${score}`;
+    }
+
     function renderTrendItem(item) {
       const tone = trendItemToneClass(item);
       const dominant = item.dominant ? "is-dominant" : "";
       const domText = item.dominant ? "PREND LE DESSUS" : "COMPARÉE";
       const previous = item.previousMatch || {};
       const recent = item.recentMatch || {};
-      const previousLabel = reconstructionLabel(previous, "Reconstitution Précédente");
-      const recentLabel = reconstructionLabel(recent, "Reconstitution Récente");
+      const previousLabel = reconstructionLineLabel(previous, "Reconstitution Précédente");
+      const recentLabel = reconstructionLineLabel(recent, "Reconstitution Récente");
       const previousScore = reconstructionScore(previous);
       const recentScore = reconstructionScore(recent);
       const progressionText = item.averageMinuteProgression != null ? ` · Progression Minute ${esc(formatValue(item.averageMinuteProgression))}` : "";
@@ -14152,8 +14162,8 @@
       const lines = ["Tendances comparées :"];
       for (const item of items) {
         const state = item.dominant ? "prise" : "comparée";
-        const previousLabel = reconstructionLabel(item.previousMatch || {}, "Reconstitution précédente");
-        const recentLabel = reconstructionLabel(item.recentMatch || {}, "Reconstitution récente");
+        const previousLabel = reconstructionLineLabel(item.previousMatch || {}, "Reconstitution précédente");
+        const recentLabel = reconstructionLineLabel(item.recentMatch || {}, "Reconstitution récente");
         const previousScore = reconstructionScore(item.previousMatch || {});
         const recentScore = reconstructionScore(item.recentMatch || {});
         const progression = item.averageMinuteProgression != null ? ` · Progression Minute ${formatValue(item.averageMinuteProgression)}` : "";
