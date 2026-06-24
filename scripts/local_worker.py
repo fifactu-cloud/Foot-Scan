@@ -2386,7 +2386,8 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
 
     Chaque match source fournit ensuite un seul élément selon sa position dans
     l'historique: dernier but, avant-dernier but, etc. Si cet élément n'existe
-    pas, on utilise l'état 0-0 du match source.
+    pas, on ignore ce match source. Le 0-0 est conservé uniquement quand le
+    match source est réellement sans but.
     """
     match_label = make_match_label(match)
     match_id = match.get("id")
@@ -2470,14 +2471,24 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
     }
 
 
+def reconstruction_source_is_true_zero_zero(source_record):
+    if not isinstance(source_record, dict):
+        return False
+    if source_record.get("eventDataIssue"):
+        return False
+    return len(source_record.get("goals") or []) == 0
+
+
 def reconstruction_source_entry(source_record, source_index):
     goals = source_record.get("goals") or []
     needed_from_end = int(source_index) + 1
 
     if len(goals) >= needed_from_end:
         entry = dict(goals[-needed_from_end])
-    else:
+    elif reconstruction_source_is_true_zero_zero(source_record):
         entry = dict(source_record.get("zeroZero") or {})
+    else:
+        return None
 
     entry["reconstructionSourceIndex"] = needed_from_end
     entry["reconstructionSourceGoalCount"] = len(goals)
@@ -2619,6 +2630,9 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
 
     for source_index, source_record in enumerate(source_records or []):
         entry = reconstruction_source_entry(source_record, source_index)
+        if not entry:
+            continue
+
         starts_new_match = bool(entry.get("isZeroZero"))
 
         if current and not starts_new_match:
@@ -2853,91 +2867,113 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
 
     next_page = 0
     by_id = {}
-    reconstruction_source_buffer = max(12, min(60, needed_matches))
-    required = skip + needed_matches + reconstruction_source_buffer
 
-    for target_pages in page_targets:
-        if stopped_history:
-            break
+    def load_until_required(required_count):
+        nonlocal next_page, by_id, stopped_history, pages_loaded_count, pages_attempted_count
 
-        for page in range(next_page, target_pages):
-            update_scan_job(
-                job_id,
-                status="running",
-                message=f"{team_name} · Tendance · Page {page + 1}/{target_pages}",
-                progress=base_progress + int(progress_span * 0.12 * ((page + 1) / max(1, target_pages))),
-            )
-            pages_attempted_count = max(pages_attempted_count, page + 1)
-            try:
-                data = get_json(f"team/{analyzed_team_id}/events/last/{page}")
-            except Exception as e:
-                error_text = str(e)
-                if "HTTP 404" in error_text or "Not Found" in error_text:
-                    stopped_history = True
-                    break
-                if pages:
-                    stopped_history = True
-                    break
-                raise
-
-            page_events = data.get("events") if isinstance(data, dict) else data
-            if isinstance(page_events, list) and page_events:
-                pages.extend(page_events)
-                pages_loaded_count = max(pages_loaded_count, page + 1)
-            else:
-                stopped_history = True
+        for target_pages in page_targets:
+            if target_pages <= next_page:
+                continue
+            if stopped_history:
                 break
 
-        next_page = max(next_page, target_pages)
+            for page in range(next_page, target_pages):
+                update_scan_job(
+                    job_id,
+                    status="running",
+                    message=f"{team_name} · Tendance · Page {page + 1}/{target_pages}",
+                    progress=base_progress + int(progress_span * 0.12 * ((page + 1) / max(1, target_pages))),
+                )
+                pages_attempted_count = max(pages_attempted_count, page + 1)
+                try:
+                    data = get_json(f"team/{analyzed_team_id}/events/last/{page}")
+                except Exception as e:
+                    error_text = str(e)
+                    if "HTTP 404" in error_text or "Not Found" in error_text:
+                        stopped_history = True
+                        break
+                    if pages:
+                        stopped_history = True
+                        break
+                    raise
+
+                page_events = data.get("events") if isinstance(data, dict) else data
+                if isinstance(page_events, list) and page_events:
+                    pages.extend(page_events)
+                    pages_loaded_count = max(pages_loaded_count, page + 1)
+                else:
+                    stopped_history = True
+                    break
+
+            next_page = max(next_page, target_pages)
+            by_id = build_finished_matches()
+            if len(by_id) >= required_count:
+                break
+
         by_id = build_finished_matches()
-        if len(by_id) >= required:
-            break
-
-    sorted_matches = sorted(by_id.values(), key=lambda m: (m.get("startTimestamp") or 0, m.get("id") or 0), reverse=True)
-    selected_matches = sorted_matches[skip:skip + required]
-
-    if len(selected_matches) < needed_matches:
-        raise RuntimeError(f"{team_name}: pas assez de matchs valides pour {trend_count} tendances ({len(selected_matches)}/{needed_matches}).")
+        return by_id
 
     event_data_issues = []
     source_records = []
-    total_sources = len(selected_matches)
+    reconstructed_samples = []
+    samples = []
+    initial_buffer = max(24, min(180, needed_matches * 10))
+    growth_step = max(12, min(120, needed_matches * 6))
+    required = skip + needed_matches + initial_buffer
 
-    for idx, match in enumerate(selected_matches, start=1):
-        update_scan_job(
-            job_id,
-            status="running",
-            message=f"{team_name} · Tendance · Source {idx}/{total_sources}",
-            progress=base_progress + int(progress_span * (0.15 + 0.80 * (idx / max(1, total_sources)))),
-        )
-        data = get_incidents_json(f"event/{match['id']}/incidents")
-        issue = data.get("_footscanIssue") if isinstance(data, dict) else None
-        incidents = data.get("incidents") if isinstance(data, dict) else data
-        if not isinstance(incidents, list):
-            incidents = []
-        if issue:
-            event_data_issues.append({
-                "id": match.get("id"),
-                "label": make_match_label(match),
-                "competition": get_competition_name(match),
-                "startTimestamp": match.get("startTimestamp") or 0,
-                "type": issue.get("type") or "blocked",
-                "reason": issue.get("reason") or issue.get("message") or "Événements non récupérés",
-                "message": issue.get("message") or "Événements non récupérés pour ce match.",
-            })
+    while True:
+        by_id = load_until_required(required)
+        sorted_matches = sorted(by_id.values(), key=lambda m: (m.get("startTimestamp") or 0, m.get("id") or 0), reverse=True)
+        selected_matches = sorted_matches[skip:required]
+        total_sources = len(selected_matches)
 
-        source_record = collect_reconstruction_goal_entries(match, incidents, analyzed_team_id)
-        if issue:
-            source_record["eventDataStatus"] = issue.get("type") or "blocked"
-            source_record["eventDataIssue"] = True
-            source_record["error"] = issue.get("reason") or issue.get("message") or "Événements non récupérés"
-        source_records.append(source_record)
+        if total_sources < needed_matches and (stopped_history or next_page >= PAGES_TO_LOAD):
+            raise RuntimeError(f"{team_name}: pas assez de matchs valides pour {trend_count} tendances ({total_sources}/{needed_matches}).")
 
-    reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode)
-    samples = reconstructed_samples[:needed_matches]
+        for idx in range(len(source_records), total_sources):
+            match = selected_matches[idx]
+            update_scan_job(
+                job_id,
+                status="running",
+                message=f"{team_name} · Tendance · Source {idx + 1}/{total_sources}",
+                progress=base_progress + int(progress_span * (0.15 + 0.80 * ((idx + 1) / max(1, total_sources)))),
+            )
+            data = get_incidents_json(f"event/{match['id']}/incidents")
+            issue = data.get("_footscanIssue") if isinstance(data, dict) else None
+            incidents = data.get("incidents") if isinstance(data, dict) else data
+            if not isinstance(incidents, list):
+                incidents = []
+            if issue:
+                event_data_issues.append({
+                    "id": match.get("id"),
+                    "label": make_match_label(match),
+                    "competition": get_competition_name(match),
+                    "startTimestamp": match.get("startTimestamp") or 0,
+                    "type": issue.get("type") or "blocked",
+                    "reason": issue.get("reason") or issue.get("message") or "Événements non récupérés",
+                    "message": issue.get("message") or "Événements non récupérés pour ce match.",
+                })
 
-    if len(samples) < needed_matches:
-        raise RuntimeError(f"{team_name}: pas assez de matchs reconstitués pour {trend_count} tendances ({len(samples)}/{needed_matches}).")
+            source_record = collect_reconstruction_goal_entries(match, incidents, analyzed_team_id)
+            if issue:
+                source_record["eventDataStatus"] = issue.get("type") or "blocked"
+                source_record["eventDataIssue"] = True
+                source_record["error"] = issue.get("reason") or issue.get("message") or "Événements non récupérés"
+            source_records.append(source_record)
+
+        reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode)
+        samples = reconstructed_samples[:needed_matches]
+
+        if len(samples) >= needed_matches:
+            break
+
+        known_available = max(0, len(sorted_matches) - skip)
+        history_exhausted = bool(stopped_history or next_page >= PAGES_TO_LOAD)
+        all_known_sources_processed = total_sources >= known_available
+        if history_exhausted and all_known_sources_processed:
+            raise RuntimeError(f"{team_name}: pas assez de matchs reconstitués pour {trend_count} tendances ({len(samples)}/{needed_matches}).")
+
+        required += growth_step
 
     administrative_ignored = sorted(
         administrative_matches_ignored.values(),
@@ -2972,7 +3008,6 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
         "pagesLimit": PAGES_TO_LOAD,
         "scanPartial": bool(event_data_issues),
     }
-
 
 def build_trend_items(samples, side_key, trend_count, trend_limit_enabled=False):
     items = []
@@ -3015,10 +3050,38 @@ def build_trend_items(samples, side_key, trend_count, trend_limit_enabled=False)
             "dominant": False,
             "selectedOldest": False,
             "selectedTrend": False,
+            "selectionWeight": 0,
+            "selectionTie": False,
             "selectionRank": None,
         })
     return items
 
+
+
+
+def normalize_trend_count(value):
+    try:
+        n = float(value or 0)
+    except Exception:
+        n = 0.0
+    if not math.isfinite(n):
+        n = 0.0
+    rounded = round(n, 6)
+    if abs(rounded - round(rounded)) < 1e-9:
+        return int(round(rounded))
+    return rounded
+
+
+def trend_item_selection_weight(item):
+    if not item or not item.get("selectedTrend"):
+        return 0.0
+    try:
+        weight = float(item.get("selectionWeight", item.get("selectedTrendWeight", 1)))
+    except Exception:
+        weight = 1.0
+    if not math.isfinite(weight) or weight <= 0:
+        return 0.0
+    return weight
 
 
 def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half", selection_metric="progression", trend_count=None):
@@ -3051,6 +3114,9 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         for item in items:
             item["dominant"] = False
             item["selectedTrend"] = False
+            item["selectedTrendWeight"] = 0
+            item["selectionWeight"] = 0
+            item["selectionTie"] = False
             item["selectedOldest"] = False
             item["selectionRank"] = None
             item["selectionMode"] = normalized_mode
@@ -3123,11 +3189,20 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             return abs(float(a.get("distance") or 9999) - float(b.get("distance") or 9999)) < 1e-9
         return abs(float(a.get("progression") or 0) - float(b.get("progression") or 0)) < 1e-9
 
-    def mark_selected(entry, rank):
+    def mark_selected(entry, rank, weight=1.0, tie=False):
         item = entry["item"]
-        item["dominant"] = True
-        item["selectedTrend"] = True
-        item["selectedOldest"] = True
+        try:
+            clean_weight = float(weight or 0)
+        except Exception:
+            clean_weight = 0.0
+        if not math.isfinite(clean_weight) or clean_weight <= 0:
+            clean_weight = 0.0
+        item["dominant"] = clean_weight > 0
+        item["selectedTrend"] = clean_weight > 0
+        item["selectedOldest"] = clean_weight > 0
+        item["selectionWeight"] = round(clean_weight, 6)
+        item["selectedTrendWeight"] = round(clean_weight, 6)
+        item["selectionTie"] = bool(tie)
         item["selectionRank"] = rank
         item["selectionMode"] = normalized_mode
         item["selectionMetric"] = normalized_metric
@@ -3172,10 +3247,12 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             best = candidates[0]
             winners = [entry for entry in candidates if same_best(entry, best)]
 
+            tie = len(winners) > 1
+            weight = 1.0 / len(winners) if winners else 1.0
             for entry in winners:
-                mark_selected(entry, rank)
+                mark_selected(entry, rank, weight=weight, tie=tie)
                 selected.append(entry)
-                rank += 1
+            rank += 1
 
     else:
         selected_count = max(1, (total + 1) // 2)
@@ -3191,6 +3268,9 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
     cutoff_progression = min((float(entry.get("progression") or 0) for entry in selected), default=None)
     cutoff_distance = max((float(entry.get("distance") or 0) for entry in selected), default=None)
 
+    home_selected_weight = sum(trend_item_selection_weight(item) for item in home_items or [])
+    away_selected_weight = sum(trend_item_selection_weight(item) for item in away_items or [])
+
     return {
         "method": normalized_mode,
         "label": label,
@@ -3199,44 +3279,45 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         "requestedTrendCount": n,
         "calculationTrendCount": n,
         "totalTrendItems": total,
-        "selectedTrendItems": len(selected),
+        "selectedTrendItems": normalize_trend_count(home_selected_weight + away_selected_weight),
         "globalAverageMinute": round(global_average, 4),
         "cutoffProgression": round(cutoff_progression, 4) if cutoff_progression is not None else None,
         "cutoffDistance": round(cutoff_distance, 4) if cutoff_distance is not None else None,
-        "homeSelectedTrendItems": sum(1 for item in home_items or [] if item.get("selectedTrend")),
-        "awaySelectedTrendItems": sum(1 for item in away_items or [] if item.get("selectedTrend")),
+        "homeSelectedTrendItems": normalize_trend_count(home_selected_weight),
+        "awaySelectedTrendItems": normalize_trend_count(away_selected_weight),
     }
 
 
 def summarize_trend_items(items):
-    counts = {"V": 0, "N": 0, "D": 0}
+    counts = {"V": 0.0, "N": 0.0, "D": 0.0}
     performance_score = 0.0
-    dominant_count = 0
+    dominant_count = 0.0
 
     for item in items or []:
-        if not item.get("dominant"):
+        weight = trend_item_selection_weight(item)
+        if weight <= 0:
             continue
-        dominant_count += 1
+        dominant_count += weight
         value = float(item.get("value") or 0)
-        performance_score += value
+        performance_score += value * weight
         style = trend_result_style(value)
-        counts[style] = counts.get(style, 0) + 1
+        counts[style] = counts.get(style, 0.0) + weight
 
+    normalized_counts = {key: normalize_trend_count(value) for key, value in counts.items()}
     order = sorted(
-        [{"style": k, "label": trend_label_from_style(k), "count": v} for k, v in counts.items()],
-        key=lambda item: (-item["count"], {"V": 0, "N": 1, "D": 2}.get(item["style"], 9)),
+        [{"style": k, "label": trend_label_from_style(k), "count": v} for k, v in normalized_counts.items()],
+        key=lambda item: (-float(item["count"] or 0), {"V": 0, "N": 1, "D": 2}.get(item["style"], 9)),
     )
-    primary = order[0] if order and order[0]["count"] > 0 else None
-    secondary = order[1] if len(order) > 1 and order[1]["count"] > 0 else None
+    primary = order[0] if order and float(order[0]["count"] or 0) > 0 else None
+    secondary = order[1] if len(order) > 1 and float(order[1]["count"] or 0) > 0 else None
 
     return {
         "performanceScore": round(performance_score, 6),
-        "resultCounts": counts,
+        "resultCounts": normalized_counts,
         "primaryResult": primary,
         "secondaryResult": secondary,
-        "dominantCount": dominant_count,
+        "dominantCount": normalize_trend_count(dominant_count),
     }
-
 
 def process_trend_scan_job(job_id, params):
     match_id = str(params.get("matchId") or "").strip()
@@ -3340,8 +3421,8 @@ def process_trend_scan_job(job_id, params):
             return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
 
         normal_side = "home" if h > a else "away"
-        home_taken_trends = int(trend_selection.get("homeSelectedTrendItems") or 0)
-        away_taken_trends = int(trend_selection.get("awaySelectedTrendItems") or 0)
+        home_taken_trends = float(trend_selection.get("homeSelectedTrendItems") or 0)
+        away_taken_trends = float(trend_selection.get("awaySelectedTrendItems") or 0)
         zero_side = "home" if h == 0 else ("away" if a == 0 else None)
         more_taken_side = None
         if home_taken_trends > away_taken_trends:
