@@ -2617,10 +2617,18 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
     match_has_assists = any(bool(entry.get("matchHasAssists")) for entry in clean_entries)
     assist_status = "assist-found" if match_has_assists else "no-assist-found"
     opponent_minutes_for_average = opponent_attack_minutes[:] if opponent_attack_minutes else [1.0]
-    reconstruction_score_label = f"{goals_for}-{goals_against}"
+    if level_mode == "attack":
+        # Camp combiné = attaque uniquement. Le score final affiché de la
+        # reconstitution doit donc être le total offensif, jamais un score
+        # complet type 1-1 qui ferait croire à attaque + défense.
+        reconstruction_score_label = f"Attaque {attack_goals_for}"
+        reconstruction_display_label = f"Reconstitution {index}"
+    else:
+        reconstruction_score_label = f"{goals_for}-{goals_against}"
+        reconstruction_display_label = f"Reconstitution {index} · {reconstruction_score_label}"
+    reconstruction_full_score_label = f"{goals_for}-{goals_against}"
     reconstruction_attack_score_label = f"Attaque {attack_goals_for}"
     opponent_attack_score_label = f"Attaque adverse {opponent_attack_goals}"
-    reconstruction_display_label = f"Reconstitution {index} · {reconstruction_score_label}"
 
     return {
         "id": sample_id,
@@ -2628,6 +2636,7 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
         "reconstructionLabel": label,
         "reconstructionDisplayLabel": reconstruction_display_label,
         "reconstructionScoreLabel": reconstruction_score_label,
+        "reconstructionFullScoreLabel": reconstruction_full_score_label,
         "reconstructionAttackScoreLabel": reconstruction_attack_score_label,
         "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
         "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
@@ -2921,15 +2930,18 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
 
         direct_score_label = direct.get("reconstructionAttackScoreLabel") or direct.get("reconstructionScoreLabel") or format(level, ".6g")
         opponent_score_label = opponent_attack.get("reconstructionScoreLabel") or f"Attaque adverse {format(adv_level, '.6g')}"
-        combined_score_label = f"{direct_score_label} + {opponent_score_label}"
+        combined_formula_label = f"{direct_score_label} + {opponent_score_label}"
+        combined_score_label = f"Attaque {format(level, '.6g')}"
+        reconstruction_index = direct.get("reconstructionIndex") or (idx + 1)
 
         sample = {
             **direct,
             "id": direct.get("id"),
             "label": direct.get("label"),
-            "reconstructionLabel": direct.get("reconstructionLabel") or direct.get("label"),
-            "reconstructionDisplayLabel": direct.get("reconstructionDisplayLabel") or direct.get("label"),
+            "reconstructionLabel": f"Reconstitution {reconstruction_index}",
+            "reconstructionDisplayLabel": f"Reconstitution {reconstruction_index}",
             "reconstructionScoreLabel": combined_score_label,
+            "reconstructionFormulaLabel": combined_formula_label,
             "directReconstructionScoreLabel": direct_score_label,
             "opponentReconstructionScoreLabel": opponent_score_label,
             "competition": direct.get("competition"),
@@ -2958,6 +2970,7 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
                 "reconstructionEntries": opponent_attack.get("reconstructionEntries") or source.get("reconstructionEntries") or [],
             },
             "analysisFormula": "attaque équipe + attaque adversaire du camp opposé",
+            "analysisFormulaLabel": combined_formula_label,
             "analysisLine": idx + 1,
             "side": side_key,
         }
