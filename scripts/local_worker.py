@@ -3566,15 +3566,15 @@ def summarize_trend_items(items):
 
 def process_trend_scan_job(job_id, params):
     match_id = str(params.get("matchId") or "").strip()
-    trend_count = int(float(params.get("trendCount") or params.get("rank1") or 4))
+    trend_count = int(float(params.get("trendCount") or params.get("rank1") or 9))
     trend_count = max(1, min(100, trend_count))
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = truthy_param(params.get("simultaneousMode"))
     trend_limit_enabled = truthy_param(params.get("trendLimitEnabled"))
-    trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
+    trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
-        trend_selection_mode = "top_line"
+        trend_selection_mode = "top_half"
     trend_selection_metric = str(params.get("trendSelectionMetric") or "high_average_minute").strip()
     if trend_selection_metric not in {"progression", "high_average_minute"}:
         trend_selection_metric = "high_average_minute"
