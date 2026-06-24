@@ -13040,10 +13040,25 @@
       `;
     }
 
+    function reconstructionLabel(sample, fallback) {
+      return sample?.reconstructionDisplayLabel || sample?.reconstructionLabel || sample?.label || fallback || "Reconstitution";
+    }
+
+    function reconstructionScore(sample) {
+      return sample?.reconstructionScoreLabel || formatValue(sample?.level ?? 0);
+    }
+
     function renderTrendItem(item) {
       const tone = trendItemToneClass(item);
       const dominant = item.dominant ? "is-dominant" : "";
       const domText = item.dominant ? "PREND LE DESSUS" : "COMPARÉE";
+      const previous = item.previousMatch || {};
+      const recent = item.recentMatch || {};
+      const previousLabel = reconstructionLabel(previous, "Reconstitution Précédente");
+      const recentLabel = reconstructionLabel(recent, "Reconstitution Récente");
+      const previousScore = reconstructionScore(previous);
+      const recentScore = reconstructionScore(recent);
+      const progressionText = item.averageMinuteProgression != null ? ` · Progression Minute ${esc(formatValue(item.averageMinuteProgression))}` : "";
       return `
         <div class="trend-row">
           <div class="trend-row-head">
@@ -13056,8 +13071,8 @@
               <span class="trend-split-bottom">${esc(formatValue(item.value))}${item.trendLimited ? "*" : ""}</span>
             </div>
             <div class="trend-mini-body">
-              <div class="trend-match-line">${esc(item.previousMatch?.label || "Match Précédent")} → ${esc(item.recentMatch?.label || "Match Récent")}</div>
-              <div class="trend-row-sub">Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}${item.timeSourceIndex ? ` · Temps T${esc(item.timeSourceIndex)} ${item.timeSourceProgression != null ? `(${esc(formatValue(item.timeSourceProgression))})` : ""}` : ""}${item.trendLimited ? ` · Limité depuis ${esc(formatValue(item.rawValue))}` : ""}</div>
+              <div class="trend-match-line">${esc(previousLabel)} → ${esc(recentLabel)}</div>
+              <div class="trend-row-sub">Score ${esc(previousScore)} → ${esc(recentScore)} · Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}${progressionText}${item.trendLimited ? ` · Limité depuis ${esc(formatValue(item.rawValue))}` : ""}</div>
             </div>
           </div>
         </div>
@@ -13079,7 +13094,7 @@
       if (!quality.isPartial && issueCount <= 0) {
         return `
           <div class="data-quality-banner ok">
-            <div class="data-quality-main">✅ Données Web Complètes</div>
+            <div class="data-quality-main">✅ Reconstitutions Valides</div>
           </div>
         `;
       }
@@ -13089,8 +13104,8 @@
 
       return `
         <div class="data-quality-banner">
-          <div class="data-quality-main">⚠️ Scan partiel · ${esc(issueCount)} ${pluralizeMatchCount(issueCount)} sans événements récupérés</div>
-          <div class="data-quality-sub">Les buts de ces matchs ne sont pas comptés. Domicile : ${esc(homeCount)} · Extérieur : ${esc(awayCount)}</div>
+          <div class="data-quality-main">⚠️ Scan partiel · ${esc(issueCount)} ${pluralizeMatchCount(issueCount)} utilisé(s) sans événements récupérés</div>
+          <div class="data-quality-sub">Ces matchs n'ont pas pu être remplacés. Domicile : ${esc(homeCount)} · Extérieur : ${esc(awayCount)}</div>
         </div>
       `;
     }
@@ -13099,7 +13114,7 @@
       const issueCount = Number(team?.eventDataIssueCount || 0);
       if (!issueCount) return "";
 
-      return `<div class="team-warning-pill">⚠️ ${esc(issueCount)} ${pluralizeMatchCount(issueCount)} sans événements</div>`;
+      return `<div class="team-warning-pill">⚠️ ${esc(issueCount)} ${pluralizeMatchCount(issueCount)} utilisé(s) sans événements</div>`;
     }
 
     function renderSummary(result) {
@@ -13378,15 +13393,19 @@
             <span class="assist-glyph">${assistOk ? "✔️" : "❌️"}</span>
           </span>
         `;
+        const scoreText = match.sourceScoreLabel ? `Score ${esc(match.sourceScoreLabel)} · ` : "";
+        const usedText = match.usedInReconstruction ? `Utilisé ${esc(match.usedCount || match.count || 1)} fois` : `Niveau ${esc(formatValue(match.trendLevel))}`;
+        const minuteText = Array.isArray(match.minutesUsed) && match.minutesUsed.length ? ` · Minutes ${esc(match.minutesUsed.join(", "))}` : "";
+        const roleText = Array.isArray(match.roles) && match.roles.length ? ` · ${esc(match.roles.join(" / "))}` : "";
         return `
           <div class="match-row ${hasIssue ? "issue" : ""}">
             <div class="row-number match-number-badge">
               <span class="match-index">${index + 1}</span>
-              <span class="match-count-mini">${esc(formatValue(match.trendLevel))}</span>
+              <span class="match-count-mini">${esc(match.usedCount || match.count || "-")}</span>
             </div>
             <div class="row-main">
               <div class="row-title match-title-with-badges">${esc(match.label)}${assistBadge}${issueText}</div>
-              <div class="row-sub">${esc(match.competition || "Toutes Compétitions")} · Niveau ${esc(formatValue(match.trendLevel))} · Moyenne Minute ${esc(formatRank(match.trendAverageMinute))}</div>
+              <div class="row-sub">${esc(match.competition || "Toutes Compétitions")} · ${scoreText}${usedText}${minuteText}${roleText}</div>
             </div>
           </div>
         `;
@@ -13403,6 +13422,7 @@
         </details>
       `;
     }
+
 
     function renderTeam(team, side, rank1, rank2) {
       const events = team.events || [];
