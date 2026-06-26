@@ -145,8 +145,8 @@ module.exports = async function (req, res) {
     const job = {
       id: jid,
       status: 'queued',
-      message: 'Scan ajouté à la file.',
-      progress: 0,
+      message: '⏳ En attente du worker Termux…',
+      progress: 1,
       createdAt: now,
       updatedAt: now,
       params: {
