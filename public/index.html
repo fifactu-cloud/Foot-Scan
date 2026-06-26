@@ -11730,8 +11730,8 @@
     let pollingTimer = null;
     let pollingErrorCount = 0;
     let pollingStartedAt = 0;
-    const QUEUED_WARNING_MS = 60000;
-    const QUEUED_TIMEOUT_MS = 300000;
+    const QUEUED_WARNING_MS = 45000;
+    const QUEUED_TIMEOUT_MS = 600000;
     let lastResult = null;
     let activePreset = "Libre";
 
@@ -12765,9 +12765,9 @@
           setStatus(job.message || "⏳ En attente du worker Termux…", safeProgress);
 
           if (elapsedQueued > QUEUED_TIMEOUT_MS) {
-            setError("Le scan est resté en attente trop longtemps. Vérifie que le worker Termux est lancé et connecté à la même base Upstash, puis relance le scan.");
-            setStatus("⏳ Worker Termux non détecté", safeProgress);
-            finishScan();
+            setError("Le worker Termux n’a toujours pas pris le job. Vérifie Termux et Upstash. La page continue d’écouter au cas où le worker se reconnecte.");
+            setStatus("⏳ En attente du worker Termux…", safeProgress);
+            pollingTimer = setTimeout(pollJob, 3000);
             return;
           }
 
