@@ -57,6 +57,7 @@ load_local_env()
 RAW_QUEUE_KEY = "sofa:queue"
 RAW_PREFETCH_QUEUE_KEY = "sofa:prefetch_queue"
 SCAN_QUEUE_KEY = "footscan:scan:queue"
+SCAN_WAKE_QUEUE_KEY = os.environ.get("SCAN_WAKE_QUEUE", "sofa:queue")
 
 CACHE_PREFIX = "sofa:cache:"
 ERROR_PREFIX = "sofa:error:"
@@ -220,10 +221,9 @@ def looks_like_scan_job_id(value):
 def pop_scan_job_fallback():
     """File scan de secours.
 
-    BRPOP est le chemin principal, mais sur certains environnements mobiles /
-    Upstash REST il peut arriver qu'une longue lecture bloquante ne réveille
-    pas immédiatement le worker. Cette vérification ponctuelle évite qu'un
-    scan reste en file alors que Termux est pourtant lancé.
+    Depuis v208, le scan est contrôlé en priorité par une lecture non bloquante
+    RPOP sur la file FOOTSCAN. C'est volontaire: sur certains Termux/Upstash REST,
+    BRPOP peut rester silencieux alors que le job est bien présent.
     """
     value = redis_cmd("RPOP", SCAN_QUEUE_KEY)
     return value or None
@@ -3836,10 +3836,26 @@ def process_scan_job(job_id):
         return
 
     job = json.loads(raw)
+    status = str(job.get("status") or "").lower()
+
+    if status in {"done", "error"}:
+        print(f"Scan job ignoré car déjà terminé: {job_id} · statut={status}")
+        return
+
+    if status == "running" and job.get("workerClaimedAt"):
+        print(f"Scan job ignoré car déjà pris par un worker: {job_id}")
+        return
+
     params = job.get("params") or {}
 
     try:
-        update_scan_job(job_id, status="running", message="Worker Termux connecté · préparation du scan…", progress=max(2, int(job.get("progress") or 0)))
+        update_scan_job(
+            job_id,
+            status="running",
+            message="Worker Termux connecté · préparation du scan…",
+            progress=max(2, int(job.get("progress") or 0)),
+            workerClaimedAt=now_ts(),
+        )
     except Exception:
         pass
 
@@ -4124,6 +4140,7 @@ def main():
     print("Mode séparé: équipe analysée + adversaires passés pondérés par match utilisé.")
     print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
+    print("Liaison scan: lecture directe RPOP v208 activée.")
     print("Système tendance: curseur 1-100, comparaison par moyenne des minutes la plus basse.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
@@ -4131,36 +4148,37 @@ def main():
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
 
     while True:
+        value = None
+        queue_key = None
+
         try:
-            # BRPOP évite le polling agressif (anciennement 3 requêtes Redis
-            # toutes les 0,5 s même sans scan). Une seule requête attend
-            # jusqu'à 10 s qu'un job arrive, ce qui protège le quota Upstash.
-            result = redis_cmd(
-                "BRPOP",
-                SCAN_QUEUE_KEY,
-                RAW_QUEUE_KEY,
-                RAW_PREFETCH_QUEUE_KEY,
-                "1" if once else "10",
-            )
+            # Priorité absolue au scan FOOTSCAN via RPOP non bloquant.
+            # C'est plus robuste que BRPOP sur certains environnements Termux/Upstash REST.
+            value = pop_scan_job_fallback()
+            queue_key = SCAN_QUEUE_KEY if value else None
         except RuntimeError as e:
             if is_upstash_quota_error(e):
                 print("\n❌ Quota Upstash atteint: limite de requêtes dépassée.")
                 print("Le worker ne peut plus lire la file tant que le quota n'est pas réinitialisé ou augmenté.")
-                print("Solution: attendre le reset Upstash, passer l'instance en plan supérieur, ou changer de base Redis.")
-                print("Note: le polling du worker a été optimisé pour éviter de consommer le quota à vide.")
                 break
             raise
 
-        queue_key, value = parse_brpop_result(result)
-
         if not value:
             try:
-                value = pop_scan_job_fallback()
-                queue_key = SCAN_QUEUE_KEY if value else None
+                # Anciennes files: on garde BRPOP avec un délai court.
+                # Le scan principal n'en dépend plus.
+                result = redis_cmd(
+                    "BRPOP",
+                    RAW_QUEUE_KEY,
+                    RAW_PREFETCH_QUEUE_KEY,
+                    "1" if once else "2",
+                )
+                queue_key, value = parse_brpop_result(result)
             except RuntimeError as e:
                 if is_upstash_quota_error(e):
                     print("\n❌ Quota Upstash atteint: limite de requêtes dépassée.")
                     print("Le worker ne peut plus lire la file tant que le quota n'est pas réinitialisé ou augmenté.")
+                    print("Solution: attendre le reset Upstash, passer l'instance en plan supérieur, ou changer de base Redis.")
                     break
                 raise
 
@@ -4168,6 +4186,7 @@ def main():
             if once:
                 print("Aucune requête en attente.")
                 break
+            time.sleep(0.4)
             continue
 
         queue_key = normalize_queue_key(queue_key)
