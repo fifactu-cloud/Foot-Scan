@@ -11729,6 +11729,9 @@
     let currentJobId = null;
     let pollingTimer = null;
     let pollingErrorCount = 0;
+    let pollingStartedAt = 0;
+    const QUEUED_WARNING_MS = 60000;
+    const QUEUED_TIMEOUT_MS = 300000;
     let lastResult = null;
     let activePreset = "Libre";
 
@@ -12733,6 +12736,8 @@
 
       currentJobId = data.id;
       pollingErrorCount = 0;
+      pollingStartedAt = Date.now();
+      setStatus(data.message || "⏳ En attente du worker Termux…", Math.max(1, Number(data.progress || 1)));
       pollJob();
     }
 
@@ -12752,7 +12757,29 @@
 
         pollingErrorCount = 0;
         setError("");
-        setStatus(job.message || job.status || "🔎 SCAN EN COURS…", job.progress || 0);
+
+        const elapsedQueued = pollingStartedAt ? Date.now() - pollingStartedAt : 0;
+        const safeProgress = Math.max(1, Number(job.progress || 0));
+
+        if (job.status === "queued") {
+          setStatus(job.message || "⏳ En attente du worker Termux…", safeProgress);
+
+          if (elapsedQueued > QUEUED_TIMEOUT_MS) {
+            setError("Le scan est resté en attente trop longtemps. Vérifie que le worker Termux est lancé et connecté à la même base Upstash, puis relance le scan.");
+            setStatus("⏳ Worker Termux non détecté", safeProgress);
+            finishScan();
+            return;
+          }
+
+          if (elapsedQueued > QUEUED_WARNING_MS) {
+            setError("Le job attend encore le worker Termux. Laisse Termux ouvert, ou relance le worker si rien ne bouge.");
+          }
+
+          pollingTimer = setTimeout(pollJob, 1200);
+          return;
+        }
+
+        setStatus(job.message || job.status || "🔎 SCAN EN COURS…", safeProgress);
 
         if (job.status === "done") {
           const resultWithOptions = {
@@ -12826,6 +12853,7 @@
       }
 
       pollingErrorCount = 0;
+      pollingStartedAt = 0;
       $("scanBtn").disabled = false;
       $("scanBtn").textContent = "SCANNER →";
     }
