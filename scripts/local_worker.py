@@ -192,6 +192,13 @@ def is_upstash_quota_error(error):
     return "max requests limit exceeded" in text or "max daily request" in text or "max request" in text
 
 
+def normalize_queue_key(value):
+    text = str(value or "").strip()
+    if (text.startswith("b'") and text.endswith("'")) or (text.startswith('b"') and text.endswith('"')):
+        text = text[2:-1]
+    return text.strip("'\"")
+
+
 def parse_brpop_result(result):
     """Retourne (queue_key, value) pour BRPOP, ou (None, None).
 
@@ -201,8 +208,25 @@ def parse_brpop_result(result):
     if not result:
         return None, None
     if isinstance(result, (list, tuple)) and len(result) >= 2:
-        return str(result[0]), result[1]
+        return normalize_queue_key(result[0]), result[1]
     return None, result
+
+
+def looks_like_scan_job_id(value):
+    text = str(value or "").strip()
+    return bool(re.fullmatch(r"[0-9a-fA-F]{24}", text))
+
+
+def pop_scan_job_fallback():
+    """File scan de secours.
+
+    BRPOP est le chemin principal, mais sur certains environnements mobiles /
+    Upstash REST il peut arriver qu'une longue lecture bloquante ne réveille
+    pas immédiatement le worker. Cette vérification ponctuelle évite qu'un
+    scan reste en file alors que Termux est pourtant lancé.
+    """
+    value = redis_cmd("RPOP", SCAN_QUEUE_KEY)
+    return value or None
 
 
 def read_url(url, headers, impersonate=False, timeout=None):
@@ -4130,12 +4154,26 @@ def main():
         queue_key, value = parse_brpop_result(result)
 
         if not value:
+            try:
+                value = pop_scan_job_fallback()
+                queue_key = SCAN_QUEUE_KEY if value else None
+            except RuntimeError as e:
+                if is_upstash_quota_error(e):
+                    print("\n❌ Quota Upstash atteint: limite de requêtes dépassée.")
+                    print("Le worker ne peut plus lire la file tant que le quota n'est pas réinitialisé ou augmenté.")
+                    break
+                raise
+
+        if not value:
             if once:
                 print("Aucune requête en attente.")
                 break
             continue
 
-        if queue_key == SCAN_QUEUE_KEY:
+        queue_key = normalize_queue_key(queue_key)
+
+        if queue_key == SCAN_QUEUE_KEY or looks_like_scan_job_id(value):
+            print(f"Scan job reçu: {value}")
             process_scan_job(value)
             continue
 
@@ -4147,9 +4185,10 @@ def main():
             process_prefetch_path(value)
             continue
 
-        # Sécurité: si le provider renvoie un format inattendu, on priorise
-        # l'ancien flux scan pour ne pas perdre le job.
-        process_scan_job(value)
+        # Sécurité: si le provider renvoie un format inattendu, on ne perd
+        # pas le contenu. Les IDs de scan sont traités plus haut; le reste
+        # reste sur l'ancien flux brut.
+        process_raw_request(value)
 
 
 if __name__ == "__main__":
