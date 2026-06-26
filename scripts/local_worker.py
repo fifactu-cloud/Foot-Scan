@@ -3156,8 +3156,11 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
     source_records = []
     reconstructed_samples = []
     samples = []
-    initial_buffer = max(24, min(180, needed_matches * 10))
-    growth_step = max(12, min(120, needed_matches * 6))
+    # Optimisation v206: on ne précharge plus une très grosse réserve
+    # d'incidents. On commence avec une marge raisonnable, puis on étend
+    # seulement si les reconstitutions valides ne sont pas encore suffisantes.
+    initial_buffer = max(6, min(36, needed_matches * 2))
+    growth_step = max(6, min(36, needed_matches * 2))
     required = skip + needed_matches + initial_buffer
 
     while True:
@@ -3215,6 +3218,17 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                     "message": "Match ignoré pour la reconstitution: le score indique plus de buts que les incidents récupérés.",
                 })
             source_records.append(source_record)
+
+            # Arrêt anticipé sans perte de qualité: dès que les N+1 vrais
+            # matchs reconstitués sont obtenus, on ne télécharge plus les
+            # incidents des matchs source suivants.
+            reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode)
+            samples = reconstructed_samples[:needed_matches]
+            if len(samples) >= needed_matches:
+                break
+
+        if len(samples) >= needed_matches:
+            break
 
         reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode)
         samples = reconstructed_samples[:needed_matches]
@@ -3799,6 +3813,11 @@ def process_scan_job(job_id):
 
     job = json.loads(raw)
     params = job.get("params") or {}
+
+    try:
+        update_scan_job(job_id, status="running", message="Worker Termux connecté · préparation du scan…", progress=max(2, int(job.get("progress") or 0)))
+    except Exception:
+        pass
 
     if params.get("trendMode") or params.get("trendCount") is not None:
         try:
