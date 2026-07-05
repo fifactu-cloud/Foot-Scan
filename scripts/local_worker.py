@@ -57,6 +57,9 @@ load_local_env()
 RAW_QUEUE_KEY = "sofa:queue"
 RAW_PREFETCH_QUEUE_KEY = "sofa:prefetch_queue"
 SCAN_QUEUE_KEY = "footscan:scan:queue"
+SCAN_PENDING_SET_KEY = "footscan:scan:pending"
+SCAN_LATEST_KEY = "footscan:scan:latest"
+SCAN_WORKER_HEARTBEAT_KEY = "footscan:worker:heartbeat"
 SCAN_WAKE_QUEUE_KEY = os.environ.get("SCAN_WAKE_QUEUE", "sofa:queue")
 
 CACHE_PREFIX = "sofa:cache:"
@@ -218,15 +221,71 @@ def looks_like_scan_job_id(value):
     return bool(re.fullmatch(r"[0-9a-fA-F]{24}", text))
 
 
-def pop_scan_job_fallback():
-    """File scan de secours.
+LAST_HEARTBEAT_SENT_AT = 0
+LAST_IDLE_LOG_AT = 0
 
-    Depuis v208, le scan est contrôlé en priorité par une lecture non bloquante
-    RPOP sur la file FOOTSCAN. C'est volontaire: sur certains Termux/Upstash REST,
-    BRPOP peut rester silencieux alors que le job est bien présent.
+
+def send_worker_heartbeat(force=False):
+    global LAST_HEARTBEAT_SENT_AT
+    ts = now_ts()
+    if not force and ts - LAST_HEARTBEAT_SENT_AT < 15:
+        return
+    payload = {
+        "status": "online",
+        "ts": ts,
+        "version": "v209",
+        "queue": SCAN_QUEUE_KEY,
+        "pendingSet": SCAN_PENDING_SET_KEY,
+    }
+    redis_cmd("SET", SCAN_WORKER_HEARTBEAT_KEY, json.dumps(payload, ensure_ascii=False), "EX", "120")
+    LAST_HEARTBEAT_SENT_AT = ts
+
+
+def pop_latest_scan_job():
+    value = redis_cmd("GET", SCAN_LATEST_KEY)
+    if not value or not looks_like_scan_job_id(value):
+        return None
+
+    raw = redis_cmd("GET", f"{SCAN_JOB_PREFIX}{value}")
+    if not raw:
+        redis_cmd("DEL", SCAN_LATEST_KEY)
+        return None
+
+    try:
+        job = json.loads(raw)
+    except Exception:
+        redis_cmd("DEL", SCAN_LATEST_KEY)
+        return None
+
+    status = str(job.get("status") or "").lower()
+    if status in {"queued", "pending"}:
+        redis_cmd("DEL", SCAN_LATEST_KEY)
+        return value
+
+    # Évite une boucle infinie sur un ancien latest déjà traité.
+    redis_cmd("DEL", SCAN_LATEST_KEY)
+    return None
+
+
+def pop_scan_job_fallback():
+    """Lecture scan robuste.
+
+    v209 ne dépend plus d'un seul mécanisme Redis. Le worker vérifie:
+    1) le set pending, 2) la file dans les deux sens, 3) la clé latest de secours.
     """
+    value = redis_cmd("SPOP", SCAN_PENDING_SET_KEY)
+    if value:
+        return value
+
     value = redis_cmd("RPOP", SCAN_QUEUE_KEY)
-    return value or None
+    if value:
+        return value
+
+    value = redis_cmd("LPOP", SCAN_QUEUE_KEY)
+    if value:
+        return value
+
+    return pop_latest_scan_job()
 
 
 def read_url(url, headers, impersonate=False, timeout=None):
@@ -2450,13 +2509,80 @@ def reconstruction_source_is_complete(source_record):
     return True
 
 
-def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
-    """Prépare les buts d'un match source pour la reconstitution diagonale.
+def reconstruction_score_average(values):
+    clean = []
+    for value in values or []:
+        try:
+            n = float(value)
+        except Exception:
+            continue
+        if math.isfinite(n):
+            clean.append(n)
+    return sum(clean) / len(clean) if clean else 0.0
 
-    Chaque match source fournit ensuite un seul élément selon sa position dans
-    l'historique: dernier but, avant-dernier but, etc. Si cet élément n'existe
-    pas, on ignore ce match source. Le 0-0 est conservé uniquement quand le
-    match source est réellement sans but.
+
+def reconstruction_number_label(value):
+    try:
+        n = float(value)
+    except Exception:
+        n = 0.0
+    if not math.isfinite(n):
+        n = 0.0
+    if abs(n - round(n)) < 1e-9:
+        return str(int(round(n)))
+    return f"{n:.2f}".rstrip("0").rstrip(".")
+
+
+def incident_score_pair(incident):
+    """Lit le score exposé par SofaScore au moment du but quand il existe."""
+    if not isinstance(incident, dict):
+        return None, None
+
+    direct_pairs = [
+        ("homeScore", "awayScore"),
+        ("home_score", "away_score"),
+    ]
+    for home_key, away_key in direct_pairs:
+        home = incident.get(home_key)
+        away = incident.get(away_key)
+        if isinstance(home, dict):
+            for key in ("current", "display", "normaltime", "value"):
+                h = safe_score_value(home.get(key))
+                a = safe_score_value(away.get(key) if isinstance(away, dict) else away)
+                if h is not None and a is not None:
+                    return h, a
+        else:
+            h = safe_score_value(home)
+            a = safe_score_value(away)
+            if h is not None and a is not None:
+                return h, a
+
+    score = incident.get("score") or incident.get("incidentScore") or incident.get("currentScore")
+    if isinstance(score, dict):
+        home = None
+        away = None
+        for key in ("home", "homeScore", "home_score"):
+            if key in score:
+                home = safe_score_value(score.get(key))
+                break
+        for key in ("away", "awayScore", "away_score"):
+            if key in score:
+                away = safe_score_value(score.get(key))
+                break
+        if home is not None and away is not None:
+            return home, away
+
+    return None, None
+
+
+def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
+    """Prépare les états de score d'un vrai match pour la reconstitution.
+
+    Chaque vrai match contient un état initial 0-0 à la minute 0. Pour chaque
+    but, on conserve le score exact au moment de l'événement, normalisé du
+    point de vue de l'équipe analysée. Une reconstitution utilisera ensuite ces
+    états selon le mode Séquence ou Escalier, sans jamais réutiliser le même
+    état de score.
     """
     match_label = make_match_label(match)
     match_id = match.get("id")
@@ -2469,25 +2595,54 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
     match_has_assists = match_contains_goal_assist(incidents)
     goals = []
 
+    home_id = ((match.get("homeTeam") or {}).get("id"))
+    analyzed_is_home = home_id == analyzed_team_id
+    running_home = 0
+    running_away = 0
+
+    goal_incidents = []
     for inc in incidents or []:
         if not isinstance(inc, dict) or inc.get("incidentType") != "goal":
             continue
-
         minute = inc.get("time")
         added = inc.get("addedTime") or 0
         if minute is None or minute < 1 or minute > 90:
             continue
+        goal_incidents.append(inc)
 
+    goal_incidents.sort(key=lambda inc: trend_goal_chrono_key(inc.get("time"), inc.get("addedTime") or 0))
+
+    for inc in goal_incidents:
+        minute = inc.get("time")
+        added = inc.get("addedTime") or 0
         own_goal = is_own_goal_incident(inc)
         if own_goal:
             goal_for_team = not own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
-            attack_delta = 0
-            opponent_attack_delta = 0
         else:
             scorer_is_analyzed = incident_belongs_to_analyzed_team(inc, match, analyzed_team_id)
             goal_for_team = scorer_is_analyzed
-            attack_delta = 1 if scorer_is_analyzed else 0
-            opponent_attack_delta = 0 if scorer_is_analyzed else 1
+
+        incident_home, incident_away = incident_score_pair(inc)
+        if incident_home is not None and incident_away is not None:
+            running_home = incident_home
+            running_away = incident_away
+        else:
+            if goal_for_team:
+                if analyzed_is_home:
+                    running_home += 1
+                else:
+                    running_away += 1
+            else:
+                if analyzed_is_home:
+                    running_away += 1
+                else:
+                    running_home += 1
+
+        team_score = running_home if analyzed_is_home else running_away
+        opponent_score = running_away if analyzed_is_home else running_home
+        attack_score = team_score
+        opponent_attack_score = opponent_score
+        index_chrono = len(goals) + 1
 
         goals.append({
             "isZeroZero": False,
@@ -2497,10 +2652,18 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
             "averageMinute": trend_goal_average_minute(minute, added),
             "chronoKey": trend_goal_chrono_key(minute, added),
             "goalDelta": 1 if goal_for_team else -1,
-            "attackDelta": attack_delta,
-            "opponentAttackDelta": opponent_attack_delta,
+            "attackDelta": 1 if goal_for_team and not own_goal else 0,
+            "opponentAttackDelta": 0 if goal_for_team or own_goal else 1,
             "goalForTeam": bool(goal_for_team),
             "ownGoal": bool(own_goal),
+            "teamScore": float(team_score),
+            "opponentScore": float(opponent_score),
+            "attackScore": float(attack_score),
+            "opponentAttackScore": float(opponent_attack_score),
+            "scoreStateLabel": f"{reconstruction_number_label(team_score)}-{reconstruction_number_label(opponent_score)}",
+            "homeScoreAtEvent": running_home,
+            "awayScoreAtEvent": running_away,
+            "stateKey": f"goal-{index_chrono}",
             "sourceMatchId": match_id,
             "sourceLabel": match_label,
             "sourceCompetition": competition,
@@ -2512,23 +2675,30 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
             "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
         })
 
-    goals.sort(key=lambda item: item.get("chronoKey") or (0, 0, 0))
     goal_data_complete = True
     if final_score_total is not None and final_score_total > len(goals):
         goal_data_complete = False
 
     zero_zero = {
         "isZeroZero": True,
-        "minute": 1,
+        "minute": 0,
         "added": 0,
-        "minuteLabel": "0-0",
-        "averageMinute": 1.0,
-        "chronoKey": (0, 1, 0),
+        "minuteLabel": "0'",
+        "averageMinute": 0.0,
+        "chronoKey": (0, 0, 0),
         "goalDelta": 0,
         "attackDelta": 0,
         "opponentAttackDelta": 0,
         "goalForTeam": None,
         "ownGoal": False,
+        "teamScore": 0.0,
+        "opponentScore": 0.0,
+        "attackScore": 0.0,
+        "opponentAttackScore": 0.0,
+        "scoreStateLabel": "0-0",
+        "homeScoreAtEvent": 0,
+        "awayScoreAtEvent": 0,
+        "stateKey": "zero-zero",
         "sourceMatchId": match_id,
         "sourceLabel": match_label,
         "sourceCompetition": competition,
@@ -2557,37 +2727,62 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
         "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
     }
 
-
 def reconstruction_source_is_true_zero_zero(source_record):
     if not reconstruction_source_is_complete(source_record):
         return False
     return bool(source_record.get("trueZeroZero"))
 
 
-def reconstruction_source_entry(source_record, goal_index_from_end):
+def reconstruction_entry_uid(entry):
+    if not isinstance(entry, dict):
+        return None
+    match_id = entry.get("sourceMatchId")
+    state_key = entry.get("stateKey") or ("zero-zero" if entry.get("isZeroZero") else entry.get("minuteLabel"))
+    return f"{match_id}:{state_key}"
+
+
+def reconstruction_source_entry(source_record, minimum_index_from_end=1, used_keys=None):
+    """Retourne le prochain état de score exploitable pour un vrai match.
+
+    minimum_index_from_end respecte la diagonale: M1 dernier score, M2
+    avant-dernier score, M3 troisième depuis la fin, etc. Si ce rang n'existe
+    plus dans les buts, on tombe sur le 0-0 minute 0. Les états déjà utilisés
+    sont ignorés: aucun but ni 0-0 ne peut servir deux fois.
+    """
     if not reconstruction_source_is_complete(source_record):
         return None
 
+    used = set(used_keys or set())
     goals = source_record.get("goals") or []
-    needed_from_end = max(1, int(goal_index_from_end or 1))
+    minimum_rank = max(1, int(minimum_index_from_end or 1))
 
-    if len(goals) >= needed_from_end:
-        entry = dict(goals[-needed_from_end])
-    elif needed_from_end == 1 and reconstruction_source_is_true_zero_zero(source_record):
-        entry = dict(source_record.get("zeroZero") or {})
-    else:
-        return None
+    for rank in range(minimum_rank, len(goals) + 1):
+        entry = dict(goals[-rank])
+        entry["reconstructionSourceIndex"] = rank
+        entry["reconstructionSourceGoalCount"] = len(goals)
+        uid = reconstruction_entry_uid(entry)
+        if uid not in used:
+            entry["reconstructionUid"] = uid
+            return entry
 
-    entry["reconstructionSourceIndex"] = needed_from_end
-    entry["reconstructionSourceGoalCount"] = len(goals)
-    return entry
+    zero = dict(source_record.get("zeroZero") or {})
+    if zero:
+        zero["reconstructionSourceIndex"] = len(goals) + 1
+        zero["reconstructionSourceGoalCount"] = len(goals)
+        uid = reconstruction_entry_uid(zero)
+        if uid not in used:
+            zero["reconstructionUid"] = uid
+            return zero
+
+    return None
 
 
 def reconstruction_entry_keeps_reverse_chronology(previous_entry, next_entry):
-    """La reconstitution remonte le match: le prochain but doit être antérieur.
+    """La reconstitution remonte le match: le prochain score doit être antérieur.
 
     Une minute de 1re mi-temps en temps additionnel reste donc valide après un
-    but de 2e mi-temps, par exemple 46 puis 45+3.
+    but de 2e mi-temps, par exemple 46 puis 45+3. Le 0-0 minute 0 clôture la
+    reconstitution et reste toujours chronologiquement valide.
     """
     if not previous_entry or not next_entry:
         return True
@@ -2595,7 +2790,6 @@ def reconstruction_entry_keeps_reverse_chronology(previous_entry, next_entry):
     previous_key = previous_entry.get("chronoKey") or (0, 0, 0)
     next_key = next_entry.get("chronoKey") or (0, 0, 0)
     return next_key <= previous_key
-
 
 def compact_reconstruction_label(entries):
     usable = [entry for entry in entries or [] if isinstance(entry, dict)]
@@ -2611,26 +2805,30 @@ def compact_reconstruction_label(entries):
     return f"{last} → {first}"
 
 
-def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full", index=1):
+def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full", index=1, reconstruction_mode="sequence"):
     clean_entries = [entry for entry in entries or [] if isinstance(entry, dict)]
     zero_only = len(clean_entries) == 1 and bool(clean_entries[0].get("isZeroZero"))
-    non_zero_entries = [entry for entry in clean_entries if not entry.get("isZeroZero")]
 
-    goals_for = sum(1 for entry in non_zero_entries if entry.get("goalDelta") == 1)
-    goals_against = sum(1 for entry in non_zero_entries if entry.get("goalDelta") == -1)
-    attack_goals_for = sum(int(entry.get("attackDelta") or 0) for entry in non_zero_entries)
-    opponent_attack_goals = sum(int(entry.get("opponentAttackDelta") or 0) for entry in non_zero_entries)
+    team_scores = [float(entry.get("teamScore") or 0.0) for entry in clean_entries]
+    opponent_scores = [float(entry.get("opponentScore") or 0.0) for entry in clean_entries]
+    attack_scores = [float(entry.get("attackScore", entry.get("teamScore") or 0.0) or 0.0) for entry in clean_entries]
+    opponent_attack_scores = [float(entry.get("opponentAttackScore", entry.get("opponentScore") or 0.0) or 0.0) for entry in clean_entries]
 
-    all_goal_minutes = [float(entry.get("averageMinute") or 1.0) for entry in non_zero_entries]
-    attack_goal_minutes = [float(entry.get("averageMinute") or 1.0) for entry in non_zero_entries if int(entry.get("attackDelta") or 0) > 0]
-    opponent_attack_minutes = [float(entry.get("averageMinute") or 1.0) for entry in non_zero_entries if int(entry.get("opponentAttackDelta") or 0) > 0]
+    avg_team_score = reconstruction_score_average(team_scores)
+    avg_opponent_score = reconstruction_score_average(opponent_scores)
+    avg_attack_score = reconstruction_score_average(attack_scores)
+    avg_opponent_attack_score = reconstruction_score_average(opponent_attack_scores)
+
+    all_state_minutes = [float(entry.get("averageMinute") or 0.0) for entry in clean_entries]
+    attack_state_minutes = [float(entry.get("averageMinute") or 0.0) for entry in clean_entries]
+    opponent_attack_minutes = [float(entry.get("averageMinute") or 0.0) for entry in clean_entries]
 
     if level_mode == "attack":
-        level = attack_goals_for
-        minutes_for_average = attack_goal_minutes[:] if attack_goal_minutes else [1.0]
+        level = avg_attack_score
+        minutes_for_average = attack_state_minutes[:] if attack_state_minutes else [0.0]
     else:
-        level = goals_for - goals_against
-        minutes_for_average = all_goal_minutes[:] if all_goal_minutes else [1.0]
+        level = avg_team_score - avg_opponent_score
+        minutes_for_average = all_state_minutes[:] if all_state_minutes else [0.0]
 
     label = compact_reconstruction_label(clean_entries)
     first_entry = clean_entries[0] if clean_entries else {}
@@ -2640,19 +2838,18 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
 
     match_has_assists = any(bool(entry.get("matchHasAssists")) for entry in clean_entries)
     assist_status = "assist-found" if match_has_assists else "no-assist-found"
-    opponent_minutes_for_average = opponent_attack_minutes[:] if opponent_attack_minutes else [1.0]
+    opponent_minutes_for_average = opponent_attack_minutes[:] if opponent_attack_minutes else [0.0]
+
+    full_score_label = f"{reconstruction_number_label(avg_team_score)}-{reconstruction_number_label(avg_opponent_score)}"
+    attack_score_label = f"Attaque {reconstruction_number_label(avg_attack_score)}"
+    opponent_attack_score_label = f"Attaque adverse {reconstruction_number_label(avg_opponent_attack_score)}"
+
     if level_mode == "attack":
-        # Camp combiné = attaque uniquement. Le score final affiché de la
-        # reconstitution doit donc être le total offensif, jamais un score
-        # complet type 1-1 qui ferait croire à attaque + défense.
-        reconstruction_score_label = f"Attaque {attack_goals_for}"
-        reconstruction_display_label = f"Reconstitution {index}"
-    else:
-        reconstruction_score_label = f"{goals_for}-{goals_against}"
+        reconstruction_score_label = attack_score_label
         reconstruction_display_label = f"Reconstitution {index} · {reconstruction_score_label}"
-    reconstruction_full_score_label = f"{goals_for}-{goals_against}"
-    reconstruction_attack_score_label = f"Attaque {attack_goals_for}"
-    opponent_attack_score_label = f"Attaque adverse {opponent_attack_goals}"
+    else:
+        reconstruction_score_label = full_score_label
+        reconstruction_display_label = f"Reconstitution {index} · {reconstruction_score_label}"
 
     return {
         "id": sample_id,
@@ -2660,29 +2857,35 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
         "reconstructionLabel": label,
         "reconstructionDisplayLabel": reconstruction_display_label,
         "reconstructionScoreLabel": reconstruction_score_label,
-        "reconstructionFullScoreLabel": reconstruction_full_score_label,
-        "reconstructionAttackScoreLabel": reconstruction_attack_score_label,
+        "reconstructionFullScoreLabel": full_score_label,
+        "reconstructionAttackScoreLabel": attack_score_label,
+        "reconstructionScoreAverage": {
+            "team": round(avg_team_score, 6),
+            "opponent": round(avg_opponent_score, 6),
+            "attack": round(avg_attack_score, 6),
+            "opponentAttack": round(avg_opponent_attack_score, 6),
+        },
         "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
         "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
         "homeTeam": {},
         "awayTeam": {},
         "analyzedTeamId": analyzed_team_id,
-        "goalsFor": goals_for,
-        "goalsAgainst": goals_against,
-        "attackGoalsFor": attack_goals_for,
-        "level": level,
+        "goalsFor": round(avg_team_score, 6),
+        "goalsAgainst": round(avg_opponent_score, 6),
+        "attackGoalsFor": round(avg_attack_score, 6),
+        "level": round(level, 6),
         "levelMode": level_mode,
         "resultStyle": trend_result_style(level),
         "resultLabel": trend_label_from_style(trend_result_style(level)),
-        "goalMinutes": all_goal_minutes,
-        "attackGoalMinutes": attack_goal_minutes,
+        "goalMinutes": all_state_minutes,
+        "attackGoalMinutes": attack_state_minutes,
         "minutesForAverage": minutes_for_average,
         "averageMinute": round(trend_average(minutes_for_average), 4),
         "matchHasAssists": match_has_assists,
         "assistDataStatus": assist_status,
         "eventDataStatus": "ok",
         "reconstructedMatch": True,
-        "reconstructionMethod": "diagonal_last_goal_reverse_chronology",
+        "reconstructionMethod": reconstruction_mode,
         "reconstructionIndex": index,
         "reconstructionZeroOnly": zero_only,
         "reconstructionEntries": [
@@ -2692,6 +2895,13 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
                 "sourceCompetition": entry.get("sourceCompetition"),
                 "sourceStartTimestamp": entry.get("sourceStartTimestamp") or 0,
                 "sourceScoreLabel": entry.get("sourceScoreLabel"),
+                "scoreStateLabel": entry.get("scoreStateLabel"),
+                "teamScore": entry.get("teamScore"),
+                "opponentScore": entry.get("opponentScore"),
+                "attackScore": entry.get("attackScore"),
+                "opponentAttackScore": entry.get("opponentAttackScore"),
+                "homeScoreAtEvent": entry.get("homeScoreAtEvent"),
+                "awayScoreAtEvent": entry.get("awayScoreAtEvent"),
                 "finalHomeScore": entry.get("finalHomeScore"),
                 "finalAwayScore": entry.get("finalAwayScore"),
                 "matchHasAssists": entry.get("matchHasAssists"),
@@ -2704,6 +2914,7 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
                 "attackDelta": entry.get("attackDelta"),
                 "opponentAttackDelta": entry.get("opponentAttackDelta"),
                 "reconstructionSourceIndex": entry.get("reconstructionSourceIndex"),
+                "stateKey": entry.get("stateKey"),
             }
             for entry in clean_entries
         ],
@@ -2711,12 +2922,12 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
             "id": f"{sample_id}-opponent-attack",
             "label": label,
             "reconstructionLabel": label,
-            "reconstructionDisplayLabel": reconstruction_display_label,
+            "reconstructionDisplayLabel": f"Reconstitution {index} · {opponent_attack_score_label}",
             "reconstructionScoreLabel": opponent_attack_score_label,
             "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
             "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
-            "level": opponent_attack_goals,
-            "attackGoalsFor": opponent_attack_goals,
+            "level": round(avg_opponent_attack_score, 6),
+            "attackGoalsFor": round(avg_opponent_attack_score, 6),
             "minutesForAverage": opponent_minutes_for_average,
             "averageMinute": round(trend_average(opponent_minutes_for_average), 4),
             "matchHasAssists": match_has_assists,
@@ -2729,103 +2940,169 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
                     "sourceCompetition": entry.get("sourceCompetition"),
                     "sourceStartTimestamp": entry.get("sourceStartTimestamp") or 0,
                     "sourceScoreLabel": entry.get("sourceScoreLabel"),
+                    "scoreStateLabel": entry.get("scoreStateLabel"),
+                    "teamScore": entry.get("teamScore"),
+                    "opponentScore": entry.get("opponentScore"),
+                    "opponentAttackScore": entry.get("opponentAttackScore"),
                     "minuteLabel": entry.get("minuteLabel"),
                     "isZeroZero": bool(entry.get("isZeroZero")),
-                    "opponentAttackDelta": entry.get("opponentAttackDelta"),
                     "matchHasAssists": entry.get("matchHasAssists"),
                     "assistDataStatus": entry.get("assistDataStatus"),
+                    "stateKey": entry.get("stateKey"),
                 }
                 for entry in clean_entries
             ],
         },
     }
 
+def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode="full", reconstruction_mode="staircase", max_samples=None):
+    """Reconstruit des matchs uniquement à partir de vrais états de score.
 
-def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode="full"):
-    """Reconstruit des matchs uniquement à partir de vrais matchs source.
-
-    Règles appliquées pour chaque camp et chaque mode de calcul :
-    - un nouveau match reconstitué démarre avec un vrai dernier but source ;
-    - la suite utilise l'avant-dernier but du match source suivant, puis le
-      troisième depuis la fin, etc. ;
-    - si le but trouvé casse la chronologie réelle, le match en cours est
-      clôturé et ce but démarre le match suivant ;
-    - un vrai 0-0 démarre et clôture immédiatement un match ;
-    - un match dont les buts ne sont pas récupérés complètement n'est pas
-      utilisé pour fabriquer un faux N 0.
+    Mode Séquence : ancien principe linéaire, mais avec le 0-0 minute 0 commun.
+    Mode Escalier : après chaque reconstitution, on revient au premier vrai match
+    encore exploitable; M1 fournit le dernier score disponible, M2 l'avant-dernier,
+    M3 le troisième depuis la fin, etc. Aucun score d'événement ni 0-0 minute 0
+    ne peut être utilisé deux fois.
     """
-    samples = []
-    current = []
-    previous_entry = None
-    source_index = 0
-    goal_index_from_end = 1
+    normalized_mode = str(reconstruction_mode or "staircase").strip().lower()
+    if normalized_mode in {"sequence", "séquence", "seq"}:
+        normalized_mode = "sequence"
+    else:
+        normalized_mode = "staircase"
 
-    def close_current():
-        nonlocal current, previous_entry, goal_index_from_end
-        if current:
-            samples.append(build_reconstructed_trend_sample(
-                current,
-                analyzed_team_id,
-                level_mode=level_mode,
-                index=len(samples) + 1,
-            ))
+    records = [record for record in (source_records or []) if reconstruction_source_is_complete(record)]
+    limit = None
+    try:
+        if max_samples is not None:
+            limit = int(max_samples)
+    except Exception:
+        limit = None
+
+    def append_sample(samples, entries):
+        if not entries:
+            return
+        samples.append(build_reconstructed_trend_sample(
+            entries,
+            analyzed_team_id,
+            level_mode=level_mode,
+            index=len(samples) + 1,
+            reconstruction_mode=normalized_mode,
+        ))
+
+    if normalized_mode == "sequence":
+        samples = []
+        used = set()
         current = []
         previous_entry = None
-        goal_index_from_end = 1
+        source_index = 0
+        score_index_from_end = 1
 
-    records = list(source_records or [])
+        def close_current():
+            nonlocal current, previous_entry, score_index_from_end
+            append_sample(samples, current)
+            current = []
+            previous_entry = None
+            score_index_from_end = 1
 
-    while source_index < len(records):
-        source_record = records[source_index]
+        while source_index < len(records):
+            if limit is not None and len(samples) >= limit:
+                break
 
-        if not reconstruction_source_is_complete(source_record):
-            close_current()
-            source_index += 1
-            continue
+            source_record = records[source_index]
+            entry = reconstruction_source_entry(source_record, score_index_from_end, used)
 
-        if reconstruction_source_is_true_zero_zero(source_record):
-            close_current()
-            zero_entry = reconstruction_source_entry(source_record, 1)
-            if zero_entry:
-                samples.append(build_reconstructed_trend_sample(
-                    [zero_entry],
-                    analyzed_team_id,
-                    level_mode=level_mode,
-                    index=len(samples) + 1,
-                ))
-            source_index += 1
-            goal_index_from_end = 1
-            continue
-
-        entry = reconstruction_source_entry(source_record, goal_index_from_end)
-
-        if not entry:
-            # Le match source n'a pas le but demandé. On clôture le match en
-            # cours puis on repart de ce même match source avec son dernier but,
-            # afin de rester sur des vrais matchs au lieu d'inventer un 0-0.
-            if current:
-                close_current()
+            if not entry:
+                if current:
+                    close_current()
+                    continue
+                source_index += 1
+                score_index_from_end = 1
                 continue
-            source_index += 1
-            goal_index_from_end = 1
-            continue
 
-        if current and not reconstruction_entry_keeps_reverse_chronology(previous_entry, entry):
-            # Le but existe mais casse l'ordre chronologique : il clôture le
-            # match en cours et devient le début du match suivant.
-            close_current()
-            current = [entry]
+            if current and not reconstruction_entry_keeps_reverse_chronology(previous_entry, entry):
+                close_current()
+                current = [entry]
+                uid = reconstruction_entry_uid(entry)
+                if uid:
+                    used.add(uid)
+                if entry.get("isZeroZero"):
+                    close_current()
+                    source_index += 1
+                    continue
+                previous_entry = entry
+                source_index += 1
+                score_index_from_end = 2
+                continue
+
+            current.append(entry)
+            uid = reconstruction_entry_uid(entry)
+            if uid:
+                used.add(uid)
+
+            if entry.get("isZeroZero"):
+                close_current()
+                source_index += 1
+                continue
+
             previous_entry = entry
             source_index += 1
-            goal_index_from_end = 2
-            continue
+            score_index_from_end += 1
 
-        current.append(entry)
-        previous_entry = entry
-        source_index += 1
-        goal_index_from_end += 1
+        if limit is None or len(samples) < limit:
+            close_current()
+        return samples
 
-    close_current()
+    samples = []
+    used = set()
+    start_index = 0
+    safety = 0
+    max_safety = max(1000, len(records) * 50 + 50)
+
+    def start_can_provide(index):
+        if index < 0 or index >= len(records):
+            return False
+        return reconstruction_source_entry(records[index], 1, used) is not None
+
+    while start_index < len(records) and safety < max_safety:
+        safety += 1
+        if limit is not None and len(samples) >= limit:
+            break
+
+        while start_index < len(records) and not start_can_provide(start_index):
+            start_index += 1
+        if start_index >= len(records):
+            break
+
+        current = []
+        previous_entry = None
+        source_index = start_index
+        offset = 0
+
+        while source_index < len(records):
+            entry = reconstruction_source_entry(records[source_index], offset + 1, used)
+            if not entry:
+                break
+
+            if current and not reconstruction_entry_keeps_reverse_chronology(previous_entry, entry):
+                break
+
+            current.append(entry)
+            uid = reconstruction_entry_uid(entry)
+            if uid:
+                used.add(uid)
+
+            if entry.get("isZeroZero"):
+                break
+
+            previous_entry = entry
+            source_index += 1
+            offset += 1
+
+        if current:
+            append_sample(samples, current)
+        else:
+            start_index += 1
+
     return samples
 
 def truthy_param(value):
@@ -3018,6 +3295,7 @@ def _source_match_rows_from_reconstruction_entries(entries, role_label=None):
             "competition": entry.get("sourceCompetition") or "Toutes compétitions",
             "startTimestamp": entry.get("sourceStartTimestamp") or 0,
             "sourceScoreLabel": entry.get("sourceScoreLabel") or "Score inconnu",
+            "scoreStateLabel": entry.get("scoreStateLabel") or ("0-0" if entry.get("isZeroZero") else None),
             "minuteLabel": entry.get("minuteLabel") or ("0-0" if entry.get("isZeroZero") else "—"),
             "isZeroZero": bool(entry.get("isZeroZero")),
             "matchHasAssists": entry.get("matchHasAssists"),
@@ -3097,7 +3375,7 @@ def rebuild_trend_matches_used_from_samples(samples):
     ]
 
 
-def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span, level_mode="full"):
+def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span, level_mode="full", reconstruction_mode="staircase"):
     needed_matches = max(2, int(trend_count) + 1)
     pages = []
     stopped_history = False
@@ -3246,7 +3524,7 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             # Arrêt anticipé sans perte de qualité: dès que les N+1 vrais
             # matchs reconstitués sont obtenus, on ne télécharge plus les
             # incidents des matchs source suivants.
-            reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode)
+            reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode, reconstruction_mode=reconstruction_mode, max_samples=needed_matches)
             samples = reconstructed_samples[:needed_matches]
             if len(samples) >= needed_matches:
                 break
@@ -3254,7 +3532,7 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
         if len(samples) >= needed_matches:
             break
 
-        reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode)
+        reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode, reconstruction_mode=reconstruction_mode, max_samples=needed_matches)
         samples = reconstructed_samples[:needed_matches]
 
         if len(samples) >= needed_matches:
@@ -3616,6 +3894,12 @@ def process_trend_scan_job(job_id, params):
     trend_selection_metric = str(params.get("trendSelectionMetric") or "high_average_minute").strip()
     if trend_selection_metric not in {"progression", "high_average_minute"}:
         trend_selection_metric = "high_average_minute"
+    reconstruction_mode = str(params.get("reconstructionMode") or "staircase").strip().lower()
+    if reconstruction_mode in {"sequence", "séquence", "seq"}:
+        reconstruction_mode = "sequence"
+    else:
+        reconstruction_mode = "staircase"
+    reconstruction_mode_label = "Séquence" if reconstruction_mode == "sequence" else "Escalier"
 
     calculation_trend_count = trend_count
 
@@ -3639,8 +3923,8 @@ def process_trend_scan_job(job_id, params):
 
     level_mode = "full" if simultaneous_mode else "attack"
 
-    home_scan = fetch_trend_team_matches(job_id, home_team["id"], skip_home, calculation_trend_count, home_team.get("name") or "Domicile", 12, 40, level_mode=level_mode)
-    away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, calculation_trend_count, away_team.get("name") or "Extérieur", 54, 40, level_mode=level_mode)
+    home_scan = fetch_trend_team_matches(job_id, home_team["id"], skip_home, calculation_trend_count, home_team.get("name") or "Domicile", 12, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode)
+    away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, calculation_trend_count, away_team.get("name") or "Extérieur", 54, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode)
 
     if not simultaneous_mode:
         # Séparé = offensif vs offensif aligné par ligne :
@@ -3755,6 +4039,8 @@ def process_trend_scan_job(job_id, params):
         "trendMatchesNeeded": needed_matches,
         "simultaneousMode": simultaneous_mode,
         "scanModeLabel": "Camp Séparé" if simultaneous_mode else "Camp Combiné",
+        "reconstructionMode": reconstruction_mode,
+        "reconstructionModeLabel": reconstruction_mode_label,
         "trendLevelMode": level_mode,
         "trendLimitEnabled": trend_limit_enabled,
         "trendLimitRange": [-2, 2] if trend_limit_enabled else None,
@@ -4140,20 +4426,30 @@ def main():
     print("Mode séparé: équipe analysée + adversaires passés pondérés par match utilisé.")
     print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Liaison scan: lecture directe RPOP v208 activée.")
-    print("Système tendance: curseur 1-100, comparaison par moyenne des minutes la plus basse.")
+    print("Liaison scan: mode robuste v209 activé (pending set + file + latest + heartbeat).")
+    print("Système tendance: curseur 1-100, comparaison par moyenne minute haute/progression selon option.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
     print("Préchargement événements: désactivé par défaut pour économiser les requêtes.")
     print("Laisse cette fenêtre ouverte pendant que tu utilises l'app.")
+
+    try:
+        ping = redis_cmd("PING")
+        print(f"Redis Upstash: OK ({ping})")
+        send_worker_heartbeat(force=True)
+        print("Heartbeat worker publié: OK")
+    except Exception as e:
+        print(f"❌ Redis Upstash inaccessible depuis Termux: {e}", file=sys.stderr)
+        if once:
+            return
 
     while True:
         value = None
         queue_key = None
 
         try:
-            # Priorité absolue au scan FOOTSCAN via RPOP non bloquant.
-            # C'est plus robuste que BRPOP sur certains environnements Termux/Upstash REST.
+            send_worker_heartbeat()
+            # Priorité absolue au scan FOOTSCAN via mode robuste v209.
             value = pop_scan_job_fallback()
             queue_key = SCAN_QUEUE_KEY if value else None
         except RuntimeError as e:
@@ -4186,6 +4482,11 @@ def main():
             if once:
                 print("Aucune requête en attente.")
                 break
+            global_idle_ts = now_ts()
+            global LAST_IDLE_LOG_AT
+            if global_idle_ts - LAST_IDLE_LOG_AT >= 30:
+                print("Worker actif: aucun scan reçu pour l'instant.")
+                LAST_IDLE_LOG_AT = global_idle_ts
             time.sleep(0.4)
             continue
 
