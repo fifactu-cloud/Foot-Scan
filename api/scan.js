@@ -1,6 +1,10 @@
 const crypto = require('crypto');
 
 const Q = 'footscan:scan:queue';
+const PENDING_SET = 'footscan:scan:pending';
+const LATEST_KEY = 'footscan:scan:latest';
+const WORKER_HEARTBEAT_KEY = 'footscan:worker:heartbeat';
+const WAKE_Q = process.env.SCAN_WAKE_QUEUE || 'sofa:queue';
 const P = 'footscan:scan:job:';
 const TTL = Number(process.env.SCAN_JOB_TTL_SECONDS || 86400);
 
@@ -26,6 +30,14 @@ async function redis(cmd) {
   }
 
   return j.result;
+}
+
+async function safeRedis(cmd) {
+  try {
+    return { ok: true, result: await redis(cmd) };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
 }
 
 async function body(req) {
@@ -88,6 +100,27 @@ module.exports = async function (req, res) {
 
   try {
     if (req.method === 'GET') {
+      if (req.query && (req.query.diag === '1' || req.query.debug === '1')) {
+        const ping = await safeRedis(['PING']);
+        const queueLen = await safeRedis(['LLEN', Q]);
+        const pendingCount = await safeRedis(['SCARD', PENDING_SET]);
+        const latest = await safeRedis(['GET', LATEST_KEY]);
+        const workerHeartbeat = await safeRedis(['GET', WORKER_HEARTBEAT_KEY]);
+
+        return res.end(JSON.stringify({
+          ok: ping.ok,
+          redisPing: ping,
+          queue: Q,
+          queueLen,
+          pendingSet: PENDING_SET,
+          pendingCount,
+          latestKey: LATEST_KEY,
+          latest,
+          workerHeartbeat,
+          now: Math.floor(Date.now() / 1000),
+        }));
+      }
+
       const jobId = req.query.jobId;
 
       if (!jobId) {
@@ -123,6 +156,7 @@ module.exports = async function (req, res) {
     const trendSelectionMode = b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half';
     const trendSelectionMetric = b.trendSelectionMetric === 'progression' ? 'progression' : 'high_average_minute';
     const trendLimitEnabled = bool(b.trendLimitEnabled);
+    const reconstructionMode = b.reconstructionMode === 'sequence' ? 'sequence' : 'staircase';
 
     if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
@@ -164,11 +198,28 @@ module.exports = async function (req, res) {
         trendSelectionMode,
         trendSelectionMetric,
         trendLimitEnabled,
+        reconstructionMode,
       },
     };
 
     await redis(['SET', P + jid, JSON.stringify(job), 'EX', String(TTL)]);
+
+    // Triple liaison volontaire pour éviter les blocages silencieux selon l'environnement:
+    // 1) set pending robuste, 2) clé latest de secours, 3) file historique.
+    await redis(['SADD', PENDING_SET, jid]);
+    await redis(['SET', LATEST_KEY, jid, 'EX', '3600']);
     await redis(['LPUSH', Q, jid]);
+
+    // Réveil de secours pour les workers Termux qui écoutent encore l'ancienne file.
+    // Le worker v208 ignore les doublons une fois le job terminé.
+    if (WAKE_Q && WAKE_Q !== Q) {
+      try {
+        await redis(['LPUSH', WAKE_Q, jid]);
+      } catch (wakeError) {
+        // Le job principal reste valide même si le réveil secondaire échoue.
+        console.warn('Scan wake queue push failed:', wakeError && wakeError.message ? wakeError.message : wakeError);
+      }
+    }
 
     return res.end(JSON.stringify(job));
   } catch (e) {
