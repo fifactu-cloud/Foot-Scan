@@ -11603,7 +11603,7 @@
               </div>
             </div>
 
-            <div class="auto-formula" id="trendFormula">9 Tendances · 10 Derniers Matchs</div>
+            <div class="auto-formula" id="trendFormula">9 Tendances · 10 Reconstitutions</div>
 
             <input id="simultaneousMode" type="checkbox" hidden />
             <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de camp">
@@ -11617,6 +11617,13 @@
               <span class="calc-mode-thumb" aria-hidden="true"></span>
               <button type="button" class="calc-mode-opt" data-mode="line" role="tab">TOP LIGNE</button>
               <button type="button" class="calc-mode-opt is-active" data-mode="half" role="tab">TOP MOITIÉ</button>
+            </div>
+
+            <input id="reconstructionMode" type="checkbox" hidden />
+            <div class="calc-mode-slider reconstruction-mode-slider" id="reconstructionModeSlider" role="tablist" aria-label="Mode de reconstitution">
+              <span class="calc-mode-thumb" aria-hidden="true"></span>
+              <button type="button" class="calc-mode-opt is-active" data-mode="staircase" role="tab">ESCALIER</button>
+              <button type="button" class="calc-mode-opt" data-mode="sequence" role="tab">SÉQUENCE</button>
             </div>
 
             <input id="trendLimitEnabled" type="checkbox" hidden />
@@ -12166,6 +12173,52 @@
       return sim ? "Camp Séparé" : "Camp Combiné";
     }
 
+    function setupReconstructionModeSlider() {
+      const slider = document.getElementById("reconstructionModeSlider");
+      const box = document.getElementById("reconstructionMode");
+      if (!slider || !box) return;
+      const opts = slider.querySelectorAll(".calc-mode-opt");
+      const positionThumb = () => {
+        const active = slider.querySelector(".calc-mode-opt.is-active");
+        if (!active) return;
+        const pad = 4;
+        const inset = 2;
+        const sliderW = slider.clientWidth;
+        let left = active.offsetLeft + inset;
+        let width = active.offsetWidth - inset * 2;
+        const maxRight = sliderW - pad;
+        if (left < pad) left = pad;
+        if (left + width > maxRight) width = maxRight - left;
+        slider.style.setProperty("--thumb-left", left + "px");
+        slider.style.setProperty("--thumb-width", width + "px");
+      };
+      const sync = () => {
+        const sequence = Boolean(box.checked);
+        slider.classList.toggle("sim", sequence);
+        opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "sequence") === sequence));
+        requestAnimationFrame(positionThumb);
+      };
+      window.addEventListener("resize", () => requestAnimationFrame(positionThumb));
+      setTimeout(positionThumb, 80);
+      setTimeout(positionThumb, 350);
+      opts.forEach((o) => o.addEventListener("click", () => {
+        box.checked = (o.dataset.mode === "sequence");
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+        sync();
+        if (typeof navigator.vibrate === "function") navigator.vibrate(8);
+      }));
+      sync();
+    }
+
+    function getReconstructionMode() {
+      return $("reconstructionMode")?.checked ? "sequence" : "staircase";
+    }
+
+    function reconstructionModeLabel(result = null) {
+      const mode = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase();
+      return mode === "sequence" ? "Séquence" : "Escalier";
+    }
+
     function setupTrendLimitSlider() {
       const slider = document.getElementById("trendLimitSlider");
       const box = document.getElementById("trendLimitEnabled");
@@ -12217,10 +12270,12 @@
       const topHalf = String(result?.trendSelectionMode || result?.trendSelection?.method || getTrendSelectionMode()).includes("half");
       const limited = isTrendLimitEnabled(result);
       const metricGlobal = (String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || getTrendSelectionMetric()).includes("high") || String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || getTrendSelectionMetric()).includes("global"));
+      const reconstructionSequence = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase() === "sequence";
 
       const modeTitle = [
         campSeparate ? "Camp Séparé" : "Camp Combiné",
         topHalf ? "Top Moitié" : "Top Ligne",
+        reconstructionSequence ? "Séquence" : "Escalier",
         limited ? "Limite -2/+2" : "Libre",
         metricGlobal ? "Moyenne Minute Haute activée" : "Moyenne Minute Haute désactivée",
       ].join(" · ");
@@ -12229,6 +12284,7 @@
         <div class="mode-dotbar" title="${esc(modeTitle)}" aria-label="${esc(modeTitle)}">
           <span class="mode-dot ${campSeparate ? "pink" : "blue"}" title="${esc(campSeparate ? "Camp Séparé" : "Camp Combiné")}"></span>
           <span class="mode-dot ${topHalf ? "pink" : "blue"}" title="${esc(topHalf ? "Top Moitié" : "Top Ligne")}"></span>
+          <span class="mode-dot ${reconstructionSequence ? "pink" : "blue"}" title="${esc(reconstructionSequence ? "Séquence" : "Escalier")}"></span>
           <span class="mode-dot ${limited ? "pink" : "blue"}" title="${esc(limited ? "Limite -2/+2" : "Libre")}"></span>
           <span class="mode-check ${metricGlobal ? "checked" : "empty"}" title="${esc(metricGlobal ? "Moyenne Minute Haute activée" : "Moyenne Minute Haute désactivée")}"></span>
         </div>
@@ -12268,7 +12324,7 @@
       if ($("trendBoxTitle")) $("trendBoxTitle").textContent = trendWord.toUpperCase();
       if ($("trendControlTitle")) $("trendControlTitle").textContent = trendWord;
       if ($("trendFormula")) {
-        $("trendFormula").textContent = `${trend} ${trendWord} · ${trend + 1} Derniers Matchs`;
+        $("trendFormula").textContent = `${trend} ${trendWord} · ${trend + 1} Reconstitutions`;
       }
       updateRangeGradientFill();
     }
@@ -12294,7 +12350,7 @@
 
     function formulaTextForCalc(calc) {
       const trend = Number(calc?.trendCount || getTrendCount());
-      return `${trend} Tendance${trend > 1 ? "s" : ""} · ${trend + 1} Derniers Matchs`;
+      return `${trend} Tendance${trend > 1 ? "s" : ""} · ${trend + 1} Reconstitutions`;
     }
 
     function updateAutoCalculator() {
@@ -12720,6 +12776,7 @@
           trendSelectionMode: getTrendSelectionMode(),
           trendSelectionMetric: getTrendSelectionMetric(),
           trendLimitEnabled: isTrendLimitEnabled(),
+          reconstructionMode: getReconstructionMode(),
           rankEventStep: 1,
           rankEventMode: "trend",
           winnerMode: "trend",
@@ -14107,7 +14164,7 @@
 
     function trendModeLabelV151(result) {
       const camp = result?.scanModeLabel || (result?.simultaneousMode ? "Camp Séparé" : "Camp Combiné");
-      return `${camp} · ${trendSelectionModeLabel(result)} · ${trendSelectionMetricLabel(result)} · ${trendLimitLabel(result)}`;
+      return `${camp} · ${trendSelectionModeLabel(result)} · ${reconstructionModeLabel(result)} · ${trendSelectionMetricLabel(result)} · ${trendLimitLabel(result)}`;
     }
 
     function trendWinnerLinesV151(result, compact = false) {
@@ -14125,13 +14182,13 @@
       const trendCount = Number(result.trendCount || entry?.autoSearch?.trendCount || 0);
       const matchesNeeded = Number(result.trendMatchesNeeded || entry?.autoSearch?.matchesNeeded || (trendCount + 1));
       if (compact) {
-        return [`Tendance : ${trendCount} · Matchs nécessaires : ${matchesNeeded} · Mode : ${trendModeLabelV151(result)}`];
+        return [`Tendance : ${trendCount} · Reconstitutions nécessaires : ${matchesNeeded} · Mode : ${trendModeLabelV151(result)}`];
       }
       return [
         "VALEUR DE RECHERCHE",
         `Mode Scan : ${trendModeLabelV151(result)}`,
         `Tendances : ${trendCount}`,
-        `Derniers Matchs : ${matchesNeeded}`,
+        `Reconstitutions : ${matchesNeeded}`,
         `Limitation Tendance : ${trendLimitLabel(result)}`,
         `Ignorer Domicile : ${entry.skipHome}`,
         `Ignorer Extérieur : ${entry.skipAway}`,
@@ -14405,6 +14462,7 @@
 
 setupCalcModeSlider();
     setupTrendSelectionSlider();
+    setupReconstructionModeSlider();
     setupTrendLimitSlider();
     initMobileNavigationEffects();
     updateReportCount();
