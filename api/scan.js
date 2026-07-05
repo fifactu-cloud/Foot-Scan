@@ -147,14 +147,14 @@ module.exports = async function (req, res) {
     const matchId = id(b.matchId || b.url || b.match);
     const rank1 = rank(b.rank1);
     const rank2 = rank(b.rank2);
-    const simultaneousMode = bool(b.simultaneousMode);
+    const simultaneousMode = b.simultaneousMode === undefined ? true : bool(b.simultaneousMode);
     const rankEventStep = numeric(b.rankEventStep, 1, 0.0001, 5);
     const rankEventMode = b.rankEventMode === 'performance' ? 'performance' : 'fixed';
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
     const isTrendMode = bool(b.trendMode) || b.trendCount !== undefined || b.rankEventMode === 'trend';
     const trendCount = numeric(b.trendCount, rank1 || 9, 1, 100);
-    const trendSelectionMode = b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half';
-    const trendSelectionMetric = b.trendSelectionMetric === 'progression' ? 'progression' : 'high_average_minute';
+    const trendSelectionMode = b.trendSelectionMode === undefined ? 'top_line' : (b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half');
+    const trendSelectionMetric = b.trendSelectionMetric === undefined ? 'progression' : (b.trendSelectionMetric === 'progression' ? 'progression' : 'high_average_minute');
     const trendLimitEnabled = bool(b.trendLimitEnabled);
     const reconstructionMode = b.reconstructionMode === 'sequence' ? 'sequence' : 'staircase';
 
