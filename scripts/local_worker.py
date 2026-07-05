@@ -3886,14 +3886,14 @@ def process_trend_scan_job(job_id, params):
     trend_count = max(1, min(100, trend_count))
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
-    simultaneous_mode = truthy_param(params.get("simultaneousMode"))
+    simultaneous_mode = True if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
     trend_limit_enabled = truthy_param(params.get("trendLimitEnabled"))
-    trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
+    trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
-        trend_selection_mode = "top_half"
-    trend_selection_metric = str(params.get("trendSelectionMetric") or "high_average_minute").strip()
+        trend_selection_mode = "top_line"
+    trend_selection_metric = str(params.get("trendSelectionMetric") or "progression").strip()
     if trend_selection_metric not in {"progression", "high_average_minute"}:
-        trend_selection_metric = "high_average_minute"
+        trend_selection_metric = "progression"
     reconstruction_mode = str(params.get("reconstructionMode") or "staircase").strip().lower()
     if reconstruction_mode in {"sequence", "séquence", "seq"}:
         reconstruction_mode = "sequence"
@@ -3983,35 +3983,6 @@ def process_trend_scan_job(job_id, params):
     def winner():
         h = float(home_summary["performanceScore"] or 0)
         a = float(away_summary["performanceScore"] or 0)
-        h_is_zero = abs(h) < 1e-9
-        a_is_zero = abs(a) < 1e-9
-
-        # Technique: une équipe avec une performance finale à 0 ne peut pas gagner.
-        # Si une seule équipe finit à 0, l'adversaire gagne, même si son score est
-        # numériquement inférieur. Si les deux finissent à 0, aucun adversaire ne
-        # peut prendre le dessus: le résultat reste une égalité.
-        if h_is_zero and a_is_zero:
-            return {"type": "tie", "side": "tie", "label": "Égalité", "score": 0, "diff": 0, "zeroPerformanceRule": True}
-        if h_is_zero:
-            return {
-                "type": "winner",
-                "side": "away",
-                "label": away_team.get("name"),
-                "score": a,
-                "diff": round(abs(h - a), 6),
-                "zeroPerformanceRule": True,
-                "blockedSide": "home",
-            }
-        if a_is_zero:
-            return {
-                "type": "winner",
-                "side": "home",
-                "label": home_team.get("name"),
-                "score": h,
-                "diff": round(abs(h - a), 6),
-                "zeroPerformanceRule": True,
-                "blockedSide": "away",
-            }
 
         if h == a:
             return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
