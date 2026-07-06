@@ -3864,6 +3864,12 @@ def summarize_trend_items(items):
         style = trend_result_style(value)
         counts[style] = counts.get(style, 0.0) + weight
 
+    # Variance finale: la performance finale est inversée uniquement après
+    # l'agrégation des tendances sélectionnées. Les tendances individuelles
+    # et leurs valeurs brutes ne sont pas modifiées.
+    raw_performance_score = performance_score
+    final_performance_score = -raw_performance_score
+
     normalized_counts = {key: normalize_trend_count(value) for key, value in counts.items()}
     order = sorted(
         [{"style": k, "label": trend_label_from_style(k), "count": v} for k, v in normalized_counts.items()],
@@ -3873,7 +3879,9 @@ def summarize_trend_items(items):
     secondary = order[1] if len(order) > 1 and float(order[1]["count"] or 0) > 0 else None
 
     return {
-        "performanceScore": round(performance_score, 6),
+        "performanceScore": round(final_performance_score, 6),
+        "rawPerformanceScore": round(raw_performance_score, 6),
+        "performanceVarianceApplied": True,
         "resultCounts": normalized_counts,
         "primaryResult": primary,
         "secondaryResult": secondary,
@@ -4076,7 +4084,8 @@ def process_trend_scan_job(job_id, params):
             "trendLimitRange": [-2, 2] if trend_limit_enabled else None,
             "trendSelectionMode": trend_selection_mode,
             "trendSelectionMetric": trend_selection_metric,
-                "trendCalculationCount": calculation_trend_count,
+            "performanceVarianceApplied": True,
+            "trendCalculationCount": calculation_trend_count,
             "trendSelectionMethod": trend_selection.get("method"),
             "trendSelection": trend_selection,
         },
