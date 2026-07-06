@@ -2401,6 +2401,78 @@ def trend_label_from_style(style):
     return {"V": "Victoire", "N": "Nul", "D": "Défaite"}.get(style, "—")
 
 
+def invert_trend_result_style(style):
+    """Variance finale du résultat: V devient D, D devient V, N reste N."""
+    key = str(style or "").strip().upper()[:1]
+    if key == "V":
+        return "D"
+    if key == "D":
+        return "V"
+    if key == "N":
+        return "N"
+    return "N"
+
+
+def build_result_profile(counts, apply_variance=True):
+    """Construit le résultat principal sans résultat secondaire arbitraire.
+
+    Si plusieurs résultats ont le même meilleur total, ils sont tous renvoyés
+    dans primaryResults. secondaryResult reste volontairement nul pour éviter
+    l'ancien affichage entre parenthèses.
+    """
+    base_counts = {"V": 0.0, "N": 0.0, "D": 0.0}
+    for key, value in (counts or {}).items():
+        style = str(key or "").strip().upper()[:1]
+        if style not in base_counts:
+            continue
+        try:
+            amount = float(value or 0)
+        except Exception:
+            amount = 0.0
+        if math.isfinite(amount):
+            base_counts[style] += amount
+
+    final_counts = {"V": 0.0, "N": 0.0, "D": 0.0}
+    for style, value in base_counts.items():
+        target = invert_trend_result_style(style) if apply_variance else style
+        final_counts[target] += value
+
+    normalized_raw_counts = {key: normalize_trend_count(value) for key, value in base_counts.items()}
+    normalized_counts = {key: normalize_trend_count(value) for key, value in final_counts.items()}
+
+    result_order = {"V": 0, "N": 1, "D": 2}
+    ordered = sorted(
+        [{"style": k, "label": trend_label_from_style(k), "count": v} for k, v in normalized_counts.items()],
+        key=lambda item: (-float(item["count"] or 0), result_order.get(item["style"], 9)),
+    )
+    top_count = float(ordered[0]["count"] or 0) if ordered else 0.0
+    primary_results = [item for item in ordered if top_count > 0 and abs(float(item["count"] or 0) - top_count) < 1e-9]
+    primary = primary_results[0] if primary_results else None
+    result_text = "/".join(item["style"] for item in primary_results) if primary_results else "—"
+
+    # Score de départage déterministe quand les performances finales sont égales.
+    # V compte positif, D négatif, N neutre.
+    result_decision_score = float(final_counts.get("V") or 0) - float(final_counts.get("D") or 0)
+    result_decision_vector = [
+        result_decision_score,
+        float(final_counts.get("V") or 0),
+        float(final_counts.get("N") or 0),
+        -float(final_counts.get("D") or 0),
+    ]
+
+    return {
+        "rawResultCounts": normalized_raw_counts,
+        "resultCounts": normalized_counts,
+        "primaryResult": primary,
+        "primaryResults": primary_results,
+        "secondaryResult": None,
+        "resultText": result_text,
+        "resultDecisionScore": round(result_decision_score, 6),
+        "resultDecisionVector": [round(value, 6) for value in result_decision_vector],
+        "resultVarianceApplied": bool(apply_variance),
+    }
+
+
 def trend_average(values):
     clean = []
     for value in values or []:
@@ -3864,27 +3936,17 @@ def summarize_trend_items(items):
         style = trend_result_style(value)
         counts[style] = counts.get(style, 0.0) + weight
 
-    # Variance finale: la performance finale est inversée uniquement après
-    # l'agrégation des tendances sélectionnées. Les tendances individuelles
-    # et leurs valeurs brutes ne sont pas modifiées.
+    # Variance finale: la performance finale et le résultat V/N/D sont inversés
+    # uniquement après l'agrégation des tendances sélectionnées.
     raw_performance_score = performance_score
     final_performance_score = -raw_performance_score
-
-    normalized_counts = {key: normalize_trend_count(value) for key, value in counts.items()}
-    order = sorted(
-        [{"style": k, "label": trend_label_from_style(k), "count": v} for k, v in normalized_counts.items()],
-        key=lambda item: (-float(item["count"] or 0), {"V": 0, "N": 1, "D": 2}.get(item["style"], 9)),
-    )
-    primary = order[0] if order and float(order[0]["count"] or 0) > 0 else None
-    secondary = order[1] if len(order) > 1 and float(order[1]["count"] or 0) > 0 else None
+    result_profile = build_result_profile(counts, apply_variance=True)
 
     return {
         "performanceScore": round(final_performance_score, 6),
         "rawPerformanceScore": round(raw_performance_score, 6),
         "performanceVarianceApplied": True,
-        "resultCounts": normalized_counts,
-        "primaryResult": primary,
-        "secondaryResult": secondary,
+        **result_profile,
         "dominantCount": normalize_trend_count(dominant_count),
     }
 
@@ -3991,15 +4053,43 @@ def process_trend_scan_job(job_id, params):
     def winner():
         h = float(home_summary["performanceScore"] or 0)
         a = float(away_summary["performanceScore"] or 0)
+        eps = 1e-9
 
-        if h == a:
-            return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0}
+        if abs(h - a) > eps:
+            side = "home" if h > a else "away"
+            if side == "home":
+                return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(abs(h - a), 6), "tieBreakByResult": False}
+            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(abs(h - a), 6), "tieBreakByResult": False}
 
-        side = "home" if h > a else "away"
+        # En cas d'égalité de performance, départage déterministe avec le résultat final V/N/D.
+        hv = list(home_summary.get("resultDecisionVector") or [0, 0, 0, 0])
+        av = list(away_summary.get("resultDecisionVector") or [0, 0, 0, 0])
+        max_len = max(len(hv), len(av), 4)
+        hv = [float(hv[i]) if i < len(hv) else 0.0 for i in range(max_len)]
+        av = [float(av[i]) if i < len(av) else 0.0 for i in range(max_len)]
+        result_cmp = 0
+        for left, right in zip(hv, av):
+            if abs(left - right) > eps:
+                result_cmp = 1 if left > right else -1
+                break
 
-        if side == "home":
-            return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(abs(h - a), 6)}
-        return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(abs(h - a), 6)}
+        if result_cmp != 0:
+            side = "home" if result_cmp > 0 else "away"
+            if side == "home":
+                return {
+                    "type": "winner", "side": "home", "label": home_team.get("name"),
+                    "score": h, "diff": 0, "tieBreakByResult": True,
+                    "resultTieBreakScore": round(float(home_summary.get("resultDecisionScore") or 0), 6),
+                    "opponentResultTieBreakScore": round(float(away_summary.get("resultDecisionScore") or 0), 6),
+                }
+            return {
+                "type": "winner", "side": "away", "label": away_team.get("name"),
+                "score": a, "diff": 0, "tieBreakByResult": True,
+                "resultTieBreakScore": round(float(away_summary.get("resultDecisionScore") or 0), 6),
+                "opponentResultTieBreakScore": round(float(home_summary.get("resultDecisionScore") or 0), 6),
+            }
+
+        return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0, "tieBreakByResult": False}
 
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
     away_issue_count = int(away_scan.get("eventDataIssueCount") or 0)
