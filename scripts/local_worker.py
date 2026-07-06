@@ -2955,7 +2955,7 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
         },
     }
 
-def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode="full", reconstruction_mode="staircase", max_samples=None):
+def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode="full", reconstruction_mode="sequence", max_samples=None):
     """Reconstruit des matchs uniquement à partir de vrais états de score.
 
     Mode Séquence : ancien principe linéaire, mais avec le 0-0 minute 0 commun.
@@ -2964,7 +2964,7 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
     M3 le troisième depuis la fin, etc. Aucun score d'événement ni 0-0 minute 0
     ne peut être utilisé deux fois.
     """
-    normalized_mode = str(reconstruction_mode or "staircase").strip().lower()
+    normalized_mode = str(reconstruction_mode or "sequence").strip().lower()
     if normalized_mode in {"sequence", "séquence", "seq"}:
         normalized_mode = "sequence"
     else:
@@ -3375,7 +3375,7 @@ def rebuild_trend_matches_used_from_samples(samples):
     ]
 
 
-def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span, level_mode="full", reconstruction_mode="staircase"):
+def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span, level_mode="full", reconstruction_mode="sequence"):
     needed_matches = max(2, int(trend_count) + 1)
     pages = []
     stopped_history = False
@@ -3894,15 +3894,15 @@ def process_trend_scan_job(job_id, params):
     trend_count = max(1, min(100, trend_count))
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
-    simultaneous_mode = True if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
+    simultaneous_mode = False if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
     trend_limit_enabled = truthy_param(params.get("trendLimitEnabled"))
-    trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
+    trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
-        trend_selection_mode = "top_line"
+        trend_selection_mode = "top_half"
     trend_selection_metric = str(params.get("trendSelectionMetric") or "progression").strip()
     if trend_selection_metric not in {"progression", "high_average_minute"}:
         trend_selection_metric = "progression"
-    reconstruction_mode = str(params.get("reconstructionMode") or "staircase").strip().lower()
+    reconstruction_mode = str(params.get("reconstructionMode") or "sequence").strip().lower()
     if reconstruction_mode in {"sequence", "séquence", "seq"}:
         reconstruction_mode = "sequence"
     else:
