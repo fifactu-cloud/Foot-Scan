@@ -12969,10 +12969,13 @@
     }
 
     function trendResultText(profile) {
+      if (profile?.resultText) return String(profile.resultText || "—");
+      const primaryResults = Array.isArray(profile?.primaryResults) ? profile.primaryResults : [];
+      const styles = primaryResults.map(item => String(item?.style || "").trim().charAt(0).toUpperCase()).filter(Boolean);
+      if (styles.length) return styles.join("/");
       const primary = profile?.primaryResult;
-      const secondary = profile?.secondaryResult;
       if (!primary) return "—";
-      return secondary ? `${primary.style} (${secondary.style})` : `${primary.style}`;
+      return `${primary.style}`;
     }
 
     function resultCodeTone(code) {
@@ -12988,17 +12991,26 @@
     }
 
     function renderTrendResultMarkup(profile) {
-      const primary = String(profile?.primaryResult?.style || "").trim().charAt(0).toUpperCase();
-      const secondary = String(profile?.secondaryResult?.style || "").trim().charAt(0).toUpperCase();
+      let styles = [];
+      if (Array.isArray(profile?.primaryResults) && profile.primaryResults.length) {
+        styles = profile.primaryResults.map(item => String(item?.style || "").trim().charAt(0).toUpperCase()).filter(Boolean);
+      } else if (profile?.resultText) {
+        styles = String(profile.resultText || "").split(/[\/+, ]+/).map(x => x.trim().charAt(0).toUpperCase()).filter(x => ["V", "N", "D"].includes(x));
+      } else {
+        const primary = String(profile?.primaryResult?.style || "").trim().charAt(0).toUpperCase();
+        if (primary) styles = [primary];
+      }
 
-      if (!primary) {
+      if (!styles.length) {
         return `<span class="trend-result-inline plain"><span class="trend-result-token neutral">—</span></span>`;
       }
 
       return `
         <span class="trend-result-inline plain">
-          <span class="trend-result-primary trend-result-token ${resultCodeTone(primary)}">${esc(primary)}</span>
-          ${secondary ? `<span class="trend-result-secondary"><span class="trend-result-paren">(</span><span class="trend-result-token ${resultCodeTone(secondary)}">${esc(secondary)}</span><span class="trend-result-paren">)</span></span>` : ""}
+          ${styles.map((style, index) => `
+            ${index ? `<span class="trend-result-separator">/</span>` : ""}
+            <span class="trend-result-primary trend-result-token ${resultCodeTone(style)}">${esc(style)}</span>
+          `).join("")}
         </span>
       `;
     }
@@ -13015,7 +13027,7 @@
           <div class="dominance-trophy" aria-hidden="true">🏆</div>
           <div class="dominance-label">👑 GAGNANT TENDANCE</div>
           <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
-          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}</div>
+          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}</div>
         </div>
       `;
     }
@@ -14173,7 +14185,7 @@
         return ["👑 GAGNANT TENDANCE : Égalité"];
       }
       const base = `👑 GAGNANT TENDANCE : ${winner.label || "Indisponible"}`;
-      const meta = `Performance : ${formatValue(winner.score)}${winner.diff != null ? ` · Écart : ${formatValue(winner.diff)}` : ""}`;
+      const meta = `Performance : ${formatValue(winner.score)}${winner.diff ? ` · Écart : ${formatValue(winner.diff)}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}`;
       return compact ? [`${base} · ${meta}`] : [base, meta];
     }
 
