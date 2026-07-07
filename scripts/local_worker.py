@@ -3807,9 +3807,11 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
     source_records = []
     reconstructed_samples = []
     samples = []
-    # Optimisation v206: on ne précharge plus une très grosse réserve
-    # d'incidents. On commence avec une marge raisonnable, puis on étend
-    # seulement si les reconstitutions valides ne sont pas encore suffisantes.
+    # Optimisation v219: l'ordre est désormais:
+    # 1) filtre Avec Extra / Sans Extra,
+    # 2) puis Ignorer matchs.
+    # On collecte donc les sources après filtrage extra, puis on applique skip
+    # sur les vrais matchs exploitables, pas avant.
     initial_buffer = max(6, min(36, needed_matches * 2))
     growth_step = max(6, min(36, needed_matches * 2))
     required = skip + needed_matches + initial_buffer
@@ -3817,11 +3819,11 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
     while True:
         by_id = load_until_required(required)
         sorted_matches = sorted(by_id.values(), key=lambda m: (m.get("startTimestamp") or 0, m.get("id") or 0), reverse=True)
-        selected_matches = sorted_matches[skip:required]
+        selected_matches = sorted_matches[:required]
         total_sources = len(selected_matches)
 
-        if total_sources < needed_matches and (stopped_history or next_page >= PAGES_TO_LOAD):
-            raise RuntimeError(f"{team_name}: pas assez de matchs valides pour {trend_count} tendances ({total_sources}/{needed_matches}).")
+        if total_sources < skip + needed_matches and (stopped_history or next_page >= PAGES_TO_LOAD):
+            raise RuntimeError(f"{team_name}: pas assez de matchs valides après filtre extra pour {trend_count} tendances ({max(0, total_sources - skip)}/{needed_matches}).")
 
         for idx in range(len(source_records), total_sources):
             match = selected_matches[idx]
@@ -3886,7 +3888,9 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             # Arrêt anticipé sans perte de qualité: dès que les N+1 vrais
             # matchs reconstitués sont obtenus, on ne télécharge plus les
             # incidents des matchs source suivants.
-            reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode, reconstruction_mode=reconstruction_mode, max_samples=needed_matches)
+            effective_source_records = [record for record in source_records if reconstruction_source_is_complete(record)]
+            analysis_source_records = effective_source_records[skip:]
+            reconstructed_samples = build_reconstructed_trend_samples(analysis_source_records, analyzed_team_id, level_mode=level_mode, reconstruction_mode=reconstruction_mode, max_samples=needed_matches)
             samples = reconstructed_samples[:needed_matches]
             if len(samples) >= needed_matches:
                 break
@@ -3894,17 +3898,21 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
         if len(samples) >= needed_matches:
             break
 
-        reconstructed_samples = build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode=level_mode, reconstruction_mode=reconstruction_mode, max_samples=needed_matches)
+        effective_source_records = [record for record in source_records if reconstruction_source_is_complete(record)]
+        analysis_source_records = effective_source_records[skip:]
+        reconstructed_samples = build_reconstructed_trend_samples(analysis_source_records, analyzed_team_id, level_mode=level_mode, reconstruction_mode=reconstruction_mode, max_samples=needed_matches)
         samples = reconstructed_samples[:needed_matches]
 
         if len(samples) >= needed_matches:
             break
 
-        known_available = max(0, len(sorted_matches) - skip)
+        effective_source_records = [record for record in source_records if reconstruction_source_is_complete(record)]
+        known_available = max(0, len(sorted_matches))
+        known_usable_after_skip = max(0, len(effective_source_records) - skip)
         history_exhausted = bool(stopped_history or next_page >= PAGES_TO_LOAD)
         all_known_sources_processed = total_sources >= known_available
         if history_exhausted and all_known_sources_processed:
-            raise RuntimeError(f"{team_name}: pas assez de matchs reconstitués pour {trend_count} tendances ({len(samples)}/{needed_matches}).")
+            raise RuntimeError(f"{team_name}: pas assez de matchs reconstitués après filtre extra puis ignorer matchs pour {trend_count} tendances ({len(samples)}/{needed_matches}, sources utilisables après ignore: {known_usable_after_skip}).")
 
         required += growth_step
 
