@@ -720,6 +720,119 @@ ADMIN_MATCH_KEYWORDS = (
     "technical defeat", "technical loss", "technical win",
 )
 
+EXTRA_TIME_PENALTY_KEYWORDS = (
+    "after extra time", "extra time", "aet", "a.e.t",
+    "overtime", "prolongation", "prolongations",
+    "apres prolongation", "apres prolongations",
+    "after penalties", "penalties", "penalty shootout",
+    "penalty shoot-out", "penalty kicks", "shootout",
+    "tirs au but", "tir au but", "apres tirs au but",
+    "tab",
+)
+
+EXTRA_TIME_PENALTY_SCORE_KEYS = (
+    "extra", "overtime", "penalt", "shootout", "period3", "period4",
+)
+
+
+def score_pair_for_key(match, key):
+    home = match.get("homeScore") or {}
+    away = match.get("awayScore") or {}
+    if not isinstance(home, dict) or not isinstance(away, dict):
+        return None, None
+    return safe_score_value(home.get(key)), safe_score_value(away.get(key))
+
+
+def extra_time_or_penalty_match_reason(match):
+    """Détecte les matchs à prolongation ou tirs au but à exclure.
+
+    FOOTSCAN doit analyser uniquement le temps réglementaire normal. Un match
+    qui va en prolongation ou aux tirs au but est donc ignoré/remplacé au lieu
+    de mélanger des scores issus d'une configuration différente.
+    """
+    if not isinstance(match, dict):
+        return None
+
+    values = []
+
+    def add(value):
+        if value is None:
+            return
+        if isinstance(value, (str, int, float, bool)):
+            text = str(value).strip()
+            if text:
+                values.append(text)
+
+    status = match.get("status") or {}
+    if isinstance(status, dict):
+        for key in ("type", "description", "reason", "text", "name", "short", "detail"):
+            add(status.get(key))
+
+    for key in (
+        "statusDescription", "statusText", "statusReason", "reason",
+        "note", "notes", "description", "resultType", "matchStatus",
+        "winnerCode", "period", "phase", "resultDescription",
+    ):
+        add(match.get(key))
+
+    haystack = " | ".join(normalize_status_text(v) for v in values if str(v).strip())
+    for keyword in EXTRA_TIME_PENALTY_KEYWORDS:
+        if keyword in haystack:
+            return f"Prolongation/tirs au but détectés: {keyword}"
+
+    for key in (
+        "hasExtraTime", "extraTime", "afterExtraTime", "overtime",
+        "hasPenalties", "penalties", "penaltyShootout",
+        "hasPenaltyShootout", "decidedByPenalties", "shootout",
+    ):
+        if match.get(key) is True:
+            return f"Prolongation/tirs au but détectés: {key}"
+
+    home_score = match.get("homeScore") or {}
+    away_score = match.get("awayScore") or {}
+    for score in (home_score, away_score):
+        if not isinstance(score, dict):
+            continue
+        for key, value in score.items():
+            normalized_key = normalize_status_text(key)
+            if any(fragment in normalized_key for fragment in EXTRA_TIME_PENALTY_SCORE_KEYS):
+                numeric = safe_score_value(value)
+                if numeric is not None and numeric != 0:
+                    return f"Prolongation/tirs au but détectés: score {key}"
+
+    # Sur SofaScore, normaltime/current différents signale souvent un résultat
+    # modifié après prolongation ou tirs au but. On l'exclut prudemment.
+    for baseline_key in ("normaltime", "regularTime"):
+        current_home, current_away = score_pair_for_key(match, "current")
+        base_home, base_away = score_pair_for_key(match, baseline_key)
+        if current_home is not None and current_away is not None and base_home is not None and base_away is not None:
+            if current_home != base_home or current_away != base_away:
+                return "Prolongation/tirs au but détectés: score final différent du temps réglementaire"
+
+    return None
+
+
+def incidents_indicate_extra_time_or_penalty(incidents):
+    for incident in incidents or []:
+        if not isinstance(incident, dict):
+            continue
+
+        incident_type = normalize_status_text(incident.get("incidentType"))
+        incident_class = normalize_status_text(incident.get("incidentClass"))
+        reason = normalize_status_text(incident.get("reason") or incident.get("description") or incident.get("text"))
+        haystack = " | ".join([incident_type, incident_class, reason])
+        if any(keyword in haystack for keyword in EXTRA_TIME_PENALTY_KEYWORDS):
+            return True
+
+        minute = incident.get("time")
+        try:
+            if minute is not None and float(minute) > 90:
+                return True
+        except Exception:
+            pass
+
+    return False
+
 
 def administrative_match_reason(match):
     """Retourne une raison si le match doit être exclu du calcul sportif.
@@ -761,6 +874,10 @@ def administrative_match_reason(match):
 
     haystack = " | ".join(normalize_status_text(v) for v in values if str(v).strip())
 
+    extra_reason = extra_time_or_penalty_match_reason(match)
+    if extra_reason:
+        return extra_reason
+
     if not haystack:
         return None
 
@@ -777,14 +894,22 @@ def administrative_match_reason(match):
 
 
 def make_administrative_match_issue(match, reason):
+    reason_text = reason or "Match administratif / forfait"
+    normalized_reason = normalize_status_text(reason_text)
+    if "prolongation" in normalized_reason or "penalt" in normalized_reason or "tir" in normalized_reason or "shootout" in normalized_reason:
+        issue_type = "extra-time-penalties"
+        message = "Match ignoré: prolongation ou tirs au but exclus de l'analyse."
+    else:
+        issue_type = "administrative"
+        message = "Match ignoré: forfait, abandon, report, annulation ou décision administrative."
     return {
         "id": match.get("id"),
         "label": make_match_label(match),
         "competition": get_competition_name(match),
         "startTimestamp": match.get("startTimestamp") or 0,
-        "type": "administrative",
-        "reason": reason or "Match administratif / forfait",
-        "message": "Match ignoré: forfait, abandon, report, annulation ou décision administrative.",
+        "type": issue_type,
+        "reason": reason_text,
+        "message": message,
     }
 
 
@@ -2080,6 +2205,34 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                     else:
                         issue = None
 
+                    if incidents_indicate_extra_time_or_penalty(incidents):
+                        issue = {
+                            "id": match.get("id"),
+                            "label": make_match_label(match),
+                            "competition": get_competition_name(match),
+                            "startTimestamp": match.get("startTimestamp") or 0,
+                            "type": "extra-time-penalties",
+                            "reason": "Prolongation ou tirs au but détectés dans les événements",
+                            "message": "Match ignoré: prolongation ou tirs au but exclus de l'analyse.",
+                        }
+                        scanned.append({
+                            "idx": idx,
+                            "match": match,
+                            "events": [],
+                            "issue": issue,
+                            "matchUsed": {
+                                "id": match.get("id"),
+                                "label": make_match_label(match),
+                                "count": 0,
+                                "startTimestamp": match.get("startTimestamp") or 0,
+                                "competition": get_competition_name(match),
+                                "eventDataStatus": "extra-time-penalties",
+                                "eventDataIssue": True,
+                                "error": "Prolongation ou tirs au but exclus de l'analyse",
+                            },
+                        })
+                        continue
+
                     events = parse_incidents(incidents, match, analyzed_team_id)
                     scan_events = separate_mode_events(events) if direct_team_only else events
 
@@ -2665,6 +2818,7 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
     true_zero_zero = final_score_total == 0 if final_score_total is not None else False
     source_score_label = f"{final_home_score}-{final_away_score}" if final_home_score is not None and final_away_score is not None else "Score inconnu"
     match_has_assists = match_contains_goal_assist(incidents)
+    extra_time_penalty_issue = incidents_indicate_extra_time_or_penalty(incidents)
     goals = []
 
     home_id = ((match.get("homeTeam") or {}).get("id"))
@@ -2795,6 +2949,7 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
         "finalAwayScore": final_away_score,
         "finalScoreTotal": final_score_total,
         "reconstructionGoalsIncomplete": not goal_data_complete,
+        "extraTimePenaltyIssue": bool(extra_time_penalty_issue),
         "matchHasAssists": match_has_assists,
         "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
     }
@@ -3560,6 +3715,19 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             if not isinstance(incidents, list):
                 incidents = []
             source_record = collect_reconstruction_goal_entries(match, incidents, analyzed_team_id)
+            if source_record.get("extraTimePenaltyIssue"):
+                source_record["eventDataStatus"] = "extra-time-penalties"
+                source_record["eventDataIssue"] = True
+                source_record["error"] = "Prolongation ou tirs au but exclus de l'analyse"
+                event_data_issues.append({
+                    "id": match.get("id"),
+                    "label": make_match_label(match),
+                    "competition": get_competition_name(match),
+                    "startTimestamp": match.get("startTimestamp") or 0,
+                    "type": "extra-time-penalties",
+                    "reason": "Prolongation ou tirs au but détectés dans les événements",
+                    "message": "Match ignoré pour la reconstitution: prolongation ou tirs au but exclus de l'analyse.",
+                })
             if issue and not source_record.get("trueZeroZero"):
                 event_data_issues.append({
                     "id": match.get("id"),
