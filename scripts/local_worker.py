@@ -824,17 +824,21 @@ def incidents_indicate_extra_time_or_penalty(incidents):
         if any(keyword in haystack for keyword in EXTRA_TIME_PENALTY_KEYWORDS):
             return True
 
-        minute = incident.get("time")
         try:
-            if minute is not None and float(minute) > 90:
+            if incident_phase_rank(incident) > 1:
                 return True
         except Exception:
-            pass
+            minute = incident.get("time")
+            try:
+                if minute is not None and float(minute) > 90:
+                    return True
+            except Exception:
+                pass
 
     return False
 
 
-def administrative_match_reason(match):
+def administrative_match_reason(match, include_extra=False):
     """Retourne une raison si le match doit être exclu du calcul sportif.
 
     Règle FOOTSCAN : tout match décidé administrativement ou non terminé
@@ -875,7 +879,7 @@ def administrative_match_reason(match):
     haystack = " | ".join(normalize_status_text(v) for v in values if str(v).strip())
 
     extra_reason = extra_time_or_penalty_match_reason(match)
-    if extra_reason:
+    if extra_reason and not include_extra:
         return extra_reason
 
     if not haystack:
@@ -1940,7 +1944,7 @@ def renormalize_opponent_past_events(events, matches_used_count):
         event["value"] = round(raw_value, 6)
 
 
-def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span, direct_team_only=False, completion_mode="total"):
+def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progress, progress_span, direct_team_only=False, completion_mode="total", include_extra=False):
     update_scan_job(
         job_id,
         status="running",
@@ -1970,7 +1974,7 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
             if home_id != analyzed_team_id and away_id != analyzed_team_id:
                 continue
 
-            admin_reason = administrative_match_reason(match)
+            admin_reason = administrative_match_reason(match, include_extra=include_extra)
             if admin_reason:
                 administrative_matches_ignored[match_id] = make_administrative_match_issue(match, admin_reason)
                 continue
@@ -2698,17 +2702,18 @@ def safe_score_value(value):
         return None
 
 
-def match_score_pair(match):
+def match_score_pair(match, regulation_time_limit=True):
     """Retourne le score final fiable du match source quand il existe.
 
-    On privilégie le score de temps réglementaire quand SofaScore le fournit,
-    sinon le score courant/final. Ce score sert uniquement à vérifier qu'un
-    0-0 est réel et que les incidents récupérés contiennent les buts du match.
+    Si la limitation du temps réglementaire est active, on privilégie le score
+    de temps réglementaire. Sinon, on privilégie le score final courant pour
+    permettre les prolongations/tirs au but quand Avec Extra est activé.
     """
     home_score = match.get("homeScore") or {}
     away_score = match.get("awayScore") or {}
 
-    for key in ("normaltime", "current", "display"):
+    keys = ("normaltime", "regularTime", "current", "display") if regulation_time_limit else ("current", "display", "normaltime", "regularTime")
+    for key in keys:
         home = safe_score_value(home_score.get(key))
         away = safe_score_value(away_score.get(key))
         if home is not None and away is not None:
@@ -2717,8 +2722,8 @@ def match_score_pair(match):
     return None, None
 
 
-def match_score_total(match):
-    home, away = match_score_pair(match)
+def match_score_total(match, regulation_time_limit=True):
+    home, away = match_score_pair(match, regulation_time_limit=regulation_time_limit)
     if home is None or away is None:
         return None
     return max(0, home) + max(0, away)
@@ -2800,7 +2805,111 @@ def incident_score_pair(incident):
     return None, None
 
 
-def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
+def incident_phase_rank(incident):
+    """Classe un événement dans la chronologie FOOTSCAN.
+
+    Chronologie normale: 0-0 < temps réglementaire < prolongation < tirs au but.
+    Lecture de reconstitution: tirs au but -> prolongation -> temps réglementaire -> 0-0.
+    Les tirs au but de séance sont traités comme une même phase/minute.
+    """
+    if not isinstance(incident, dict):
+        return 1
+
+    texts = []
+    for key in ("incidentType", "incidentClass", "type", "class", "period", "phase", "description", "reason", "text"):
+        value = incident.get(key)
+        if value is not None:
+            texts.append(normalize_status_text(value))
+    haystack = " | ".join(texts)
+
+    # Attention: un penalty dans le temps réglementaire ne doit pas devenir
+    # séance de tirs au but. On cherche surtout shootout/penalties.
+    if "shootout" in haystack or "penalties" in haystack or "penalty shoot" in haystack or "tirs au but" in haystack or "tir au but" in haystack:
+        return 3
+    if "period5" in haystack or "penaltyshootout" in haystack or "penalty-shootout" in haystack:
+        return 3
+
+    if "extra time" in haystack or "overtime" in haystack or "prolongation" in haystack or "period3" in haystack or "period4" in haystack:
+        return 2
+
+    minute = incident.get("time")
+    added = incident.get("addedTime") or 0
+    try:
+        minute_value = float(minute)
+    except Exception:
+        minute_value = None
+
+    # Si SofaScore encode le temps additionnel réglementaire sous forme
+    # time=90, addedTime=8, cela reste du temps réglementaire.
+    try:
+        added_value = float(added or 0)
+    except Exception:
+        added_value = 0
+
+    if minute_value is None:
+        return 3 if "penalt" in haystack else 1
+    if minute_value > 90 and added_value <= 0:
+        return 2
+    return 1
+
+
+def incident_is_within_regulation_time(incident):
+    return incident_phase_rank(incident) == 1
+
+
+def incident_reconstruction_chrono_key(incident):
+    phase = incident_phase_rank(incident)
+    minute = incident.get("time") if isinstance(incident, dict) else 0
+    added = incident.get("addedTime") if isinstance(incident, dict) else 0
+    try:
+        minute_value = int(float(minute or 0))
+    except Exception:
+        minute_value = 0
+    try:
+        added_value = int(float(added or 0))
+    except Exception:
+        added_value = 0
+
+    if phase == 3:
+        return (3, 0, 0, 0)
+    if phase == 2:
+        return (2, minute_value, added_value, 0)
+    regular_key = trend_goal_chrono_key(minute_value, added_value)
+    return (1, regular_key[0], regular_key[1], regular_key[2])
+
+
+def incident_reconstruction_average_minute(incident):
+    phase = incident_phase_rank(incident)
+    minute = incident.get("time") if isinstance(incident, dict) else 0
+    added = incident.get("addedTime") if isinstance(incident, dict) else 0
+    try:
+        minute_value = float(minute or 0)
+    except Exception:
+        minute_value = 0.0
+    try:
+        added_value = float(added or 0)
+    except Exception:
+        added_value = 0.0
+    if phase == 3:
+        return 130.0
+    if phase == 2:
+        return max(91.0, minute_value + added_value)
+    return trend_goal_average_minute(minute_value, added_value)
+
+
+def incident_reconstruction_minute_label(incident):
+    phase = incident_phase_rank(incident)
+    if phase == 3:
+        return "TAB"
+    minute = incident.get("time") if isinstance(incident, dict) else 0
+    added = incident.get("addedTime") if isinstance(incident, dict) else 0
+    label = trend_goal_minute_label(minute, added)
+    if phase == 2:
+        return f"P {label}"
+    return label
+
+
+def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id, include_extra=False, regulation_time_limit=True):
     """Prépare les états de score d'un vrai match pour la reconstitution.
 
     Chaque vrai match contient un état initial 0-0 à la minute 0. Pour chaque
@@ -2813,12 +2922,12 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
     match_id = match.get("id")
     competition = get_competition_name(match)
     start_timestamp = match.get("startTimestamp") or 0
-    final_home_score, final_away_score = match_score_pair(match)
-    final_score_total = match_score_total(match)
+    final_home_score, final_away_score = match_score_pair(match, regulation_time_limit=regulation_time_limit)
+    final_score_total = match_score_total(match, regulation_time_limit=regulation_time_limit)
     true_zero_zero = final_score_total == 0 if final_score_total is not None else False
     source_score_label = f"{final_home_score}-{final_away_score}" if final_home_score is not None and final_away_score is not None else "Score inconnu"
     match_has_assists = match_contains_goal_assist(incidents)
-    extra_time_penalty_issue = incidents_indicate_extra_time_or_penalty(incidents)
+    extra_time_penalty_issue = (not include_extra) and incidents_indicate_extra_time_or_penalty(incidents)
     goals = []
 
     home_id = ((match.get("homeTeam") or {}).get("id"))
@@ -2831,12 +2940,16 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
         if not isinstance(inc, dict) or inc.get("incidentType") != "goal":
             continue
         minute = inc.get("time")
-        added = inc.get("addedTime") or 0
-        if minute is None or minute < 1 or minute > 90:
+        phase_rank = incident_phase_rank(inc)
+        if phase_rank > 1 and not include_extra:
+            continue
+        if regulation_time_limit and not incident_is_within_regulation_time(inc):
+            continue
+        if phase_rank == 1 and (minute is None or float(minute) < 1):
             continue
         goal_incidents.append(inc)
 
-    goal_incidents.sort(key=lambda inc: trend_goal_chrono_key(inc.get("time"), inc.get("addedTime") or 0))
+    goal_incidents.sort(key=incident_reconstruction_chrono_key)
 
     for inc in goal_incidents:
         minute = inc.get("time")
@@ -2869,14 +2982,23 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
         attack_score = team_score
         opponent_attack_score = opponent_score
         index_chrono = len(goals) + 1
+        try:
+            clean_minute = int(float(minute or 0))
+        except Exception:
+            clean_minute = 0
+        try:
+            clean_added = int(float(added or 0))
+        except Exception:
+            clean_added = 0
 
         goals.append({
             "isZeroZero": False,
-            "minute": int(minute),
-            "added": int(added or 0),
-            "minuteLabel": trend_goal_minute_label(minute, added),
-            "averageMinute": trend_goal_average_minute(minute, added),
-            "chronoKey": trend_goal_chrono_key(minute, added),
+            "minute": clean_minute,
+            "added": clean_added,
+            "minuteLabel": incident_reconstruction_minute_label(inc),
+            "averageMinute": incident_reconstruction_average_minute(inc),
+            "chronoKey": incident_reconstruction_chrono_key(inc),
+            "phaseRank": incident_phase_rank(inc),
             "goalDelta": 1 if goal_for_team else -1,
             "attackDelta": 1 if goal_for_team and not own_goal else 0,
             "opponentAttackDelta": 0 if goal_for_team or own_goal else 1,
@@ -2911,7 +3033,7 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id):
         "added": 0,
         "minuteLabel": "0'",
         "averageMinute": 0.0,
-        "chronoKey": (0, 0, 0),
+        "chronoKey": (0, 0, 0, 0),
         "goalDelta": 0,
         "attackDelta": 0,
         "opponentAttackDelta": 0,
@@ -3602,7 +3724,7 @@ def rebuild_trend_matches_used_from_samples(samples):
     ]
 
 
-def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span, level_mode="full", reconstruction_mode="sequence"):
+def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span, level_mode="full", reconstruction_mode="sequence", include_extra=False, regulation_time_limit=True):
     needed_matches = max(2, int(trend_count) + 1)
     pages = []
     stopped_history = False
@@ -3622,7 +3744,7 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             away_id = (match.get("awayTeam") or {}).get("id")
             if home_id != analyzed_team_id and away_id != analyzed_team_id:
                 continue
-            admin_reason = administrative_match_reason(match)
+            admin_reason = administrative_match_reason(match, include_extra=include_extra)
             if admin_reason:
                 administrative_matches_ignored[match_id] = make_administrative_match_issue(match, admin_reason)
                 continue
@@ -3714,7 +3836,7 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             incidents = data.get("incidents") if isinstance(data, dict) else data
             if not isinstance(incidents, list):
                 incidents = []
-            source_record = collect_reconstruction_goal_entries(match, incidents, analyzed_team_id)
+            source_record = collect_reconstruction_goal_entries(match, incidents, analyzed_team_id, include_extra=include_extra, regulation_time_limit=regulation_time_limit)
             if source_record.get("extraTimePenaltyIssue"):
                 source_record["eventDataStatus"] = "extra-time-penalties"
                 source_record["eventDataIssue"] = True
@@ -4125,13 +4247,13 @@ def process_trend_scan_job(job_id, params):
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = False if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
-    trend_limit_enabled = truthy_param(params.get("trendLimitEnabled"))
+    trend_limit_enabled = False
     trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
         trend_selection_mode = "top_half"
-    trend_selection_metric = str(params.get("trendSelectionMetric") or "progression").strip()
-    if trend_selection_metric not in {"progression", "high_average_minute"}:
-        trend_selection_metric = "progression"
+    trend_selection_metric = "progression"
+    include_extra = truthy_param(params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled"))
+    regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
     reconstruction_mode = str(params.get("reconstructionMode") or "sequence").strip().lower()
     if reconstruction_mode in {"sequence", "séquence", "seq"}:
         reconstruction_mode = "sequence"
@@ -4161,8 +4283,8 @@ def process_trend_scan_job(job_id, params):
 
     level_mode = "full" if simultaneous_mode else "attack"
 
-    home_scan = fetch_trend_team_matches(job_id, home_team["id"], skip_home, calculation_trend_count, home_team.get("name") or "Domicile", 12, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode)
-    away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, calculation_trend_count, away_team.get("name") or "Extérieur", 54, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode)
+    home_scan = fetch_trend_team_matches(job_id, home_team["id"], skip_home, calculation_trend_count, home_team.get("name") or "Domicile", 12, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode, include_extra=include_extra, regulation_time_limit=regulation_time_limit)
+    away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, calculation_trend_count, away_team.get("name") or "Extérieur", 54, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode, include_extra=include_extra, regulation_time_limit=regulation_time_limit)
 
     if not simultaneous_mode:
         # Séparé = offensif vs offensif aligné par ligne :
@@ -4279,8 +4401,11 @@ def process_trend_scan_job(job_id, params):
         "reconstructionMode": reconstruction_mode,
         "reconstructionModeLabel": reconstruction_mode_label,
         "trendLevelMode": level_mode,
-        "trendLimitEnabled": trend_limit_enabled,
-        "trendLimitRange": [-2, 2] if trend_limit_enabled else None,
+        "trendLimitEnabled": False,
+        "trendLimitRange": None,
+        "includeExtra": bool(include_extra),
+        "includeExtraEnabled": bool(include_extra),
+        "regulationTimeLimitEnabled": bool(regulation_time_limit),
         "trendSelectionMode": trend_selection_mode,
         "trendSelectionMetric": trend_selection_metric,
         "trendSelection": trend_selection,
@@ -4338,8 +4463,8 @@ def process_trend_scan_job(job_id, params):
             "pagesToLoad": PAGES_TO_LOAD,
             "system": "trend",
             "trendLevelMode": level_mode,
-            "trendLimitEnabled": trend_limit_enabled,
-            "trendLimitRange": [-2, 2] if trend_limit_enabled else None,
+            "trendLimitEnabled": False,
+            "trendLimitRange": None,
             "trendSelectionMode": trend_selection_mode,
             "trendSelectionMetric": trend_selection_metric,
             "performanceVarianceApplied": True,
@@ -4665,7 +4790,7 @@ def main():
     print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Liaison scan: mode robuste v209 activé (pending set + file + latest + heartbeat).")
-    print("Système tendance: curseur 1-100, comparaison par moyenne minute haute/progression selon option.")
+    print("Système tendance: curseur 1-100, extra configurable, limitation temps réglementaire configurable.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
     print("Préchargement événements: désactivé par défaut pour économiser les requêtes.")
