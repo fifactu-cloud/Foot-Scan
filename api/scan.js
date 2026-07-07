@@ -154,8 +154,10 @@ module.exports = async function (req, res) {
     const isTrendMode = bool(b.trendMode) || b.trendCount !== undefined || b.rankEventMode === 'trend';
     const trendCount = numeric(b.trendCount, rank1 || 9, 1, 100);
     const trendSelectionMode = b.trendSelectionMode === undefined ? 'top_half' : (b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half');
-    const trendSelectionMetric = b.trendSelectionMetric === undefined ? 'progression' : (b.trendSelectionMetric === 'progression' ? 'progression' : 'high_average_minute');
-    const trendLimitEnabled = bool(b.trendLimitEnabled);
+    const trendSelectionMetric = 'progression';
+    const trendLimitEnabled = false;
+    const includeExtra = bool(b.includeExtra || b.includeExtraEnabled);
+    const regulationTimeLimitEnabled = b.regulationTimeLimitEnabled === undefined ? true : bool(b.regulationTimeLimitEnabled);
     const reconstructionMode = b.reconstructionMode === undefined ? 'sequence' : (b.reconstructionMode === 'sequence' ? 'sequence' : 'staircase');
 
     if (!/^\d+$/.test(matchId)) {
@@ -198,6 +200,9 @@ module.exports = async function (req, res) {
         trendSelectionMode,
         trendSelectionMetric,
         trendLimitEnabled,
+        includeExtra,
+        includeExtraEnabled: includeExtra,
+        regulationTimeLimitEnabled,
         reconstructionMode,
       },
     };
