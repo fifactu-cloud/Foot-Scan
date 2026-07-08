@@ -931,6 +931,86 @@ def make_match_label(match):
     return f"{prefix} · {teams}" if prefix else teams
 
 
+def detect_two_legged_tie(match):
+    """Détecte automatiquement une confrontation aller-retour SofaScore.
+
+    On privilégie les signaux explicites (aggregate/leg/two-legged) exposés par
+    l'API. La détection reste prudente: le mot "leg" seul n'est pas utilisé
+    pour éviter les faux positifs avec "league".
+    """
+    if not isinstance(match, dict):
+        return {"detected": False}
+
+    explicit_bool_keys = (
+        "twoLegged", "twoLeggedTie", "isTwoLegged", "isTwoLeggedTie",
+        "hasTwoLegs", "hasFirstLeg", "hasSecondLeg", "isFirstLeg",
+        "isSecondLeg", "aggregate", "hasAggregateScore",
+    )
+    for key in explicit_bool_keys:
+        if match.get(key) is True:
+            return {"detected": True, "reason": f"champ explicite {key}", "label": "Aller-Retour (Switch)"}
+
+    explicit_value_keys = (
+        "aggregateWinnerCode", "aggregatedWinnerCode", "aggregateScore",
+        "aggregatedScore", "homeAggregateScore", "awayAggregateScore",
+        "homeAggregatedScore", "awayAggregatedScore", "firstLeg",
+        "secondLeg", "previousLegEvent", "nextLegEvent",
+    )
+    for key in explicit_value_keys:
+        if match.get(key) not in (None, "", [], {}):
+            return {"detected": True, "reason": f"champ agrégat/leg {key}", "label": "Aller-Retour (Switch)"}
+
+    for score_side in ("homeScore", "awayScore"):
+        score = match.get(score_side) or {}
+        if isinstance(score, dict):
+            for key, value in score.items():
+                normalized_key = normalize_status_text(key)
+                if "aggreg" in normalized_key or "aggregate" in normalized_key:
+                    if value not in (None, "", {}, []):
+                        return {"detected": True, "reason": f"score agrégé {score_side}.{key}", "label": "Aller-Retour (Switch)"}
+
+    phrases = (
+        "two-legged", "two legged", "two legs", "2 legs", "2-legged",
+        "first leg", "1st leg", "leg 1", "second leg", "2nd leg", "leg 2",
+        "return leg", "home-and-away", "home and away",
+        "aller-retour", "aller retour", "match aller", "match retour",
+        "score cumule", "score cumulé", "aggregate score", "aggregated score",
+        "on aggregate", "aggregate winner", "aggregated winner",
+    )
+
+    def walk(value, path="match", depth=0):
+        if depth > 5:
+            return None
+        if isinstance(value, dict):
+            for key, child in value.items():
+                normalized_key = normalize_status_text(key)
+                if "aggreg" in normalized_key and child not in (None, "", {}, []):
+                    return f"champ {path}.{key}"
+                for phrase in phrases:
+                    if phrase in normalized_key:
+                        return f"champ {path}.{key}"
+                found = walk(child, f"{path}.{key}", depth + 1)
+                if found:
+                    return found
+        elif isinstance(value, list):
+            for index, child in enumerate(value[:20]):
+                found = walk(child, f"{path}[{index}]", depth + 1)
+                if found:
+                    return found
+        elif isinstance(value, str):
+            normalized = normalize_status_text(value)
+            for phrase in phrases:
+                if phrase in normalized:
+                    return f"texte {path}"
+        return None
+
+    reason = walk(match)
+    if reason:
+        return {"detected": True, "reason": reason, "label": "Aller-Retour (Switch)"}
+
+    return {"detected": False}
+
+
 def incident_belongs_to_analyzed_team(incident, match, analyzed_team_id):
     home_team = match.get("homeTeam") or {}
     team_is_home = home_team.get("id") == analyzed_team_id
@@ -3833,7 +3913,19 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 message=f"{team_name} · Tendance · Source {idx + 1}/{total_sources}",
                 progress=base_progress + int(progress_span * (0.15 + 0.80 * ((idx + 1) / max(1, total_sources)))),
             )
-            data = get_incidents_json(f"event/{match['id']}/incidents")
+            try:
+                data = get_incidents_json(f"event/{match['id']}/incidents")
+            except Exception as e:
+                err_text = str(e)
+                data = {
+                    "_footscanIssue": {
+                        "type": "missing" if ("HTTP 404" in err_text or "Not Found" in err_text) else ("blocked" if ("challenge" in err_text or "HTTP 403" in err_text) else "error"),
+                        "reason": err_text,
+                        "message": "Reconstitution non valide: événements/buts non récupérables pour ce match.",
+                    },
+                    "incidents": [],
+                }
+
             issue = data.get("_footscanIssue") if isinstance(data, dict) else None
             incidents = data.get("incidents") if isinstance(data, dict) else data
             if not isinstance(incidents, list):
@@ -3873,15 +3965,15 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             elif source_record.get("reconstructionGoalsIncomplete"):
                 source_record["eventDataStatus"] = "incomplete-goals"
                 source_record["eventDataIssue"] = True
-                source_record["error"] = "Buts du match incomplets pour la reconstitution"
+                source_record["error"] = "Reconstitution non valide: score non nul sans buts récupérables complets"
                 event_data_issues.append({
                     "id": match.get("id"),
                     "label": make_match_label(match),
                     "competition": get_competition_name(match),
                     "startTimestamp": match.get("startTimestamp") or 0,
                     "type": "incomplete-goals",
-                    "reason": "Buts du match incomplets pour la reconstitution",
-                    "message": "Match ignoré pour la reconstitution: le score indique plus de buts que les incidents récupérés.",
+                    "reason": "Reconstitution non valide: score non nul sans buts récupérables complets",
+                    "message": "Reconstitution non valide: le score du match est non nul mais les buts récupérables sont absents ou incomplets.",
                 })
             source_records.append(source_record)
 
@@ -4347,6 +4439,7 @@ def process_trend_scan_job(job_id, params):
 
     home_summary = summarize_trend_items(home_items)
     away_summary = summarize_trend_items(away_items)
+    two_legged_info = detect_two_legged_tie(match)
 
     def winner():
         h = float(home_summary["performanceScore"] or 0)
@@ -4355,10 +4448,43 @@ def process_trend_scan_job(job_id, params):
         equality_gap_threshold = 0.2222222222
         gap = abs(h - a)
 
+        def finalize(base):
+            final = dict(base or {})
+            if not two_legged_info.get("detected"):
+                return final
+
+            original = dict(final)
+            final["allReturnDetected"] = True
+            final["allReturnSwitch"] = True
+            final["allReturnLabel"] = "Aller-Retour (Switch)"
+            final["allReturnReason"] = two_legged_info.get("reason")
+            final["originalWinner"] = original
+
+            side = final.get("side")
+            if side == "home":
+                final["side"] = "away"
+                final["label"] = away_team.get("name")
+                final["score"] = a
+                final["switchedFromSide"] = "home"
+                final["switchedToSide"] = "away"
+                final["switchApplied"] = True
+            elif side == "away":
+                final["side"] = "home"
+                final["label"] = home_team.get("name")
+                final["score"] = h
+                final["switchedFromSide"] = "away"
+                final["switchedToSide"] = "home"
+                final["switchApplied"] = True
+            else:
+                # Un nul reste un nul même en confrontation aller-retour.
+                final["switchApplied"] = False
+
+            return final
+
         # Nouvelle règle: si l'écart domicile/extérieur est inférieur au seuil,
         # le scan reste en égalité, sans départage résultat.
         if gap < equality_gap_threshold:
-            return {
+            return finalize({
                 "type": "tie",
                 "side": "tie",
                 "label": "Égalité",
@@ -4367,13 +4493,13 @@ def process_trend_scan_job(job_id, params):
                 "tieBreakByResult": False,
                 "equalityByGap": True,
                 "equalityGapThreshold": equality_gap_threshold,
-            }
+            })
 
         if gap > eps:
             side = "home" if h > a else "away"
             if side == "home":
-                return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(gap, 6), "tieBreakByResult": False}
-            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(gap, 6), "tieBreakByResult": False}
+                return finalize({"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(gap, 6), "tieBreakByResult": False})
+            return finalize({"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(gap, 6), "tieBreakByResult": False})
 
         # En cas d'égalité exacte de performance hors seuil, départage déterministe avec le résultat final V/N/D.
         hv = list(home_summary.get("resultDecisionVector") or [0, 0, 0, 0])
@@ -4390,20 +4516,20 @@ def process_trend_scan_job(job_id, params):
         if result_cmp != 0:
             side = "home" if result_cmp > 0 else "away"
             if side == "home":
-                return {
+                return finalize({
                     "type": "winner", "side": "home", "label": home_team.get("name"),
                     "score": h, "diff": 0, "tieBreakByResult": True,
                     "resultTieBreakScore": round(float(home_summary.get("resultDecisionScore") or 0), 6),
                     "opponentResultTieBreakScore": round(float(away_summary.get("resultDecisionScore") or 0), 6),
-                }
-            return {
+                })
+            return finalize({
                 "type": "winner", "side": "away", "label": away_team.get("name"),
                 "score": a, "diff": 0, "tieBreakByResult": True,
                 "resultTieBreakScore": round(float(away_summary.get("resultDecisionScore") or 0), 6),
                 "opponentResultTieBreakScore": round(float(home_summary.get("resultDecisionScore") or 0), 6),
-            }
+            })
 
-        return {"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0, "tieBreakByResult": False}
+        return finalize({"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0, "tieBreakByResult": False})
 
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
     away_issue_count = int(away_scan.get("eventDataIssueCount") or 0)
@@ -4414,6 +4540,11 @@ def process_trend_scan_job(job_id, params):
     home_admin_count = int(home_scan.get("administrativeMatchCount") or 0)
     away_admin_count = int(away_scan.get("administrativeMatchCount") or 0)
     total_admin_count = home_admin_count + away_admin_count
+    invalid_reconstruction_issues = [
+        issue for issue in ((home_scan.get("ignoredSourceIssues") or []) + (away_scan.get("ignoredSourceIssues") or []))
+        if isinstance(issue, dict) and str(issue.get("type") or "") in {"incomplete-goals", "missing", "blocked", "error"}
+    ]
+    invalid_reconstruction_issue_count = len(invalid_reconstruction_issues)
 
     result = {
         "trendMode": True,
@@ -4475,10 +4606,16 @@ def process_trend_scan_job(job_id, params):
             "homeIgnoredSourceIssueCount": home_ignored_issue_count,
             "awayIgnoredSourceIssueCount": away_ignored_issue_count,
             "ignoredSourceIssues": (home_scan.get("ignoredSourceIssues") or []) + (away_scan.get("ignoredSourceIssues") or []),
+            "invalidReconstructionIssueCount": invalid_reconstruction_issue_count,
+            "invalidReconstructionIssues": invalid_reconstruction_issues,
             "message": (
                 f"⚠️ Scan partiel : {total_issue_count} match(s) utilisé(s) sans événements récupérés."
                 if total_issue_count else
-                "Scan complet : reconstitutions valides. Les matchs incomplets éventuels ont été ignorés et remplacés."
+                (
+                    f"⚠️ Reconstitution non valide ignorée/remplacée : {invalid_reconstruction_issue_count} match(s) à score non nul sans buts récupérables."
+                    if invalid_reconstruction_issue_count else
+                    "Scan complet : reconstitutions valides. Les matchs incomplets éventuels ont été ignorés et remplacés."
+                )
             ),
         },
         "config": {
@@ -4688,6 +4825,9 @@ def process_scan_job(job_id):
                 "awayTeam": away_team,
                 "startTimestamp": match.get("startTimestamp"),
                 "label": make_match_label(match),
+                "allReturnDetected": bool(two_legged_info.get("detected")),
+                "allReturnLabel": "Aller-Retour (Switch)" if two_legged_info.get("detected") else None,
+                "allReturnReason": two_legged_info.get("reason"),
             },
             "home": home,
             "away": away,
