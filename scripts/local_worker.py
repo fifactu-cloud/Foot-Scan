@@ -4352,14 +4352,30 @@ def process_trend_scan_job(job_id, params):
         h = float(home_summary["performanceScore"] or 0)
         a = float(away_summary["performanceScore"] or 0)
         eps = 1e-9
+        equality_gap_threshold = 0.2222222222
+        gap = abs(h - a)
 
-        if abs(h - a) > eps:
+        # Nouvelle règle: si l'écart domicile/extérieur est inférieur au seuil,
+        # le scan reste en égalité, sans départage résultat.
+        if gap < equality_gap_threshold:
+            return {
+                "type": "tie",
+                "side": "tie",
+                "label": "Égalité",
+                "score": round((h + a) / 2, 6),
+                "diff": round(gap, 6),
+                "tieBreakByResult": False,
+                "equalityByGap": True,
+                "equalityGapThreshold": equality_gap_threshold,
+            }
+
+        if gap > eps:
             side = "home" if h > a else "away"
             if side == "home":
-                return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(abs(h - a), 6), "tieBreakByResult": False}
-            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(abs(h - a), 6), "tieBreakByResult": False}
+                return {"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(gap, 6), "tieBreakByResult": False}
+            return {"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(gap, 6), "tieBreakByResult": False}
 
-        # En cas d'égalité de performance, départage déterministe avec le résultat final V/N/D.
+        # En cas d'égalité exacte de performance hors seuil, départage déterministe avec le résultat final V/N/D.
         hv = list(home_summary.get("resultDecisionVector") or [0, 0, 0, 0])
         av = list(away_summary.get("resultDecisionVector") or [0, 0, 0, 0])
         max_len = max(len(hv), len(av), 4)
