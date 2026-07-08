@@ -13048,13 +13048,16 @@
       const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
+      const allReturnText = winner.allReturnDetected
+        ? ` · ${esc(winner.allReturnLabel || "Aller-Retour (Switch)")}${winner.switchApplied === false ? " · nul conservé" : ""}`
+        : "";
       return `
         <div class="dominance-box dominance-win">
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
           <div class="dominance-trophy" aria-hidden="true">🏆</div>
           <div class="dominance-label">👑 GAGNANT TENDANCE</div>
           <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
-          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}</div>
+          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}${allReturnText}</div>
         </div>
       `;
     }
@@ -13217,8 +13220,9 @@
     function renderDataQualityWarning(result) {
       const quality = result?.dataQuality || {};
       const issueCount = Number(quality.eventDataIssueCount || 0);
+      const invalidCount = Number(quality.invalidReconstructionIssueCount || 0);
 
-      if (!quality.isPartial && issueCount <= 0) {
+      if (!quality.isPartial && issueCount <= 0 && invalidCount <= 0) {
         return `
           <div class="data-quality-banner ok">
             <div class="data-quality-main">✅ Reconstitutions Valides</div>
@@ -13229,10 +13233,19 @@
       const homeCount = Number(quality.homeIssueCount || 0);
       const awayCount = Number(quality.awayIssueCount || 0);
 
+      if (invalidCount > 0 && issueCount <= 0) {
+        return `
+          <div class="data-quality-banner">
+            <div class="data-quality-main">⚠️ Reconstitution non valide ignorée/remplacée · ${esc(invalidCount)} ${pluralizeMatchCount(invalidCount)}</div>
+            <div class="data-quality-sub">Score non nul sans buts récupérables ou informations de buts incomplètes. Aucun faux 0-0 n'a été créé.</div>
+          </div>
+        `;
+      }
+
       return `
         <div class="data-quality-banner">
           <div class="data-quality-main">⚠️ Scan partiel · ${esc(issueCount)} ${pluralizeMatchCount(issueCount)} utilisé(s) sans événements récupérés</div>
-          <div class="data-quality-sub">Ces matchs n'ont pas pu être remplacés. Domicile : ${esc(homeCount)} · Extérieur : ${esc(awayCount)}</div>
+          <div class="data-quality-sub">Ces matchs n'ont pas pu être remplacés. Domicile : ${esc(homeCount)} · Extérieur : ${esc(awayCount)}${invalidCount ? ` · Reconstitutions non valides ignorées/remplacées : ${esc(invalidCount)}` : ""}</div>
         </div>
       `;
     }
