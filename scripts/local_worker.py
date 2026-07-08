@@ -4360,6 +4360,16 @@ def process_trend_scan_job(job_id, params):
     else:
         reconstruction_mode = "staircase"
     reconstruction_mode_label = "Séquence" if reconstruction_mode == "sequence" else "Escalier"
+    all_return_switch_manual = truthy_param(
+        params.get("allReturnSwitchManual")
+        if params.get("allReturnSwitchManual") is not None
+        else params.get("allReturnSwitchEnabled")
+    )
+    all_return_info = {
+        "detected": bool(all_return_switch_manual),
+        "reason": "activation manuelle",
+        "label": "Aller-Retour (Switch)",
+    }
 
     calculation_trend_count = trend_count
 
@@ -4439,7 +4449,7 @@ def process_trend_scan_job(job_id, params):
 
     home_summary = summarize_trend_items(home_items)
     away_summary = summarize_trend_items(away_items)
-    two_legged_info = detect_two_legged_tie(match)
+    two_legged_info = all_return_info
 
     def winner():
         h = float(home_summary["performanceScore"] or 0)
@@ -4561,6 +4571,8 @@ def process_trend_scan_job(job_id, params):
         "includeExtra": bool(include_extra),
         "includeExtraEnabled": bool(include_extra),
         "regulationTimeLimitEnabled": bool(regulation_time_limit),
+        "allReturnSwitchManual": bool(all_return_switch_manual),
+        "allReturnSwitchEnabled": bool(all_return_switch_manual),
         "trendSelectionMode": trend_selection_mode,
         "trendSelectionMetric": trend_selection_metric,
         "trendSelection": trend_selection,
@@ -4570,6 +4582,9 @@ def process_trend_scan_job(job_id, params):
             "awayTeam": away_team,
             "startTimestamp": match.get("startTimestamp"),
             "label": make_match_label(match),
+            "allReturnDetected": bool(all_return_switch_manual),
+            "allReturnLabel": "Aller-Retour (Switch)" if all_return_switch_manual else None,
+            "allReturnReason": "activation manuelle" if all_return_switch_manual else None,
         },
         "home": {
             **home_team,
@@ -4629,6 +4644,8 @@ def process_trend_scan_job(job_id, params):
             "trendSelectionMode": trend_selection_mode,
             "trendSelectionMetric": trend_selection_metric,
             "performanceVarianceApplied": True,
+            "allReturnSwitchManual": bool(all_return_switch_manual),
+            "allReturnSwitchEnabled": bool(all_return_switch_manual),
             "trendCalculationCount": calculation_trend_count,
             "trendSelectionMethod": trend_selection.get("method"),
             "trendSelection": trend_selection,
@@ -4687,6 +4704,16 @@ def process_scan_job(job_id):
     rank_event_step = params.get("rankEventStep", DEFAULT_RANK_EVENT_STEP)
     rank_event_mode = params.get("rankEventMode") or params.get("rankStepMode") or "fixed"
     winner_mode = "evolution" if params.get("winnerMode") == "evolution" else "dominance"
+    all_return_switch_manual = truthy_param(
+        params.get("allReturnSwitchManual")
+        if params.get("allReturnSwitchManual") is not None
+        else params.get("allReturnSwitchEnabled")
+    )
+    two_legged_info = {
+        "detected": bool(all_return_switch_manual),
+        "reason": "activation manuelle",
+        "label": "Aller-Retour (Switch)",
+    }
     configure_rank_advancement(rank_event_step, rank_event_mode)
 
     effective_rank1 = rank1
@@ -4836,6 +4863,8 @@ def process_scan_job(job_id):
             "rank1": effective_rank1,
             "rank2": effective_rank2,
             "simultaneousMode": simultaneous_mode,
+            "allReturnSwitchManual": bool(all_return_switch_manual),
+            "allReturnSwitchEnabled": bool(all_return_switch_manual),
             "rankEventStep": CURRENT_RANK_EVENT_STEP,
             "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
             "rankEventStepLabel": rank_advancement_label(),
