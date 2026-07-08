@@ -159,6 +159,7 @@ module.exports = async function (req, res) {
     const includeExtra = bool(b.includeExtra || b.includeExtraEnabled);
     const regulationTimeLimitEnabled = b.regulationTimeLimitEnabled === undefined ? true : bool(b.regulationTimeLimitEnabled);
     const reconstructionMode = b.reconstructionMode === undefined ? 'sequence' : (b.reconstructionMode === 'sequence' ? 'sequence' : 'staircase');
+    const allReturnSwitchManual = bool(b.allReturnSwitchManual || b.allReturnSwitchEnabled || b.manualAllReturnSwitch);
 
     if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
@@ -204,6 +205,8 @@ module.exports = async function (req, res) {
         includeExtraEnabled: includeExtra,
         regulationTimeLimitEnabled,
         reconstructionMode,
+        allReturnSwitchManual,
+        allReturnSwitchEnabled: allReturnSwitchManual,
       },
     };
 
