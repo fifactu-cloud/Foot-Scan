@@ -11639,6 +11639,12 @@
               <span class="metric-check-text">LIMITATION TEMPS RÉGLEMENTAIRE</span>
             </label>
 
+            <label class="metric-check-row" for="allReturnSwitchManual">
+              <input id="allReturnSwitchManual" type="checkbox" />
+              <span class="metric-check-box" aria-hidden="true"></span>
+              <span class="metric-check-text">ALLER-RETOUR (SWITCH)</span>
+            </label>
+
           </div>
         </div>
 
@@ -11713,6 +11719,7 @@
           <div class="bar-line"><span>Sans Extra</span><strong>Exclut Prolongations Et Tirs Au But</strong></div>
           <div class="bar-line"><span>Avec Extra</span><strong>Autorise Prolongations Et Tirs Au But</strong></div>
           <div class="bar-line"><span>Lim. Temps</span><strong>Ne Dépasse Pas Le Temps Réglementaire</strong></div>
+          <div class="bar-line"><span>Aller-Retour</span><strong>Switch Manuel Du Gagnant</strong></div>
         </div>
 
         <div class="bar-card">
@@ -12176,6 +12183,16 @@
       return isRegulationTimeLimitEnabled(result) ? "Limitation Temps Réglementaire" : "Temps Complet";
     }
 
+    function isAllReturnSwitchManualEnabled(result = null) {
+      if (result && Object.prototype.hasOwnProperty.call(result, "allReturnSwitchManual")) return Boolean(result.allReturnSwitchManual);
+      if (result && Object.prototype.hasOwnProperty.call(result, "allReturnSwitchEnabled")) return Boolean(result.allReturnSwitchEnabled);
+      return Boolean($("allReturnSwitchManual")?.checked);
+    }
+
+    function allReturnSwitchLabel(result = null) {
+      return isAllReturnSwitchManualEnabled(result) ? "Aller-Retour (Switch)" : "Aller-Retour OFF";
+    }
+
 
     function campModeLabel(result = null) {
       const sim = Boolean(result?.simultaneousMode ?? isSimultaneousMode());
@@ -12296,6 +12313,7 @@
         reconstructionSequence ? "Séquence" : "Escalier",
         withExtra ? "Avec Extra" : "Sans Extra",
         regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet",
+        isAllReturnSwitchManualEnabled(result) ? "Aller-Retour (Switch)" : "Aller-Retour OFF",
       ].join(" · ");
 
       return `
@@ -12305,6 +12323,7 @@
           <span class="mode-dot ${reconstructionSequence ? "pink" : "blue"}" title="${esc(reconstructionSequence ? "Séquence" : "Escalier")}"></span>
           <span class="mode-dot ${withExtra ? "pink" : "blue"}" title="${esc(withExtra ? "Avec Extra" : "Sans Extra")}"></span>
           <span class="mode-check ${regulationLimited ? "checked" : "empty"}" title="${esc(regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet")}"></span>
+          <span class="mode-check ${isAllReturnSwitchManualEnabled(result) ? "checked" : "empty"}" title="${esc(allReturnSwitchLabel(result))}"></span>
         </div>
       `;
     }
@@ -12798,6 +12817,8 @@
           includeExtraEnabled: isIncludeExtraEnabled(),
           regulationTimeLimitEnabled: isRegulationTimeLimitEnabled(),
           reconstructionMode: getReconstructionMode(),
+          allReturnSwitchManual: isAllReturnSwitchManualEnabled(),
+          allReturnSwitchEnabled: isAllReturnSwitchManualEnabled(),
           rankEventStep: 1,
           rankEventMode: "trend",
           winnerMode: "trend",
@@ -12872,6 +12893,8 @@
             includeExtra: Boolean(job.result?.includeExtra ?? isIncludeExtraEnabled()),
             includeExtraEnabled: Boolean(job.result?.includeExtraEnabled ?? job.result?.includeExtra ?? isIncludeExtraEnabled()),
             regulationTimeLimitEnabled: Boolean(job.result?.regulationTimeLimitEnabled ?? isRegulationTimeLimitEnabled()),
+            allReturnSwitchManual: Boolean(job.result?.allReturnSwitchManual ?? job.result?.allReturnSwitchEnabled ?? isAllReturnSwitchManualEnabled()),
+            allReturnSwitchEnabled: Boolean(job.result?.allReturnSwitchEnabled ?? job.result?.allReturnSwitchManual ?? isAllReturnSwitchManualEnabled()),
           };
 
           lastResult = {
@@ -12887,6 +12910,8 @@
               includeExtra: Boolean(resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
               includeExtraEnabled: Boolean(resultWithOptions.includeExtraEnabled ?? resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
               regulationTimeLimitEnabled: Boolean(resultWithOptions.regulationTimeLimitEnabled ?? isRegulationTimeLimitEnabled()),
+              allReturnSwitchManual: Boolean(resultWithOptions.allReturnSwitchManual ?? isAllReturnSwitchManualEnabled()),
+              allReturnSwitchEnabled: Boolean(resultWithOptions.allReturnSwitchEnabled ?? resultWithOptions.allReturnSwitchManual ?? isAllReturnSwitchManualEnabled()),
               rankEventStep: resultWithOptions.rankEventStep,
               rankEventMode: resultWithOptions.rankEventMode,
               winnerMode: resultWithOptions.winnerMode,
@@ -14216,7 +14241,7 @@
 
     function trendModeLabelV151(result) {
       const camp = result?.scanModeLabel || (result?.simultaneousMode ? "Camp Séparé" : "Camp Combiné");
-      return `${camp} · ${trendSelectionModeLabel(result)} · ${reconstructionModeLabel(result)} · ${extraModeLabel(result)} · ${regulationTimeLimitLabel(result)}`;
+      return `${camp} · ${trendSelectionModeLabel(result)} · ${reconstructionModeLabel(result)} · ${extraModeLabel(result)} · ${regulationTimeLimitLabel(result)} · ${allReturnSwitchLabel(result)}`;
     }
 
     function trendWinnerLinesV151(result, compact = false) {
@@ -14243,6 +14268,7 @@
         `Reconstitutions : ${matchesNeeded}`,
         `Extra : ${extraModeLabel(result)}`,
         `Temps Réglementaire : ${regulationTimeLimitLabel(result)}`,
+        `Aller-Retour : ${allReturnSwitchLabel(result)}`,
         `Ignorer Domicile : ${entry.skipHome}`,
         `Ignorer Extérieur : ${entry.skipAway}`,
       ];
