@@ -4397,17 +4397,12 @@ def process_trend_scan_job(job_id, params):
     away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, calculation_trend_count, away_team.get("name") or "Extérieur", 54, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode, include_extra=include_extra, regulation_time_limit=regulation_time_limit)
 
     if not simultaneous_mode:
-        # Séparé = offensif vs offensif aligné par ligne :
-        # A ligne N = attaque A ligne N + attaque de l'adversaire passé de B ligne N.
-        # B ligne N = attaque B ligne N + attaque de l'adversaire passé de A ligne N.
-        home_combined = build_separated_offensive_samples(home_scan["trendMatches"], away_scan["trendMatches"], "home")
-        away_combined = build_separated_offensive_samples(away_scan["trendMatches"], home_scan["trendMatches"], "away")
+        # Camp Combiné : attaque pure, sans défense.
+        # Les reconstitutions ont déjà été construites avec level_mode="attack" :
+        # chaque score à l'événement est réduit au côté offensif du camp analysé.
+        # On ne rajoute donc plus l'attaque adverse / défense issue du camp opposé.
         home_scan["trendMatchesDirect"] = home_scan["trendMatches"]
         away_scan["trendMatchesDirect"] = away_scan["trendMatches"]
-        home_scan["trendMatches"] = home_combined
-        away_scan["trendMatches"] = away_combined
-        home_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(home_combined)
-        away_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(away_combined)
 
     home_items = build_trend_items(home_scan["trendMatches"], "home", calculation_trend_count, trend_limit_enabled=trend_limit_enabled)
     away_items = build_trend_items(away_scan["trendMatches"], "away", calculation_trend_count, trend_limit_enabled=trend_limit_enabled)
