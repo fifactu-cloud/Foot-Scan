@@ -11639,6 +11639,12 @@
               <span class="metric-check-text">LIMITATION TEMPS RÉGLEMENTAIRE</span>
             </label>
 
+            <label class="metric-check-row" for="highAverageMinuteEnabled">
+              <input id="highAverageMinuteEnabled" type="checkbox" />
+              <span class="metric-check-box" aria-hidden="true"></span>
+              <span class="metric-check-text">MOYENNE MINUTE HAUTE</span>
+            </label>
+
             <label class="metric-check-row" for="allReturnSwitchManual">
               <input id="allReturnSwitchManual" type="checkbox" />
               <span class="metric-check-box" aria-hidden="true"></span>
@@ -12166,12 +12172,19 @@
       return String(mode).includes("line") ? "Top Ligne" : "Top Moitié";
     }
 
+    function isHighAverageMinuteEnabled(result = null) {
+      const metric = String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || "").toLowerCase();
+      if (["high_average_minute", "moyenne_minute_haute", "high", "haute"].includes(metric)) return true;
+      if (result && Object.prototype.hasOwnProperty.call(result, "highAverageMinuteEnabled")) return Boolean(result.highAverageMinuteEnabled);
+      return Boolean($("highAverageMinuteEnabled")?.checked);
+    }
+
     function getTrendSelectionMetric() {
-      return "progression";
+      return isHighAverageMinuteEnabled() ? "high_average_minute" : "progression";
     }
 
     function trendSelectionMetricLabel(result = null) {
-      return "Progression";
+      return isHighAverageMinuteEnabled(result) ? "Moyenne Minute Haute" : "Progression";
     }
 
     function isRegulationTimeLimitEnabled(result = null) {
@@ -12305,6 +12318,7 @@
       const topHalf = String(result?.trendSelectionMode || result?.trendSelection?.method || getTrendSelectionMode()).includes("half");
       const withExtra = isIncludeExtraEnabled(result);
       const regulationLimited = isRegulationTimeLimitEnabled(result);
+      const highAverageMinute = isHighAverageMinuteEnabled(result);
       const reconstructionSequence = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase() === "sequence";
 
       const modeTitle = [
@@ -12313,6 +12327,7 @@
         reconstructionSequence ? "Séquence" : "Escalier",
         withExtra ? "Avec Extra" : "Sans Extra",
         regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet",
+        highAverageMinute ? "Moyenne Minute Haute" : "Progression Minute",
         isAllReturnSwitchManualEnabled(result) ? "Aller-Retour (Switch)" : "Aller-Retour OFF",
       ].join(" · ");
 
@@ -12323,6 +12338,7 @@
           <span class="mode-dot ${reconstructionSequence ? "pink" : "blue"}" title="${esc(reconstructionSequence ? "Séquence" : "Escalier")}"></span>
           <span class="mode-dot ${withExtra ? "pink" : "blue"}" title="${esc(withExtra ? "Avec Extra" : "Sans Extra")}"></span>
           <span class="mode-check ${regulationLimited ? "checked" : "empty"}" title="${esc(regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet")}"></span>
+          <span class="mode-check ${highAverageMinute ? "checked" : "empty"}" title="${esc(highAverageMinute ? "Moyenne Minute Haute" : "Progression Minute")}"></span>
           <span class="mode-check ${isAllReturnSwitchManualEnabled(result) ? "checked" : "empty"}" title="${esc(allReturnSwitchLabel(result))}"></span>
         </div>
       `;
@@ -12812,6 +12828,7 @@
           simultaneousMode: isSimultaneousMode(),
           trendSelectionMode: getTrendSelectionMode(),
           trendSelectionMetric: getTrendSelectionMetric(),
+          highAverageMinuteEnabled: isHighAverageMinuteEnabled(),
           trendLimitEnabled: false,
           includeExtra: isIncludeExtraEnabled(),
           includeExtraEnabled: isIncludeExtraEnabled(),
@@ -12889,6 +12906,7 @@
             winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
             trendSelectionMode: job.result?.trendSelectionMode || getTrendSelectionMode(),
             trendSelectionMetric: job.result?.trendSelectionMetric || getTrendSelectionMetric(),
+            highAverageMinuteEnabled: Boolean(job.result?.highAverageMinuteEnabled ?? isHighAverageMinuteEnabled(job.result)),
             trendLimitEnabled: false,
             includeExtra: Boolean(job.result?.includeExtra ?? isIncludeExtraEnabled()),
             includeExtraEnabled: Boolean(job.result?.includeExtraEnabled ?? job.result?.includeExtra ?? isIncludeExtraEnabled()),
@@ -12906,6 +12924,7 @@
               simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
               trendSelectionMode: resultWithOptions.trendSelectionMode || getTrendSelectionMode(),
               trendSelectionMetric: resultWithOptions.trendSelectionMetric || getTrendSelectionMetric(),
+              highAverageMinuteEnabled: Boolean(resultWithOptions.highAverageMinuteEnabled ?? isHighAverageMinuteEnabled(resultWithOptions)),
               trendLimitEnabled: false,
               includeExtra: Boolean(resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
               includeExtraEnabled: Boolean(resultWithOptions.includeExtraEnabled ?? resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
@@ -14244,7 +14263,7 @@
 
     function trendModeLabelV151(result) {
       const camp = result?.scanModeLabel || (result?.simultaneousMode ? "Camp Séparé" : "Camp Combiné");
-      return `${camp} · ${trendSelectionModeLabel(result)} · ${reconstructionModeLabel(result)} · ${extraModeLabel(result)} · ${regulationTimeLimitLabel(result)} · ${allReturnSwitchLabel(result)}`;
+      return `${camp} · ${trendSelectionModeLabel(result)} · ${reconstructionModeLabel(result)} · ${extraModeLabel(result)} · ${regulationTimeLimitLabel(result)} · ${trendSelectionMetricLabel(result)} · ${allReturnSwitchLabel(result)}`;
     }
 
     function trendWinnerLinesV151(result, compact = false) {
@@ -14272,6 +14291,7 @@
         `Reconstitutions : ${matchesNeeded}`,
         `Extra : ${extraModeLabel(result)}`,
         `Temps Réglementaire : ${regulationTimeLimitLabel(result)}`,
+        `Sélection Minute : ${trendSelectionMetricLabel(result)}`,
         `Aller-Retour : ${allReturnSwitchLabel(result)}`,
         `Ignorer Domicile : ${entry.skipHome}`,
         `Ignorer Extérieur : ${entry.skipAway}`,
