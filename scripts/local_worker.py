@@ -3248,6 +3248,14 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
     avg_attack_score = reconstruction_score_average(attack_scores)
     avg_opponent_attack_score = reconstruction_score_average(opponent_attack_scores)
 
+    # Camp Combiné: les scores de reconstitution sont récupérés sans défense.
+    # On conserve le score offensif au moment de chaque événement, mais le côté
+    # défensif/adverse n'entre plus dans la moyenne ni dans la formule combinée.
+    attack_only_without_defense = str(level_mode or "").strip().lower() == "attack"
+    if attack_only_without_defense:
+        avg_opponent_score = 0.0
+        avg_opponent_attack_score = 0.0
+
     all_state_minutes = [float(entry.get("averageMinute") or 0.0) for entry in clean_entries]
     attack_state_minutes = [float(entry.get("averageMinute") or 0.0) for entry in clean_entries]
     opponent_attack_minutes = [float(entry.get("averageMinute") or 0.0) for entry in clean_entries]
@@ -3304,6 +3312,7 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
         "attackGoalsFor": round(avg_attack_score, 6),
         "level": round(level, 6),
         "levelMode": level_mode,
+        "defenseRemovedForCombined": bool(attack_only_without_defense),
         "resultStyle": trend_result_style(level),
         "resultLabel": trend_label_from_style(trend_result_style(level)),
         "goalMinutes": all_state_minutes,
@@ -3325,10 +3334,10 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
                 "sourceStartTimestamp": entry.get("sourceStartTimestamp") or 0,
                 "sourceScoreLabel": entry.get("sourceScoreLabel"),
                 "scoreStateLabel": entry.get("scoreStateLabel"),
-                "teamScore": entry.get("teamScore"),
-                "opponentScore": entry.get("opponentScore"),
+                "teamScore": entry.get("attackScore") if attack_only_without_defense else entry.get("teamScore"),
+                "opponentScore": 0.0 if attack_only_without_defense else entry.get("opponentScore"),
                 "attackScore": entry.get("attackScore"),
-                "opponentAttackScore": entry.get("opponentAttackScore"),
+                "opponentAttackScore": 0.0 if attack_only_without_defense else entry.get("opponentAttackScore"),
                 "homeScoreAtEvent": entry.get("homeScoreAtEvent"),
                 "awayScoreAtEvent": entry.get("awayScoreAtEvent"),
                 "finalHomeScore": entry.get("finalHomeScore"),
@@ -3357,8 +3366,8 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
             "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
             "level": round(avg_opponent_attack_score, 6),
             "attackGoalsFor": round(avg_opponent_attack_score, 6),
-            "minutesForAverage": opponent_minutes_for_average,
-            "averageMinute": round(trend_average(opponent_minutes_for_average), 4),
+            "minutesForAverage": [] if attack_only_without_defense else opponent_minutes_for_average,
+            "averageMinute": round(trend_average(opponent_minutes_for_average), 4) if not attack_only_without_defense else 0.0,
             "matchHasAssists": match_has_assists,
             "assistDataStatus": assist_status,
             "reconstructedMatch": True,
@@ -3370,9 +3379,9 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
                     "sourceStartTimestamp": entry.get("sourceStartTimestamp") or 0,
                     "sourceScoreLabel": entry.get("sourceScoreLabel"),
                     "scoreStateLabel": entry.get("scoreStateLabel"),
-                    "teamScore": entry.get("teamScore"),
-                    "opponentScore": entry.get("opponentScore"),
-                    "opponentAttackScore": entry.get("opponentAttackScore"),
+                    "teamScore": entry.get("attackScore") if attack_only_without_defense else entry.get("teamScore"),
+                    "opponentScore": 0.0 if attack_only_without_defense else entry.get("opponentScore"),
+                    "opponentAttackScore": 0.0 if attack_only_without_defense else entry.get("opponentAttackScore"),
                     "minuteLabel": entry.get("minuteLabel"),
                     "isZeroZero": bool(entry.get("isZeroZero")),
                     "matchHasAssists": entry.get("matchHasAssists"),
@@ -3651,17 +3660,28 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
         opponent_attack = source.get("opponentAttack") or {}
 
         direct_level = float(direct.get("level") or 0)
-        adv_level = float(opponent_attack.get("level") or 0)
-        level = direct_level + adv_level
+        defense_removed = bool(direct.get("defenseRemovedForCombined"))
 
         direct_minutes = list(direct.get("minutesForAverage") or [1.0])
-        adv_minutes = list(opponent_attack.get("minutesForAverage") or [1.0])
-        minutes_for_average = direct_minutes + adv_minutes
+        direct_score_label = direct.get("reconstructionAttackScoreLabel") or direct.get("reconstructionScoreLabel") or format(direct_level, ".6g")
 
-        direct_score_label = direct.get("reconstructionAttackScoreLabel") or direct.get("reconstructionScoreLabel") or format(level, ".6g")
-        opponent_score_label = opponent_attack.get("reconstructionScoreLabel") or f"Attaque adverse {format(adv_level, '.6g')}"
-        combined_formula_label = f"{direct_score_label} + {opponent_score_label}"
-        combined_score_label = f"Attaque {format(level, '.6g')}"
+        if defense_removed:
+            adv_level = 0.0
+            adv_minutes = []
+            level = direct_level
+            minutes_for_average = direct_minutes
+            opponent_score_label = "Défense retirée"
+            combined_formula_label = f"{direct_score_label} · sans défense"
+            combined_score_label = direct_score_label
+        else:
+            adv_level = float(opponent_attack.get("level") or 0)
+            level = direct_level + adv_level
+            adv_minutes = list(opponent_attack.get("minutesForAverage") or [1.0])
+            minutes_for_average = direct_minutes + adv_minutes
+            opponent_score_label = opponent_attack.get("reconstructionScoreLabel") or f"Attaque adverse {format(adv_level, '.6g')}"
+            combined_formula_label = f"{direct_score_label} + {opponent_score_label}"
+            combined_score_label = f"Attaque {format(level, '.6g')}"
+
         reconstruction_index = direct.get("reconstructionIndex") or (idx + 1)
 
         sample = {
@@ -3694,12 +3714,12 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
                 "startTimestamp": source.get("startTimestamp") or 0,
                 "level": round(adv_level, 6),
                 "minutesForAverage": adv_minutes,
-                "averageMinute": round(trend_average(adv_minutes), 4),
+                "averageMinute": round(trend_average(adv_minutes), 4) if adv_minutes else 0.0,
                 "matchHasAssists": opponent_attack.get("matchHasAssists", source.get("matchHasAssists")),
                 "assistDataStatus": opponent_attack.get("assistDataStatus", source.get("assistDataStatus")),
-                "reconstructionEntries": opponent_attack.get("reconstructionEntries") or source.get("reconstructionEntries") or [],
+                "reconstructionEntries": [] if defense_removed else (opponent_attack.get("reconstructionEntries") or source.get("reconstructionEntries") or []),
             },
-            "analysisFormula": "attaque équipe + attaque adversaire du camp opposé",
+            "analysisFormula": "attaque équipe sans défense" if defense_removed else "attaque équipe + attaque adversaire du camp opposé",
             "analysisFormulaLabel": combined_formula_label,
             "analysisLine": idx + 1,
             "side": side_key,
@@ -4348,11 +4368,12 @@ def process_trend_scan_job(job_id, params):
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = False if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
     trend_limit_enabled = False
-    trend_selection_mode = str(params.get("trendSelectionMode") or "top_half").strip()
+    trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
-        trend_selection_mode = "top_half"
+        trend_selection_mode = "top_line"
     trend_selection_metric = "progression"
-    include_extra = truthy_param(params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled"))
+    include_extra_raw = params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled")
+    include_extra = True if include_extra_raw is None else truthy_param(include_extra_raw)
     regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
     reconstruction_mode = str(params.get("reconstructionMode") or "sequence").strip().lower()
     if reconstruction_mode in {"sequence", "séquence", "seq"}:
@@ -4397,12 +4418,17 @@ def process_trend_scan_job(job_id, params):
     away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, calculation_trend_count, away_team.get("name") or "Extérieur", 54, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode, include_extra=include_extra, regulation_time_limit=regulation_time_limit)
 
     if not simultaneous_mode:
-        # Camp Combiné : attaque pure, sans défense.
-        # Les reconstitutions ont déjà été construites avec level_mode="attack" :
-        # chaque score à l'événement est réduit au côté offensif du camp analysé.
-        # On ne rajoute donc plus l'attaque adverse / défense issue du camp opposé.
+        # Séparé = offensif vs offensif aligné par ligne :
+        # A ligne N = attaque A ligne N + attaque de l'adversaire passé de B ligne N.
+        # B ligne N = attaque B ligne N + attaque de l'adversaire passé de A ligne N.
+        home_combined = build_separated_offensive_samples(home_scan["trendMatches"], away_scan["trendMatches"], "home")
+        away_combined = build_separated_offensive_samples(away_scan["trendMatches"], home_scan["trendMatches"], "away")
         home_scan["trendMatchesDirect"] = home_scan["trendMatches"]
         away_scan["trendMatchesDirect"] = away_scan["trendMatches"]
+        home_scan["trendMatches"] = home_combined
+        away_scan["trendMatches"] = away_combined
+        home_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(home_combined)
+        away_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(away_combined)
 
     home_items = build_trend_items(home_scan["trendMatches"], "home", calculation_trend_count, trend_limit_enabled=trend_limit_enabled)
     away_items = build_trend_items(away_scan["trendMatches"], "away", calculation_trend_count, trend_limit_enabled=trend_limit_enabled)
@@ -4486,8 +4512,8 @@ def process_trend_scan_job(job_id, params):
 
             return final
 
-        # Nouvelle règle: si l'écart domicile/extérieur est inférieur au seuil,
-        # le scan reste en égalité, sans départage résultat.
+        # Règle d'écart: si l'écart domicile/extérieur est inférieur au seuil,
+        # le scan reste en égalité avant tout switch gagnant.
         if gap < equality_gap_threshold:
             return finalize({
                 "type": "tie",
@@ -4498,6 +4524,50 @@ def process_trend_scan_job(job_id, params):
                 "tieBreakByResult": False,
                 "equalityByGap": True,
                 "equalityGapThreshold": equality_gap_threshold,
+            })
+
+        # Switch Gagnant: une équipe avec une performance finale exactement à 0
+        # ne peut pas être désignée gagnante. Si une seule équipe est à 0,
+        # l'adversaire gagne. Si les deux sont à 0, l'égalité reste conservée.
+        h_is_zero = abs(h) < eps
+        a_is_zero = abs(a) < eps
+        if h_is_zero and a_is_zero:
+            return finalize({
+                "type": "tie",
+                "side": "tie",
+                "label": "Égalité",
+                "score": 0,
+                "diff": 0,
+                "tieBreakByResult": False,
+                "zeroPerformanceSwitch": True,
+                "zeroPerformanceSwitchLabel": "Switch Gagnant",
+                "zeroPerformanceBoth": True,
+            })
+        if h_is_zero:
+            return finalize({
+                "type": "winner",
+                "side": "away",
+                "label": away_team.get("name"),
+                "score": a,
+                "diff": round(gap, 6),
+                "tieBreakByResult": False,
+                "zeroPerformanceSwitch": True,
+                "zeroPerformanceSwitchLabel": "Switch Gagnant",
+                "zeroPerformanceBlockedSide": "home",
+                "zeroPerformanceBlockedLabel": home_team.get("name"),
+            })
+        if a_is_zero:
+            return finalize({
+                "type": "winner",
+                "side": "home",
+                "label": home_team.get("name"),
+                "score": h,
+                "diff": round(gap, 6),
+                "tieBreakByResult": False,
+                "zeroPerformanceSwitch": True,
+                "zeroPerformanceSwitchLabel": "Switch Gagnant",
+                "zeroPerformanceBlockedSide": "away",
+                "zeroPerformanceBlockedLabel": away_team.get("name"),
             })
 
         if gap > eps:
