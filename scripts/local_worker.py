@@ -4371,7 +4371,9 @@ def process_trend_scan_job(job_id, params):
     trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
         trend_selection_mode = "top_line"
-    trend_selection_metric = "progression"
+    trend_selection_metric_raw = str(params.get("trendSelectionMetric") or "").strip().lower()
+    high_average_minute_enabled = truthy_param(params.get("highAverageMinuteEnabled")) or trend_selection_metric_raw in {"high_average_minute", "moyenne_minute_haute", "high", "haute"}
+    trend_selection_metric = "high_average_minute" if high_average_minute_enabled else "progression"
     include_extra_raw = params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled")
     include_extra = True if include_extra_raw is None else truthy_param(include_extra_raw)
     regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
@@ -4640,6 +4642,7 @@ def process_trend_scan_job(job_id, params):
         "allReturnSwitchEnabled": bool(all_return_switch_manual),
         "trendSelectionMode": trend_selection_mode,
         "trendSelectionMetric": trend_selection_metric,
+        "highAverageMinuteEnabled": bool(high_average_minute_enabled),
         "trendSelection": trend_selection,
         "match": {
             "id": match.get("id"),
