@@ -11612,11 +11612,11 @@
               <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">CAMP SÉPARÉ</button>
             </div>
 
-            <input id="trendSelectionMode" type="checkbox" hidden checked />
-            <div class="calc-mode-slider trend-selection-slider sim" id="trendSelectionSlider" role="tablist" aria-label="Mode de sélection tendance">
+            <input id="trendSelectionMode" type="checkbox" hidden />
+            <div class="calc-mode-slider trend-selection-slider" id="trendSelectionSlider" role="tablist" aria-label="Mode de sélection tendance">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt" data-mode="line" role="tab">TOP LIGNE</button>
-              <button type="button" class="calc-mode-opt is-active" data-mode="half" role="tab">TOP MOITIÉ</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="line" role="tab">TOP LIGNE</button>
+              <button type="button" class="calc-mode-opt" data-mode="half" role="tab">TOP MOITIÉ</button>
             </div>
 
             <input id="reconstructionMode" type="checkbox" hidden checked />
@@ -11626,11 +11626,11 @@
               <button type="button" class="calc-mode-opt is-active" data-mode="sequence" role="tab">SÉQUENCE</button>
             </div>
 
-            <input id="includeExtraEnabled" type="checkbox" hidden />
-            <div class="calc-mode-slider trend-limit-slider" id="extraModeSlider" role="tablist" aria-label="Mode extra">
+            <input id="includeExtraEnabled" type="checkbox" hidden checked />
+            <div class="calc-mode-slider trend-limit-slider sim" id="extraModeSlider" role="tablist" aria-label="Mode extra">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt is-active" data-mode="without" role="tab">SANS EXTRA</button>
-              <button type="button" class="calc-mode-opt" data-mode="with" role="tab">AVEC EXTRA</button>
+              <button type="button" class="calc-mode-opt" data-mode="without" role="tab">SANS EXTRA</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="with" role="tab">AVEC EXTRA</button>
             </div>
 
             <label class="metric-check-row" for="regulationTimeLimitEnabled">
@@ -13073,6 +13073,9 @@
       const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
+      const zeroSwitchText = winner.zeroPerformanceSwitch
+        ? ` · ${esc(winner.zeroPerformanceSwitchLabel || "Switch Gagnant")}${winner.zeroPerformanceBlockedLabel ? ` · ${esc(winner.zeroPerformanceBlockedLabel)} à 0` : ""}`
+        : "";
       const allReturnText = winner.allReturnDetected
         ? ` · ${esc(winner.allReturnLabel || "Aller-Retour (Switch)")}${winner.switchApplied === false ? " · nul conservé" : ""}`
         : "";
@@ -13082,7 +13085,7 @@
           <div class="dominance-trophy" aria-hidden="true">🏆</div>
           <div class="dominance-label">👑 GAGNANT TENDANCE</div>
           <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
-          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}${allReturnText}</div>
+          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}${zeroSwitchText}${allReturnText}</div>
         </div>
       `;
     }
@@ -14250,7 +14253,8 @@
         return ["👑 GAGNANT TENDANCE : Égalité"];
       }
       const base = `👑 GAGNANT TENDANCE : ${winner.label || "Indisponible"}`;
-      const meta = `Performance : ${formatValue(winner.score)}${winner.diff ? ` · Écart : ${formatValue(winner.diff)}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}`;
+      const zeroSwitchText = winner.zeroPerformanceSwitch ? ` · ${winner.zeroPerformanceSwitchLabel || "Switch Gagnant"}${winner.zeroPerformanceBlockedLabel ? ` · ${winner.zeroPerformanceBlockedLabel} à 0` : ""}` : "";
+      const meta = `Performance : ${formatValue(winner.score)}${winner.diff ? ` · Écart : ${formatValue(winner.diff)}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}${zeroSwitchText}`;
       return compact ? [`${base} · ${meta}`] : [base, meta];
     }
 
