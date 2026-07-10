@@ -153,10 +153,12 @@ module.exports = async function (req, res) {
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
     const isTrendMode = bool(b.trendMode) || b.trendCount !== undefined || b.rankEventMode === 'trend';
     const trendCount = numeric(b.trendCount, rank1 || 9, 1, 100);
-    const trendSelectionMode = b.trendSelectionMode === undefined ? 'top_half' : (b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half');
-    const trendSelectionMetric = 'progression';
+    const trendSelectionMode = b.trendSelectionMode === undefined ? 'top_line' : (b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half');
+    const trendSelectionMetricRaw = String(b.trendSelectionMetric || '').trim().toLowerCase();
+    const highAverageMinuteEnabled = bool(b.highAverageMinuteEnabled) || ['high_average_minute', 'moyenne_minute_haute', 'high', 'haute'].includes(trendSelectionMetricRaw);
+    const trendSelectionMetric = highAverageMinuteEnabled ? 'high_average_minute' : 'progression';
     const trendLimitEnabled = false;
-    const includeExtra = bool(b.includeExtra || b.includeExtraEnabled);
+    const includeExtra = (b.includeExtra === undefined && b.includeExtraEnabled === undefined) ? true : bool(b.includeExtra || b.includeExtraEnabled);
     const regulationTimeLimitEnabled = b.regulationTimeLimitEnabled === undefined ? true : bool(b.regulationTimeLimitEnabled);
     const reconstructionMode = b.reconstructionMode === undefined ? 'sequence' : (b.reconstructionMode === 'sequence' ? 'sequence' : 'staircase');
     const allReturnSwitchManual = bool(b.allReturnSwitchManual || b.allReturnSwitchEnabled || b.manualAllReturnSwitch);
@@ -200,6 +202,7 @@ module.exports = async function (req, res) {
         trendCount,
         trendSelectionMode,
         trendSelectionMetric,
+        highAverageMinuteEnabled,
         trendLimitEnabled,
         includeExtra,
         includeExtraEnabled: includeExtra,
