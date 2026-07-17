@@ -4136,8 +4136,12 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         normalized_mode = "top_half"
 
     normalized_metric = str(selection_metric or "progression").strip().lower()
-    if normalized_metric in {"high", "haute", "high_average", "high_average_minute", "moyenne_haute", "moyenne_minute_haute", "global", "global_average", "global_average_minute", "moyenne", "moyenne_globale", "moyenne_minute_globale"}:
-        normalized_metric = "high_average_minute"
+    if normalized_metric in {
+        "high", "haute", "high_variance", "high_variance_quantity",
+        "variance_haute", "quantite_variance_haute", "quantité_variance_haute",
+        "performance_quantity", "high_performance_quantity", "absolute_performance",
+    }:
+        normalized_metric = "high_variance_quantity"
     else:
         normalized_metric = "progression"
 
@@ -4165,6 +4169,7 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             item["selectionMode"] = normalized_mode
             item["selectionMetric"] = normalized_metric
             item["selectionProgression"] = None
+            item["selectionVarianceQuantity"] = None
             item["selectionDistance"] = None
             item["globalAverageMinute"] = None
             item["timeSourceIndex"] = None
@@ -4192,6 +4197,14 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
                 item["recentAverageMinute"] = round(recent_avg, 4)
                 item["previousAverageMinute"] = round(previous_avg, 4)
 
+            try:
+                performance_value = float(item.get("value") or 0)
+            except (TypeError, ValueError):
+                performance_value = 0.0
+            if not math.isfinite(performance_value):
+                performance_value = 0.0
+            variance_quantity = abs(performance_value)
+
             minutes = []
             for minute in item.get("minuteBasis") or []:
                 try:
@@ -4208,6 +4221,7 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
                 "side": side_key,
                 "item": item,
                 "progression": progression,
+                "varianceQuantity": variance_quantity,
                 "averageMinute": average_minute,
                 "sourceIndex": source_index,
                 "relativeIndex": source_index,
@@ -4221,15 +4235,17 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         entry["distance"] = distance
         entry["item"]["globalAverageMinute"] = round(global_average, 4)
         entry["item"]["selectionDistance"] = round(distance, 4)
+        entry["item"]["selectionVarianceQuantity"] = round(float(entry.get("varianceQuantity") or 0), 6)
 
     def score_key(entry):
-        if normalized_metric == "high_average_minute":
-            return (-float(entry.get("averageMinute") or 0), float(entry.get("sourceIndex") or 9999))
+        if normalized_metric == "high_variance_quantity":
+            # Plus |performance| est grand, plus la tendance prend le dessus.
+            return (-float(entry.get("varianceQuantity") or 0), float(entry.get("sourceIndex") or 9999))
         return (-float(entry.get("progression") or 0), float(entry.get("averageMinute") or 9999))
 
     def same_best(a, b):
-        if normalized_metric == "high_average_minute":
-            return abs(float(a.get("averageMinute") or 0) - float(b.get("averageMinute") or 0)) < 1e-9
+        if normalized_metric == "high_variance_quantity":
+            return abs(float(a.get("varianceQuantity") or 0) - float(b.get("varianceQuantity") or 0)) < 1e-9
         return abs(float(a.get("progression") or 0) - float(b.get("progression") or 0)) < 1e-9
 
     def mark_selected(entry, rank, weight=1.0, tie=False):
@@ -4250,24 +4266,27 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         item["selectionMode"] = normalized_mode
         item["selectionMetric"] = normalized_metric
         item["selectionProgression"] = round(float(entry.get("progression") or 0), 4)
+        item["selectionVarianceQuantity"] = round(float(entry.get("varianceQuantity") or 0), 6)
         item["selectionDistance"] = round(float(entry.get("distance") or 0), 4)
         item["globalAverageMinute"] = round(global_average, 4)
 
     selected = []
     label = "Top Moitié" if normalized_mode == "top_half" else "Top Ligne"
+    metric_label = "Quantité Variance Haute" if normalized_metric == "high_variance_quantity" else "Progression Moyenne"
 
     if total <= 0:
         return {
             "method": normalized_mode,
             "label": label,
             "selectionMetric": normalized_metric,
-            "selectionMetricLabel": "Moyenne Minute Haute" if normalized_metric == "high_average_minute" else "Progression Moyenne",
+            "selectionMetricLabel": metric_label,
             "requestedTrendCount": n,
             "calculationTrendCount": n,
             "totalTrendItems": 0,
             "selectedTrendItems": 0,
             "globalAverageMinute": round(global_average, 4),
             "cutoffProgression": None,
+            "cutoffVarianceQuantity": None,
             "cutoffDistance": None,
             "homeSelectedTrendItems": 0,
             "awaySelectedTrendItems": 0,
@@ -4309,6 +4328,7 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             mark_selected(entry, rank)
 
     cutoff_progression = min((float(entry.get("progression") or 0) for entry in selected), default=None)
+    cutoff_variance_quantity = min((float(entry.get("varianceQuantity") or 0) for entry in selected), default=None)
     cutoff_distance = max((float(entry.get("distance") or 0) for entry in selected), default=None)
 
     home_selected_weight = sum(trend_item_selection_weight(item) for item in home_items or [])
@@ -4318,18 +4338,18 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         "method": normalized_mode,
         "label": label,
         "selectionMetric": normalized_metric,
-        "selectionMetricLabel": "Moyenne Minute Haute" if normalized_metric == "high_average_minute" else "Progression Moyenne",
+        "selectionMetricLabel": metric_label,
         "requestedTrendCount": n,
         "calculationTrendCount": n,
         "totalTrendItems": total,
         "selectedTrendItems": normalize_trend_count(home_selected_weight + away_selected_weight),
         "globalAverageMinute": round(global_average, 4),
         "cutoffProgression": round(cutoff_progression, 4) if cutoff_progression is not None else None,
+        "cutoffVarianceQuantity": round(cutoff_variance_quantity, 6) if cutoff_variance_quantity is not None else None,
         "cutoffDistance": round(cutoff_distance, 4) if cutoff_distance is not None else None,
         "homeSelectedTrendItems": normalize_trend_count(home_selected_weight),
         "awaySelectedTrendItems": normalize_trend_count(away_selected_weight),
     }
-
 
 def summarize_trend_items(items):
     counts = {"V": 0.0, "N": 0.0, "D": 0.0}
@@ -4372,8 +4392,8 @@ def process_trend_scan_job(job_id, params):
     if trend_selection_mode not in {"top_line", "top_half"}:
         trend_selection_mode = "top_line"
     trend_selection_metric_raw = str(params.get("trendSelectionMetric") or "").strip().lower()
-    high_average_minute_enabled = truthy_param(params.get("highAverageMinuteEnabled")) or trend_selection_metric_raw in {"high_average_minute", "moyenne_minute_haute", "high", "haute"}
-    trend_selection_metric = "high_average_minute" if high_average_minute_enabled else "progression"
+    high_variance_quantity_enabled = truthy_param(params.get("highVarianceQuantityEnabled")) or trend_selection_metric_raw in {"high_variance_quantity", "quantite_variance_haute", "high", "haute"}
+    trend_selection_metric = "high_variance_quantity" if high_variance_quantity_enabled else "progression"
     include_extra_raw = params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled")
     include_extra = True if include_extra_raw is None else truthy_param(include_extra_raw)
     regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
@@ -4642,7 +4662,7 @@ def process_trend_scan_job(job_id, params):
         "allReturnSwitchEnabled": bool(all_return_switch_manual),
         "trendSelectionMode": trend_selection_mode,
         "trendSelectionMetric": trend_selection_metric,
-        "highAverageMinuteEnabled": bool(high_average_minute_enabled),
+        "highVarianceQuantityEnabled": bool(high_variance_quantity_enabled),
         "trendSelection": trend_selection,
         "match": {
             "id": match.get("id"),
