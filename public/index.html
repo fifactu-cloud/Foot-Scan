@@ -11031,7 +11031,7 @@
       letter-spacing: .045em !important;
     }
 
-    /* === v202 : option sélection moyenne minute haute === */
+    /* === v202 : option sélection quantité variance haute === */
     .metric-check-row {
       display: flex !important;
       align-items: center !important;
@@ -11639,10 +11639,10 @@
               <span class="metric-check-text">LIMITATION TEMPS RÉGLEMENTAIRE</span>
             </label>
 
-            <label class="metric-check-row" for="highAverageMinuteEnabled">
-              <input id="highAverageMinuteEnabled" type="checkbox" />
+            <label class="metric-check-row" for="highVarianceQuantityEnabled">
+              <input id="highVarianceQuantityEnabled" type="checkbox" />
               <span class="metric-check-box" aria-hidden="true"></span>
-              <span class="metric-check-text">MOYENNE MINUTE HAUTE</span>
+              <span class="metric-check-text">QUANTITÉ VARIANCE HAUTE</span>
             </label>
 
             <label class="metric-check-row" for="allReturnSwitchManual">
@@ -12172,19 +12172,19 @@
       return String(mode).includes("line") ? "Top Ligne" : "Top Moitié";
     }
 
-    function isHighAverageMinuteEnabled(result = null) {
+    function isHighVarianceQuantityEnabled(result = null) {
       const metric = String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || "").toLowerCase();
-      if (["high_average_minute", "moyenne_minute_haute", "high", "haute"].includes(metric)) return true;
-      if (result && Object.prototype.hasOwnProperty.call(result, "highAverageMinuteEnabled")) return Boolean(result.highAverageMinuteEnabled);
-      return Boolean($("highAverageMinuteEnabled")?.checked);
+      if (["high_variance_quantity", "quantite_variance_haute", "high", "haute"].includes(metric)) return true;
+      if (result && Object.prototype.hasOwnProperty.call(result, "highVarianceQuantityEnabled")) return Boolean(result.highVarianceQuantityEnabled);
+      return Boolean($("highVarianceQuantityEnabled")?.checked);
     }
 
     function getTrendSelectionMetric() {
-      return isHighAverageMinuteEnabled() ? "high_average_minute" : "progression";
+      return isHighVarianceQuantityEnabled() ? "high_variance_quantity" : "progression";
     }
 
     function trendSelectionMetricLabel(result = null) {
-      return isHighAverageMinuteEnabled(result) ? "Moyenne Minute Haute" : "Progression";
+      return isHighVarianceQuantityEnabled(result) ? "Quantité Variance Haute" : "Progression";
     }
 
     function isRegulationTimeLimitEnabled(result = null) {
@@ -12318,7 +12318,7 @@
       const topHalf = String(result?.trendSelectionMode || result?.trendSelection?.method || getTrendSelectionMode()).includes("half");
       const withExtra = isIncludeExtraEnabled(result);
       const regulationLimited = isRegulationTimeLimitEnabled(result);
-      const highAverageMinute = isHighAverageMinuteEnabled(result);
+      const highVarianceQuantity = isHighVarianceQuantityEnabled(result);
       const reconstructionSequence = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase() === "sequence";
 
       const modeTitle = [
@@ -12327,7 +12327,7 @@
         reconstructionSequence ? "Séquence" : "Escalier",
         withExtra ? "Avec Extra" : "Sans Extra",
         regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet",
-        highAverageMinute ? "Moyenne Minute Haute" : "Progression Minute",
+        highVarianceQuantity ? "Quantité Variance Haute" : "Progression Minute",
         isAllReturnSwitchManualEnabled(result) ? "Aller-Retour (Switch)" : "Aller-Retour OFF",
       ].join(" · ");
 
@@ -12338,7 +12338,7 @@
           <span class="mode-dot ${reconstructionSequence ? "pink" : "blue"}" title="${esc(reconstructionSequence ? "Séquence" : "Escalier")}"></span>
           <span class="mode-dot ${withExtra ? "pink" : "blue"}" title="${esc(withExtra ? "Avec Extra" : "Sans Extra")}"></span>
           <span class="mode-check ${regulationLimited ? "checked" : "empty"}" title="${esc(regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet")}"></span>
-          <span class="mode-check ${highAverageMinute ? "checked" : "empty"}" title="${esc(highAverageMinute ? "Moyenne Minute Haute" : "Progression Minute")}"></span>
+          <span class="mode-check ${highVarianceQuantity ? "checked" : "empty"}" title="${esc(highVarianceQuantity ? "Quantité Variance Haute" : "Progression Minute")}"></span>
           <span class="mode-check ${isAllReturnSwitchManualEnabled(result) ? "checked" : "empty"}" title="${esc(allReturnSwitchLabel(result))}"></span>
         </div>
       `;
@@ -12828,7 +12828,7 @@
           simultaneousMode: isSimultaneousMode(),
           trendSelectionMode: getTrendSelectionMode(),
           trendSelectionMetric: getTrendSelectionMetric(),
-          highAverageMinuteEnabled: isHighAverageMinuteEnabled(),
+          highVarianceQuantityEnabled: isHighVarianceQuantityEnabled(),
           trendLimitEnabled: false,
           includeExtra: isIncludeExtraEnabled(),
           includeExtraEnabled: isIncludeExtraEnabled(),
@@ -12906,7 +12906,7 @@
             winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
             trendSelectionMode: job.result?.trendSelectionMode || getTrendSelectionMode(),
             trendSelectionMetric: job.result?.trendSelectionMetric || getTrendSelectionMetric(),
-            highAverageMinuteEnabled: Boolean(job.result?.highAverageMinuteEnabled ?? isHighAverageMinuteEnabled(job.result)),
+            highVarianceQuantityEnabled: Boolean(job.result?.highVarianceQuantityEnabled ?? isHighVarianceQuantityEnabled(job.result)),
             trendLimitEnabled: false,
             includeExtra: Boolean(job.result?.includeExtra ?? isIncludeExtraEnabled()),
             includeExtraEnabled: Boolean(job.result?.includeExtraEnabled ?? job.result?.includeExtra ?? isIncludeExtraEnabled()),
@@ -12924,7 +12924,7 @@
               simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
               trendSelectionMode: resultWithOptions.trendSelectionMode || getTrendSelectionMode(),
               trendSelectionMetric: resultWithOptions.trendSelectionMetric || getTrendSelectionMetric(),
-              highAverageMinuteEnabled: Boolean(resultWithOptions.highAverageMinuteEnabled ?? isHighAverageMinuteEnabled(resultWithOptions)),
+              highVarianceQuantityEnabled: Boolean(resultWithOptions.highVarianceQuantityEnabled ?? isHighVarianceQuantityEnabled(resultWithOptions)),
               trendLimitEnabled: false,
               includeExtra: Boolean(resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
               includeExtraEnabled: Boolean(resultWithOptions.includeExtraEnabled ?? resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
@@ -14291,7 +14291,7 @@
         `Reconstitutions : ${matchesNeeded}`,
         `Extra : ${extraModeLabel(result)}`,
         `Temps Réglementaire : ${regulationTimeLimitLabel(result)}`,
-        `Sélection Minute : ${trendSelectionMetricLabel(result)}`,
+        `Sélection Tendance : ${trendSelectionMetricLabel(result)}`,
         `Aller-Retour : ${allReturnSwitchLabel(result)}`,
         `Ignorer Domicile : ${entry.skipHome}`,
         `Ignorer Extérieur : ${entry.skipAway}`,
