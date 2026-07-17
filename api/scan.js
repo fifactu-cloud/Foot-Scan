@@ -155,8 +155,8 @@ module.exports = async function (req, res) {
     const trendCount = numeric(b.trendCount, rank1 || 9, 1, 100);
     const trendSelectionMode = b.trendSelectionMode === undefined ? 'top_line' : (b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half');
     const trendSelectionMetricRaw = String(b.trendSelectionMetric || '').trim().toLowerCase();
-    const highAverageMinuteEnabled = bool(b.highAverageMinuteEnabled) || ['high_average_minute', 'moyenne_minute_haute', 'high', 'haute'].includes(trendSelectionMetricRaw);
-    const trendSelectionMetric = highAverageMinuteEnabled ? 'high_average_minute' : 'progression';
+    const highVarianceQuantityEnabled = bool(b.highVarianceQuantityEnabled) || ['high_variance_quantity', 'quantite_variance_haute', 'high', 'haute'].includes(trendSelectionMetricRaw);
+    const trendSelectionMetric = highVarianceQuantityEnabled ? 'high_variance_quantity' : 'progression';
     const trendLimitEnabled = false;
     const includeExtra = (b.includeExtra === undefined && b.includeExtraEnabled === undefined) ? true : bool(b.includeExtra || b.includeExtraEnabled);
     const regulationTimeLimitEnabled = b.regulationTimeLimitEnabled === undefined ? true : bool(b.regulationTimeLimitEnabled);
@@ -202,7 +202,7 @@ module.exports = async function (req, res) {
         trendCount,
         trendSelectionMode,
         trendSelectionMetric,
-        highAverageMinuteEnabled,
+        highVarianceQuantityEnabled,
         trendLimitEnabled,
         includeExtra,
         includeExtraEnabled: includeExtra,
