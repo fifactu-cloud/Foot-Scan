@@ -7017,12 +7017,18 @@
     }
 
     .winner-close-gap-warning {
-      display: inline-block;
-      margin-left: 0.2em;
-      font-size: 0.55em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0.22em;
+      padding: 0.1em 0.16em;
+      border: 1px solid rgba(250, 204, 21, 0.72);
+      border-radius: 999px;
+      background: rgba(250, 204, 21, 0.13);
+      font-size: 0.48em;
       line-height: 1;
-      vertical-align: 0.12em;
-      filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.45));
+      vertical-align: 0.13em;
+      filter: drop-shadow(0 0 7px rgba(250, 204, 21, 0.62));
     }
 
     .dominance-trophy {
@@ -13063,7 +13069,7 @@
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
           <div class="dominance-trophy" aria-hidden="true">🏆</div>
           <div class="dominance-label">👑 GAGNANT TENDANCE</div>
-          <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}${winner.type === "winner" && winner.closeGapWarning ? ` <span class="winner-close-gap-warning" role="img" aria-label="Écart très faible" title="Écart inférieur à 0,1111111111">⚠️</span>` : ""}</div>
+          <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}${winner.closeGapWarning ? ` <span class="winner-close-gap-warning" role="img" aria-label="Écart très faible ou égalité exacte" title="Écart inférieur à 0,1111111111">⚠️</span>` : ""}</div>
           <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}</div>
         </div>
       `;
