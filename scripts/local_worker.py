@@ -4439,8 +4439,10 @@ def process_trend_scan_job(job_id, params):
         eps = 1e-9
         close_gap_warning_threshold = 0.1111111111
         gap = abs(h - a)
+        warning = gap < close_gap_warning_threshold
 
         # Égalité uniquement lorsque les deux niveaux sont réellement identiques.
+        # Une égalité exacte a un écart nul : elle doit donc afficher l'avertissement.
         if gap <= eps:
             return {
                 "type": "tie",
@@ -4449,11 +4451,10 @@ def process_trend_scan_job(job_id, params):
                 "score": round((h + a) / 2, 6),
                 "diff": 0,
                 "tieBreakByResult": False,
-                "closeGapWarning": False,
+                "closeGapWarning": warning,
                 "closeGapWarningThreshold": close_gap_warning_threshold,
             }
 
-        warning = gap < close_gap_warning_threshold
         if h > a:
             return {
                 "type": "winner",
