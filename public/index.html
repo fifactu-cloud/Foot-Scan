@@ -11645,6 +11645,12 @@
               <span class="metric-check-text">QUANTITÉ VARIANCE HAUTE</span>
             </label>
 
+            <label class="metric-check-row" for="highAverageMinuteEnabled">
+              <input id="highAverageMinuteEnabled" type="checkbox" />
+              <span class="metric-check-box" aria-hidden="true"></span>
+              <span class="metric-check-text">MOYENNE MINUTE HAUTE</span>
+            </label>
+
             <label class="metric-check-row" for="allReturnSwitchManual">
               <input id="allReturnSwitchManual" type="checkbox" />
               <span class="metric-check-box" aria-hidden="true"></span>
@@ -11738,6 +11744,9 @@
           <div class="bar-card-title">⏱️ Comparaison</div>
           <div class="bar-line"><span>Temps</span><strong>Moy. Minutes Des Buts</strong></div>
           <div class="bar-line"><span>Défaut</span><strong>Progression Moy. La Plus Forte</strong></div>
+          <div class="bar-line"><span>Variance Haute</span><strong>Performance La Plus Éloignée De 0</strong></div>
+          <div class="bar-line"><span>Minute Haute</span><strong>Moyenne Minute La Plus Forte</strong></div>
+          <div class="bar-line"><span>Performance Finale</span><strong>Somme Des Tendances Prises ÷ Leur Nombre</strong></div>
           <div class="bar-line"><span>Extra</span><strong>Penalty → Prolongation → Temps Réglementaire → 0-0</strong></div>
         </div>
       </div>
@@ -12172,19 +12181,43 @@
       return String(mode).includes("line") ? "Top Ligne" : "Top Moitié";
     }
 
+    function isHighAverageMinuteEnabled(result = null) {
+      const metric = String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || "").toLowerCase();
+      if (["high_average_minute", "moyenne_minute_haute", "average_minute_high", "minute_haute"].includes(metric)) return true;
+      if (result && Object.prototype.hasOwnProperty.call(result, "highAverageMinuteEnabled")) return Boolean(result.highAverageMinuteEnabled);
+      return Boolean($("highAverageMinuteEnabled")?.checked);
+    }
+
     function isHighVarianceQuantityEnabled(result = null) {
       const metric = String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || "").toLowerCase();
+      if (["high_average_minute", "moyenne_minute_haute", "average_minute_high", "minute_haute"].includes(metric)) return false;
       if (["high_variance_quantity", "quantite_variance_haute", "high", "haute"].includes(metric)) return true;
       if (result && Object.prototype.hasOwnProperty.call(result, "highVarianceQuantityEnabled")) return Boolean(result.highVarianceQuantityEnabled);
       return Boolean($("highVarianceQuantityEnabled")?.checked);
     }
 
     function getTrendSelectionMetric() {
-      return isHighVarianceQuantityEnabled() ? "high_variance_quantity" : "progression";
+      if (isHighAverageMinuteEnabled()) return "high_average_minute";
+      if (isHighVarianceQuantityEnabled()) return "high_variance_quantity";
+      return "progression";
     }
 
     function trendSelectionMetricLabel(result = null) {
-      return isHighVarianceQuantityEnabled(result) ? "Quantité Variance Haute" : "Progression";
+      if (isHighAverageMinuteEnabled(result)) return "Moyenne Minute Haute";
+      if (isHighVarianceQuantityEnabled(result)) return "Quantité Variance Haute";
+      return "Progression";
+    }
+
+    function setupTrendMetricChecks() {
+      const variance = $("highVarianceQuantityEnabled");
+      const minute = $("highAverageMinuteEnabled");
+      if (!variance || !minute) return;
+      variance.addEventListener("change", () => {
+        if (variance.checked) minute.checked = false;
+      });
+      minute.addEventListener("change", () => {
+        if (minute.checked) variance.checked = false;
+      });
     }
 
     function isRegulationTimeLimitEnabled(result = null) {
@@ -12319,7 +12352,11 @@
       const withExtra = isIncludeExtraEnabled(result);
       const regulationLimited = isRegulationTimeLimitEnabled(result);
       const highVarianceQuantity = isHighVarianceQuantityEnabled(result);
+      const highAverageMinute = isHighAverageMinuteEnabled(result);
       const reconstructionSequence = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase() === "sequence";
+      const selectionMetricTitle = highAverageMinute
+        ? "Moyenne Minute Haute"
+        : (highVarianceQuantity ? "Quantité Variance Haute" : "Progression Minute");
 
       const modeTitle = [
         campSeparate ? "Camp Séparé" : "Camp Combiné",
@@ -12327,7 +12364,7 @@
         reconstructionSequence ? "Séquence" : "Escalier",
         withExtra ? "Avec Extra" : "Sans Extra",
         regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet",
-        highVarianceQuantity ? "Quantité Variance Haute" : "Progression Minute",
+        selectionMetricTitle,
         isAllReturnSwitchManualEnabled(result) ? "Aller-Retour (Switch)" : "Aller-Retour OFF",
       ].join(" · ");
 
@@ -12338,7 +12375,8 @@
           <span class="mode-dot ${reconstructionSequence ? "pink" : "blue"}" title="${esc(reconstructionSequence ? "Séquence" : "Escalier")}"></span>
           <span class="mode-dot ${withExtra ? "pink" : "blue"}" title="${esc(withExtra ? "Avec Extra" : "Sans Extra")}"></span>
           <span class="mode-check ${regulationLimited ? "checked" : "empty"}" title="${esc(regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet")}"></span>
-          <span class="mode-check ${highVarianceQuantity ? "checked" : "empty"}" title="${esc(highVarianceQuantity ? "Quantité Variance Haute" : "Progression Minute")}"></span>
+          <span class="mode-check ${highVarianceQuantity ? "checked" : "empty"}" title="${esc(highVarianceQuantity ? "Quantité Variance Haute" : "Quantité Variance Haute OFF")}"></span>
+          <span class="mode-check ${highAverageMinute ? "checked" : "empty"}" title="${esc(highAverageMinute ? "Moyenne Minute Haute" : "Moyenne Minute Haute OFF")}"></span>
           <span class="mode-check ${isAllReturnSwitchManualEnabled(result) ? "checked" : "empty"}" title="${esc(allReturnSwitchLabel(result))}"></span>
         </div>
       `;
@@ -12829,6 +12867,7 @@
           trendSelectionMode: getTrendSelectionMode(),
           trendSelectionMetric: getTrendSelectionMetric(),
           highVarianceQuantityEnabled: isHighVarianceQuantityEnabled(),
+          highAverageMinuteEnabled: isHighAverageMinuteEnabled(),
           trendLimitEnabled: false,
           includeExtra: isIncludeExtraEnabled(),
           includeExtraEnabled: isIncludeExtraEnabled(),
@@ -12907,6 +12946,7 @@
             trendSelectionMode: job.result?.trendSelectionMode || getTrendSelectionMode(),
             trendSelectionMetric: job.result?.trendSelectionMetric || getTrendSelectionMetric(),
             highVarianceQuantityEnabled: Boolean(job.result?.highVarianceQuantityEnabled ?? isHighVarianceQuantityEnabled(job.result)),
+            highAverageMinuteEnabled: Boolean(job.result?.highAverageMinuteEnabled ?? isHighAverageMinuteEnabled(job.result)),
             trendLimitEnabled: false,
             includeExtra: Boolean(job.result?.includeExtra ?? isIncludeExtraEnabled()),
             includeExtraEnabled: Boolean(job.result?.includeExtraEnabled ?? job.result?.includeExtra ?? isIncludeExtraEnabled()),
@@ -12925,6 +12965,7 @@
               trendSelectionMode: resultWithOptions.trendSelectionMode || getTrendSelectionMode(),
               trendSelectionMetric: resultWithOptions.trendSelectionMetric || getTrendSelectionMetric(),
               highVarianceQuantityEnabled: Boolean(resultWithOptions.highVarianceQuantityEnabled ?? isHighVarianceQuantityEnabled(resultWithOptions)),
+              highAverageMinuteEnabled: Boolean(resultWithOptions.highAverageMinuteEnabled ?? isHighAverageMinuteEnabled(resultWithOptions)),
               trendLimitEnabled: false,
               includeExtra: Boolean(resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
               includeExtraEnabled: Boolean(resultWithOptions.includeExtraEnabled ?? resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
@@ -14407,7 +14448,7 @@
       lines.push("");
       lines.push("LEXIQUE");
       lines.push("V = Victoire · N = Nul · D = Défaite");
-      lines.push("Performance = somme exacte des tendances prises, sans inversion finale.");
+      lines.push("Performance finale = somme pondérée des tendances prises ÷ nombre de tendances prises.");
       lines.push("Tendance = niveau du match récent - niveau du match précédent.");
       lines.push("Comparaison = la zone temps sélectionne une position, puis la performance est prise dans la zone opposée.");
       lines.push("0-0 = score initial à la minute 0 dans chaque match.");
@@ -14567,6 +14608,7 @@ setupCalcModeSlider();
     setupTrendSelectionSlider();
     setupReconstructionModeSlider();
     setupExtraModeSlider();
+    setupTrendMetricChecks();
     initMobileNavigationEffects();
     updateReportCount();
     updateAutoCalculator();
