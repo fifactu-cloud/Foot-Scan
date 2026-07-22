@@ -7016,6 +7016,15 @@
       margin: 4px 0 3px;
     }
 
+    .winner-close-gap-warning {
+      display: inline-block;
+      margin-left: 0.2em;
+      font-size: 0.55em;
+      line-height: 1;
+      vertical-align: 0.12em;
+      filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.45));
+    }
+
     .dominance-trophy {
       position: absolute;
       right: -10px;
@@ -11031,7 +11040,7 @@
       letter-spacing: .045em !important;
     }
 
-    /* === v202 : option sélection quantité variance haute === */
+    /* === Options de contrôle du scan === */
     .metric-check-row {
       display: flex !important;
       align-items: center !important;
@@ -11605,11 +11614,11 @@
 
             <div class="auto-formula" id="trendFormula">9 Tendances · 10 Reconstitutions</div>
 
-            <input id="simultaneousMode" type="checkbox" hidden />
-            <div class="calc-mode-slider" id="calcModeSlider" role="tablist" aria-label="Mode de camp">
+            <input id="simultaneousMode" type="checkbox" hidden checked />
+            <div class="calc-mode-slider sim" id="calcModeSlider" role="tablist" aria-label="Mode de camp">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">CAMP COMBINÉ</button>
-              <button type="button" class="calc-mode-opt" data-mode="simultaneous" role="tab">CAMP SÉPARÉ</button>
+              <button type="button" class="calc-mode-opt" data-mode="separate" role="tab">CAMP COMBINÉ</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="simultaneous" role="tab">CAMP SÉPARÉ</button>
             </div>
 
             <input id="trendSelectionMode" type="checkbox" hidden />
@@ -11637,24 +11646,6 @@
               <input id="regulationTimeLimitEnabled" type="checkbox" checked />
               <span class="metric-check-box" aria-hidden="true"></span>
               <span class="metric-check-text">LIMITATION TEMPS RÉGLEMENTAIRE</span>
-            </label>
-
-            <label class="metric-check-row" for="highVarianceQuantityEnabled">
-              <input id="highVarianceQuantityEnabled" type="checkbox" />
-              <span class="metric-check-box" aria-hidden="true"></span>
-              <span class="metric-check-text">QUANTITÉ VARIANCE HAUTE</span>
-            </label>
-
-            <label class="metric-check-row" for="highAverageMinuteEnabled">
-              <input id="highAverageMinuteEnabled" type="checkbox" />
-              <span class="metric-check-box" aria-hidden="true"></span>
-              <span class="metric-check-text">MOYENNE MINUTE HAUTE</span>
-            </label>
-
-            <label class="metric-check-row" for="allReturnSwitchManual">
-              <input id="allReturnSwitchManual" type="checkbox" />
-              <span class="metric-check-box" aria-hidden="true"></span>
-              <span class="metric-check-text">ALLER-RETOUR (SWITCH)</span>
             </label>
 
           </div>
@@ -11731,7 +11722,6 @@
           <div class="bar-line"><span>Sans Extra</span><strong>Exclut Prolongations Et Tirs Au But</strong></div>
           <div class="bar-line"><span>Avec Extra</span><strong>Autorise Prolongations Et Tirs Au But</strong></div>
           <div class="bar-line"><span>Lim. Temps</span><strong>Ne Dépasse Pas Le Temps Réglementaire</strong></div>
-          <div class="bar-line"><span>Aller-Retour</span><strong>Switch Manuel Du Gagnant</strong></div>
         </div>
 
         <div class="bar-card">
@@ -11744,8 +11734,6 @@
           <div class="bar-card-title">⏱️ Comparaison</div>
           <div class="bar-line"><span>Temps</span><strong>Moy. Minutes Des Buts</strong></div>
           <div class="bar-line"><span>Défaut</span><strong>Progression Moy. La Plus Forte</strong></div>
-          <div class="bar-line"><span>Variance Haute</span><strong>Performance La Plus Éloignée De 0</strong></div>
-          <div class="bar-line"><span>Minute Haute</span><strong>Moyenne Minute La Plus Forte</strong></div>
           <div class="bar-line"><span>Performance Finale</span><strong>Somme Des Tendances Prises ÷ Leur Nombre</strong></div>
           <div class="bar-line"><span>Extra</span><strong>Penalty → Prolongation → Temps Réglementaire → 0-0</strong></div>
         </div>
@@ -12181,43 +12169,12 @@
       return String(mode).includes("line") ? "Top Ligne" : "Top Moitié";
     }
 
-    function isHighAverageMinuteEnabled(result = null) {
-      const metric = String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || "").toLowerCase();
-      if (["high_average_minute", "moyenne_minute_haute", "average_minute_high", "minute_haute"].includes(metric)) return true;
-      if (result && Object.prototype.hasOwnProperty.call(result, "highAverageMinuteEnabled")) return Boolean(result.highAverageMinuteEnabled);
-      return Boolean($("highAverageMinuteEnabled")?.checked);
-    }
-
-    function isHighVarianceQuantityEnabled(result = null) {
-      const metric = String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || "").toLowerCase();
-      if (["high_average_minute", "moyenne_minute_haute", "average_minute_high", "minute_haute"].includes(metric)) return false;
-      if (["high_variance_quantity", "quantite_variance_haute", "high", "haute"].includes(metric)) return true;
-      if (result && Object.prototype.hasOwnProperty.call(result, "highVarianceQuantityEnabled")) return Boolean(result.highVarianceQuantityEnabled);
-      return Boolean($("highVarianceQuantityEnabled")?.checked);
-    }
-
     function getTrendSelectionMetric() {
-      if (isHighAverageMinuteEnabled()) return "high_average_minute";
-      if (isHighVarianceQuantityEnabled()) return "high_variance_quantity";
       return "progression";
     }
 
     function trendSelectionMetricLabel(result = null) {
-      if (isHighAverageMinuteEnabled(result)) return "Moyenne Minute Haute";
-      if (isHighVarianceQuantityEnabled(result)) return "Quantité Variance Haute";
       return "Progression";
-    }
-
-    function setupTrendMetricChecks() {
-      const variance = $("highVarianceQuantityEnabled");
-      const minute = $("highAverageMinuteEnabled");
-      if (!variance || !minute) return;
-      variance.addEventListener("change", () => {
-        if (variance.checked) minute.checked = false;
-      });
-      minute.addEventListener("change", () => {
-        if (minute.checked) variance.checked = false;
-      });
     }
 
     function isRegulationTimeLimitEnabled(result = null) {
@@ -12228,17 +12185,6 @@
     function regulationTimeLimitLabel(result = null) {
       return isRegulationTimeLimitEnabled(result) ? "Limitation Temps Réglementaire" : "Temps Complet";
     }
-
-    function isAllReturnSwitchManualEnabled(result = null) {
-      if (result && Object.prototype.hasOwnProperty.call(result, "allReturnSwitchManual")) return Boolean(result.allReturnSwitchManual);
-      if (result && Object.prototype.hasOwnProperty.call(result, "allReturnSwitchEnabled")) return Boolean(result.allReturnSwitchEnabled);
-      return Boolean($("allReturnSwitchManual")?.checked);
-    }
-
-    function allReturnSwitchLabel(result = null) {
-      return isAllReturnSwitchManualEnabled(result) ? "Aller-Retour (Switch)" : "Aller-Retour OFF";
-    }
-
 
     function campModeLabel(result = null) {
       const sim = Boolean(result?.simultaneousMode ?? isSimultaneousMode());
@@ -12351,12 +12297,7 @@
       const topHalf = String(result?.trendSelectionMode || result?.trendSelection?.method || getTrendSelectionMode()).includes("half");
       const withExtra = isIncludeExtraEnabled(result);
       const regulationLimited = isRegulationTimeLimitEnabled(result);
-      const highVarianceQuantity = isHighVarianceQuantityEnabled(result);
-      const highAverageMinute = isHighAverageMinuteEnabled(result);
       const reconstructionSequence = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase() === "sequence";
-      const selectionMetricTitle = highAverageMinute
-        ? "Moyenne Minute Haute"
-        : (highVarianceQuantity ? "Quantité Variance Haute" : "Progression Minute");
 
       const modeTitle = [
         campSeparate ? "Camp Séparé" : "Camp Combiné",
@@ -12364,8 +12305,7 @@
         reconstructionSequence ? "Séquence" : "Escalier",
         withExtra ? "Avec Extra" : "Sans Extra",
         regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet",
-        selectionMetricTitle,
-        isAllReturnSwitchManualEnabled(result) ? "Aller-Retour (Switch)" : "Aller-Retour OFF",
+        "Progression Minute",
       ].join(" · ");
 
       return `
@@ -12375,9 +12315,6 @@
           <span class="mode-dot ${reconstructionSequence ? "pink" : "blue"}" title="${esc(reconstructionSequence ? "Séquence" : "Escalier")}"></span>
           <span class="mode-dot ${withExtra ? "pink" : "blue"}" title="${esc(withExtra ? "Avec Extra" : "Sans Extra")}"></span>
           <span class="mode-check ${regulationLimited ? "checked" : "empty"}" title="${esc(regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet")}"></span>
-          <span class="mode-check ${highVarianceQuantity ? "checked" : "empty"}" title="${esc(highVarianceQuantity ? "Quantité Variance Haute" : "Quantité Variance Haute OFF")}"></span>
-          <span class="mode-check ${highAverageMinute ? "checked" : "empty"}" title="${esc(highAverageMinute ? "Moyenne Minute Haute" : "Moyenne Minute Haute OFF")}"></span>
-          <span class="mode-check ${isAllReturnSwitchManualEnabled(result) ? "checked" : "empty"}" title="${esc(allReturnSwitchLabel(result))}"></span>
         </div>
       `;
     }
@@ -12866,15 +12803,11 @@
           simultaneousMode: isSimultaneousMode(),
           trendSelectionMode: getTrendSelectionMode(),
           trendSelectionMetric: getTrendSelectionMetric(),
-          highVarianceQuantityEnabled: isHighVarianceQuantityEnabled(),
-          highAverageMinuteEnabled: isHighAverageMinuteEnabled(),
           trendLimitEnabled: false,
           includeExtra: isIncludeExtraEnabled(),
           includeExtraEnabled: isIncludeExtraEnabled(),
           regulationTimeLimitEnabled: isRegulationTimeLimitEnabled(),
           reconstructionMode: getReconstructionMode(),
-          allReturnSwitchManual: isAllReturnSwitchManualEnabled(),
-          allReturnSwitchEnabled: isAllReturnSwitchManualEnabled(),
           rankEventStep: 1,
           rankEventMode: "trend",
           winnerMode: "trend",
@@ -12945,14 +12878,10 @@
             winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
             trendSelectionMode: job.result?.trendSelectionMode || getTrendSelectionMode(),
             trendSelectionMetric: job.result?.trendSelectionMetric || getTrendSelectionMetric(),
-            highVarianceQuantityEnabled: Boolean(job.result?.highVarianceQuantityEnabled ?? isHighVarianceQuantityEnabled(job.result)),
-            highAverageMinuteEnabled: Boolean(job.result?.highAverageMinuteEnabled ?? isHighAverageMinuteEnabled(job.result)),
             trendLimitEnabled: false,
             includeExtra: Boolean(job.result?.includeExtra ?? isIncludeExtraEnabled()),
             includeExtraEnabled: Boolean(job.result?.includeExtraEnabled ?? job.result?.includeExtra ?? isIncludeExtraEnabled()),
             regulationTimeLimitEnabled: Boolean(job.result?.regulationTimeLimitEnabled ?? isRegulationTimeLimitEnabled()),
-            allReturnSwitchManual: Boolean(job.result?.allReturnSwitchManual ?? job.result?.allReturnSwitchEnabled ?? isAllReturnSwitchManualEnabled()),
-            allReturnSwitchEnabled: Boolean(job.result?.allReturnSwitchEnabled ?? job.result?.allReturnSwitchManual ?? isAllReturnSwitchManualEnabled()),
           };
 
           lastResult = {
@@ -12964,14 +12893,10 @@
               simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
               trendSelectionMode: resultWithOptions.trendSelectionMode || getTrendSelectionMode(),
               trendSelectionMetric: resultWithOptions.trendSelectionMetric || getTrendSelectionMetric(),
-              highVarianceQuantityEnabled: Boolean(resultWithOptions.highVarianceQuantityEnabled ?? isHighVarianceQuantityEnabled(resultWithOptions)),
-              highAverageMinuteEnabled: Boolean(resultWithOptions.highAverageMinuteEnabled ?? isHighAverageMinuteEnabled(resultWithOptions)),
               trendLimitEnabled: false,
               includeExtra: Boolean(resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
               includeExtraEnabled: Boolean(resultWithOptions.includeExtraEnabled ?? resultWithOptions.includeExtra ?? isIncludeExtraEnabled()),
               regulationTimeLimitEnabled: Boolean(resultWithOptions.regulationTimeLimitEnabled ?? isRegulationTimeLimitEnabled()),
-              allReturnSwitchManual: Boolean(resultWithOptions.allReturnSwitchManual ?? isAllReturnSwitchManualEnabled()),
-              allReturnSwitchEnabled: Boolean(resultWithOptions.allReturnSwitchEnabled ?? resultWithOptions.allReturnSwitchManual ?? isAllReturnSwitchManualEnabled()),
               rankEventStep: resultWithOptions.rankEventStep,
               rankEventMode: resultWithOptions.rankEventMode,
               winnerMode: resultWithOptions.winnerMode,
@@ -13133,19 +13058,13 @@
       const confetti = Array.from({ length: 20 }, (_, i) => `
         <span class="status-confetti-piece" style="--left:${(i * 23) % 100}%;--x:${((i % 9) - 4) * 9}px;--r:${420 + (i % 10) * 72}deg;--dur:${2350 + (i % 8) * 180}ms;--delay:-${(i % 17) * 135}ms;--c:${confColors[i % confColors.length]}"></span>
       `).join("");
-      const zeroSwitchText = winner.zeroPerformanceSwitch
-        ? ` · ${esc(winner.zeroPerformanceSwitchLabel || "Switch Gagnant")}${winner.zeroPerformanceBlockedLabel ? ` · ${esc(winner.zeroPerformanceBlockedLabel)} à 0` : ""}`
-        : "";
-      const allReturnText = winner.allReturnDetected
-        ? ` · ${esc(winner.allReturnLabel || "Aller-Retour (Switch)")}${winner.switchApplied === false ? " · nul conservé" : ""}`
-        : "";
       return `
         <div class="dominance-box dominance-win">
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
           <div class="dominance-trophy" aria-hidden="true">🏆</div>
           <div class="dominance-label">👑 GAGNANT TENDANCE</div>
-          <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
-          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}${zeroSwitchText}${allReturnText}</div>
+          <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}${winner.type === "winner" && winner.closeGapWarning ? ` <span class="winner-close-gap-warning" role="img" aria-label="Écart très faible" title="Écart inférieur à 0,1111111111">⚠️</span>` : ""}</div>
+          <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}</div>
         </div>
       `;
     }
@@ -14304,7 +14223,7 @@
 
     function trendModeLabelV151(result) {
       const camp = result?.scanModeLabel || (result?.simultaneousMode ? "Camp Séparé" : "Camp Combiné");
-      return `${camp} · ${trendSelectionModeLabel(result)} · ${reconstructionModeLabel(result)} · ${extraModeLabel(result)} · ${regulationTimeLimitLabel(result)} · ${trendSelectionMetricLabel(result)} · ${allReturnSwitchLabel(result)}`;
+      return `${camp} · ${trendSelectionModeLabel(result)} · ${reconstructionModeLabel(result)} · ${extraModeLabel(result)} · ${regulationTimeLimitLabel(result)} · ${trendSelectionMetricLabel(result)}`;
     }
 
     function trendWinnerLinesV151(result, compact = false) {
@@ -14313,8 +14232,7 @@
         return ["👑 GAGNANT TENDANCE : Égalité"];
       }
       const base = `👑 GAGNANT TENDANCE : ${winner.label || "Indisponible"}`;
-      const zeroSwitchText = winner.zeroPerformanceSwitch ? ` · ${winner.zeroPerformanceSwitchLabel || "Switch Gagnant"}${winner.zeroPerformanceBlockedLabel ? ` · ${winner.zeroPerformanceBlockedLabel} à 0` : ""}` : "";
-      const meta = `Performance : ${formatValue(winner.score)}${winner.diff ? ` · Écart : ${formatValue(winner.diff)}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}${zeroSwitchText}`;
+      const meta = `Performance : ${formatValue(winner.score)}${winner.diff ? ` · Écart : ${formatValue(winner.diff)}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}`;
       return compact ? [`${base} · ${meta}`] : [base, meta];
     }
 
@@ -14333,7 +14251,6 @@
         `Extra : ${extraModeLabel(result)}`,
         `Temps Réglementaire : ${regulationTimeLimitLabel(result)}`,
         `Sélection Tendance : ${trendSelectionMetricLabel(result)}`,
-        `Aller-Retour : ${allReturnSwitchLabel(result)}`,
         `Ignorer Domicile : ${entry.skipHome}`,
         `Ignorer Extérieur : ${entry.skipAway}`,
       ];
@@ -14608,7 +14525,6 @@ setupCalcModeSlider();
     setupTrendSelectionSlider();
     setupReconstructionModeSlider();
     setupExtraModeSlider();
-    setupTrendMetricChecks();
     initMobileNavigationEffects();
     updateReportCount();
     updateAutoCalculator();
