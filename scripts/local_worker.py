@@ -933,86 +933,6 @@ def make_match_label(match):
     return f"{prefix} · {teams}" if prefix else teams
 
 
-def detect_two_legged_tie(match):
-    """Détecte automatiquement une confrontation aller-retour SofaScore.
-
-    On privilégie les signaux explicites (aggregate/leg/two-legged) exposés par
-    l'API. La détection reste prudente: le mot "leg" seul n'est pas utilisé
-    pour éviter les faux positifs avec "league".
-    """
-    if not isinstance(match, dict):
-        return {"detected": False}
-
-    explicit_bool_keys = (
-        "twoLegged", "twoLeggedTie", "isTwoLegged", "isTwoLeggedTie",
-        "hasTwoLegs", "hasFirstLeg", "hasSecondLeg", "isFirstLeg",
-        "isSecondLeg", "aggregate", "hasAggregateScore",
-    )
-    for key in explicit_bool_keys:
-        if match.get(key) is True:
-            return {"detected": True, "reason": f"champ explicite {key}", "label": "Aller-Retour (Switch)"}
-
-    explicit_value_keys = (
-        "aggregateWinnerCode", "aggregatedWinnerCode", "aggregateScore",
-        "aggregatedScore", "homeAggregateScore", "awayAggregateScore",
-        "homeAggregatedScore", "awayAggregatedScore", "firstLeg",
-        "secondLeg", "previousLegEvent", "nextLegEvent",
-    )
-    for key in explicit_value_keys:
-        if match.get(key) not in (None, "", [], {}):
-            return {"detected": True, "reason": f"champ agrégat/leg {key}", "label": "Aller-Retour (Switch)"}
-
-    for score_side in ("homeScore", "awayScore"):
-        score = match.get(score_side) or {}
-        if isinstance(score, dict):
-            for key, value in score.items():
-                normalized_key = normalize_status_text(key)
-                if "aggreg" in normalized_key or "aggregate" in normalized_key:
-                    if value not in (None, "", {}, []):
-                        return {"detected": True, "reason": f"score agrégé {score_side}.{key}", "label": "Aller-Retour (Switch)"}
-
-    phrases = (
-        "two-legged", "two legged", "two legs", "2 legs", "2-legged",
-        "first leg", "1st leg", "leg 1", "second leg", "2nd leg", "leg 2",
-        "return leg", "home-and-away", "home and away",
-        "aller-retour", "aller retour", "match aller", "match retour",
-        "score cumule", "score cumulé", "aggregate score", "aggregated score",
-        "on aggregate", "aggregate winner", "aggregated winner",
-    )
-
-    def walk(value, path="match", depth=0):
-        if depth > 5:
-            return None
-        if isinstance(value, dict):
-            for key, child in value.items():
-                normalized_key = normalize_status_text(key)
-                if "aggreg" in normalized_key and child not in (None, "", {}, []):
-                    return f"champ {path}.{key}"
-                for phrase in phrases:
-                    if phrase in normalized_key:
-                        return f"champ {path}.{key}"
-                found = walk(child, f"{path}.{key}", depth + 1)
-                if found:
-                    return found
-        elif isinstance(value, list):
-            for index, child in enumerate(value[:20]):
-                found = walk(child, f"{path}[{index}]", depth + 1)
-                if found:
-                    return found
-        elif isinstance(value, str):
-            normalized = normalize_status_text(value)
-            for phrase in phrases:
-                if phrase in normalized:
-                    return f"texte {path}"
-        return None
-
-    reason = walk(match)
-    if reason:
-        return {"detected": True, "reason": reason, "label": "Aller-Retour (Switch)"}
-
-    return {"detected": False}
-
-
 def incident_belongs_to_analyzed_team(incident, match, analyzed_team_id):
     home_team = match.get("homeTeam") or {}
     team_is_home = home_team.get("id") == analyzed_team_id
@@ -4195,20 +4115,7 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
     else:
         normalized_mode = "top_half"
 
-    normalized_metric = str(selection_metric or "progression").strip().lower()
-    if normalized_metric in {
-        "high_average_minute", "moyenne_minute_haute", "average_minute_high",
-        "minute_haute", "high_minute", "highest_average_minute",
-    }:
-        normalized_metric = "high_average_minute"
-    elif normalized_metric in {
-        "high", "haute", "high_variance", "high_variance_quantity",
-        "variance_haute", "quantite_variance_haute", "quantité_variance_haute",
-        "performance_quantity", "high_performance_quantity", "absolute_performance",
-    }:
-        normalized_metric = "high_variance_quantity"
-    else:
-        normalized_metric = "progression"
+    normalized_metric = "progression"
 
     home_items = home_items or []
     away_items = away_items or []
@@ -4234,7 +4141,6 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             item["selectionMode"] = normalized_mode
             item["selectionMetric"] = normalized_metric
             item["selectionProgression"] = None
-            item["selectionVarianceQuantity"] = None
             item["selectionDistance"] = None
             item["globalAverageMinute"] = None
             item["timeSourceIndex"] = None
@@ -4262,14 +4168,6 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
                 item["recentAverageMinute"] = round(recent_avg, 4)
                 item["previousAverageMinute"] = round(previous_avg, 4)
 
-            try:
-                performance_value = float(item.get("value") or 0)
-            except (TypeError, ValueError):
-                performance_value = 0.0
-            if not math.isfinite(performance_value):
-                performance_value = 0.0
-            variance_quantity = abs(performance_value)
-
             minutes = []
             for minute in item.get("minuteBasis") or []:
                 try:
@@ -4286,7 +4184,6 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
                 "side": side_key,
                 "item": item,
                 "progression": progression,
-                "varianceQuantity": variance_quantity,
                 "averageMinute": average_minute,
                 "sourceIndex": source_index,
                 "relativeIndex": source_index,
@@ -4300,22 +4197,11 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         entry["distance"] = distance
         entry["item"]["globalAverageMinute"] = round(global_average, 4)
         entry["item"]["selectionDistance"] = round(distance, 4)
-        entry["item"]["selectionVarianceQuantity"] = round(float(entry.get("varianceQuantity") or 0), 6)
 
     def score_key(entry):
-        if normalized_metric == "high_average_minute":
-            # Plus la moyenne minute de la tendance est haute, plus elle prend le dessus.
-            return (-float(entry.get("averageMinute") or 0), float(entry.get("sourceIndex") or 9999))
-        if normalized_metric == "high_variance_quantity":
-            # Plus |performance| est grand, plus la tendance prend le dessus.
-            return (-float(entry.get("varianceQuantity") or 0), float(entry.get("sourceIndex") or 9999))
         return (-float(entry.get("progression") or 0), float(entry.get("averageMinute") or 9999))
 
     def same_best(a, b):
-        if normalized_metric == "high_average_minute":
-            return abs(float(a.get("averageMinute") or 0) - float(b.get("averageMinute") or 0)) < 1e-9
-        if normalized_metric == "high_variance_quantity":
-            return abs(float(a.get("varianceQuantity") or 0) - float(b.get("varianceQuantity") or 0)) < 1e-9
         return abs(float(a.get("progression") or 0) - float(b.get("progression") or 0)) < 1e-9
 
     def mark_selected(entry, rank, weight=1.0, tie=False):
@@ -4336,17 +4222,12 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         item["selectionMode"] = normalized_mode
         item["selectionMetric"] = normalized_metric
         item["selectionProgression"] = round(float(entry.get("progression") or 0), 4)
-        item["selectionVarianceQuantity"] = round(float(entry.get("varianceQuantity") or 0), 6)
         item["selectionDistance"] = round(float(entry.get("distance") or 0), 4)
         item["globalAverageMinute"] = round(global_average, 4)
 
     selected = []
     label = "Top Moitié" if normalized_mode == "top_half" else "Top Ligne"
-    metric_label = (
-        "Moyenne Minute Haute"
-        if normalized_metric == "high_average_minute"
-        else ("Quantité Variance Haute" if normalized_metric == "high_variance_quantity" else "Progression Moyenne")
-    )
+    metric_label = "Progression Moyenne"
 
     if total <= 0:
         return {
@@ -4360,7 +4241,6 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             "selectedTrendItems": 0,
             "globalAverageMinute": round(global_average, 4),
             "cutoffProgression": None,
-            "cutoffVarianceQuantity": None,
             "cutoffDistance": None,
             "homeSelectedTrendItems": 0,
             "awaySelectedTrendItems": 0,
@@ -4402,7 +4282,6 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             mark_selected(entry, rank)
 
     cutoff_progression = min((float(entry.get("progression") or 0) for entry in selected), default=None)
-    cutoff_variance_quantity = min((float(entry.get("varianceQuantity") or 0) for entry in selected), default=None)
     cutoff_distance = max((float(entry.get("distance") or 0) for entry in selected), default=None)
 
     home_selected_weight = sum(trend_item_selection_weight(item) for item in home_items or [])
@@ -4419,7 +4298,6 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         "selectedTrendItems": normalize_trend_count(home_selected_weight + away_selected_weight),
         "globalAverageMinute": round(global_average, 4),
         "cutoffProgression": round(cutoff_progression, 4) if cutoff_progression is not None else None,
-        "cutoffVarianceQuantity": round(cutoff_variance_quantity, 6) if cutoff_variance_quantity is not None else None,
         "cutoffDistance": round(cutoff_distance, 4) if cutoff_distance is not None else None,
         "homeSelectedTrendItems": normalize_trend_count(home_selected_weight),
         "awaySelectedTrendItems": normalize_trend_count(away_selected_weight),
@@ -4462,24 +4340,12 @@ def process_trend_scan_job(job_id, params):
     trend_count = max(1, min(100, trend_count))
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
-    simultaneous_mode = False if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
+    simultaneous_mode = True if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
     trend_limit_enabled = False
     trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
     if trend_selection_mode not in {"top_line", "top_half"}:
         trend_selection_mode = "top_line"
-    trend_selection_metric_raw = str(params.get("trendSelectionMetric") or "").strip().lower()
-    high_average_minute_enabled = truthy_param(params.get("highAverageMinuteEnabled")) or trend_selection_metric_raw in {
-        "high_average_minute", "moyenne_minute_haute", "average_minute_high", "minute_haute"
-    }
-    high_variance_quantity_enabled = (not high_average_minute_enabled) and (
-        truthy_param(params.get("highVarianceQuantityEnabled"))
-        or trend_selection_metric_raw in {"high_variance_quantity", "quantite_variance_haute", "high", "haute"}
-    )
-    trend_selection_metric = (
-        "high_average_minute"
-        if high_average_minute_enabled
-        else ("high_variance_quantity" if high_variance_quantity_enabled else "progression")
-    )
+    trend_selection_metric = "progression"
     include_extra_raw = params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled")
     include_extra = True if include_extra_raw is None else truthy_param(include_extra_raw)
     regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
@@ -4489,17 +4355,6 @@ def process_trend_scan_job(job_id, params):
     else:
         reconstruction_mode = "staircase"
     reconstruction_mode_label = "Séquence" if reconstruction_mode == "sequence" else "Escalier"
-    all_return_switch_manual = truthy_param(
-        params.get("allReturnSwitchManual")
-        if params.get("allReturnSwitchManual") is not None
-        else params.get("allReturnSwitchEnabled")
-    )
-    all_return_info = {
-        "detected": bool(all_return_switch_manual),
-        "reason": "activation manuelle",
-        "label": "Aller-Retour (Switch)",
-    }
-
     calculation_trend_count = trend_count
 
     update_scan_job(job_id, status="running", message="Récupération Du Match Principal…", progress=5)
@@ -4578,141 +4433,48 @@ def process_trend_scan_job(job_id, params):
 
     home_summary = summarize_trend_items(home_items)
     away_summary = summarize_trend_items(away_items)
-    two_legged_info = all_return_info
-
     def winner():
         h = float(home_summary["performanceScore"] or 0)
         a = float(away_summary["performanceScore"] or 0)
         eps = 1e-9
-        equality_gap_threshold = 0.2222222222
+        close_gap_warning_threshold = 0.1111111111
         gap = abs(h - a)
 
-        def finalize(base):
-            final = dict(base or {})
-            if not two_legged_info.get("detected"):
-                return final
-
-            original = dict(final)
-            final["allReturnDetected"] = True
-            final["allReturnSwitch"] = True
-            final["allReturnLabel"] = "Aller-Retour (Switch)"
-            final["allReturnReason"] = two_legged_info.get("reason")
-            final["originalWinner"] = original
-
-            side = final.get("side")
-            if side == "home":
-                final["side"] = "away"
-                final["label"] = away_team.get("name")
-                final["score"] = a
-                final["switchedFromSide"] = "home"
-                final["switchedToSide"] = "away"
-                final["switchApplied"] = True
-            elif side == "away":
-                final["side"] = "home"
-                final["label"] = home_team.get("name")
-                final["score"] = h
-                final["switchedFromSide"] = "away"
-                final["switchedToSide"] = "home"
-                final["switchApplied"] = True
-            else:
-                # Un nul reste un nul même en confrontation aller-retour.
-                final["switchApplied"] = False
-
-            return final
-
-        # Règle d'écart: si l'écart domicile/extérieur est inférieur au seuil,
-        # le scan reste en égalité avant tout switch gagnant.
-        if gap < equality_gap_threshold:
-            return finalize({
+        # Égalité uniquement lorsque les deux niveaux sont réellement identiques.
+        if gap <= eps:
+            return {
                 "type": "tie",
                 "side": "tie",
                 "label": "Égalité",
                 "score": round((h + a) / 2, 6),
-                "diff": round(gap, 6),
-                "tieBreakByResult": False,
-                "equalityByGap": True,
-                "equalityGapThreshold": equality_gap_threshold,
-            })
-
-        # Switch Gagnant: une équipe avec une performance finale exactement à 0
-        # ne peut pas être désignée gagnante. Si une seule équipe est à 0,
-        # l'adversaire gagne. Si les deux sont à 0, l'égalité reste conservée.
-        h_is_zero = abs(h) < eps
-        a_is_zero = abs(a) < eps
-        if h_is_zero and a_is_zero:
-            return finalize({
-                "type": "tie",
-                "side": "tie",
-                "label": "Égalité",
-                "score": 0,
                 "diff": 0,
                 "tieBreakByResult": False,
-                "zeroPerformanceSwitch": True,
-                "zeroPerformanceSwitchLabel": "Switch Gagnant",
-                "zeroPerformanceBoth": True,
-            })
-        if h_is_zero:
-            return finalize({
-                "type": "winner",
-                "side": "away",
-                "label": away_team.get("name"),
-                "score": a,
-                "diff": round(gap, 6),
-                "tieBreakByResult": False,
-                "zeroPerformanceSwitch": True,
-                "zeroPerformanceSwitchLabel": "Switch Gagnant",
-                "zeroPerformanceBlockedSide": "home",
-                "zeroPerformanceBlockedLabel": home_team.get("name"),
-            })
-        if a_is_zero:
-            return finalize({
+                "closeGapWarning": False,
+                "closeGapWarningThreshold": close_gap_warning_threshold,
+            }
+
+        warning = gap < close_gap_warning_threshold
+        if h > a:
+            return {
                 "type": "winner",
                 "side": "home",
                 "label": home_team.get("name"),
                 "score": h,
                 "diff": round(gap, 6),
                 "tieBreakByResult": False,
-                "zeroPerformanceSwitch": True,
-                "zeroPerformanceSwitchLabel": "Switch Gagnant",
-                "zeroPerformanceBlockedSide": "away",
-                "zeroPerformanceBlockedLabel": away_team.get("name"),
-            })
-
-        if gap > eps:
-            side = "home" if h > a else "away"
-            if side == "home":
-                return finalize({"type": "winner", "side": "home", "label": home_team.get("name"), "score": h, "diff": round(gap, 6), "tieBreakByResult": False})
-            return finalize({"type": "winner", "side": "away", "label": away_team.get("name"), "score": a, "diff": round(gap, 6), "tieBreakByResult": False})
-
-        # En cas d'égalité exacte de performance hors seuil, départage déterministe avec le résultat final V/N/D.
-        hv = list(home_summary.get("resultDecisionVector") or [0, 0, 0, 0])
-        av = list(away_summary.get("resultDecisionVector") or [0, 0, 0, 0])
-        max_len = max(len(hv), len(av), 4)
-        hv = [float(hv[i]) if i < len(hv) else 0.0 for i in range(max_len)]
-        av = [float(av[i]) if i < len(av) else 0.0 for i in range(max_len)]
-        result_cmp = 0
-        for left, right in zip(hv, av):
-            if abs(left - right) > eps:
-                result_cmp = 1 if left > right else -1
-                break
-
-        if result_cmp != 0:
-            side = "home" if result_cmp > 0 else "away"
-            if side == "home":
-                return finalize({
-                    "type": "winner", "side": "home", "label": home_team.get("name"),
-                    "score": h, "diff": 0, "tieBreakByResult": True,
-                    "resultTieBreakScore": round(float(home_summary.get("resultDecisionScore") or 0), 6),
-                    "opponentResultTieBreakScore": round(float(away_summary.get("resultDecisionScore") or 0), 6),
-                })
-            return finalize({
-                "type": "winner", "side": "away", "label": away_team.get("name"),
-                "score": a, "diff": 0, "tieBreakByResult": True,
-                "resultTieBreakScore": round(float(away_summary.get("resultDecisionScore") or 0), 6),
-                "opponentResultTieBreakScore": round(float(home_summary.get("resultDecisionScore") or 0), 6),
-            })
-
-        return finalize({"type": "tie", "side": "tie", "label": "Égalité", "score": h, "diff": 0, "tieBreakByResult": False})
+                "closeGapWarning": warning,
+                "closeGapWarningThreshold": close_gap_warning_threshold,
+            }
+        return {
+            "type": "winner",
+            "side": "away",
+            "label": away_team.get("name"),
+            "score": a,
+            "diff": round(gap, 6),
+            "tieBreakByResult": False,
+            "closeGapWarning": warning,
+            "closeGapWarningThreshold": close_gap_warning_threshold,
+        }
 
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
     away_issue_count = int(away_scan.get("eventDataIssueCount") or 0)
@@ -4744,12 +4506,8 @@ def process_trend_scan_job(job_id, params):
         "includeExtra": bool(include_extra),
         "includeExtraEnabled": bool(include_extra),
         "regulationTimeLimitEnabled": bool(regulation_time_limit),
-        "allReturnSwitchManual": bool(all_return_switch_manual),
-        "allReturnSwitchEnabled": bool(all_return_switch_manual),
         "trendSelectionMode": trend_selection_mode,
         "trendSelectionMetric": trend_selection_metric,
-        "highVarianceQuantityEnabled": bool(high_variance_quantity_enabled),
-        "highAverageMinuteEnabled": bool(high_average_minute_enabled),
         "trendSelection": trend_selection,
         "match": {
             "id": match.get("id"),
@@ -4757,9 +4515,6 @@ def process_trend_scan_job(job_id, params):
             "awayTeam": away_team,
             "startTimestamp": match.get("startTimestamp"),
             "label": make_match_label(match),
-            "allReturnDetected": bool(all_return_switch_manual),
-            "allReturnLabel": "Aller-Retour (Switch)" if all_return_switch_manual else None,
-            "allReturnReason": "activation manuelle" if all_return_switch_manual else None,
         },
         "home": {
             **home_team,
@@ -4818,17 +4573,13 @@ def process_trend_scan_job(job_id, params):
             "trendLimitRange": None,
             "trendSelectionMode": trend_selection_mode,
             "trendSelectionMetric": trend_selection_metric,
-            "highVarianceQuantityEnabled": bool(high_variance_quantity_enabled),
-            "highAverageMinuteEnabled": bool(high_average_minute_enabled),
-            "performanceAverageApplied": True,
+                    "performanceAverageApplied": True,
             "performanceVarianceApplied": False,
             "reconstructionWindowBase": RECONSTRUCTION_WINDOW_BASE_MATCHES,
             "reconstructionWindowMax": RECONSTRUCTION_WINDOW_MAX_MATCHES,
             "reconstructionDirection": "oldest_to_newest",
             "trendDisplayDirection": "newest_to_oldest",
-            "allReturnSwitchManual": bool(all_return_switch_manual),
-            "allReturnSwitchEnabled": bool(all_return_switch_manual),
-            "trendCalculationCount": calculation_trend_count,
+                    "trendCalculationCount": calculation_trend_count,
             "trendSelectionMethod": trend_selection.get("method"),
             "trendSelection": trend_selection,
         },
@@ -4886,16 +4637,6 @@ def process_scan_job(job_id):
     rank_event_step = params.get("rankEventStep", DEFAULT_RANK_EVENT_STEP)
     rank_event_mode = params.get("rankEventMode") or params.get("rankStepMode") or "fixed"
     winner_mode = "evolution" if params.get("winnerMode") == "evolution" else "dominance"
-    all_return_switch_manual = truthy_param(
-        params.get("allReturnSwitchManual")
-        if params.get("allReturnSwitchManual") is not None
-        else params.get("allReturnSwitchEnabled")
-    )
-    two_legged_info = {
-        "detected": bool(all_return_switch_manual),
-        "reason": "activation manuelle",
-        "label": "Aller-Retour (Switch)",
-    }
     configure_rank_advancement(rank_event_step, rank_event_mode)
 
     effective_rank1 = rank1
@@ -5034,9 +4775,6 @@ def process_scan_job(job_id):
                 "awayTeam": away_team,
                 "startTimestamp": match.get("startTimestamp"),
                 "label": make_match_label(match),
-                "allReturnDetected": bool(two_legged_info.get("detected")),
-                "allReturnLabel": "Aller-Retour (Switch)" if two_legged_info.get("detected") else None,
-                "allReturnReason": two_legged_info.get("reason"),
             },
             "home": home,
             "away": away,
@@ -5045,9 +4783,7 @@ def process_scan_job(job_id):
             "rank1": effective_rank1,
             "rank2": effective_rank2,
             "simultaneousMode": simultaneous_mode,
-            "allReturnSwitchManual": bool(all_return_switch_manual),
-            "allReturnSwitchEnabled": bool(all_return_switch_manual),
-            "rankEventStep": CURRENT_RANK_EVENT_STEP,
+                    "rankEventStep": CURRENT_RANK_EVENT_STEP,
             "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
             "rankEventStepLabel": rank_advancement_label(),
             "winnerMode": winner_mode,
