@@ -7016,19 +7016,37 @@
       margin: 4px 0 3px;
     }
 
+    .dominance-win .dominance-label {
+      display: inline-grid !important;
+      grid-template-columns: 1.15em auto 1.15em;
+      align-items: center;
+      justify-content: center;
+      column-gap: 0.38em;
+      width: fit-content;
+      margin: 0 auto;
+    }
+
+    .dominance-label-icon,
     .winner-close-gap-warning {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      margin-left: 0.22em;
-      padding: 0.1em 0.16em;
-      border: 1px solid rgba(250, 204, 21, 0.72);
-      border-radius: 999px;
-      background: rgba(250, 204, 21, 0.13);
-      font-size: 0.48em;
+      width: 1.15em;
+      height: 1.15em;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      font-size: 1em;
       line-height: 1;
-      vertical-align: 0.13em;
-      filter: drop-shadow(0 0 7px rgba(250, 204, 21, 0.62));
+    }
+
+    .winner-close-gap-warning {
+      filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.58));
+    }
+
+    .winner-close-gap-placeholder {
+      visibility: hidden;
     }
 
     .dominance-trophy {
@@ -13068,8 +13086,14 @@
         <div class="dominance-box dominance-win">
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
           <div class="dominance-trophy" aria-hidden="true">🏆</div>
-          <div class="dominance-label">👑 GAGNANT TENDANCE</div>
-          <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}${winner.closeGapWarning ? ` <span class="winner-close-gap-warning" role="img" aria-label="Écart très faible ou égalité exacte" title="Écart inférieur à 0,1111111111">⚠️</span>` : ""}</div>
+          <div class="dominance-label">
+            <span class="dominance-label-icon" aria-hidden="true">👑</span>
+            <span>GAGNANT TENDANCE</span>
+            ${winner.closeGapWarning
+              ? `<span class="winner-close-gap-warning" role="img" aria-label="Écart très faible ou égalité exacte" title="Écart inférieur à 0,1111111111">⚠️</span>`
+              : `<span class="winner-close-gap-warning winner-close-gap-placeholder" aria-hidden="true">⚠️</span>`}
+          </div>
+          <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
           <div class="dominance-meta">Performance : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${winner.tieBreakByResult ? " · Départage résultat" : ""}</div>
         </div>
       `;
