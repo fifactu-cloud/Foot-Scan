@@ -4197,6 +4197,11 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
 
     normalized_metric = str(selection_metric or "progression").strip().lower()
     if normalized_metric in {
+        "high_average_minute", "moyenne_minute_haute", "average_minute_high",
+        "minute_haute", "high_minute", "highest_average_minute",
+    }:
+        normalized_metric = "high_average_minute"
+    elif normalized_metric in {
         "high", "haute", "high_variance", "high_variance_quantity",
         "variance_haute", "quantite_variance_haute", "quantité_variance_haute",
         "performance_quantity", "high_performance_quantity", "absolute_performance",
@@ -4298,12 +4303,17 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
         entry["item"]["selectionVarianceQuantity"] = round(float(entry.get("varianceQuantity") or 0), 6)
 
     def score_key(entry):
+        if normalized_metric == "high_average_minute":
+            # Plus la moyenne minute de la tendance est haute, plus elle prend le dessus.
+            return (-float(entry.get("averageMinute") or 0), float(entry.get("sourceIndex") or 9999))
         if normalized_metric == "high_variance_quantity":
             # Plus |performance| est grand, plus la tendance prend le dessus.
             return (-float(entry.get("varianceQuantity") or 0), float(entry.get("sourceIndex") or 9999))
         return (-float(entry.get("progression") or 0), float(entry.get("averageMinute") or 9999))
 
     def same_best(a, b):
+        if normalized_metric == "high_average_minute":
+            return abs(float(a.get("averageMinute") or 0) - float(b.get("averageMinute") or 0)) < 1e-9
         if normalized_metric == "high_variance_quantity":
             return abs(float(a.get("varianceQuantity") or 0) - float(b.get("varianceQuantity") or 0)) < 1e-9
         return abs(float(a.get("progression") or 0) - float(b.get("progression") or 0)) < 1e-9
@@ -4332,7 +4342,11 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
 
     selected = []
     label = "Top Moitié" if normalized_mode == "top_half" else "Top Ligne"
-    metric_label = "Quantité Variance Haute" if normalized_metric == "high_variance_quantity" else "Progression Moyenne"
+    metric_label = (
+        "Moyenne Minute Haute"
+        if normalized_metric == "high_average_minute"
+        else ("Quantité Variance Haute" if normalized_metric == "high_variance_quantity" else "Progression Moyenne")
+    )
 
     if total <= 0:
         return {
@@ -4426,14 +4440,17 @@ def summarize_trend_items(items):
         style = trend_result_style(value)
         counts[style] = counts.get(style, 0.0) + weight
 
-    # La performance finale conserve désormais son signe naturel.
+    # La performance finale est la moyenne pondérée des tendances réellement prises.
     raw_performance_score = performance_score
-    final_performance_score = raw_performance_score
+    final_performance_score = (raw_performance_score / dominant_count) if dominant_count > 0 else 0.0
     result_profile = build_result_profile(counts, apply_variance=True)
 
     return {
         "performanceScore": round(final_performance_score, 6),
         "rawPerformanceScore": round(raw_performance_score, 6),
+        "performanceSum": round(raw_performance_score, 6),
+        "performanceAverageDivisor": normalize_trend_count(dominant_count),
+        "performanceAverageApplied": True,
         "performanceVarianceApplied": False,
         **result_profile,
         "dominantCount": normalize_trend_count(dominant_count),
@@ -4451,8 +4468,18 @@ def process_trend_scan_job(job_id, params):
     if trend_selection_mode not in {"top_line", "top_half"}:
         trend_selection_mode = "top_line"
     trend_selection_metric_raw = str(params.get("trendSelectionMetric") or "").strip().lower()
-    high_variance_quantity_enabled = truthy_param(params.get("highVarianceQuantityEnabled")) or trend_selection_metric_raw in {"high_variance_quantity", "quantite_variance_haute", "high", "haute"}
-    trend_selection_metric = "high_variance_quantity" if high_variance_quantity_enabled else "progression"
+    high_average_minute_enabled = truthy_param(params.get("highAverageMinuteEnabled")) or trend_selection_metric_raw in {
+        "high_average_minute", "moyenne_minute_haute", "average_minute_high", "minute_haute"
+    }
+    high_variance_quantity_enabled = (not high_average_minute_enabled) and (
+        truthy_param(params.get("highVarianceQuantityEnabled"))
+        or trend_selection_metric_raw in {"high_variance_quantity", "quantite_variance_haute", "high", "haute"}
+    )
+    trend_selection_metric = (
+        "high_average_minute"
+        if high_average_minute_enabled
+        else ("high_variance_quantity" if high_variance_quantity_enabled else "progression")
+    )
     include_extra_raw = params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled")
     include_extra = True if include_extra_raw is None else truthy_param(include_extra_raw)
     regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
@@ -4722,6 +4749,7 @@ def process_trend_scan_job(job_id, params):
         "trendSelectionMode": trend_selection_mode,
         "trendSelectionMetric": trend_selection_metric,
         "highVarianceQuantityEnabled": bool(high_variance_quantity_enabled),
+        "highAverageMinuteEnabled": bool(high_average_minute_enabled),
         "trendSelection": trend_selection,
         "match": {
             "id": match.get("id"),
@@ -4790,6 +4818,9 @@ def process_trend_scan_job(job_id, params):
             "trendLimitRange": None,
             "trendSelectionMode": trend_selection_mode,
             "trendSelectionMetric": trend_selection_metric,
+            "highVarianceQuantityEnabled": bool(high_variance_quantity_enabled),
+            "highAverageMinuteEnabled": bool(high_average_minute_enabled),
+            "performanceAverageApplied": True,
             "performanceVarianceApplied": False,
             "reconstructionWindowBase": RECONSTRUCTION_WINDOW_BASE_MATCHES,
             "reconstructionWindowMax": RECONSTRUCTION_WINDOW_MAX_MATCHES,
