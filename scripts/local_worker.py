@@ -77,6 +77,8 @@ PREFETCH_MAX_MATCHES_PER_PAGE = int(os.environ.get("PREFETCH_MAX_MATCHES_PER_PAG
 
 PAGES_TO_LOAD = int(os.environ.get("FOOTSCAN_PAGES_TO_LOAD", "40"))
 PAGE_LOAD_STEPS = [10, 15, 20, 30, 40]
+RECONSTRUCTION_WINDOW_BASE_MATCHES = max(10, int(os.environ.get("FOOTSCAN_RECONSTRUCTION_WINDOW_BASE", "30")))
+RECONSTRUCTION_WINDOW_MAX_MATCHES = max(RECONSTRUCTION_WINDOW_BASE_MATCHES, int(os.environ.get("FOOTSCAN_RECONSTRUCTION_WINDOW_MAX", "40")))
 INITIAL_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_INITIAL_MATCHES_PER_TEAM", "15"))
 SECOND_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_SECOND_MATCHES_PER_TEAM", "17"))
 MAX_MATCHES_PER_TEAM = int(os.environ.get("FOOTSCAN_MAX_MATCHES_PER_TEAM", "100"))
@@ -2888,9 +2890,9 @@ def incident_score_pair(incident):
 def incident_phase_rank(incident):
     """Classe un événement dans la chronologie FOOTSCAN.
 
-    Chronologie normale: 0-0 < temps réglementaire < prolongation < tirs au but.
-    Lecture de reconstitution: tirs au but -> prolongation -> temps réglementaire -> 0-0.
-    Les tirs au but de séance sont traités comme une même phase/minute.
+    Chronologie normale et lecture de reconstitution: 0-0 < temps réglementaire
+    < prolongation < tirs au but. Les tirs au but de séance sont traités comme
+    une même phase/minute.
     """
     if not isinstance(incident, dict):
         return 1
@@ -3170,23 +3172,25 @@ def reconstruction_entry_uid(entry):
     return f"{match_id}:{state_key}"
 
 
-def reconstruction_source_entry(source_record, minimum_index_from_end=1, used_keys=None):
-    """Retourne le prochain état de score exploitable pour un vrai match.
+def reconstruction_source_entry(source_record, minimum_index_from_start=1, used_keys=None):
+    """Retourne le prochain état exploitable en lecture chronologique.
 
-    minimum_index_from_end respecte la diagonale: M1 dernier score, M2
-    avant-dernier score, M3 troisième depuis la fin, etc. Si ce rang n'existe
-    plus dans les buts, on tombe sur le 0-0 minute 0. Les états déjà utilisés
-    sont ignorés: aucun but ni 0-0 ne peut servir deux fois.
+    La diagonale est désormais lue depuis le début du match: M1 fournit le
+    0-0 minute 0, M2 le premier score après but, M3 le deuxième score après
+    but, etc. Les états déjà consommés sont ignorés et ne peuvent jamais être
+    réutilisés.
     """
     if not reconstruction_source_is_complete(source_record):
         return None
 
     used = set(used_keys or set())
-    goals = source_record.get("goals") or []
-    minimum_rank = max(1, int(minimum_index_from_end or 1))
+    zero = dict(source_record.get("zeroZero") or {})
+    goals = [dict(goal) for goal in (source_record.get("goals") or []) if isinstance(goal, dict)]
+    states = ([zero] if zero else []) + goals
+    minimum_rank = max(1, int(minimum_index_from_start or 1))
 
-    for rank in range(minimum_rank, len(goals) + 1):
-        entry = dict(goals[-rank])
+    for rank in range(minimum_rank, len(states) + 1):
+        entry = dict(states[rank - 1])
         entry["reconstructionSourceIndex"] = rank
         entry["reconstructionSourceGoalCount"] = len(goals)
         uid = reconstruction_entry_uid(entry)
@@ -3194,31 +3198,23 @@ def reconstruction_source_entry(source_record, minimum_index_from_end=1, used_ke
             entry["reconstructionUid"] = uid
             return entry
 
-    zero = dict(source_record.get("zeroZero") or {})
-    if zero:
-        zero["reconstructionSourceIndex"] = len(goals) + 1
-        zero["reconstructionSourceGoalCount"] = len(goals)
-        uid = reconstruction_entry_uid(zero)
-        if uid not in used:
-            zero["reconstructionUid"] = uid
-            return zero
-
     return None
 
 
-def reconstruction_entry_keeps_reverse_chronology(previous_entry, next_entry):
-    """La reconstitution remonte le match: le prochain score doit être antérieur.
+def reconstruction_entry_keeps_forward_chronology(previous_entry, next_entry):
+    """Le prochain état doit être identique ou postérieur chronologiquement.
 
-    Une minute de 1re mi-temps en temps additionnel reste donc valide après un
-    but de 2e mi-temps, par exemple 46 puis 45+3. Le 0-0 minute 0 clôture la
-    reconstitution et reste toujours chronologiquement valide.
+    La lecture va de la minute 0 vers la fin du match. La phase prime sur la
+    minute: temps réglementaire < prolongation < tirs au but. Les tirs au but
+    d'une séance ont la même clé chronologique et restent donc compatibles.
     """
     if not previous_entry or not next_entry:
         return True
 
-    previous_key = previous_entry.get("chronoKey") or (0, 0, 0)
-    next_key = next_entry.get("chronoKey") or (0, 0, 0)
-    return next_key <= previous_key
+    previous_key = previous_entry.get("chronoKey") or (0, 0, 0, 0)
+    next_key = next_entry.get("chronoKey") or (0, 0, 0, 0)
+    return next_key >= previous_key
+
 
 def compact_reconstruction_label(entries):
     usable = [entry for entry in entries or [] if isinstance(entry, dict)]
@@ -3231,8 +3227,7 @@ def compact_reconstruction_label(entries):
     if first == last:
         return first
 
-    return f"{last} → {first}"
-
+    return f"{first} → {last}"
 
 def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full", index=1, reconstruction_mode="sequence"):
     clean_entries = [entry for entry in entries or [] if isinstance(entry, dict)]
@@ -3303,7 +3298,7 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
             "opponentAttack": round(avg_opponent_attack_score, 6),
         },
         "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
-        "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
+        "startTimestamp": last_entry.get("sourceStartTimestamp") or first_entry.get("sourceStartTimestamp") or 0,
         "homeTeam": {},
         "awayTeam": {},
         "analyzedTeamId": analyzed_team_id,
@@ -3363,7 +3358,7 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
             "reconstructionDisplayLabel": f"Reconstitution {index} · {opponent_attack_score_label}",
             "reconstructionScoreLabel": opponent_attack_score_label,
             "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
-            "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
+            "startTimestamp": last_entry.get("sourceStartTimestamp") or first_entry.get("sourceStartTimestamp") or 0,
             "level": round(avg_opponent_attack_score, 6),
             "attackGoalsFor": round(avg_opponent_attack_score, 6),
             "minutesForAverage": [] if attack_only_without_defense else opponent_minutes_for_average,
@@ -3394,13 +3389,13 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
     }
 
 def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode="full", reconstruction_mode="sequence", max_samples=None):
-    """Reconstruit des matchs uniquement à partir de vrais états de score.
+    """Reconstruit les matchs du plus ancien vers le plus récent.
 
-    Mode Séquence : ancien principe linéaire, mais avec le 0-0 minute 0 commun.
-    Mode Escalier : après chaque reconstitution, on revient au premier vrai match
-    encore exploitable; M1 fournit le dernier score disponible, M2 l'avant-dernier,
-    M3 le troisième depuis la fin, etc. Aucun score d'événement ni 0-0 minute 0
-    ne peut être utilisé deux fois.
+    Les vrais matchs reçus doivent être classés chronologiquement. Dans chaque
+    match, la lecture va du 0-0 minute 0 vers la fin. Mode Séquence: on continue
+    dans la plage sans revenir systématiquement au premier match. Mode Escalier:
+    après chaque clôture, on revient au premier match encore exploitable. Aucun
+    état de score ne peut être consommé deux fois.
     """
     normalized_mode = str(reconstruction_mode or "sequence").strip().lower()
     if normalized_mode in {"sequence", "séquence", "seq"}:
@@ -3409,6 +3404,11 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
         normalized_mode = "staircase"
 
     records = [record for record in (source_records or []) if reconstruction_source_is_complete(record)]
+    records.sort(key=lambda record: (
+        (record.get("startTimestamp") or ((record.get("match") or {}).get("startTimestamp")) or 0),
+        (record.get("id") or ((record.get("match") or {}).get("id")) or 0),
+    ))
+
     limit = None
     try:
         if max_samples is not None:
@@ -3433,43 +3433,39 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
         current = []
         previous_entry = None
         source_index = 0
-        score_index_from_end = 1
+        score_index_from_start = 1
 
         def close_current():
-            nonlocal current, previous_entry, score_index_from_end
+            nonlocal current, previous_entry, score_index_from_start
             append_sample(samples, current)
             current = []
             previous_entry = None
-            score_index_from_end = 1
+            score_index_from_start = 1
 
         while source_index < len(records):
             if limit is not None and len(samples) >= limit:
                 break
 
             source_record = records[source_index]
-            entry = reconstruction_source_entry(source_record, score_index_from_end, used)
+            entry = reconstruction_source_entry(source_record, score_index_from_start, used)
 
             if not entry:
                 if current:
                     close_current()
                     continue
                 source_index += 1
-                score_index_from_end = 1
+                score_index_from_start = 1
                 continue
 
-            if current and not reconstruction_entry_keeps_reverse_chronology(previous_entry, entry):
+            if current and not reconstruction_entry_keeps_forward_chronology(previous_entry, entry):
                 close_current()
                 current = [entry]
                 uid = reconstruction_entry_uid(entry)
                 if uid:
                     used.add(uid)
-                if entry.get("isZeroZero"):
-                    close_current()
-                    source_index += 1
-                    continue
                 previous_entry = entry
                 source_index += 1
-                score_index_from_end = 2
+                score_index_from_start = 2
                 continue
 
             current.append(entry)
@@ -3477,14 +3473,9 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
             if uid:
                 used.add(uid)
 
-            if entry.get("isZeroZero"):
-                close_current()
-                source_index += 1
-                continue
-
             previous_entry = entry
             source_index += 1
-            score_index_from_end += 1
+            score_index_from_start += 1
 
         if limit is None or len(samples) < limit:
             close_current()
@@ -3494,7 +3485,7 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
     used = set()
     start_index = 0
     safety = 0
-    max_safety = max(1000, len(records) * 50 + 50)
+    max_safety = max(1000, len(records) * 80 + 80)
 
     def start_can_provide(index):
         if index < 0 or index >= len(records):
@@ -3521,16 +3512,13 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
             if not entry:
                 break
 
-            if current and not reconstruction_entry_keeps_reverse_chronology(previous_entry, entry):
+            if current and not reconstruction_entry_keeps_forward_chronology(previous_entry, entry):
                 break
 
             current.append(entry)
             uid = reconstruction_entry_uid(entry)
             if uid:
                 used.add(uid)
-
-            if entry.get("isZeroZero"):
-                break
 
             previous_entry = entry
             source_index += 1
@@ -3542,6 +3530,26 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
             start_index += 1
 
     return samples
+
+
+def renumber_reconstructed_samples_chronologically(samples):
+    """Renumérote une sélection du plus ancien (R1) au plus récent (Rn)."""
+    output = []
+    for index, source in enumerate(samples or [], start=1):
+        sample = dict(source or {})
+        sample["reconstructionIndex"] = index
+        score_label = sample.get("reconstructionScoreLabel") or reconstruction_number_label(sample.get("level") or 0)
+        sample["reconstructionDisplayLabel"] = f"Reconstitution {index} · {score_label}"
+
+        opponent_attack = sample.get("opponentAttack")
+        if isinstance(opponent_attack, dict):
+            opponent_attack = dict(opponent_attack)
+            opponent_score_label = opponent_attack.get("reconstructionScoreLabel") or reconstruction_number_label(opponent_attack.get("level") or 0)
+            opponent_attack["reconstructionDisplayLabel"] = f"Reconstitution {index} · {opponent_score_label}"
+            sample["opponentAttack"] = opponent_attack
+
+        output.append(sample)
+    return output
 
 def truthy_param(value):
     if isinstance(value, bool):
@@ -3832,6 +3840,10 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
     pages_loaded_count = 0
     pages_attempted_count = 0
 
+    window_base = RECONSTRUCTION_WINDOW_BASE_MATCHES
+    window_max = RECONSTRUCTION_WINDOW_MAX_MATCHES
+    window_target = window_base
+
     def build_finished_matches():
         by_id = {}
         for match in pages:
@@ -3905,25 +3917,43 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
 
     event_data_issues = []
     source_records = []
-    reconstructed_samples = []
     samples = []
-    # Optimisation v219: l'ordre est désormais:
-    # 1) filtre Avec Extra / Sans Extra,
-    # 2) puis Ignorer matchs.
-    # On collecte donc les sources après filtrage extra, puis on applique skip
-    # sur les vrais matchs exploitables, pas avant.
-    initial_buffer = max(6, min(36, needed_matches * 2))
-    growth_step = max(6, min(36, needed_matches * 2))
-    required = skip + needed_matches + initial_buffer
+    sorted_matches = []
+
+    # Le filtre Extra est déjà appliqué dans build_finished_matches. Ignorer
+    # matchs s'applique ensuite aux sources complètes, puis la fenêtre retient
+    # les 30 matchs admissibles les plus récents (40 seulement si nécessaire).
+    raw_buffer = max(8, skip + 4)
+    required = skip + window_target + raw_buffer
+
+    def make_latest_samples(effective_records, target_window):
+        # effective_records est du plus récent au plus ancien. On garde la
+        # fenêtre la plus proche du présent, puis on reconstruit de l'ancien
+        # vers le récent. Enfin, on conserve les N+1 dernières reconstitutions.
+        window_desc = list(effective_records[skip:skip + target_window])
+        window_chrono = list(reversed(window_desc))
+        all_chronological = build_reconstructed_trend_samples(
+            window_chrono,
+            analyzed_team_id,
+            level_mode=level_mode,
+            reconstruction_mode=reconstruction_mode,
+            max_samples=None,
+        )
+        latest_chronological = all_chronological[-needed_matches:]
+        latest_chronological = renumber_reconstructed_samples_chronologically(latest_chronological)
+        # L'affichage/calcul attend le plus récent en premier: Tendance 1 est
+        # donc plus récente que Tendance 9.
+        return list(reversed(latest_chronological))
 
     while True:
         by_id = load_until_required(required)
-        sorted_matches = sorted(by_id.values(), key=lambda m: (m.get("startTimestamp") or 0, m.get("id") or 0), reverse=True)
+        sorted_matches = sorted(
+            by_id.values(),
+            key=lambda m: (m.get("startTimestamp") or 0, m.get("id") or 0),
+            reverse=True,
+        )
         selected_matches = sorted_matches[:required]
         total_sources = len(selected_matches)
-
-        if total_sources < skip + needed_matches and (stopped_history or next_page >= PAGES_TO_LOAD):
-            raise RuntimeError(f"{team_name}: pas assez de matchs valides après filtre extra pour {trend_count} tendances ({max(0, total_sources - skip)}/{needed_matches}).")
 
         for idx in range(len(source_records), total_sources):
             match = selected_matches[idx]
@@ -3950,7 +3980,13 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             incidents = data.get("incidents") if isinstance(data, dict) else data
             if not isinstance(incidents, list):
                 incidents = []
-            source_record = collect_reconstruction_goal_entries(match, incidents, analyzed_team_id, include_extra=include_extra, regulation_time_limit=regulation_time_limit)
+            source_record = collect_reconstruction_goal_entries(
+                match,
+                incidents,
+                analyzed_team_id,
+                include_extra=include_extra,
+                regulation_time_limit=regulation_time_limit,
+            )
             if source_record.get("extraTimePenaltyIssue"):
                 source_record["eventDataStatus"] = "extra-time-penalties"
                 source_record["eventDataIssue"] = True
@@ -3979,8 +4015,6 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 source_record["eventDataIssue"] = True
                 source_record["error"] = issue.get("reason") or issue.get("message") or "Événements non récupérés"
             elif issue and source_record.get("trueZeroZero"):
-                # Un vrai 0-0 n'a aucun but à récupérer: il reste valide même si
-                # l'endpoint incidents ne renvoie rien d'exploitable.
                 source_record["eventDataStatus"] = "ok-zero-zero"
             elif source_record.get("reconstructionGoalsIncomplete"):
                 source_record["eventDataStatus"] = "incomplete-goals"
@@ -3997,36 +4031,57 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 })
             source_records.append(source_record)
 
-            # Arrêt anticipé sans perte de qualité: dès que les N+1 vrais
-            # matchs reconstitués sont obtenus, on ne télécharge plus les
-            # incidents des matchs source suivants.
-            effective_source_records = [record for record in source_records if reconstruction_source_is_complete(record)]
-            analysis_source_records = effective_source_records[skip:]
-            reconstructed_samples = build_reconstructed_trend_samples(analysis_source_records, analyzed_team_id, level_mode=level_mode, reconstruction_mode=reconstruction_mode, max_samples=needed_matches)
-            samples = reconstructed_samples[:needed_matches]
+            effective = [record for record in source_records if reconstruction_source_is_complete(record)]
+            usable_after_skip = max(0, len(effective) - skip)
+            if usable_after_skip >= window_target:
+                samples = make_latest_samples(effective, window_target)
+                if len(samples) >= needed_matches:
+                    break
+                if window_target < window_max:
+                    window_target = window_max
+                    required = max(required, skip + window_target + raw_buffer)
+                else:
+                    raise RuntimeError(
+                        f"{team_name}: pas assez de reconstitutions dans la plage maximale "
+                        f"de {window_max} matchs ({len(samples)}/{needed_matches})."
+                    )
+
+        if len(samples) >= needed_matches:
+            break
+
+        effective = [record for record in source_records if reconstruction_source_is_complete(record)]
+        usable_after_skip = max(0, len(effective) - skip)
+
+        if usable_after_skip >= window_target:
+            samples = make_latest_samples(effective, window_target)
             if len(samples) >= needed_matches:
                 break
+            if window_target < window_max:
+                window_target = window_max
+                required = max(required, skip + window_target + raw_buffer)
+                continue
+            raise RuntimeError(
+                f"{team_name}: pas assez de reconstitutions dans la plage maximale "
+                f"de {window_max} matchs ({len(samples)}/{needed_matches})."
+            )
 
-        if len(samples) >= needed_matches:
-            break
-
-        effective_source_records = [record for record in source_records if reconstruction_source_is_complete(record)]
-        analysis_source_records = effective_source_records[skip:]
-        reconstructed_samples = build_reconstructed_trend_samples(analysis_source_records, analyzed_team_id, level_mode=level_mode, reconstruction_mode=reconstruction_mode, max_samples=needed_matches)
-        samples = reconstructed_samples[:needed_matches]
-
-        if len(samples) >= needed_matches:
-            break
-
-        effective_source_records = [record for record in source_records if reconstruction_source_is_complete(record)]
-        known_available = max(0, len(sorted_matches))
-        known_usable_after_skip = max(0, len(effective_source_records) - skip)
         history_exhausted = bool(stopped_history or next_page >= PAGES_TO_LOAD)
-        all_known_sources_processed = total_sources >= known_available
+        all_known_sources_processed = len(source_records) >= len(sorted_matches)
         if history_exhausted and all_known_sources_processed:
-            raise RuntimeError(f"{team_name}: pas assez de matchs reconstitués après filtre extra puis ignorer matchs pour {trend_count} tendances ({len(samples)}/{needed_matches}, sources utilisables après ignore: {known_usable_after_skip}).")
+            # Même si moins de 30 matchs existent, on tente la plage disponible.
+            available_window = min(window_max, usable_after_skip)
+            if available_window > 0:
+                samples = make_latest_samples(effective, available_window)
+            if len(samples) >= needed_matches:
+                break
+            raise RuntimeError(
+                f"{team_name}: pas assez de reconstitutions dans la plage historique "
+                f"({len(samples)}/{needed_matches}, matchs utilisables: {usable_after_skip}, "
+                f"plage maximale: {window_max})."
+            )
 
-        required += growth_step
+        # Plus de sources brutes sont nécessaires à cause de matchs incomplets.
+        required += max(8, min(20, window_max // 2))
 
     administrative_ignored = sorted(
         administrative_matches_ignored.values(),
@@ -4047,6 +4102,11 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
         "pagesLoaded": pages_loaded_count,
         "pagesAttempted": pages_attempted_count,
         "pagesLimit": PAGES_TO_LOAD,
+        "reconstructionWindowBase": window_base,
+        "reconstructionWindowUsed": min(window_target, max(0, len([record for record in source_records if reconstruction_source_is_complete(record)]) - skip)),
+        "reconstructionWindowMax": window_max,
+        "reconstructionDirection": "oldest_to_newest",
+        "displayDirection": "newest_to_oldest",
         "scanPartial": False,
     }
 
@@ -4366,16 +4426,15 @@ def summarize_trend_items(items):
         style = trend_result_style(value)
         counts[style] = counts.get(style, 0.0) + weight
 
-    # Variance finale: la performance finale et le résultat V/N/D sont inversés
-    # uniquement après l'agrégation des tendances sélectionnées.
+    # La performance finale conserve désormais son signe naturel.
     raw_performance_score = performance_score
-    final_performance_score = -raw_performance_score
+    final_performance_score = raw_performance_score
     result_profile = build_result_profile(counts, apply_variance=True)
 
     return {
         "performanceScore": round(final_performance_score, 6),
         "rawPerformanceScore": round(raw_performance_score, 6),
-        "performanceVarianceApplied": True,
+        "performanceVarianceApplied": False,
         **result_profile,
         "dominantCount": normalize_trend_count(dominant_count),
     }
@@ -4731,7 +4790,11 @@ def process_trend_scan_job(job_id, params):
             "trendLimitRange": None,
             "trendSelectionMode": trend_selection_mode,
             "trendSelectionMetric": trend_selection_metric,
-            "performanceVarianceApplied": True,
+            "performanceVarianceApplied": False,
+            "reconstructionWindowBase": RECONSTRUCTION_WINDOW_BASE_MATCHES,
+            "reconstructionWindowMax": RECONSTRUCTION_WINDOW_MAX_MATCHES,
+            "reconstructionDirection": "oldest_to_newest",
+            "trendDisplayDirection": "newest_to_oldest",
             "allReturnSwitchManual": bool(all_return_switch_manual),
             "allReturnSwitchEnabled": bool(all_return_switch_manual),
             "trendCalculationCount": calculation_trend_count,
