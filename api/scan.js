@@ -147,22 +147,18 @@ module.exports = async function (req, res) {
     const matchId = id(b.matchId || b.url || b.match);
     const rank1 = rank(b.rank1);
     const rank2 = rank(b.rank2);
-    const simultaneousMode = b.simultaneousMode === undefined ? false : bool(b.simultaneousMode);
+    const simultaneousMode = b.simultaneousMode === undefined ? true : bool(b.simultaneousMode);
     const rankEventStep = numeric(b.rankEventStep, 1, 0.0001, 5);
     const rankEventMode = b.rankEventMode === 'performance' ? 'performance' : 'fixed';
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
     const isTrendMode = bool(b.trendMode) || b.trendCount !== undefined || b.rankEventMode === 'trend';
     const trendCount = numeric(b.trendCount, rank1 || 9, 1, 100);
     const trendSelectionMode = b.trendSelectionMode === undefined ? 'top_line' : (b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half');
-    const trendSelectionMetricRaw = String(b.trendSelectionMetric || '').trim().toLowerCase();
-    const highAverageMinuteEnabled = bool(b.highAverageMinuteEnabled) || ['high_average_minute', 'moyenne_minute_haute', 'average_minute_high', 'minute_haute'].includes(trendSelectionMetricRaw);
-    const highVarianceQuantityEnabled = !highAverageMinuteEnabled && (bool(b.highVarianceQuantityEnabled) || ['high_variance_quantity', 'quantite_variance_haute', 'high', 'haute'].includes(trendSelectionMetricRaw));
-    const trendSelectionMetric = highAverageMinuteEnabled ? 'high_average_minute' : (highVarianceQuantityEnabled ? 'high_variance_quantity' : 'progression');
+    const trendSelectionMetric = 'progression';
     const trendLimitEnabled = false;
     const includeExtra = (b.includeExtra === undefined && b.includeExtraEnabled === undefined) ? true : bool(b.includeExtra || b.includeExtraEnabled);
     const regulationTimeLimitEnabled = b.regulationTimeLimitEnabled === undefined ? true : bool(b.regulationTimeLimitEnabled);
     const reconstructionMode = b.reconstructionMode === undefined ? 'sequence' : (b.reconstructionMode === 'sequence' ? 'sequence' : 'staircase');
-    const allReturnSwitchManual = bool(b.allReturnSwitchManual || b.allReturnSwitchEnabled || b.manualAllReturnSwitch);
 
     if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
@@ -203,15 +199,11 @@ module.exports = async function (req, res) {
         trendCount,
         trendSelectionMode,
         trendSelectionMetric,
-        highVarianceQuantityEnabled,
-        highAverageMinuteEnabled,
         trendLimitEnabled,
         includeExtra,
         includeExtraEnabled: includeExtra,
         regulationTimeLimitEnabled,
         reconstructionMode,
-        allReturnSwitchManual,
-        allReturnSwitchEnabled: allReturnSwitchManual,
       },
     };
 
