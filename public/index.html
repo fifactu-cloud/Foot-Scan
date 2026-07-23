@@ -13238,8 +13238,8 @@
               <span class="trend-split-bottom">${esc(formatValue(item.value))}${item.trendLimited ? "*" : ""}</span>
             </div>
             <div class="trend-mini-body">
-              <div class="trend-match-line">${esc(previousLabel)} → ${esc(recentLabel)}</div>
-              <div class="trend-row-sub">Score ${esc(previousScore)} → ${esc(recentScore)} · Niveau ${esc(formatValue(item.previousLevel))} → ${esc(formatValue(item.recentLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}${progressionText}${item.trendLimited ? ` · Limité depuis ${esc(formatValue(item.rawValue))}` : ""}</div>
+              <div class="trend-match-line">${esc(recentLabel)} → ${esc(previousLabel)}</div>
+              <div class="trend-row-sub">Score ${esc(recentScore)} → ${esc(previousScore)} · Niveau ${esc(formatValue(item.recentLevel))} → ${esc(formatValue(item.previousLevel))} · Moyenne Minutes ${esc(formatRank(item.averageMinute))}${progressionText}${item.trendLimited ? ` · Limité depuis ${esc(formatValue(item.rawValue))}` : ""}</div>
             </div>
           </div>
         </div>
@@ -14335,7 +14335,7 @@
         const previousScore = reconstructionScore(item.previousMatch || {});
         const recentScore = reconstructionScore(item.recentMatch || {});
         const progression = item.averageMinuteProgression != null ? ` · Progression Minute ${formatValue(item.averageMinuteProgression)}` : "";
-        lines.push(`- Tendance ${item.index} · ${state} · ${item.resultStyle || "N"} · ${formatValue(item.value)} · ${previousLabel} → ${recentLabel} · Score ${previousScore} → ${recentScore} · Niveau ${formatValue(item.previousLevel)} → ${formatValue(item.recentLevel)} · Moyenne Minutes ${formatRank(item.averageMinute)}${progression}`);
+        lines.push(`- Tendance ${item.index} · ${state} · ${item.resultStyle || "N"} · ${formatValue(item.value)} · ${recentLabel} → ${previousLabel} · Score ${recentScore} → ${previousScore} · Niveau ${formatValue(item.recentLevel)} → ${formatValue(item.previousLevel)} · Moyenne Minutes ${formatRank(item.averageMinute)}${progression}`);
       }
       return lines;
     }
@@ -14396,7 +14396,7 @@
       lines.push("LEXIQUE");
       lines.push("V = Victoire · N = Nul · D = Défaite");
       lines.push("Performance finale = somme pondérée des tendances prises ÷ nombre de tendances prises.");
-      lines.push("Tendance = niveau du match récent - niveau du match précédent.");
+      lines.push("Tendance = mouvement de la reconstitution récente vers la reconstitution ancienne (niveau ancien - niveau récent).");
       lines.push("Comparaison = la zone temps sélectionne une position, puis la performance est prise dans la zone opposée.");
       lines.push("0-0 = score initial à la minute 0 dans chaque match.");
       lines.push("");
