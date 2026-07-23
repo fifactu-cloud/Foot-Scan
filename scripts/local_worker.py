@@ -4035,14 +4035,15 @@ def build_trend_items(samples, side_key, trend_count, trend_limit_enabled=False)
     for i in range(int(trend_count)):
         recent = samples[i]
         previous = samples[i + 1]
-        raw_trend_value = (recent.get("level") or 0) - (previous.get("level") or 0)
+        # Mouvement de tendance : reconstitution la plus récente vers la plus ancienne.
+        raw_trend_value = (previous.get("level") or 0) - (recent.get("level") or 0)
         trend_value = max(-2.0, min(2.0, float(raw_trend_value))) if trend_limit_enabled else raw_trend_value
         trend_was_limited = bool(trend_limit_enabled and float(raw_trend_value) != float(trend_value))
         previous_minutes = previous.get("minutesForAverage") or [1]
         recent_minutes = recent.get("minutesForAverage") or [1]
         previous_avg_minute = trend_average(previous_minutes)
         recent_avg_minute = trend_average(recent_minutes)
-        average_minute_progression = recent_avg_minute - previous_avg_minute
+        average_minute_progression = previous_avg_minute - recent_avg_minute
         # Moyenne minute de la tendance = moyenne des 2 reconstitutions comparées.
         # Chaque reconstitution garde le même poids, peu importe son nombre de buts.
         minutes = [recent_avg_minute, previous_avg_minute]
@@ -4163,7 +4164,7 @@ def select_trend_items_by_mode(home_items, away_items, selection_mode="top_half"
             except (TypeError, ValueError):
                 recent_avg = trend_average((item.get("recentMatch") or {}).get("minutesForAverage") or [1])
                 previous_avg = trend_average((item.get("previousMatch") or {}).get("minutesForAverage") or [1])
-                progression = recent_avg - previous_avg
+                progression = previous_avg - recent_avg
                 item["averageMinuteProgression"] = round(progression, 4)
                 item["recentAverageMinute"] = round(recent_avg, 4)
                 item["previousAverageMinute"] = round(previous_avg, 4)
@@ -4580,6 +4581,7 @@ def process_trend_scan_job(job_id, params):
             "reconstructionWindowMax": RECONSTRUCTION_WINDOW_MAX_MATCHES,
             "reconstructionDirection": "oldest_to_newest",
             "trendDisplayDirection": "newest_to_oldest",
+            "trendMovementDirection": "newest_to_oldest",
                     "trendCalculationCount": calculation_trend_count,
             "trendSelectionMethod": trend_selection.get("method"),
             "trendSelection": trend_selection,
