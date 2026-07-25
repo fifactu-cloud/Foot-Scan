@@ -12152,6 +12152,10 @@
       sync();
     }
 
+    function isSimultaneousMode() {
+      return Boolean($("simultaneousMode")?.checked);
+    }
+
     function setupVarianceDirectionOptions() {
       const trendToMean = $("trendToMeanEnabled");
       const meanToTrend = $("meanToTrendEnabled");
