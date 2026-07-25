@@ -1,10 +1,7 @@
 const crypto = require('crypto');
 
 const Q = 'footscan:scan:queue';
-const PENDING_SET = 'footscan:scan:pending';
-const LATEST_KEY = 'footscan:scan:latest';
 const WORKER_HEARTBEAT_KEY = 'footscan:worker:heartbeat';
-const WAKE_Q = process.env.SCAN_WAKE_QUEUE || 'sofa:queue';
 const P = 'footscan:scan:job:';
 const TTL = Number(process.env.SCAN_JOB_TTL_SECONDS || 86400);
 
@@ -103,8 +100,6 @@ module.exports = async function (req, res) {
       if (req.query && (req.query.diag === '1' || req.query.debug === '1')) {
         const ping = await safeRedis(['PING']);
         const queueLen = await safeRedis(['LLEN', Q]);
-        const pendingCount = await safeRedis(['SCARD', PENDING_SET]);
-        const latest = await safeRedis(['GET', LATEST_KEY]);
         const workerHeartbeat = await safeRedis(['GET', WORKER_HEARTBEAT_KEY]);
 
         return res.end(JSON.stringify({
@@ -112,11 +107,8 @@ module.exports = async function (req, res) {
           redisPing: ping,
           queue: Q,
           queueLen,
-          pendingSet: PENDING_SET,
-          pendingCount,
-          latestKey: LATEST_KEY,
-          latest,
           workerHeartbeat,
+          dispatchMode: 'single-queue-brpop',
           now: Math.floor(Date.now() / 1000),
         }));
       }
@@ -147,13 +139,21 @@ module.exports = async function (req, res) {
     const matchId = id(b.matchId || b.url || b.match);
     const rank1 = rank(b.rank1);
     const rank2 = rank(b.rank2);
-    const simultaneousMode = b.simultaneousMode === undefined ? true : bool(b.simultaneousMode);
+    const requestedCampMode = String(b.campMode || '').trim().toLowerCase();
+    const campMode = requestedCampMode === 'combined' || requestedCampMode === 'combine'
+      ? 'combined'
+      : (requestedCampMode === 'separate' || requestedCampMode === 'separated'
+        ? 'separate'
+        : (b.simultaneousMode === undefined ? 'separate' : (bool(b.simultaneousMode) ? 'separate' : 'combined')));
+    const simultaneousMode = campMode === 'separate';
     const rankEventStep = numeric(b.rankEventStep, 1, 0.0001, 5);
     const rankEventMode = b.rankEventMode === 'performance' ? 'performance' : 'fixed';
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
     const isTrendMode = bool(b.trendMode) || b.reconstructionCount !== undefined || b.trendCount !== undefined || b.rankEventMode === 'trend';
     const reconstructionCount = numeric(b.reconstructionCount, numeric(b.trendCount, rank1 || 9, 1, 100), 1, 100);
     const trendCount = reconstructionCount; // compatibilité avec les anciens workers/rapports
+    const trendSelectionMode = b.trendSelectionMode === 'top_half' ? 'top_half' : 'top_line';
+    const highGoalQuantityEnabled = bool(b.highGoalQuantityEnabled);
     const trendToMeanEnabled = bool(b.trendToMeanEnabled);
     const meanToTrendEnabled = !trendToMeanEnabled && bool(b.meanToTrendEnabled);
     const includeExtra = (b.includeExtra === undefined && b.includeExtraEnabled === undefined) ? true : bool(b.includeExtra || b.includeExtraEnabled);
@@ -192,12 +192,15 @@ module.exports = async function (req, res) {
         skipHome: skip(b.skipHome),
         skipAway: skip(b.skipAway),
         simultaneousMode,
+        campMode,
         rankEventStep,
         rankEventMode,
         winnerMode,
         trendMode: isTrendMode,
         trendCount,
         reconstructionCount,
+        trendSelectionMode,
+        highGoalQuantityEnabled,
         trendToMeanEnabled,
         meanToTrendEnabled,
         includeExtra,
@@ -209,22 +212,9 @@ module.exports = async function (req, res) {
 
     await redis(['SET', P + jid, JSON.stringify(job), 'EX', String(TTL)]);
 
-    // Triple liaison volontaire pour éviter les blocages silencieux selon l'environnement:
-    // 1) set pending robuste, 2) clé latest de secours, 3) file historique.
-    await redis(['SADD', PENDING_SET, jid]);
-    await redis(['SET', LATEST_KEY, jid, 'EX', '3600']);
+    // Une seule file FIFO. Le worker écoute cette file avec BRPOP,
+    // ce qui réveille Termux immédiatement sans polling intensif ni doublons.
     await redis(['LPUSH', Q, jid]);
-
-    // Réveil de secours pour les workers Termux qui écoutent encore l'ancienne file.
-    // Le worker v208 ignore les doublons une fois le job terminé.
-    if (WAKE_Q && WAKE_Q !== Q) {
-      try {
-        await redis(['LPUSH', WAKE_Q, jid]);
-      } catch (wakeError) {
-        // Le job principal reste valide même si le réveil secondaire échoue.
-        console.warn('Scan wake queue push failed:', wakeError && wakeError.message ? wakeError.message : wakeError);
-      }
-    }
 
     return res.end(JSON.stringify(job));
   } catch (e) {
