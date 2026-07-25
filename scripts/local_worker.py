@@ -3766,7 +3766,7 @@ def rebuild_trend_matches_used_from_samples(samples):
 
 
 def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_name, base_progress, progress_span, level_mode="full", reconstruction_mode="sequence", include_extra=False, regulation_time_limit=True):
-    needed_matches = max(2, int(trend_count) + 1)
+    needed_matches = max(1, int(trend_count))
     pages = []
     stopped_history = False
     administrative_matches_ignored = {}
@@ -3816,7 +3816,7 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 update_scan_job(
                     job_id,
                     status="running",
-                    message=f"{team_name} · Tendance · Page {page + 1}/{target_pages}",
+                    message=f"{team_name} · Reconstitution · Page {page + 1}/{target_pages}",
                     progress=base_progress + int(progress_span * 0.12 * ((page + 1) / max(1, target_pages))),
                 )
                 pages_attempted_count = max(pages_attempted_count, page + 1)
@@ -3888,7 +3888,7 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             update_scan_job(
                 job_id,
                 status="running",
-                message=f"{team_name} · Tendance · Source {idx + 1}/{total_sources}",
+                message=f"{team_name} · Reconstitution · Source {idx + 1}/{total_sources}",
                 progress=base_progress + int(progress_span * (0.15 + 0.80 * ((idx + 1) / max(1, total_sources)))),
             )
             try:
@@ -4343,28 +4343,97 @@ def summarize_trend_items(items):
         "dominantCount": normalize_trend_count(dominant_count),
     }
 
+def reconstruction_goal_quantity(sample):
+    """Quantité de buts utilisée pour choisir la reconstitution la plus offensive."""
+    if not isinstance(sample, dict):
+        return 0.0
+    score_average = sample.get("reconstructionScoreAverage") or {}
+    level_mode = str(sample.get("levelMode") or "").strip().lower()
+    if level_mode in {"attack", "separated-attack-vs-attack"} or sample.get("defenseRemovedForCombined"):
+        value = sample.get("attackGoalsFor", score_average.get("attack", sample.get("goalsFor", 0)))
+    else:
+        value = sample.get("goalsFor", score_average.get("team", 0))
+    try:
+        number = float(value or 0)
+    except Exception:
+        number = 0.0
+    return number if math.isfinite(number) else 0.0
+
+
+def summarize_reconstruction_samples(samples):
+    clean = [sample for sample in (samples or []) if isinstance(sample, dict)]
+    if not clean:
+        return {
+            "meanScore": 0.0,
+            "tendencyScore": 0.0,
+            "reconstructionCount": 0,
+            "highestMinuteIndex": None,
+            "highestGoalsIndex": None,
+            "highestMinuteValue": 0.0,
+            "highestGoalsValue": 0.0,
+            "highestMinuteReconstruction": None,
+            "highestGoalsReconstruction": None,
+            "performanceScore": 0.0,
+            "dominantCount": 0,
+        }
+
+    levels = [float(sample.get("level") or 0.0) for sample in clean]
+    mean_score = sum(levels) / len(levels)
+
+    # Les échantillons sont classés du plus récent au plus ancien. En cas
+    # d'égalité de critère, le premier garde donc la priorité (le plus récent).
+    minute_index = max(range(len(clean)), key=lambda idx: float(clean[idx].get("averageMinute") or 0.0))
+    goals_index = max(range(len(clean)), key=lambda idx: reconstruction_goal_quantity(clean[idx]))
+    minute_sample = clean[minute_index]
+    goals_sample = clean[goals_index]
+    tendency_score = (float(minute_sample.get("level") or 0.0) + float(goals_sample.get("level") or 0.0)) / 2.0
+
+    return {
+        "meanScore": round(mean_score, 6),
+        "tendencyScore": round(tendency_score, 6),
+        "reconstructionCount": len(clean),
+        "highestMinuteIndex": minute_index + 1,
+        "highestGoalsIndex": goals_index + 1,
+        "highestMinuteValue": round(float(minute_sample.get("averageMinute") or 0.0), 4),
+        "highestGoalsValue": round(reconstruction_goal_quantity(goals_sample), 6),
+        "highestMinuteReconstruction": minute_sample,
+        "highestGoalsReconstruction": goals_sample,
+        # Compatibilité avec l'ancien rendu : la « performance » est désormais
+        # la Tendance calculée depuis les deux reconstitutions repères.
+        "performanceScore": round(tendency_score, 6),
+        "dominantCount": len(clean),
+    }
+
+
 def process_trend_scan_job(job_id, params):
     match_id = str(params.get("matchId") or "").strip()
-    trend_count = int(float(params.get("trendCount") or params.get("rank1") or 9))
-    trend_count = max(1, min(100, trend_count))
+    reconstruction_count = int(float(params.get("reconstructionCount") or params.get("trendCount") or params.get("rank1") or 9))
+    reconstruction_count = max(1, min(100, reconstruction_count))
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
     simultaneous_mode = True if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
-    trend_limit_enabled = False
-    trend_selection_mode = str(params.get("trendSelectionMode") or "top_line").strip()
-    if trend_selection_mode not in {"top_line", "top_half"}:
-        trend_selection_mode = "top_line"
-    trend_selection_metric = "progression"
     include_extra_raw = params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled")
     include_extra = True if include_extra_raw is None else truthy_param(include_extra_raw)
     regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
     reconstruction_mode = str(params.get("reconstructionMode") or "sequence").strip().lower()
-    if reconstruction_mode in {"sequence", "séquence", "seq"}:
-        reconstruction_mode = "sequence"
-    else:
-        reconstruction_mode = "staircase"
+    reconstruction_mode = "sequence" if reconstruction_mode in {"sequence", "séquence", "seq"} else "staircase"
     reconstruction_mode_label = "Séquence" if reconstruction_mode == "sequence" else "Escalier"
-    calculation_trend_count = trend_count
+
+    trend_to_mean_enabled = truthy_param(params.get("trendToMeanEnabled"))
+    mean_to_trend_enabled = truthy_param(params.get("meanToTrendEnabled"))
+    # Sécurité serveur : les deux sens sont exclusifs. Si un ancien client
+    # envoie les deux, Tendance Vers Moyenne garde la priorité.
+    if trend_to_mean_enabled:
+        mean_to_trend_enabled = False
+    variance_direction = (
+        "trend_to_mean" if trend_to_mean_enabled else
+        ("mean_to_trend" if mean_to_trend_enabled else "none")
+    )
+    variance_direction_label = {
+        "trend_to_mean": "Tendance Vers Moyenne",
+        "mean_to_trend": "Moyenne Vers Tendance",
+        "none": "Tendance Directe",
+    }[variance_direction]
 
     update_scan_job(job_id, status="running", message="Récupération Du Match Principal…", progress=5)
     match_data = get_json(f"event/{match_id}")
@@ -4375,115 +4444,112 @@ def process_trend_scan_job(job_id, params):
 
     home_team = match["homeTeam"]
     away_team = match["awayTeam"]
-    needed_matches = calculation_trend_count + 1
+    needed_matches = reconstruction_count
 
     update_scan_job(
         job_id,
         status="running",
-        message=f"Match trouvé : {home_team.get('name')} vs {away_team.get('name')} · {trend_count} tendances ({needed_matches} matchs)",
+        message=f"Match trouvé : {home_team.get('name')} vs {away_team.get('name')} · {reconstruction_count} reconstitutions",
         progress=10,
     )
 
     level_mode = "full" if simultaneous_mode else "attack"
 
-    home_scan = fetch_trend_team_matches(job_id, home_team["id"], skip_home, calculation_trend_count, home_team.get("name") or "Domicile", 12, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode, include_extra=include_extra, regulation_time_limit=regulation_time_limit)
-    away_scan = fetch_trend_team_matches(job_id, away_team["id"], skip_away, calculation_trend_count, away_team.get("name") or "Extérieur", 54, 40, level_mode=level_mode, reconstruction_mode=reconstruction_mode, include_extra=include_extra, regulation_time_limit=regulation_time_limit)
+    home_scan = fetch_trend_team_matches(
+        job_id, home_team["id"], skip_home, reconstruction_count,
+        home_team.get("name") or "Domicile", 12, 40,
+        level_mode=level_mode, reconstruction_mode=reconstruction_mode,
+        include_extra=include_extra, regulation_time_limit=regulation_time_limit,
+    )
+    away_scan = fetch_trend_team_matches(
+        job_id, away_team["id"], skip_away, reconstruction_count,
+        away_team.get("name") or "Extérieur", 54, 40,
+        level_mode=level_mode, reconstruction_mode=reconstruction_mode,
+        include_extra=include_extra, regulation_time_limit=regulation_time_limit,
+    )
 
     if not simultaneous_mode:
-        # Séparé = offensif vs offensif aligné par ligne :
-        # A ligne N = attaque A ligne N + attaque de l'adversaire passé de B ligne N.
-        # B ligne N = attaque B ligne N + attaque de l'adversaire passé de A ligne N.
         home_combined = build_separated_offensive_samples(home_scan["trendMatches"], away_scan["trendMatches"], "home")
         away_combined = build_separated_offensive_samples(away_scan["trendMatches"], home_scan["trendMatches"], "away")
         home_scan["trendMatchesDirect"] = home_scan["trendMatches"]
         away_scan["trendMatchesDirect"] = away_scan["trendMatches"]
-        home_scan["trendMatches"] = home_combined
-        away_scan["trendMatches"] = away_combined
-        home_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(home_combined)
-        away_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(away_combined)
+        home_scan["trendMatches"] = home_combined[:reconstruction_count]
+        away_scan["trendMatches"] = away_combined[:reconstruction_count]
+        home_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(home_scan["trendMatches"])
+        away_scan["matchesUsed"] = rebuild_trend_matches_used_from_samples(away_scan["trendMatches"])
+    else:
+        home_scan["trendMatches"] = list(home_scan.get("trendMatches") or [])[:reconstruction_count]
+        away_scan["trendMatches"] = list(away_scan.get("trendMatches") or [])[:reconstruction_count]
 
-    home_items = build_trend_items(home_scan["trendMatches"], "home", calculation_trend_count, trend_limit_enabled=trend_limit_enabled)
-    away_items = build_trend_items(away_scan["trendMatches"], "away", calculation_trend_count, trend_limit_enabled=trend_limit_enabled)
+    if len(home_scan["trendMatches"]) < reconstruction_count or len(away_scan["trendMatches"]) < reconstruction_count:
+        raise RuntimeError(
+            f"Reconstitutions insuffisantes : {len(home_scan['trendMatches'])}/{reconstruction_count} domicile, "
+            f"{len(away_scan['trendMatches'])}/{reconstruction_count} extérieur."
+        )
 
-    # Zone unique : la sélection et la performance utilisent les mêmes tendances.
-    trend_selection = select_trend_items_by_mode(
-        home_items,
-        away_items,
-        trend_selection_mode,
-        trend_selection_metric,
-        trend_count=trend_count,
-    )
+    home_summary = summarize_reconstruction_samples(home_scan["trendMatches"])
+    away_summary = summarize_reconstruction_samples(away_scan["trendMatches"])
+
     comparisons = []
-
-    for i in range(calculation_trend_count):
-        home_item = home_items[i]
-        away_item = away_items[i]
-        hm = float(home_item.get("averageMinute") or 0)
-        am = float(away_item.get("averageMinute") or 0)
-        home_selected = bool(home_item.get("selectedTrend"))
-        away_selected = bool(away_item.get("selectedTrend"))
-
-        if home_selected and away_selected:
-            dominant = "both"
-        elif home_selected:
-            dominant = "home"
-        elif away_selected:
-            dominant = "away"
-        else:
-            dominant = "none"
-
+    for index in range(reconstruction_count):
+        home_sample = home_scan["trendMatches"][index]
+        away_sample = away_scan["trendMatches"][index]
         comparisons.append({
-            "index": i + 1,
-            "dominant": dominant,
-            "home": home_item,
-            "away": away_item,
-            "minuteDiff": round(abs(hm - am), 4),
+            "index": index + 1,
+            "home": home_sample,
+            "away": away_sample,
+            "minuteDiff": round(abs(float(home_sample.get("averageMinute") or 0) - float(away_sample.get("averageMinute") or 0)), 4),
         })
 
-    home_summary = summarize_trend_items(home_items)
-    away_summary = summarize_trend_items(away_items)
+    def metric_for(summary):
+        mean_score = float(summary.get("meanScore") or 0.0)
+        tendency_score = float(summary.get("tendencyScore") or 0.0)
+        if variance_direction == "trend_to_mean":
+            return mean_score - tendency_score
+        if variance_direction == "mean_to_trend":
+            return tendency_score - mean_score
+        return tendency_score
+
     def winner():
-        h = float(home_summary["performanceScore"] or 0)
-        a = float(away_summary["performanceScore"] or 0)
+        h = metric_for(home_summary)
+        a = metric_for(away_summary)
         eps = 1e-9
         close_gap_warning_threshold = 0.1111111111
         gap = abs(h - a)
         warning = gap < close_gap_warning_threshold
-
-        # Égalité uniquement lorsque les deux niveaux sont réellement identiques.
-        # Une égalité exacte a un écart nul : elle doit donc afficher l'avertissement.
+        common = {
+            "mode": variance_direction,
+            "modeLabel": variance_direction_label,
+            "homeMetric": round(h, 6),
+            "awayMetric": round(a, 6),
+            "closeGapWarning": warning,
+            "closeGapWarningThreshold": close_gap_warning_threshold,
+        }
         if gap <= eps:
             return {
+                **common,
                 "type": "tie",
                 "side": "tie",
                 "label": "Égalité",
                 "score": round((h + a) / 2, 6),
                 "diff": 0,
-                "tieBreakByResult": False,
-                "closeGapWarning": warning,
-                "closeGapWarningThreshold": close_gap_warning_threshold,
             }
-
         if h > a:
             return {
+                **common,
                 "type": "winner",
                 "side": "home",
                 "label": home_team.get("name"),
-                "score": h,
+                "score": round(h, 6),
                 "diff": round(gap, 6),
-                "tieBreakByResult": False,
-                "closeGapWarning": warning,
-                "closeGapWarningThreshold": close_gap_warning_threshold,
             }
         return {
+            **common,
             "type": "winner",
             "side": "away",
             "label": away_team.get("name"),
-            "score": a,
+            "score": round(a, 6),
             "diff": round(gap, 6),
-            "tieBreakByResult": False,
-            "closeGapWarning": warning,
-            "closeGapWarningThreshold": close_gap_warning_threshold,
         }
 
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
@@ -4503,22 +4569,23 @@ def process_trend_scan_job(job_id, params):
 
     result = {
         "trendMode": True,
-        "trendCount": trend_count,
-        "trendCalculationCount": calculation_trend_count,
+        "reconstructionOnlyMode": True,
+        "reconstructionCount": reconstruction_count,
+        "trendCount": reconstruction_count,
+        "trendCalculationCount": reconstruction_count,
         "trendMatchesNeeded": needed_matches,
         "simultaneousMode": simultaneous_mode,
         "scanModeLabel": "Camp Séparé" if simultaneous_mode else "Camp Combiné",
         "reconstructionMode": reconstruction_mode,
         "reconstructionModeLabel": reconstruction_mode_label,
         "trendLevelMode": level_mode,
-        "trendLimitEnabled": False,
-        "trendLimitRange": None,
         "includeExtra": bool(include_extra),
         "includeExtraEnabled": bool(include_extra),
         "regulationTimeLimitEnabled": bool(regulation_time_limit),
-        "trendSelectionMode": trend_selection_mode,
-        "trendSelectionMetric": trend_selection_metric,
-        "trendSelection": trend_selection,
+        "trendToMeanEnabled": bool(trend_to_mean_enabled),
+        "meanToTrendEnabled": bool(mean_to_trend_enabled),
+        "varianceDirection": variance_direction,
+        "varianceDirectionLabel": variance_direction_label,
         "match": {
             "id": match.get("id"),
             "homeTeam": home_team,
@@ -4529,24 +4596,24 @@ def process_trend_scan_job(job_id, params):
         "home": {
             **home_team,
             **home_scan,
-            "trend": {**home_summary, "items": home_items},
-            "r1": {"value": home_summary["performanceScore"], "sources": []},
+            "trend": {**home_summary, "items": home_scan["trendMatches"]},
+            "r1": {"value": home_summary["tendencyScore"], "sources": []},
             "r2": None,
-            "zoneStats": {"average": None, "count": 0},
+            "zoneStats": {"average": home_summary["meanScore"], "count": reconstruction_count},
         },
         "away": {
             **away_team,
             **away_scan,
-            "trend": {**away_summary, "items": away_items},
-            "r1": {"value": away_summary["performanceScore"], "sources": []},
+            "trend": {**away_summary, "items": away_scan["trendMatches"]},
+            "r1": {"value": away_summary["tendencyScore"], "sources": []},
             "r2": None,
-            "zoneStats": {"average": None, "count": 0},
+            "zoneStats": {"average": away_summary["meanScore"], "count": reconstruction_count},
         },
         "trendComparisons": comparisons,
         "trendWinner": winner(),
-        "requestedRank1": trend_count,
+        "requestedRank1": reconstruction_count,
         "requestedRank2": None,
-        "rank1": trend_count,
+        "rank1": reconstruction_count,
         "rank2": None,
         "dataQuality": {
             "isPartial": total_issue_count > 0,
@@ -4574,30 +4641,25 @@ def process_trend_scan_job(job_id, params):
             ),
         },
         "config": {
-            "trendCount": trend_count,
+            "reconstructionCount": reconstruction_count,
+            "trendCount": reconstruction_count,
             "trendMatchesNeeded": needed_matches,
             "pagesToLoad": PAGES_TO_LOAD,
-            "system": "trend",
+            "system": "reconstruction",
             "trendLevelMode": level_mode,
-            "trendLimitEnabled": False,
-            "trendLimitRange": None,
-            "trendSelectionMode": trend_selection_mode,
-            "trendSelectionMetric": trend_selection_metric,
-                    "performanceAverageApplied": True,
-            "performanceVarianceApplied": False,
+            "trendToMeanEnabled": bool(trend_to_mean_enabled),
+            "meanToTrendEnabled": bool(mean_to_trend_enabled),
+            "varianceDirection": variance_direction,
+            "varianceDirectionLabel": variance_direction_label,
             "reconstructionWindowBase": RECONSTRUCTION_WINDOW_BASE_MATCHES,
             "reconstructionWindowMax": RECONSTRUCTION_WINDOW_MAX_MATCHES,
             "reconstructionDirection": "newest_to_oldest",
-            "trendDisplayDirection": "newest_to_oldest",
-            "trendMovementDirection": "newest_to_oldest",
-                    "trendCalculationCount": calculation_trend_count,
-            "trendSelectionMethod": trend_selection.get("method"),
-            "trendSelection": trend_selection,
+            "displayDirection": "newest_to_oldest",
         },
     }
 
-    update_scan_job(job_id, status="done", message="📈 Scan tendance terminé.", progress=100, result=result, finishedAt=now_ts())
-    print(f"✅ Scan tendance terminé: {job_id} · {trend_count} tendances · gagnant {result['trendWinner']['label']}")
+    update_scan_job(job_id, status="done", message="🧩 Scan reconstitutions terminé.", progress=100, result=result, finishedAt=now_ts())
+    print(f"✅ Scan reconstitutions terminé: {job_id} · {reconstruction_count} reconstitutions · gagnant {result['trendWinner']['label']}")
 
 def process_scan_job(job_id):
     raw = redis_cmd("GET", f"{SCAN_JOB_PREFIX}{job_id}")
