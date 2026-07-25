@@ -230,16 +230,16 @@ LAST_IDLE_LOG_AT = 0
 def send_worker_heartbeat(force=False):
     global LAST_HEARTBEAT_SENT_AT
     ts = now_ts()
-    if not force and ts - LAST_HEARTBEAT_SENT_AT < 15:
+    if not force and ts - LAST_HEARTBEAT_SENT_AT < 60:
         return
     payload = {
         "status": "online",
         "ts": ts,
-        "version": "v209",
+        "version": "v240",
         "queue": SCAN_QUEUE_KEY,
         "pendingSet": SCAN_PENDING_SET_KEY,
     }
-    redis_cmd("SET", SCAN_WORKER_HEARTBEAT_KEY, json.dumps(payload, ensure_ascii=False), "EX", "120")
+    redis_cmd("SET", SCAN_WORKER_HEARTBEAT_KEY, json.dumps(payload, ensure_ascii=False), "EX", "180")
     LAST_HEARTBEAT_SENT_AT = ts
 
 
@@ -4344,35 +4344,131 @@ def summarize_trend_items(items):
     }
 
 def reconstruction_goal_quantity(sample):
-    """Quantité de buts utilisée pour choisir la reconstitution la plus offensive."""
+    """Quantité de buts utilisée comme critère de sélection.
+
+    Camp combiné : attaque uniquement, conformément à la règle sans défense.
+    Camp séparé : score complet, donc buts de l'équipe + buts adverses.
+    """
     if not isinstance(sample, dict):
         return 0.0
     score_average = sample.get("reconstructionScoreAverage") or {}
     level_mode = str(sample.get("levelMode") or "").strip().lower()
-    if level_mode in {"attack", "separated-attack-vs-attack"} or sample.get("defenseRemovedForCombined"):
-        value = sample.get("attackGoalsFor", score_average.get("attack", sample.get("goalsFor", 0)))
-    else:
-        value = sample.get("goalsFor", score_average.get("team", 0))
+    attack_only = level_mode in {"attack", "separated-attack-vs-attack"} or sample.get("defenseRemovedForCombined")
     try:
-        number = float(value or 0)
+        if attack_only:
+            value = sample.get("attackGoalsFor", score_average.get("attack", sample.get("goalsFor", 0)))
+            number = float(value or 0)
+        else:
+            team_value = float(sample.get("goalsFor", score_average.get("team", 0)) or 0)
+            opponent_value = float(sample.get("goalsAgainst", score_average.get("opponent", 0)) or 0)
+            number = team_value + opponent_value
     except Exception:
         number = 0.0
     return number if math.isfinite(number) else 0.0
 
 
-def summarize_reconstruction_samples(samples):
+def reconstruction_selection_metric(sample, metric="minute"):
+    if str(metric or "minute").lower() == "goals":
+        return reconstruction_goal_quantity(sample)
+    try:
+        value = float((sample or {}).get("averageMinute") or 0.0)
+    except Exception:
+        value = 0.0
+    return value if math.isfinite(value) else 0.0
+
+
+def select_reconstruction_samples(home_samples, away_samples, selection_mode="top_line", selection_metric="minute"):
+    """Marque les reconstitutions retenues pour calculer la Tendance.
+
+    Top Ligne compare les deux équipes ligne par ligne. En cas d'égalité exacte,
+    chaque reconstitution reçoit un poids de 0,5.
+    Top Moitié conserve, pour chaque équipe, la moitié haute de ses propres
+    reconstitutions selon le critère choisi.
+    """
+    mode = "top_half" if str(selection_mode or "").lower() == "top_half" else "top_line"
+    metric = "goals" if str(selection_metric or "").lower() == "goals" else "minute"
+    metric_label = "Quantité But Haute" if metric == "goals" else "Moyenne Minute Haute"
+    eps = 1e-9
+
+    home_samples = list(home_samples or [])
+    away_samples = list(away_samples or [])
+
+    for side, samples in (("home", home_samples), ("away", away_samples)):
+        for index, sample in enumerate(samples):
+            sample["selectedForTendency"] = False
+            sample["selectedTrend"] = False
+            sample["selectionWeight"] = 0.0
+            sample["selectedTrendWeight"] = 0.0
+            sample["selectionTie"] = False
+            sample["selectionRank"] = None
+            sample["selectionMode"] = mode
+            sample["selectionMetric"] = metric
+            sample["selectionMetricLabel"] = metric_label
+            sample["selectionMetricValue"] = round(reconstruction_selection_metric(sample, metric), 6)
+            sample["selectionSide"] = side
+            sample["selectionSourceIndex"] = index + 1
+
+    def mark(sample, rank, weight=1.0, tie=False):
+        clean_weight = float(weight or 0.0)
+        sample["selectedForTendency"] = clean_weight > 0
+        sample["selectedTrend"] = clean_weight > 0
+        sample["selectionWeight"] = round(clean_weight, 6)
+        sample["selectedTrendWeight"] = round(clean_weight, 6)
+        sample["selectionTie"] = bool(tie)
+        sample["selectionRank"] = rank
+
+    if mode == "top_line":
+        line_count = min(len(home_samples), len(away_samples))
+        for index in range(line_count):
+            home_sample = home_samples[index]
+            away_sample = away_samples[index]
+            home_value = reconstruction_selection_metric(home_sample, metric)
+            away_value = reconstruction_selection_metric(away_sample, metric)
+            if abs(home_value - away_value) <= eps:
+                mark(home_sample, index + 1, 0.5, True)
+                mark(away_sample, index + 1, 0.5, True)
+            elif home_value > away_value:
+                mark(home_sample, index + 1, 1.0, False)
+            else:
+                mark(away_sample, index + 1, 1.0, False)
+    else:
+        for samples in (home_samples, away_samples):
+            selected_count = max(1, (len(samples) + 1) // 2) if samples else 0
+            ordered = sorted(
+                enumerate(samples),
+                key=lambda pair: (-reconstruction_selection_metric(pair[1], metric), pair[0]),
+            )
+            for rank, (_, sample) in enumerate(ordered[:selected_count], start=1):
+                mark(sample, rank, 1.0, False)
+
+    def selected_weight(samples):
+        return sum(float((sample or {}).get("selectionWeight") or 0.0) for sample in samples)
+
+    return {
+        "method": mode,
+        "label": "Top Moitié" if mode == "top_half" else "Top Ligne",
+        "selectionMetric": metric,
+        "selectionMetricLabel": metric_label,
+        "homeSelectedReconstructionCount": normalize_trend_count(selected_weight(home_samples)),
+        "awaySelectedReconstructionCount": normalize_trend_count(selected_weight(away_samples)),
+        "homeSelectedRawCount": sum(1 for sample in home_samples if sample.get("selectedForTendency")),
+        "awaySelectedRawCount": sum(1 for sample in away_samples if sample.get("selectedForTendency")),
+    }
+
+
+def summarize_reconstruction_samples(samples, selection=None):
     clean = [sample for sample in (samples or []) if isinstance(sample, dict)]
+    metric_label = (selection or {}).get("selectionMetricLabel") or "Moyenne Minute Haute"
     if not clean:
         return {
             "meanScore": 0.0,
             "tendencyScore": 0.0,
             "reconstructionCount": 0,
-            "highestMinuteIndex": None,
-            "highestGoalsIndex": None,
-            "highestMinuteValue": 0.0,
-            "highestGoalsValue": 0.0,
-            "highestMinuteReconstruction": None,
-            "highestGoalsReconstruction": None,
+            "selectedReconstructionCount": 0,
+            "selectedReconstructionRawCount": 0,
+            "selectionMetricLabel": metric_label,
+            "selectionMode": (selection or {}).get("method") or "top_line",
+            "selectionModeLabel": (selection or {}).get("label") or "Top Ligne",
             "performanceScore": 0.0,
             "dominantCount": 0,
         }
@@ -4380,28 +4476,34 @@ def summarize_reconstruction_samples(samples):
     levels = [float(sample.get("level") or 0.0) for sample in clean]
     mean_score = sum(levels) / len(levels)
 
-    # Les échantillons sont classés du plus récent au plus ancien. En cas
-    # d'égalité de critère, le premier garde donc la priorité (le plus récent).
-    minute_index = max(range(len(clean)), key=lambda idx: float(clean[idx].get("averageMinute") or 0.0))
-    goals_index = max(range(len(clean)), key=lambda idx: reconstruction_goal_quantity(clean[idx]))
-    minute_sample = clean[minute_index]
-    goals_sample = clean[goals_index]
-    tendency_score = (float(minute_sample.get("level") or 0.0) + float(goals_sample.get("level") or 0.0)) / 2.0
+    weighted_sum = 0.0
+    selected_weight = 0.0
+    selected_raw_count = 0
+    for sample in clean:
+        try:
+            weight = float(sample.get("selectionWeight") or 0.0)
+        except Exception:
+            weight = 0.0
+        if weight <= 0:
+            continue
+        selected_raw_count += 1
+        selected_weight += weight
+        weighted_sum += float(sample.get("level") or 0.0) * weight
+
+    tendency_score = weighted_sum / selected_weight if selected_weight > 0 else 0.0
 
     return {
         "meanScore": round(mean_score, 6),
         "tendencyScore": round(tendency_score, 6),
         "reconstructionCount": len(clean),
-        "highestMinuteIndex": minute_index + 1,
-        "highestGoalsIndex": goals_index + 1,
-        "highestMinuteValue": round(float(minute_sample.get("averageMinute") or 0.0), 4),
-        "highestGoalsValue": round(reconstruction_goal_quantity(goals_sample), 6),
-        "highestMinuteReconstruction": minute_sample,
-        "highestGoalsReconstruction": goals_sample,
-        # Compatibilité avec l'ancien rendu : la « performance » est désormais
-        # la Tendance calculée depuis les deux reconstitutions repères.
+        "selectedReconstructionCount": normalize_trend_count(selected_weight),
+        "selectedReconstructionRawCount": selected_raw_count,
+        "selectionMetric": (selection or {}).get("selectionMetric") or "minute",
+        "selectionMetricLabel": metric_label,
+        "selectionMode": (selection or {}).get("method") or "top_line",
+        "selectionModeLabel": (selection or {}).get("label") or "Top Ligne",
         "performanceScore": round(tendency_score, 6),
-        "dominantCount": len(clean),
+        "dominantCount": normalize_trend_count(selected_weight),
     }
 
 
@@ -4411,13 +4513,25 @@ def process_trend_scan_job(job_id, params):
     reconstruction_count = max(1, min(100, reconstruction_count))
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
-    simultaneous_mode = True if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
+    camp_mode_raw = str(params.get("campMode") or "").strip().lower()
+    if camp_mode_raw in {"combined", "combine", "camp_combine", "camp-combiné"}:
+        camp_mode = "combined"
+    elif camp_mode_raw in {"separate", "separated", "camp_separe", "camp-séparé"}:
+        camp_mode = "separate"
+    else:
+        simultaneous_legacy = True if params.get("simultaneousMode") is None else truthy_param(params.get("simultaneousMode"))
+        camp_mode = "separate" if simultaneous_legacy else "combined"
+    simultaneous_mode = camp_mode == "separate"
     include_extra_raw = params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled")
     include_extra = True if include_extra_raw is None else truthy_param(include_extra_raw)
     regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
     reconstruction_mode = str(params.get("reconstructionMode") or "sequence").strip().lower()
     reconstruction_mode = "sequence" if reconstruction_mode in {"sequence", "séquence", "seq"} else "staircase"
     reconstruction_mode_label = "Séquence" if reconstruction_mode == "sequence" else "Escalier"
+
+    trend_selection_mode = "top_half" if str(params.get("trendSelectionMode") or "top_line").strip().lower() == "top_half" else "top_line"
+    high_goal_quantity_enabled = truthy_param(params.get("highGoalQuantityEnabled"))
+    trend_selection_metric = "goals" if high_goal_quantity_enabled else "minute"
 
     trend_to_mean_enabled = truthy_param(params.get("trendToMeanEnabled"))
     mean_to_trend_enabled = truthy_param(params.get("meanToTrendEnabled"))
@@ -4487,8 +4601,14 @@ def process_trend_scan_job(job_id, params):
             f"{len(away_scan['trendMatches'])}/{reconstruction_count} extérieur."
         )
 
-    home_summary = summarize_reconstruction_samples(home_scan["trendMatches"])
-    away_summary = summarize_reconstruction_samples(away_scan["trendMatches"])
+    trend_selection = select_reconstruction_samples(
+        home_scan["trendMatches"],
+        away_scan["trendMatches"],
+        selection_mode=trend_selection_mode,
+        selection_metric=trend_selection_metric,
+    )
+    home_summary = summarize_reconstruction_samples(home_scan["trendMatches"], trend_selection)
+    away_summary = summarize_reconstruction_samples(away_scan["trendMatches"], trend_selection)
 
     comparisons = []
     for index in range(reconstruction_count):
@@ -4574,8 +4694,13 @@ def process_trend_scan_job(job_id, params):
         "trendCount": reconstruction_count,
         "trendCalculationCount": reconstruction_count,
         "trendMatchesNeeded": needed_matches,
+        "trendSelectionMode": trend_selection_mode,
+        "trendSelectionMetric": trend_selection_metric,
+        "highGoalQuantityEnabled": bool(high_goal_quantity_enabled),
+        "trendSelection": trend_selection,
+        "campMode": camp_mode,
         "simultaneousMode": simultaneous_mode,
-        "scanModeLabel": "Camp Séparé" if simultaneous_mode else "Camp Combiné",
+        "scanModeLabel": "Camp Séparé" if camp_mode == "separate" else "Camp Combiné",
         "reconstructionMode": reconstruction_mode,
         "reconstructionModeLabel": reconstruction_mode_label,
         "trendLevelMode": level_mode,
@@ -4706,7 +4831,16 @@ def process_scan_job(job_id):
     rank2 = float(rank2) if rank2 is not None else None
     skip_home = int(params.get("skipHome") or 0)
     skip_away = int(params.get("skipAway") or 0)
-    simultaneous_mode = bool(params.get("simultaneousMode"))
+    legacy_camp_mode_raw = str(params.get("campMode") or "").strip().lower()
+    if legacy_camp_mode_raw in {"combined", "combine", "camp_combine", "camp-combiné"}:
+        simultaneous_mode = False
+        legacy_camp_mode = "combined"
+    elif legacy_camp_mode_raw in {"separate", "separated", "camp_separe", "camp-séparé"}:
+        simultaneous_mode = True
+        legacy_camp_mode = "separate"
+    else:
+        simultaneous_mode = bool(params.get("simultaneousMode"))
+        legacy_camp_mode = "separate" if simultaneous_mode else "combined"
     rank_event_step = params.get("rankEventStep", DEFAULT_RANK_EVENT_STEP)
     rank_event_mode = params.get("rankEventMode") or params.get("rankStepMode") or "fixed"
     winner_mode = "evolution" if params.get("winnerMode") == "evolution" else "dominance"
@@ -4855,6 +4989,7 @@ def process_scan_job(job_id):
             "requestedRank2": rank2,
             "rank1": effective_rank1,
             "rank2": effective_rank2,
+            "campMode": legacy_camp_mode,
             "simultaneousMode": simultaneous_mode,
                     "rankEventStep": CURRENT_RANK_EVENT_STEP,
             "rankEventMode": CURRENT_RANK_ADVANCEMENT_MODE,
@@ -4973,7 +5108,7 @@ def main():
     print("Mode séparé: équipe analysée + adversaires passés pondérés par match utilisé.")
     print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Liaison scan: mode robuste v209 activé (pending set + file + latest + heartbeat).")
+    print("Liaison scan: file FIFO unique + écoute BRPOP immédiate v240.")
     print("Système tendance: curseur 1-100, extra configurable, limitation temps réglementaire configurable.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
@@ -4996,34 +5131,25 @@ def main():
 
         try:
             send_worker_heartbeat()
-            # Priorité absolue au scan FOOTSCAN via mode robuste v209.
-            value = pop_scan_job_fallback()
-            queue_key = SCAN_QUEUE_KEY if value else None
+            # Une seule attente bloquante écoute la file FOOTSCAN en priorité.
+            # LPUSH côté API + BRPOP côté worker forme une FIFO fiable et réactive.
+            result = redis_cmd(
+                "BRPOP",
+                SCAN_QUEUE_KEY,
+                RAW_QUEUE_KEY,
+                RAW_PREFETCH_QUEUE_KEY,
+                "1" if once else "15",
+            )
+            queue_key, value = parse_brpop_result(result)
         except RuntimeError as e:
             if is_upstash_quota_error(e):
                 print("\n❌ Quota Upstash atteint: limite de requêtes dépassée.")
                 print("Le worker ne peut plus lire la file tant que le quota n'est pas réinitialisé ou augmenté.")
+                print("Solution: attendre le reset Upstash, passer l'instance en plan supérieur, ou changer de base Redis.")
                 break
-            raise
-
-        if not value:
-            try:
-                # Anciennes files: on garde BRPOP avec un délai court.
-                # Le scan principal n'en dépend plus.
-                result = redis_cmd(
-                    "BRPOP",
-                    RAW_QUEUE_KEY,
-                    RAW_PREFETCH_QUEUE_KEY,
-                    "1" if once else "2",
-                )
-                queue_key, value = parse_brpop_result(result)
-            except RuntimeError as e:
-                if is_upstash_quota_error(e):
-                    print("\n❌ Quota Upstash atteint: limite de requêtes dépassée.")
-                    print("Le worker ne peut plus lire la file tant que le quota n'est pas réinitialisé ou augmenté.")
-                    print("Solution: attendre le reset Upstash, passer l'instance en plan supérieur, ou changer de base Redis.")
-                    break
-                raise
+            print(f"⚠️ Liaison Redis interrompue: {e}. Nouvelle tentative dans 2 secondes.", file=sys.stderr)
+            time.sleep(2)
+            continue
 
         if not value:
             if once:
@@ -5031,10 +5157,9 @@ def main():
                 break
             global_idle_ts = now_ts()
             global LAST_IDLE_LOG_AT
-            if global_idle_ts - LAST_IDLE_LOG_AT >= 30:
-                print("Worker actif: aucun scan reçu pour l'instant.")
+            if global_idle_ts - LAST_IDLE_LOG_AT >= 60:
+                print("Worker actif: en attente d'un scan FOOTSCAN.")
                 LAST_IDLE_LOG_AT = global_idle_ts
-            time.sleep(0.4)
             continue
 
         queue_key = normalize_queue_key(queue_key)
