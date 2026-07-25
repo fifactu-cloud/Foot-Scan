@@ -151,11 +151,11 @@ module.exports = async function (req, res) {
     const rankEventStep = numeric(b.rankEventStep, 1, 0.0001, 5);
     const rankEventMode = b.rankEventMode === 'performance' ? 'performance' : 'fixed';
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
-    const isTrendMode = bool(b.trendMode) || b.trendCount !== undefined || b.rankEventMode === 'trend';
-    const trendCount = numeric(b.trendCount, rank1 || 9, 1, 100);
-    const trendSelectionMode = b.trendSelectionMode === undefined ? 'top_line' : (b.trendSelectionMode === 'top_line' ? 'top_line' : 'top_half');
-    const trendSelectionMetric = 'progression';
-    const trendLimitEnabled = false;
+    const isTrendMode = bool(b.trendMode) || b.reconstructionCount !== undefined || b.trendCount !== undefined || b.rankEventMode === 'trend';
+    const reconstructionCount = numeric(b.reconstructionCount, numeric(b.trendCount, rank1 || 9, 1, 100), 1, 100);
+    const trendCount = reconstructionCount; // compatibilité avec les anciens workers/rapports
+    const trendToMeanEnabled = bool(b.trendToMeanEnabled);
+    const meanToTrendEnabled = !trendToMeanEnabled && bool(b.meanToTrendEnabled);
     const includeExtra = (b.includeExtra === undefined && b.includeExtraEnabled === undefined) ? true : bool(b.includeExtra || b.includeExtraEnabled);
     const regulationTimeLimitEnabled = b.regulationTimeLimitEnabled === undefined ? true : bool(b.regulationTimeLimitEnabled);
     const reconstructionMode = b.reconstructionMode === undefined ? 'sequence' : (b.reconstructionMode === 'sequence' ? 'sequence' : 'staircase');
@@ -197,9 +197,9 @@ module.exports = async function (req, res) {
         winnerMode,
         trendMode: isTrendMode,
         trendCount,
-        trendSelectionMode,
-        trendSelectionMetric,
-        trendLimitEnabled,
+        reconstructionCount,
+        trendToMeanEnabled,
+        meanToTrendEnabled,
         includeExtra,
         includeExtraEnabled: includeExtra,
         regulationTimeLimitEnabled,
