@@ -11641,8 +11641,15 @@
             <input id="simultaneousMode" type="checkbox" hidden checked />
             <div class="calc-mode-slider sim" id="calcModeSlider" role="tablist" aria-label="Mode de camp">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt" data-mode="separate" role="tab">CAMP COMBINÉ</button>
-              <button type="button" class="calc-mode-opt is-active" data-mode="simultaneous" role="tab">CAMP SÉPARÉ</button>
+              <button type="button" class="calc-mode-opt" data-mode="combined" role="tab">CAMP COMBINÉ</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">CAMP SÉPARÉ</button>
+            </div>
+
+            <input id="trendSelectionMode" type="checkbox" hidden />
+            <div class="calc-mode-slider trend-selection-slider" id="trendSelectionSlider" role="tablist" aria-label="Sélection des reconstitutions pour la tendance">
+              <span class="calc-mode-thumb" aria-hidden="true"></span>
+              <button type="button" class="calc-mode-opt is-active" data-mode="line" role="tab">TOP LIGNE</button>
+              <button type="button" class="calc-mode-opt" data-mode="half" role="tab">TOP MOITIÉ</button>
             </div>
 
             <input id="reconstructionMode" type="checkbox" hidden checked />
@@ -11663,6 +11670,12 @@
               <input id="regulationTimeLimitEnabled" type="checkbox" checked />
               <span class="metric-check-box" aria-hidden="true"></span>
               <span class="metric-check-text">LIMITATION TEMPS RÉGLEMENTAIRE</span>
+            </label>
+
+            <label class="metric-check-row" for="highGoalQuantityEnabled">
+              <input id="highGoalQuantityEnabled" type="checkbox" />
+              <span class="metric-check-box" aria-hidden="true"></span>
+              <span class="metric-check-text">QUANTITÉ BUT HAUTE</span>
             </label>
 
             <label class="metric-check-row" for="trendToMeanEnabled">
@@ -11750,12 +11763,15 @@
           <div class="bar-line"><span>Sans Extra</span><strong>Exclut Prolongations Et Tirs Au But</strong></div>
           <div class="bar-line"><span>Avec Extra</span><strong>Autorise Prolongations Et Tirs Au But</strong></div>
           <div class="bar-line"><span>Lim. Temps</span><strong>Ne Dépasse Pas Le Temps Réglementaire</strong></div>
+          <div class="bar-line"><span>Top Ligne</span><strong>Compare Les Reconstitutions De La Même Ligne</strong></div>
+          <div class="bar-line"><span>Top Moitié</span><strong>Garde La Moitié Haute De Chaque Équipe</strong></div>
+          <div class="bar-line"><span>Quantité But Haute</span><strong>Remplace Le Critère Minute Par Le Nombre De Buts</strong></div>
         </div>
 
         <div class="bar-card">
           <div class="bar-card-title">📈 Moyenne & Tendance</div>
           <div class="bar-line"><span>Moyenne</span><strong>Moyenne De Toutes Les Reconstitutions</strong></div>
-          <div class="bar-line"><span>Tendance</span><strong>Moyenne Entre La Reconstitution Minute Haute Et Celle Avec Le Plus De Buts</strong></div>
+          <div class="bar-line"><span>Tendance</span><strong>Moyenne Des Reconstitutions Retenues Par Top Ligne Ou Top Moitié</strong></div>
           <div class="bar-line"><span>0-0</span><strong>Minute 0 Et Borne De Clôture</strong></div>
         </div>
 
@@ -12137,14 +12153,14 @@
       const sync = () => {
         const sim = Boolean(box.checked);
         slider.classList.toggle("sim", sim);
-        opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "simultaneous") === sim));
+        opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "separate") === sim));
         requestAnimationFrame(positionThumb);
       };
       window.addEventListener("resize", () => requestAnimationFrame(positionThumb));
       setTimeout(positionThumb, 80);
       setTimeout(positionThumb, 350);
       opts.forEach((o) => o.addEventListener("click", () => {
-        box.checked = (o.dataset.mode === "simultaneous");
+        box.checked = (o.dataset.mode === "separate");
         box.dispatchEvent(new Event("change", { bubbles: true }));
         sync();
         if (typeof navigator.vibrate === "function") navigator.vibrate(8);
@@ -12154,6 +12170,65 @@
 
     function isSimultaneousMode() {
       return Boolean($("simultaneousMode")?.checked);
+    }
+
+    function setupTrendSelectionSlider() {
+      const slider = document.getElementById("trendSelectionSlider");
+      const box = document.getElementById("trendSelectionMode");
+      if (!slider || !box) return;
+      const opts = slider.querySelectorAll(".calc-mode-opt");
+      const positionThumb = () => {
+        const active = slider.querySelector(".calc-mode-opt.is-active");
+        if (!active) return;
+        const pad = 4;
+        const inset = 2;
+        const sliderW = slider.clientWidth;
+        let left = active.offsetLeft + inset;
+        let width = active.offsetWidth - inset * 2;
+        const maxRight = sliderW - pad;
+        if (left < pad) left = pad;
+        if (left + width > maxRight) width = maxRight - left;
+        slider.style.setProperty("--thumb-left", left + "px");
+        slider.style.setProperty("--thumb-width", width + "px");
+      };
+      const sync = () => {
+        const topHalf = Boolean(box.checked);
+        slider.classList.toggle("sim", topHalf);
+        opts.forEach((o) => o.classList.toggle("is-active", (o.dataset.mode === "half") === topHalf));
+        requestAnimationFrame(positionThumb);
+      };
+      window.addEventListener("resize", () => requestAnimationFrame(positionThumb));
+      setTimeout(positionThumb, 80);
+      setTimeout(positionThumb, 350);
+      opts.forEach((o) => o.addEventListener("click", () => {
+        box.checked = (o.dataset.mode === "half");
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+        sync();
+        if (typeof navigator.vibrate === "function") navigator.vibrate(8);
+      }));
+      sync();
+    }
+
+    function getTrendSelectionMode(result = null) {
+      if (result && (result.trendSelectionMode || result.trendSelection?.method)) {
+        return String(result.trendSelectionMode || result.trendSelection.method).includes("half") ? "top_half" : "top_line";
+      }
+      return $("trendSelectionMode")?.checked ? "top_half" : "top_line";
+    }
+
+    function trendSelectionModeLabel(result = null) {
+      return getTrendSelectionMode(result) === "top_half" ? "Top Moitié" : "Top Ligne";
+    }
+
+    function isHighGoalQuantityEnabled(result = null) {
+      if (result && Object.prototype.hasOwnProperty.call(result, "highGoalQuantityEnabled")) return Boolean(result.highGoalQuantityEnabled);
+      const metric = String(result?.trendSelectionMetric || result?.trendSelection?.selectionMetric || "").toLowerCase();
+      if (metric) return metric === "goals" || metric === "high_goal_quantity";
+      return Boolean($("highGoalQuantityEnabled")?.checked);
+    }
+
+    function trendSelectionMetricLabel(result = null) {
+      return isHighGoalQuantityEnabled(result) ? "Quantité But Haute" : "Moyenne Minute Haute";
     }
 
     function setupVarianceDirectionOptions() {
@@ -12194,9 +12269,28 @@
       return isRegulationTimeLimitEnabled(result) ? "Limitation Temps Réglementaire" : "Temps Complet";
     }
 
+    function normalizeCampMode(value, simultaneousFallback = null) {
+      const raw = String(value || "").trim().toLowerCase();
+      if (["separate", "separated", "camp_separe", "camp-séparé", "camp séparé"].includes(raw)) return "separate";
+      if (["combined", "combine", "camp_combine", "camp-combiné", "camp combiné"].includes(raw)) return "combined";
+      if (simultaneousFallback !== null && simultaneousFallback !== undefined) {
+        return Boolean(simultaneousFallback) ? "separate" : "combined";
+      }
+      return isSimultaneousMode() ? "separate" : "combined";
+    }
+
+    function getCampMode(result = null) {
+      if (result && Object.prototype.hasOwnProperty.call(result, "campMode")) {
+        return normalizeCampMode(result.campMode, result.simultaneousMode);
+      }
+      if (result && Object.prototype.hasOwnProperty.call(result, "simultaneousMode")) {
+        return normalizeCampMode(null, result.simultaneousMode);
+      }
+      return normalizeCampMode(null, isSimultaneousMode());
+    }
+
     function campModeLabel(result = null) {
-      const sim = Boolean(result?.simultaneousMode ?? isSimultaneousMode());
-      return sim ? "Camp Séparé" : "Camp Combiné";
+      return getCampMode(result) === "separate" ? "Camp Séparé" : "Camp Combiné";
     }
 
     function setupReconstructionModeSlider() {
@@ -12301,7 +12395,10 @@
     }
 
     function renderModeScanDots(result) {
-      const campSeparate = Boolean(result?.simultaneousMode ?? isSimultaneousMode());
+      const campMode = getCampMode(result);
+      const campSeparate = campMode === "separate";
+      const topHalf = getTrendSelectionMode(result) === "top_half";
+      const highGoals = isHighGoalQuantityEnabled(result);
       const withExtra = isIncludeExtraEnabled(result);
       const regulationLimited = isRegulationTimeLimitEnabled(result);
       const reconstructionSequence = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase() === "sequence";
@@ -12309,6 +12406,8 @@
 
       const modeTitle = [
         campSeparate ? "Camp Séparé" : "Camp Combiné",
+        topHalf ? "Top Moitié" : "Top Ligne",
+        highGoals ? "Quantité But Haute" : "Moyenne Minute Haute",
         reconstructionSequence ? "Séquence" : "Escalier",
         withExtra ? "Avec Extra" : "Sans Extra",
         regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet",
@@ -12317,7 +12416,9 @@
 
       return `
         <span class="mode-dotbar" title="${esc(modeTitle)}" aria-label="${esc(modeTitle)}">
-          <span class="mode-dot ${campSeparate ? "blue" : "pink"}" title="${esc(campSeparate ? "Camp Séparé" : "Camp Combiné")}"></span>
+          <span class="mode-dot camp-mode-dot ${campSeparate ? "blue" : "pink"}" data-camp-mode="${campMode}" title="${esc(campSeparate ? "Camp Séparé" : "Camp Combiné")}"></span>
+          <span class="mode-dot ${topHalf ? "pink" : "blue"}" title="${esc(topHalf ? "Top Moitié" : "Top Ligne")}"></span>
+          <span class="mode-check ${highGoals ? "checked" : "empty"}" title="${esc(highGoals ? "Quantité But Haute" : "Moyenne Minute Haute")}"></span>
           <span class="mode-dot ${reconstructionSequence ? "pink" : "blue"}" title="${esc(reconstructionSequence ? "Séquence" : "Escalier")}"></span>
           <span class="mode-dot ${withExtra ? "pink" : "blue"}" title="${esc(withExtra ? "Avec Extra" : "Sans Extra")}"></span>
           <span class="mode-check ${regulationLimited ? "checked" : "empty"}" title="${esc(regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet")}"></span>
@@ -12804,7 +12905,10 @@
           skipHome: skipHomeValue,
           skipAway: skipAwayValue,
           simultaneousMode: isSimultaneousMode(),
+          campMode: isSimultaneousMode() ? "separate" : "combined",
           reconstructionCount: trendCount,
+          trendSelectionMode: getTrendSelectionMode(),
+          highGoalQuantityEnabled: isHighGoalQuantityEnabled(),
           trendToMeanEnabled: isTrendToMeanEnabled(),
           meanToTrendEnabled: isMeanToTrendEnabled(),
           includeExtra: isIncludeExtraEnabled(),
@@ -12873,9 +12977,11 @@
         setStatus(job.message || job.status || "🔎 SCAN EN COURS…", safeProgress);
 
         if (job.status === "done") {
+          const resolvedCampMode = normalizeCampMode(job.result?.campMode, job.result?.simultaneousMode ?? isSimultaneousMode());
           const resultWithOptions = {
             ...job.result,
-            simultaneousMode: Boolean(job.result?.simultaneousMode ?? isSimultaneousMode()),
+            campMode: resolvedCampMode,
+            simultaneousMode: resolvedCampMode === "separate",
             rankEventStep: Number(job.result?.rankEventStep ?? calculateAutoRanks().advancement),
             rankEventMode: job.result?.rankEventMode || (isPerformanceAdvanceMode() ? "performance" : "fixed"),
             winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
@@ -12892,6 +12998,7 @@
             skipAway: skipAwayValue,
             autoSearch: {
               ...calculateAutoRanks(),
+              campMode: resultWithOptions.campMode,
               simultaneousMode: Boolean(resultWithOptions.simultaneousMode),
               trendToMeanEnabled: Boolean(resultWithOptions.trendToMeanEnabled ?? isTrendToMeanEnabled()),
               meanToTrendEnabled: Boolean(resultWithOptions.meanToTrendEnabled ?? isMeanToTrendEnabled()),
@@ -13199,9 +13306,10 @@
     function reconstructionGoalQuantity(sample) {
       const average = sample?.reconstructionScoreAverage || {};
       const mode = String(sample?.levelMode || "").toLowerCase();
-      const raw = (mode === "attack" || mode === "separated-attack-vs-attack" || sample?.defenseRemovedForCombined)
+      const attackOnly = mode === "attack" || mode === "separated-attack-vs-attack" || sample?.defenseRemovedForCombined;
+      const raw = attackOnly
         ? (sample?.attackGoalsFor ?? average.attack ?? sample?.goalsFor ?? 0)
-        : (sample?.goalsFor ?? average.team ?? 0);
+        : (Number(sample?.goalsFor ?? average.team ?? 0) + Number(sample?.goalsAgainst ?? average.opponent ?? 0));
       const value = Number(raw);
       return Number.isFinite(value) ? value : 0;
     }
@@ -13214,8 +13322,9 @@
       const averageMinute = Number(sample?.averageMinute || 0);
       const goals = reconstructionGoalQuantity(sample);
       const badges = [];
-      if (displayIndex === Number(trend?.highestMinuteIndex)) badges.push("MINUTE HAUTE");
-      if (displayIndex === Number(trend?.highestGoalsIndex)) badges.push("PLUS DE BUTS");
+      if (sample?.selectedForTendency || sample?.selectedTrend) {
+        badges.push(sample?.selectionTie ? "RETENUE 50%" : "RETENUE");
+      }
       return `
         <div class="trend-row">
           <div class="trend-row-head">
@@ -14242,7 +14351,7 @@
 
     function trendModeLabelV151(result) {
       const camp = result?.scanModeLabel || (result?.simultaneousMode ? "Camp Séparé" : "Camp Combiné");
-      return `${camp} · ${reconstructionModeLabel(result)} · ${extraModeLabel(result)} · ${regulationTimeLimitLabel(result)} · ${varianceDirectionLabel(result)}`;
+      return `${camp} · ${trendSelectionModeLabel(result)} · ${trendSelectionMetricLabel(result)} · ${reconstructionModeLabel(result)} · ${extraModeLabel(result)} · ${regulationTimeLimitLabel(result)} · ${varianceDirectionLabel(result)}`;
     }
 
     function trendWinnerLinesV151(result, compact = false) {
@@ -14264,6 +14373,8 @@
         "VALEUR DE RECHERCHE",
         `Mode Scan : ${trendModeLabelV151(result)}`,
         `Reconstitutions : ${count}`,
+        `Sélection : ${trendSelectionModeLabel(result)}`,
+        `Critère : ${trendSelectionMetricLabel(result)}`,
         `Extra : ${extraModeLabel(result)}`,
         `Temps Réglementaire : ${regulationTimeLimitLabel(result)}`,
         `Direction : ${varianceDirectionLabel(result)}`,
@@ -14298,8 +14409,8 @@
         `${String(side || "").toUpperCase()} — ${team?.name || "—"}`,
         `Moyenne : ${mean}`,
         `Tendance : ${tendency}`,
-        `Reconstitution minute haute : ${trend.highestMinuteIndex || "—"}`,
-        `Reconstitution plus de buts : ${trend.highestGoalsIndex || "—"}`,
+        `Reconstitutions retenues : ${formatRank(trend.selectedReconstructionCount || 0)}`,
+        `Critère de sélection : ${trend.selectionMetricLabel || "—"}`,
         `Matchs utilisés : ${(team?.matchesUsed || []).length}`,
       ];
     }
@@ -14319,8 +14430,7 @@
       items.forEach((sample, index) => {
         const displayIndex = Number(sample?.reconstructionIndex || index + 1);
         const markers = [];
-        if (displayIndex === Number(trend.highestMinuteIndex)) markers.push("minute haute");
-        if (displayIndex === Number(trend.highestGoalsIndex)) markers.push("plus de buts");
+        if (sample?.selectedForTendency || sample?.selectedTrend) markers.push(sample?.selectionTie ? "retenue 50%" : "retenue");
         lines.push(`- Reconstitution ${displayIndex} · Score ${reconstructionScore(sample)} · Niveau ${formatValue(sample?.level)} · Moyenne Minute ${formatRank(sample?.averageMinute)} · Quantité Buts ${formatRank(reconstructionGoalQuantity(sample))}${markers.length ? ` · ${markers.join(" + ")}` : ""}`);
       });
       return lines;
@@ -14381,7 +14491,9 @@
       lines.push("");
       lines.push("LEXIQUE");
       lines.push("Moyenne = moyenne de toutes les reconstitutions de l’équipe.");
-      lines.push("Tendance = moyenne entre la reconstitution à la moyenne minute la plus haute et celle ayant le plus de buts.");
+      lines.push("Tendance = moyenne des reconstitutions retenues par Top Ligne ou Top Moitié.");
+      lines.push("Critère normal = moyenne minute la plus haute.");
+      lines.push("Quantité But Haute = sélection par le nombre de buts le plus élevé.");
       lines.push("Tendance Vers Moyenne = Moyenne − Tendance.");
       lines.push("Moyenne Vers Tendance = Tendance − Moyenne.");
       lines.push("Sans option = comparaison directe des Tendances.");
@@ -14539,6 +14651,7 @@
     }, { passive: true });
 
 setupCalcModeSlider();
+    setupTrendSelectionSlider();
     setupVarianceDirectionOptions();
     setupReconstructionModeSlider();
     setupExtraModeSlider();
