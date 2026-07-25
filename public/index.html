@@ -11249,6 +11249,31 @@
       transform: translateY(-.5px);
     }
 
+    /* === v243 : 4 sliders + 4 cases fidèlement représentés dans RÉSUMÉ === */
+    .result-shell .summary-mode-dots {
+      padding-left: 6px !important;
+      padding-right: 6px !important;
+    }
+
+    .result-shell .mode-dotbar {
+      gap: clamp(4px, 1.35vw, 7px) !important;
+    }
+
+    .result-shell .mode-dot,
+    .result-shell .mode-check {
+      width: clamp(10px, 2.7vw, 13px) !important;
+      height: clamp(10px, 2.7vw, 13px) !important;
+    }
+
+    .result-shell .mode-check.checked::after {
+      font-size: clamp(8px, 2.25vw, 10px) !important;
+    }
+
+    .result-shell .mini-badge span {
+      min-width: 0 !important;
+      overflow-wrap: anywhere !important;
+    }
+
     /* === v188 : supprime définitivement le raccord de couleur avant Matchs Utilisés === */
     .result-shell .team-card > .section:last-of-type {
       background: transparent !important;
@@ -12402,27 +12427,30 @@
       const withExtra = isIncludeExtraEnabled(result);
       const regulationLimited = isRegulationTimeLimitEnabled(result);
       const reconstructionSequence = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase() === "sequence";
-      const direction = varianceDirectionLabel(result);
+      const trendToMean = isTrendToMeanEnabled(result);
+      const meanToTrend = isMeanToTrendEnabled(result);
 
       const modeTitle = [
         campSeparate ? "Camp Séparé" : "Camp Combiné",
         topHalf ? "Top Moitié" : "Top Ligne",
-        highGoals ? "Quantité But Haute" : "Moyenne Minute Haute",
+        highGoals ? "Quantité But Haute cochée" : "Quantité But Haute décochée",
         reconstructionSequence ? "Séquence" : "Escalier",
         withExtra ? "Avec Extra" : "Sans Extra",
-        regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet",
-        direction,
+        regulationLimited ? "Limitation Temps Réglementaire cochée" : "Limitation Temps Réglementaire décochée",
+        trendToMean ? "Tendance Vers Moyenne cochée" : "Tendance Vers Moyenne décochée",
+        meanToTrend ? "Moyenne Vers Tendance cochée" : "Moyenne Vers Tendance décochée",
       ].join(" · ");
 
       return `
         <span class="mode-dotbar" title="${esc(modeTitle)}" aria-label="${esc(modeTitle)}">
-          <span class="mode-dot camp-mode-dot ${campSeparate ? "blue" : "pink"}" data-camp-mode="${campMode}" title="${esc(campSeparate ? "Camp Séparé" : "Camp Combiné")}"></span>
+          <span class="mode-dot camp-mode-dot ${campSeparate ? "pink" : "blue"}" data-camp-mode="${campMode}" title="${esc(campSeparate ? "Camp Séparé" : "Camp Combiné")}"></span>
           <span class="mode-dot ${topHalf ? "pink" : "blue"}" title="${esc(topHalf ? "Top Moitié" : "Top Ligne")}"></span>
-          <span class="mode-check ${highGoals ? "checked" : "empty"}" title="${esc(highGoals ? "Quantité But Haute" : "Moyenne Minute Haute")}"></span>
+          <span class="mode-check ${highGoals ? "checked" : "empty"}" title="Quantité But Haute ${highGoals ? "cochée" : "décochée"}"></span>
           <span class="mode-dot ${reconstructionSequence ? "pink" : "blue"}" title="${esc(reconstructionSequence ? "Séquence" : "Escalier")}"></span>
           <span class="mode-dot ${withExtra ? "pink" : "blue"}" title="${esc(withExtra ? "Avec Extra" : "Sans Extra")}"></span>
-          <span class="mode-check ${regulationLimited ? "checked" : "empty"}" title="${esc(regulationLimited ? "Limitation Temps Réglementaire" : "Temps Complet")}"></span>
-          <span class="mode-check ${direction === "Tendance Directe" ? "empty" : "checked"}" title="${esc(direction)}"></span>
+          <span class="mode-check ${regulationLimited ? "checked" : "empty"}" title="Limitation Temps Réglementaire ${regulationLimited ? "cochée" : "décochée"}"></span>
+          <span class="mode-check ${trendToMean ? "checked" : "empty"}" title="Tendance Vers Moyenne ${trendToMean ? "cochée" : "décochée"}"></span>
+          <span class="mode-check ${meanToTrend ? "checked" : "empty"}" title="Moyenne Vers Tendance ${meanToTrend ? "cochée" : "décochée"}"></span>
         </span>
       `;
     }
@@ -12982,6 +13010,10 @@
             ...job.result,
             campMode: resolvedCampMode,
             simultaneousMode: resolvedCampMode === "separate",
+            trendSelectionMode: job.result?.trendSelectionMode || job.result?.trendSelection?.method || getTrendSelectionMode(),
+            trendSelectionMetric: job.result?.trendSelectionMetric || job.result?.trendSelection?.selectionMetric || (isHighGoalQuantityEnabled() ? "goals" : "minute"),
+            highGoalQuantityEnabled: Boolean(job.result?.highGoalQuantityEnabled ?? isHighGoalQuantityEnabled()),
+            reconstructionMode: job.result?.reconstructionMode || getReconstructionMode(),
             rankEventStep: Number(job.result?.rankEventStep ?? calculateAutoRanks().advancement),
             rankEventMode: job.result?.rankEventMode || (isPerformanceAdvanceMode() ? "performance" : "fixed"),
             winnerMode: job.result?.winnerMode || (isEvolutionWinnerMode() ? "evolution" : "dominance"),
@@ -13189,6 +13221,9 @@
       const trend = team?.trend || {};
       const mean = Number(trend.meanScore || 0);
       const tendency = Number(trend.tendencyScore || 0);
+      const reconstructionCount = Number(trend.reconstructionCount ?? (trend.items || []).length ?? 0);
+      const selectedCountRaw = Number(trend.selectedReconstructionCount ?? trend.dominantCount ?? 0);
+      const selectedCount = Number.isFinite(selectedCountRaw) ? selectedCountRaw : 0;
       const cellTone = tendency > 0 ? "cell-pos" : (tendency < 0 ? "cell-neg" : "cell-neutral");
       return `
         <div class="summary-cell ${cellTone}">
@@ -13201,7 +13236,8 @@
           <div class="mini-values">
             <div class="mini-badge"><span>MOYENNE</span><strong class="${valueClass(mean)}">${esc(formatValue(mean))}</strong></div>
             <div class="mini-badge"><span>TENDANCE</span><strong class="${valueClass(tendency)}">${esc(formatValue(tendency))}</strong></div>
-            <div class="mini-badge"><span>RECONSTITUTIONS</span><strong>${esc(trend.reconstructionCount || (trend.items || []).length || 0)}</strong></div>
+            <div class="mini-badge"><span>RECONSTITUTIONS</span><strong>${esc(formatRank(reconstructionCount))}</strong></div>
+            <div class="mini-badge"><span>RECONSTITUTIONS PRISES</span><strong>${esc(formatRank(selectedCount))}</strong></div>
           </div>
         </div>
       `;
@@ -13259,7 +13295,7 @@
               </div>
               <div>
                 <div class="team-name">${esc(String(team.name || "—").toUpperCase())}</div>
-                <div class="team-meta">${esc(items.length)} Reconstitution${items.length > 1 ? "s" : ""} · ${esc((team.matchesUsed || []).length)} Matchs Sources</div>
+                <div class="team-meta">${esc(items.length)} Reconstitution${items.length > 1 ? "s" : ""} · ${esc(formatRank(trend.selectedReconstructionCount ?? trend.dominantCount ?? 0))} Prise${Number(trend.selectedReconstructionCount ?? trend.dominantCount ?? 0) > 1 ? "s" : ""} · ${esc((team.matchesUsed || []).length)} Matchs Sources</div>
                 ${renderTeamDataIssueWarning(team)}
               </div>
             </div>
