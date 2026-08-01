@@ -11201,6 +11201,24 @@
       min-width: 0 !important;
     }
 
+    .mode-count {
+      min-width: clamp(20px, 5.2vw, 27px) !important;
+      height: clamp(15px, 3.8vw, 19px) !important;
+      padding: 0 5px !important;
+      border-radius: 999px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex: 0 0 auto !important;
+      color: #e0f2fe !important;
+      font-size: clamp(8px, 2.15vw, 10px) !important;
+      font-weight: 1000 !important;
+      line-height: 1 !important;
+      background: rgba(14, 165, 233, .16) !important;
+      border: 1px solid rgba(56, 189, 248, .48) !important;
+      box-shadow: 0 0 12px rgba(56, 189, 248, .18) !important;
+    }
+
     .mode-dot {
       width: clamp(11px, 3vw, 14px) !important;
       height: clamp(11px, 3vw, 14px) !important;
@@ -11234,6 +11252,12 @@
       border-color: rgba(56,189,248,.72) !important;
       background: linear-gradient(135deg,#38bdf8,#2563eb) !important;
       box-shadow: 0 0 12px rgba(56,189,248,.24) !important;
+    }
+
+    .mode-check.switch-checked {
+      border-color: rgba(251, 113, 133, .78) !important;
+      background: linear-gradient(135deg,#fb7185,#db2777) !important;
+      box-shadow: 0 0 12px rgba(251,113,133,.26) !important;
     }
 
     .mode-check.checked::after {
@@ -11677,18 +11701,18 @@
               <button type="button" class="calc-mode-opt" data-mode="half" role="tab">TOP MOITIÉ</button>
             </div>
 
-            <input id="reconstructionMode" type="checkbox" hidden checked />
-            <div class="calc-mode-slider reconstruction-mode-slider sim" id="reconstructionModeSlider" role="tablist" aria-label="Mode de reconstitution">
+            <input id="reconstructionMode" type="checkbox" hidden />
+            <div class="calc-mode-slider reconstruction-mode-slider" id="reconstructionModeSlider" role="tablist" aria-label="Mode de reconstitution">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt" data-mode="staircase" role="tab">ESCALIER</button>
-              <button type="button" class="calc-mode-opt is-active" data-mode="sequence" role="tab">SÉQUENCE</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="staircase" role="tab">ESCALIER</button>
+              <button type="button" class="calc-mode-opt" data-mode="sequence" role="tab">SÉQUENCE</button>
             </div>
 
-            <input id="includeExtraEnabled" type="checkbox" hidden checked />
-            <div class="calc-mode-slider trend-limit-slider sim" id="extraModeSlider" role="tablist" aria-label="Mode extra">
+            <input id="includeExtraEnabled" type="checkbox" hidden />
+            <div class="calc-mode-slider trend-limit-slider" id="extraModeSlider" role="tablist" aria-label="Mode extra">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt" data-mode="without" role="tab">SANS EXTRA</button>
-              <button type="button" class="calc-mode-opt is-active" data-mode="with" role="tab">AVEC EXTRA</button>
+              <button type="button" class="calc-mode-opt is-active" data-mode="without" role="tab">SANS EXTRA</button>
+              <button type="button" class="calc-mode-opt" data-mode="with" role="tab">AVEC EXTRA</button>
             </div>
 
             <label class="metric-check-row" for="regulationTimeLimitEnabled">
@@ -11698,7 +11722,7 @@
             </label>
 
             <label class="metric-check-row" for="highGoalQuantityEnabled">
-              <input id="highGoalQuantityEnabled" type="checkbox" />
+              <input id="highGoalQuantityEnabled" type="checkbox" checked />
               <span class="metric-check-box" aria-hidden="true"></span>
               <span class="metric-check-text">QUANTITÉ BUT HAUTE</span>
             </label>
@@ -11710,7 +11734,7 @@
             </label>
 
             <label class="metric-check-row" for="meanToTrendEnabled">
-              <input id="meanToTrendEnabled" type="checkbox" />
+              <input id="meanToTrendEnabled" type="checkbox" checked />
               <span class="metric-check-box" aria-hidden="true"></span>
               <span class="metric-check-text">MOYENNE VERS TENDANCE</span>
             </label>
@@ -11777,6 +11801,7 @@
           <div class="bar-line"><span>Direction</span><strong>Plus Grande Évolution Signée</strong></div>
           <div class="bar-line"><span>Égalité</span><strong>Valeurs Exactement Identiques</strong></div>
           <div class="bar-line"><span>⚠️</span><strong>Écart Inférieur À 0,1111111111</strong></div>
+          <div class="bar-line"><span>Switch Gagnant</span><strong>Deux Comptages Pris En X.5 Inversent Le Gagnant</strong></div>
         </div>
 
         <div class="bar-card">
@@ -12419,38 +12444,50 @@
       return extraModeLabel(result);
     }
 
+    function isSwitchWinnerApplied(result = null) {
+      if (!result) return false;
+      if (Object.prototype.hasOwnProperty.call(result, "switchWinnerApplied")) return Boolean(result.switchWinnerApplied);
+      return Boolean(result?.trendWinner?.switchWinnerApplied);
+    }
+
     function renderModeScanDots(result) {
+      const reconstructionCount = Number(result?.reconstructionCount || result?.trendCount || getTrendCount());
       const campMode = getCampMode(result);
       const campSeparate = campMode === "separate";
       const topHalf = getTrendSelectionMode(result) === "top_half";
-      const highGoals = isHighGoalQuantityEnabled(result);
+      const reconstructionSequence = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase() === "sequence";
       const withExtra = isIncludeExtraEnabled(result);
       const regulationLimited = isRegulationTimeLimitEnabled(result);
-      const reconstructionSequence = String(result?.reconstructionMode || getReconstructionMode()).toLowerCase() === "sequence";
+      const highGoals = isHighGoalQuantityEnabled(result);
       const trendToMean = isTrendToMeanEnabled(result);
       const meanToTrend = isMeanToTrendEnabled(result);
+      const switchApplied = isSwitchWinnerApplied(result);
 
       const modeTitle = [
+        `${formatRank(reconstructionCount)} Reconstitutions`,
         campSeparate ? "Camp Séparé" : "Camp Combiné",
         topHalf ? "Top Moitié" : "Top Ligne",
-        highGoals ? "Quantité But Haute cochée" : "Quantité But Haute décochée",
         reconstructionSequence ? "Séquence" : "Escalier",
         withExtra ? "Avec Extra" : "Sans Extra",
         regulationLimited ? "Limitation Temps Réglementaire cochée" : "Limitation Temps Réglementaire décochée",
+        highGoals ? "Quantité But Haute cochée" : "Quantité But Haute décochée",
         trendToMean ? "Tendance Vers Moyenne cochée" : "Tendance Vers Moyenne décochée",
         meanToTrend ? "Moyenne Vers Tendance cochée" : "Moyenne Vers Tendance décochée",
+        switchApplied ? "Switch Gagnant appliqué" : "Switch Gagnant non appliqué",
       ].join(" · ");
 
       return `
         <span class="mode-dotbar" title="${esc(modeTitle)}" aria-label="${esc(modeTitle)}">
+          <span class="mode-count" title="${esc(`${formatRank(reconstructionCount)} Reconstitutions`)}">${esc(formatRank(reconstructionCount))}</span>
           <span class="mode-dot camp-mode-dot ${campSeparate ? "pink" : "blue"}" data-camp-mode="${campMode}" title="${esc(campSeparate ? "Camp Séparé" : "Camp Combiné")}"></span>
           <span class="mode-dot ${topHalf ? "pink" : "blue"}" title="${esc(topHalf ? "Top Moitié" : "Top Ligne")}"></span>
-          <span class="mode-check ${highGoals ? "checked" : "empty"}" title="Quantité But Haute ${highGoals ? "cochée" : "décochée"}"></span>
           <span class="mode-dot ${reconstructionSequence ? "pink" : "blue"}" title="${esc(reconstructionSequence ? "Séquence" : "Escalier")}"></span>
           <span class="mode-dot ${withExtra ? "pink" : "blue"}" title="${esc(withExtra ? "Avec Extra" : "Sans Extra")}"></span>
-          <span class="mode-check ${regulationLimited ? "checked" : "empty"}" title="Limitation Temps Réglementaire ${regulationLimited ? "cochée" : "décochée"}"></span>
-          <span class="mode-check ${trendToMean ? "checked" : "empty"}" title="Tendance Vers Moyenne ${trendToMean ? "cochée" : "décochée"}"></span>
-          <span class="mode-check ${meanToTrend ? "checked" : "empty"}" title="Moyenne Vers Tendance ${meanToTrend ? "cochée" : "décochée"}"></span>
+          ${regulationLimited ? '<span class="mode-check checked" title="Limitation Temps Réglementaire cochée"></span>' : ''}
+          ${highGoals ? '<span class="mode-check checked" title="Quantité But Haute cochée"></span>' : ''}
+          ${trendToMean ? '<span class="mode-check checked" title="Tendance Vers Moyenne cochée"></span>' : ''}
+          ${meanToTrend ? '<span class="mode-check checked" title="Moyenne Vers Tendance cochée"></span>' : ''}
+          ${switchApplied ? '<span class="mode-check checked switch-checked" title="Switch Gagnant appliqué"></span>' : ''}
         </span>
       `;
     }
@@ -13200,6 +13237,7 @@
       `).join("");
       const modeLabel = winner.modeLabel || varianceDirectionLabel(result);
       const metricLabel = modeLabel === "Tendance Directe" ? "Tendance" : `Évolution ${modeLabel.replace(" Vers ", " → ")}`;
+      const switchApplied = Boolean(winner.switchWinnerApplied || result?.switchWinnerApplied);
       return `
         <div class="dominance-box dominance-win">
           <div class="status-confetti" aria-hidden="true">${confetti}</div>
@@ -13212,7 +13250,7 @@
               : `<span class="winner-close-gap-warning winner-close-gap-placeholder" aria-hidden="true">⚠️</span>`}
           </div>
           <div class="dominance-team">${esc(String(winner.label || "Indisponible").toUpperCase())}</div>
-          <div class="dominance-meta">${esc(metricLabel)} : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}</div>
+          <div class="dominance-meta">${esc(metricLabel)} : ${esc(formatValue(winner.score))}${winner.diff ? ` · Écart : ${esc(formatValue(winner.diff))}` : ""}${switchApplied ? " · Switch Gagnant" : ""}</div>
         </div>
       `;
     }
@@ -14395,7 +14433,8 @@
       const base = `👑 GAGNANT TENDANCE : ${winner.label || "Indisponible"}`;
       const mode = winner.modeLabel || varianceDirectionLabel(result);
       const metric = mode === "Tendance Directe" ? "Tendance" : `Évolution ${mode.replace(" Vers ", " → ")}`;
-      const meta = `${metric} : ${formatValue(winner.score)}${winner.diff ? ` · Écart : ${formatValue(winner.diff)}` : ""}`;
+      const switchLabel = winner.switchWinnerApplied || result?.switchWinnerApplied ? " · Switch Gagnant" : "";
+      const meta = `${metric} : ${formatValue(winner.score)}${winner.diff ? ` · Écart : ${formatValue(winner.diff)}` : ""}${switchLabel}`;
       return compact ? [`${base} · ${meta}`] : [base, meta];
     }
 
@@ -14533,6 +14572,7 @@
       lines.push("Tendance Vers Moyenne = Moyenne − Tendance.");
       lines.push("Moyenne Vers Tendance = Tendance − Moyenne.");
       lines.push("Sans option = comparaison directe des Tendances.");
+      lines.push("Switch Gagnant = si les deux équipes ont un nombre de reconstitutions prises se terminant par 0,5, le gagnant est inversé lorsqu’il existe.");
       lines.push("0-0 = score initial minute 0 et borne de clôture de reconstitution.");
       lines.push("");
       lines.push("────────────────────────");
@@ -14686,7 +14726,21 @@
       }
     }, { passive: true });
 
-setupCalcModeSlider();
+    function applyDefaultScanSettings() {
+      if ($("trendNumber")) $("trendNumber").value = "9";
+      if ($("trendRange")) $("trendRange").value = "9";
+      if ($("simultaneousMode")) $("simultaneousMode").checked = true;
+      if ($("trendSelectionMode")) $("trendSelectionMode").checked = false;
+      if ($("reconstructionMode")) $("reconstructionMode").checked = false;
+      if ($("includeExtraEnabled")) $("includeExtraEnabled").checked = false;
+      if ($("regulationTimeLimitEnabled")) $("regulationTimeLimitEnabled").checked = true;
+      if ($("highGoalQuantityEnabled")) $("highGoalQuantityEnabled").checked = true;
+      if ($("trendToMeanEnabled")) $("trendToMeanEnabled").checked = false;
+      if ($("meanToTrendEnabled")) $("meanToTrendEnabled").checked = true;
+    }
+
+    applyDefaultScanSettings();
+    setupCalcModeSlider();
     setupTrendSelectionSlider();
     setupVarianceDirectionOptions();
     setupReconstructionModeSlider();
