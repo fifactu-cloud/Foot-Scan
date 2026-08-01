@@ -235,7 +235,7 @@ def send_worker_heartbeat(force=False):
     payload = {
         "status": "online",
         "ts": ts,
-        "version": "v240",
+        "version": "v244",
         "queue": SCAN_QUEUE_KEY,
         "pendingSet": SCAN_PENDING_SET_KEY,
     }
@@ -4523,18 +4523,18 @@ def process_trend_scan_job(job_id, params):
         camp_mode = "separate" if simultaneous_legacy else "combined"
     simultaneous_mode = camp_mode == "separate"
     include_extra_raw = params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled")
-    include_extra = True if include_extra_raw is None else truthy_param(include_extra_raw)
+    include_extra = False if include_extra_raw is None else truthy_param(include_extra_raw)
     regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
-    reconstruction_mode = str(params.get("reconstructionMode") or "sequence").strip().lower()
+    reconstruction_mode = str(params.get("reconstructionMode") or "staircase").strip().lower()
     reconstruction_mode = "sequence" if reconstruction_mode in {"sequence", "séquence", "seq"} else "staircase"
     reconstruction_mode_label = "Séquence" if reconstruction_mode == "sequence" else "Escalier"
 
     trend_selection_mode = "top_half" if str(params.get("trendSelectionMode") or "top_line").strip().lower() == "top_half" else "top_line"
-    high_goal_quantity_enabled = truthy_param(params.get("highGoalQuantityEnabled"))
+    high_goal_quantity_enabled = True if params.get("highGoalQuantityEnabled") is None else truthy_param(params.get("highGoalQuantityEnabled"))
     trend_selection_metric = "goals" if high_goal_quantity_enabled else "minute"
 
     trend_to_mean_enabled = truthy_param(params.get("trendToMeanEnabled"))
-    mean_to_trend_enabled = truthy_param(params.get("meanToTrendEnabled"))
+    mean_to_trend_enabled = True if params.get("meanToTrendEnabled") is None else truthy_param(params.get("meanToTrendEnabled"))
     # Sécurité serveur : les deux sens sont exclusifs. Si un ancien client
     # envoie les deux, Tendance Vers Moyenne garde la priorité.
     if trend_to_mean_enabled:
@@ -4630,6 +4630,22 @@ def process_trend_scan_job(job_id, params):
             return tendency_score - mean_score
         return tendency_score
 
+    def has_half_reconstruction_count(value):
+        try:
+            clean = float(value or 0.0)
+        except Exception:
+            return False
+        if not math.isfinite(clean):
+            return False
+        return abs((clean - math.floor(clean)) - 0.5) <= 1e-9
+
+    home_selected_count = float(home_summary.get("selectedReconstructionCount") or 0.0)
+    away_selected_count = float(away_summary.get("selectedReconstructionCount") or 0.0)
+    switch_winner_triggered = (
+        has_half_reconstruction_count(home_selected_count) and
+        has_half_reconstruction_count(away_selected_count)
+    )
+
     def winner():
         h = metric_for(home_summary)
         a = metric_for(away_summary)
@@ -4644,6 +4660,10 @@ def process_trend_scan_job(job_id, params):
             "awayMetric": round(a, 6),
             "closeGapWarning": warning,
             "closeGapWarningThreshold": close_gap_warning_threshold,
+            "homeSelectedReconstructionCount": normalize_trend_count(home_selected_count),
+            "awaySelectedReconstructionCount": normalize_trend_count(away_selected_count),
+            "switchWinnerTriggered": bool(switch_winner_triggered),
+            "switchWinnerRule": "both_selected_counts_end_in_half",
         }
         if gap <= eps:
             return {
@@ -4653,23 +4673,29 @@ def process_trend_scan_job(job_id, params):
                 "label": "Égalité",
                 "score": round((h + a) / 2, 6),
                 "diff": 0,
+                "switchWinnerApplied": False,
+                "originalSide": "tie",
+                "originalLabel": "Égalité",
             }
-        if h > a:
-            return {
-                **common,
-                "type": "winner",
-                "side": "home",
-                "label": home_team.get("name"),
-                "score": round(h, 6),
-                "diff": round(gap, 6),
-            }
+
+        normal_side = "home" if h > a else "away"
+        normal_label = home_team.get("name") if normal_side == "home" else away_team.get("name")
+        final_side = normal_side
+        if switch_winner_triggered:
+            final_side = "away" if normal_side == "home" else "home"
+
+        final_label = home_team.get("name") if final_side == "home" else away_team.get("name")
+        final_score = h if final_side == "home" else a
         return {
             **common,
             "type": "winner",
-            "side": "away",
-            "label": away_team.get("name"),
-            "score": round(a, 6),
+            "side": final_side,
+            "label": final_label,
+            "score": round(final_score, 6),
             "diff": round(gap, 6),
+            "switchWinnerApplied": bool(switch_winner_triggered),
+            "originalSide": normal_side,
+            "originalLabel": normal_label,
         }
 
     home_issue_count = int(home_scan.get("eventDataIssueCount") or 0)
@@ -4736,6 +4762,9 @@ def process_trend_scan_job(job_id, params):
         },
         "trendComparisons": comparisons,
         "trendWinner": winner(),
+        "switchWinnerTriggered": bool(switch_winner_triggered),
+        "switchWinnerApplied": bool(switch_winner_triggered and abs(metric_for(home_summary) - metric_for(away_summary)) > 1e-9),
+        "switchWinnerRule": "both_selected_counts_end_in_half",
         "requestedRank1": reconstruction_count,
         "requestedRank2": None,
         "rank1": reconstruction_count,
@@ -4776,6 +4805,8 @@ def process_trend_scan_job(job_id, params):
             "meanToTrendEnabled": bool(mean_to_trend_enabled),
             "varianceDirection": variance_direction,
             "varianceDirectionLabel": variance_direction_label,
+            "switchWinnerTriggered": bool(switch_winner_triggered),
+            "switchWinnerRule": "both_selected_counts_end_in_half",
             "reconstructionWindowBase": RECONSTRUCTION_WINDOW_BASE_MATCHES,
             "reconstructionWindowMax": RECONSTRUCTION_WINDOW_MAX_MATCHES,
             "reconstructionDirection": "newest_to_oldest",
@@ -5108,7 +5139,7 @@ def main():
     print("Mode séparé: équipe analysée + adversaires passés pondérés par match utilisé.")
     print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
-    print("Liaison scan: file FIFO unique + écoute BRPOP immédiate v240.")
+    print("Liaison scan: lecture directe prioritaire + attente courte v244.")
     print("Système tendance: curseur 1-100, extra configurable, limitation temps réglementaire configurable.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
@@ -5131,16 +5162,23 @@ def main():
 
         try:
             send_worker_heartbeat()
-            # Une seule attente bloquante écoute la file FOOTSCAN en priorité.
-            # LPUSH côté API + BRPOP côté worker forme une FIFO fiable et réactive.
-            result = redis_cmd(
-                "BRPOP",
-                SCAN_QUEUE_KEY,
-                RAW_QUEUE_KEY,
-                RAW_PREFETCH_QUEUE_KEY,
-                "1" if once else "15",
-            )
-            queue_key, value = parse_brpop_result(result)
+
+            # Lecture directe prioritaire : elle récupère immédiatement les jobs
+            # déjà présents et évite de dépendre uniquement du BRPOP REST.
+            value = redis_cmd("RPOP", SCAN_QUEUE_KEY)
+            queue_key = SCAN_QUEUE_KEY if value else None
+
+            if not value:
+                # Attente courte de secours. Si le BRPOP REST reste silencieux
+                # sur Termux/Upstash, le prochain RPOP reprend le job sous 2 s.
+                result = redis_cmd(
+                    "BRPOP",
+                    SCAN_QUEUE_KEY,
+                    RAW_QUEUE_KEY,
+                    RAW_PREFETCH_QUEUE_KEY,
+                    "1" if once else "2",
+                )
+                queue_key, value = parse_brpop_result(result)
         except RuntimeError as e:
             if is_upstash_quota_error(e):
                 print("\n❌ Quota Upstash atteint: limite de requêtes dépassée.")
