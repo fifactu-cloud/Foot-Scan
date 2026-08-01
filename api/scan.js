@@ -153,12 +153,12 @@ module.exports = async function (req, res) {
     const reconstructionCount = numeric(b.reconstructionCount, numeric(b.trendCount, rank1 || 9, 1, 100), 1, 100);
     const trendCount = reconstructionCount; // compatibilité avec les anciens workers/rapports
     const trendSelectionMode = b.trendSelectionMode === 'top_half' ? 'top_half' : 'top_line';
-    const highGoalQuantityEnabled = bool(b.highGoalQuantityEnabled);
+    const highGoalQuantityEnabled = b.highGoalQuantityEnabled === undefined ? true : bool(b.highGoalQuantityEnabled);
     const trendToMeanEnabled = bool(b.trendToMeanEnabled);
-    const meanToTrendEnabled = !trendToMeanEnabled && bool(b.meanToTrendEnabled);
-    const includeExtra = (b.includeExtra === undefined && b.includeExtraEnabled === undefined) ? true : bool(b.includeExtra || b.includeExtraEnabled);
+    const meanToTrendEnabled = !trendToMeanEnabled && (b.meanToTrendEnabled === undefined ? true : bool(b.meanToTrendEnabled));
+    const includeExtra = (b.includeExtra === undefined && b.includeExtraEnabled === undefined) ? false : bool(b.includeExtra || b.includeExtraEnabled);
     const regulationTimeLimitEnabled = b.regulationTimeLimitEnabled === undefined ? true : bool(b.regulationTimeLimitEnabled);
-    const reconstructionMode = b.reconstructionMode === undefined ? 'sequence' : (b.reconstructionMode === 'sequence' ? 'sequence' : 'staircase');
+    const reconstructionMode = b.reconstructionMode === undefined ? 'staircase' : (b.reconstructionMode === 'sequence' ? 'sequence' : 'staircase');
 
     if (!/^\d+$/.test(matchId)) {
       res.statusCode = 400;
