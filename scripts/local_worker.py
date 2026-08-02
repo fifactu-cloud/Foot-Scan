@@ -235,7 +235,7 @@ def send_worker_heartbeat(force=False):
     payload = {
         "status": "online",
         "ts": ts,
-        "version": "v244",
+        "version": "v246",
         "queue": SCAN_QUEUE_KEY,
         "pendingSet": SCAN_PENDING_SET_KEY,
     }
@@ -3092,19 +3092,36 @@ def reconstruction_entry_uid(entry):
     return f"{match_id}:{state_key}"
 
 
-def reconstruction_source_entry(source_record, minimum_index_from_end=1, used_keys=None):
+def reconstruction_source_entry(
+    source_record,
+    minimum_index_from_end=1,
+    used_keys=None,
+    offensive_only=False,
+    offensive_side=None,
+):
     """Retourne le prochain état de score exploitable pour un vrai match.
 
     minimum_index_from_end respecte la diagonale: M1 dernier score, M2
-    avant-dernier score, M3 troisième depuis la fin, etc. Si ce rang n'existe
-    plus dans les buts, on tombe sur le 0-0 minute 0. Les états déjà utilisés
-    sont ignorés: aucun but ni 0-0 ne peut servir deux fois.
+    avant-dernier score, M3 troisième depuis la fin, etc. En Camp Combiné,
+    le filtre peut cibler les buts offensifs de l'équipe analysée ou ceux de
+    son adversaire. Le 0-0 minute 0 reste toujours disponible et participe à
+    chaque reconstitution offensive.
+    Les états déjà utilisés sont ignorés: aucun but ni 0-0 ne peut servir
+    deux fois.
     """
     if not reconstruction_source_is_complete(source_record):
         return None
 
     used = set(used_keys or set())
     goals = source_record.get("goals") or []
+    normalized_offensive_side = str(offensive_side or "").strip().lower()
+    if not normalized_offensive_side and offensive_only:
+        normalized_offensive_side = "team"
+
+    if normalized_offensive_side == "team":
+        goals = [entry for entry in goals if float((entry or {}).get("attackDelta") or 0.0) > 0.0]
+    elif normalized_offensive_side == "opponent":
+        goals = [entry for entry in goals if float((entry or {}).get("opponentAttackDelta") or 0.0) > 0.0]
     minimum_rank = max(1, int(minimum_index_from_end or 1))
 
     for rank in range(minimum_rank, len(goals) + 1):
@@ -3156,37 +3173,58 @@ def compact_reconstruction_label(entries):
     return f"{last} → {first}"
 
 
-def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full", index=1, reconstruction_mode="sequence"):
+def build_reconstructed_trend_sample(
+    entries,
+    analyzed_team_id,
+    level_mode="full",
+    index=1,
+    reconstruction_mode="sequence",
+    context_perspective="team",
+):
     clean_entries = [entry for entry in entries or [] if isinstance(entry, dict)]
     zero_only = len(clean_entries) == 1 and bool(clean_entries[0].get("isZeroZero"))
 
-    team_scores = [float(entry.get("teamScore") or 0.0) for entry in clean_entries]
-    opponent_scores = [float(entry.get("opponentScore") or 0.0) for entry in clean_entries]
-    attack_scores = [float(entry.get("attackScore", entry.get("teamScore") or 0.0) or 0.0) for entry in clean_entries]
-    opponent_attack_scores = [float(entry.get("opponentAttackScore", entry.get("opponentScore") or 0.0) or 0.0) for entry in clean_entries]
+    raw_team_scores = [float(entry.get("teamScore") or 0.0) for entry in clean_entries]
+    raw_opponent_scores = [float(entry.get("opponentScore") or 0.0) for entry in clean_entries]
+    raw_attack_scores = [float(entry.get("attackScore", entry.get("teamScore") or 0.0) or 0.0) for entry in clean_entries]
+    raw_opponent_attack_scores = [float(entry.get("opponentAttackScore", entry.get("opponentScore") or 0.0) or 0.0) for entry in clean_entries]
+
+    normalized_perspective = str(context_perspective or "team").strip().lower()
+    if normalized_perspective == "opponent":
+        # Pour l'attaque de l'adversaire, le contexte doit être lu depuis son
+        # propre point de vue : score adverse - score de l'équipe analysée.
+        team_scores = raw_opponent_scores
+        opponent_scores = raw_team_scores
+        attack_scores = raw_opponent_attack_scores
+        opponent_attack_scores = raw_attack_scores
+    else:
+        normalized_perspective = "team"
+        team_scores = raw_team_scores
+        opponent_scores = raw_opponent_scores
+        attack_scores = raw_attack_scores
+        opponent_attack_scores = raw_opponent_attack_scores
 
     avg_team_score = reconstruction_score_average(team_scores)
     avg_opponent_score = reconstruction_score_average(opponent_scores)
     avg_attack_score = reconstruction_score_average(attack_scores)
     avg_opponent_attack_score = reconstruction_score_average(opponent_attack_scores)
+    context_values = [team_score - opponent_score for team_score, opponent_score in zip(team_scores, opponent_scores)]
+    avg_context_value = reconstruction_score_average(context_values)
 
-    # Camp Combiné: les scores de reconstitution sont récupérés sans défense.
-    # On conserve le score offensif au moment de chaque événement, mais le côté
-    # défensif/adverse n'entre plus dans la moyenne ni dans la formule combinée.
-    attack_only_without_defense = str(level_mode or "").strip().lower() == "attack"
-    if attack_only_without_defense:
-        avg_opponent_score = 0.0
-        avg_opponent_attack_score = 0.0
+    # Dans les deux camps, la valeur d'un état est son contexte exact :
+    # score de l'équipe moins score adverse. En Camp Combiné, clean_entries
+    # contient uniquement les buts offensifs récupérés et le 0-0 initial.
+    combined_context_preserved = str(level_mode or "").strip().lower() == "attack"
 
     all_state_minutes = [float(entry.get("averageMinute") or 0.0) for entry in clean_entries]
     attack_state_minutes = [float(entry.get("averageMinute") or 0.0) for entry in clean_entries]
     opponent_attack_minutes = [float(entry.get("averageMinute") or 0.0) for entry in clean_entries]
 
     if level_mode == "attack":
-        level = avg_attack_score
+        level = avg_context_value
         minutes_for_average = attack_state_minutes[:] if attack_state_minutes else [0.0]
     else:
-        level = avg_team_score - avg_opponent_score
+        level = avg_context_value
         minutes_for_average = all_state_minutes[:] if all_state_minutes else [0.0]
 
     label = compact_reconstruction_label(clean_entries)
@@ -3201,10 +3239,11 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
 
     full_score_label = f"{reconstruction_number_label(avg_team_score)}-{reconstruction_number_label(avg_opponent_score)}"
     attack_score_label = f"Attaque {reconstruction_number_label(avg_attack_score)}"
+    contextual_attack_score_label = f"Attaque contextuelle {reconstruction_number_label(avg_context_value)}"
     opponent_attack_score_label = f"Attaque adverse {reconstruction_number_label(avg_opponent_attack_score)}"
 
     if level_mode == "attack":
-        reconstruction_score_label = attack_score_label
+        reconstruction_score_label = contextual_attack_score_label
         reconstruction_display_label = f"Reconstitution {index} · {reconstruction_score_label}"
     else:
         reconstruction_score_label = full_score_label
@@ -3223,6 +3262,7 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
             "opponent": round(avg_opponent_score, 6),
             "attack": round(avg_attack_score, 6),
             "opponentAttack": round(avg_opponent_attack_score, 6),
+            "context": round(avg_context_value, 6),
         },
         "competition": first_entry.get("sourceCompetition") or last_entry.get("sourceCompetition") or "Reconstitution",
         "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
@@ -3234,7 +3274,9 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
         "attackGoalsFor": round(avg_attack_score, 6),
         "level": round(level, 6),
         "levelMode": level_mode,
-        "defenseRemovedForCombined": bool(attack_only_without_defense),
+        "defenseRemovedForCombined": False,
+        "combinedContextPreserved": bool(combined_context_preserved),
+        "contextPerspective": normalized_perspective,
         "resultStyle": trend_result_style(level),
         "resultLabel": trend_label_from_style(trend_result_style(level)),
         "goalMinutes": all_state_minutes,
@@ -3256,10 +3298,10 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
                 "sourceStartTimestamp": entry.get("sourceStartTimestamp") or 0,
                 "sourceScoreLabel": entry.get("sourceScoreLabel"),
                 "scoreStateLabel": entry.get("scoreStateLabel"),
-                "teamScore": entry.get("attackScore") if attack_only_without_defense else entry.get("teamScore"),
-                "opponentScore": 0.0 if attack_only_without_defense else entry.get("opponentScore"),
+                "teamScore": entry.get("teamScore"),
+                "opponentScore": entry.get("opponentScore"),
                 "attackScore": entry.get("attackScore"),
-                "opponentAttackScore": 0.0 if attack_only_without_defense else entry.get("opponentAttackScore"),
+                "opponentAttackScore": entry.get("opponentAttackScore"),
                 "homeScoreAtEvent": entry.get("homeScoreAtEvent"),
                 "awayScoreAtEvent": entry.get("awayScoreAtEvent"),
                 "finalHomeScore": entry.get("finalHomeScore"),
@@ -3288,8 +3330,8 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
             "startTimestamp": first_entry.get("sourceStartTimestamp") or last_entry.get("sourceStartTimestamp") or 0,
             "level": round(avg_opponent_attack_score, 6),
             "attackGoalsFor": round(avg_opponent_attack_score, 6),
-            "minutesForAverage": [] if attack_only_without_defense else opponent_minutes_for_average,
-            "averageMinute": round(trend_average(opponent_minutes_for_average), 4) if not attack_only_without_defense else 0.0,
+            "minutesForAverage": opponent_minutes_for_average,
+            "averageMinute": round(trend_average(opponent_minutes_for_average), 4),
             "matchHasAssists": match_has_assists,
             "assistDataStatus": assist_status,
             "reconstructedMatch": True,
@@ -3301,9 +3343,9 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
                     "sourceStartTimestamp": entry.get("sourceStartTimestamp") or 0,
                     "sourceScoreLabel": entry.get("sourceScoreLabel"),
                     "scoreStateLabel": entry.get("scoreStateLabel"),
-                    "teamScore": entry.get("attackScore") if attack_only_without_defense else entry.get("teamScore"),
-                    "opponentScore": 0.0 if attack_only_without_defense else entry.get("opponentScore"),
-                    "opponentAttackScore": 0.0 if attack_only_without_defense else entry.get("opponentAttackScore"),
+                    "teamScore": entry.get("teamScore"),
+                    "opponentScore": entry.get("opponentScore"),
+                    "opponentAttackScore": entry.get("opponentAttackScore"),
                     "minuteLabel": entry.get("minuteLabel"),
                     "isZeroZero": bool(entry.get("isZeroZero")),
                     "matchHasAssists": entry.get("matchHasAssists"),
@@ -3315,7 +3357,15 @@ def build_reconstructed_trend_sample(entries, analyzed_team_id, level_mode="full
         },
     }
 
-def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mode="full", reconstruction_mode="sequence", max_samples=None):
+def build_reconstructed_trend_samples(
+    source_records,
+    analyzed_team_id,
+    level_mode="full",
+    reconstruction_mode="sequence",
+    max_samples=None,
+    offensive_side=None,
+    context_perspective="team",
+):
     """Reconstruit des matchs uniquement à partir de vrais états de score.
 
     Mode Séquence : ancien principe linéaire, mais avec le 0-0 minute 0 commun.
@@ -3331,6 +3381,10 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
         normalized_mode = "staircase"
 
     records = [record for record in (source_records or []) if reconstruction_source_is_complete(record)]
+    offensive_only = str(level_mode or "").strip().lower() == "attack"
+    normalized_offensive_side = str(offensive_side or "").strip().lower()
+    if offensive_only and normalized_offensive_side not in {"team", "opponent"}:
+        normalized_offensive_side = "team"
     limit = None
     try:
         if max_samples is not None:
@@ -3347,6 +3401,7 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
             level_mode=level_mode,
             index=len(samples) + 1,
             reconstruction_mode=normalized_mode,
+            context_perspective=context_perspective,
         ))
 
     if normalized_mode == "sequence":
@@ -3369,7 +3424,13 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
                 break
 
             source_record = records[source_index]
-            entry = reconstruction_source_entry(source_record, score_index_from_end, used)
+            entry = reconstruction_source_entry(
+                source_record,
+                score_index_from_end,
+                used,
+                offensive_only=offensive_only,
+                offensive_side=normalized_offensive_side,
+            )
 
             if not entry:
                 if current:
@@ -3421,7 +3482,13 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
     def start_can_provide(index):
         if index < 0 or index >= len(records):
             return False
-        return reconstruction_source_entry(records[index], 1, used) is not None
+        return reconstruction_source_entry(
+            records[index],
+            1,
+            used,
+            offensive_only=offensive_only,
+            offensive_side=normalized_offensive_side,
+        ) is not None
 
     while start_index < len(records) and safety < max_safety:
         safety += 1
@@ -3439,7 +3506,13 @@ def build_reconstructed_trend_samples(source_records, analyzed_team_id, level_mo
         offset = 0
 
         while source_index < len(records):
-            entry = reconstruction_source_entry(records[source_index], offset + 1, used)
+            entry = reconstruction_source_entry(
+                records[source_index],
+                offset + 1,
+                used,
+                offensive_only=offensive_only,
+                offensive_side=normalized_offensive_side,
+            )
             if not entry:
                 break
 
@@ -3498,7 +3571,8 @@ def trend_match_sample(match, incidents, analyzed_team_id, level_mode="full"):
     """Construit le niveau d'un match pour le système Tendance.
 
     level_mode="full" : niveau = buts marqués - buts encaissés.
-    level_mode="attack" : niveau = buts offensifs uniquement, sans défense.
+    level_mode="attack" : niveau direct = buts offensifs; le contexte adverse
+    est ensuite réintégré dans la formule du Camp Combiné.
 
     Important pour le mode séparé : un CSC adverse qui profite à l'équipe
     n'est pas considéré comme une attaque de cette équipe. Les prolongations
@@ -3586,44 +3660,34 @@ def trend_opponent_team_id(match, analyzed_team_id):
 
 
 def build_separated_offensive_samples(primary_samples, opposite_samples, side_key):
-    """Construit le mode séparé offensif vs offensif aligné par ligne.
+    """Finalise le Camp Combiné avec les deux attaques contextuelles.
 
-    Pour A ligne N : attaque A ligne N + attaque de l'adversaire passé de B ligne N.
-    Pour B ligne N : attaque B ligne N + attaque de l'adversaire passé de A ligne N.
-    Le simultané n'utilise pas cette fonction et reste en attaque + défense.
+    Pour A ligne N : moyenne contextuelle de l'attaque de A ligne N + moyenne
+    contextuelle de l'attaque de l'adversaire de l'adversaire, récupérée dans
+    le camp opposé ligne N. Chaque moyenne contient uniquement les buts
+    offensifs de son camp et son propre 0-0 initial.
     """
     combined = []
     total = min(len(primary_samples or []), len(opposite_samples or []))
 
     for idx in range(total):
-        direct = primary_samples[idx] or {}
-        source = opposite_samples[idx] or {}
+        direct = dict((primary_samples or [])[idx] or {})
+        source = (opposite_samples or [])[idx] or {}
         opponent_attack = source.get("opponentAttack") or {}
 
-        direct_level = float(direct.get("level") or 0)
-        defense_removed = bool(direct.get("defenseRemovedForCombined"))
+        direct_level = float(direct.get("level") or 0.0)
+        adversary_of_adversary_level = float(opponent_attack.get("level") or 0.0)
+        level = direct_level + adversary_of_adversary_level
 
-        direct_minutes = list(direct.get("minutesForAverage") or [1.0])
-        direct_score_label = direct.get("reconstructionAttackScoreLabel") or direct.get("reconstructionScoreLabel") or format(direct_level, ".6g")
-
-        if defense_removed:
-            adv_level = 0.0
-            adv_minutes = []
-            level = direct_level
-            minutes_for_average = direct_minutes
-            opponent_score_label = "Défense retirée"
-            combined_formula_label = f"{direct_score_label} · sans défense"
-            combined_score_label = direct_score_label
-        else:
-            adv_level = float(opponent_attack.get("level") or 0)
-            level = direct_level + adv_level
-            adv_minutes = list(opponent_attack.get("minutesForAverage") or [1.0])
-            minutes_for_average = direct_minutes + adv_minutes
-            opponent_score_label = opponent_attack.get("reconstructionScoreLabel") or f"Attaque adverse {format(adv_level, '.6g')}"
-            combined_formula_label = f"{direct_score_label} + {opponent_score_label}"
-            combined_score_label = f"Attaque {format(level, '.6g')}"
-
+        direct_minutes = list(direct.get("minutesForAverage") or [0.0])
+        adversary_of_adversary_minutes = list(opponent_attack.get("minutesForAverage") or [0.0])
+        minutes_for_average = direct_minutes + adversary_of_adversary_minutes
         reconstruction_index = direct.get("reconstructionIndex") or (idx + 1)
+
+        direct_score_label = f"Attaque contextuelle {format(direct_level, '.6g')}"
+        opponent_score_label = f"Attaque contextuelle adverse {format(adversary_of_adversary_level, '.6g')}"
+        combined_score_label = f"Attaque contextuelle {format(level, '.6g')}"
+        formula_label = f"{direct_score_label} + {opponent_score_label}"
 
         sample = {
             **direct,
@@ -3632,7 +3696,7 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
             "reconstructionLabel": f"Reconstitution {reconstruction_index}",
             "reconstructionDisplayLabel": f"Reconstitution {reconstruction_index}",
             "reconstructionScoreLabel": combined_score_label,
-            "reconstructionFormulaLabel": combined_formula_label,
+            "reconstructionFormulaLabel": formula_label,
             "directReconstructionScoreLabel": direct_score_label,
             "opponentReconstructionScoreLabel": opponent_score_label,
             "competition": direct.get("competition"),
@@ -3644,7 +3708,7 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
             "minutesForAverage": minutes_for_average,
             "averageMinute": round(trend_average(minutes_for_average), 4),
             "directAttackLevel": round(direct_level, 6),
-            "opponentAttackLevel": round(adv_level, 6),
+            "opponentAttackLevel": round(adversary_of_adversary_level, 6),
             "opponentAttackSource": {
                 "id": source.get("id"),
                 "label": source.get("label"),
@@ -3653,15 +3717,18 @@ def build_separated_offensive_samples(primary_samples, opposite_samples, side_ke
                 "reconstructionScoreLabel": opponent_score_label,
                 "competition": source.get("competition"),
                 "startTimestamp": source.get("startTimestamp") or 0,
-                "level": round(adv_level, 6),
-                "minutesForAverage": adv_minutes,
-                "averageMinute": round(trend_average(adv_minutes), 4) if adv_minutes else 0.0,
+                "level": round(adversary_of_adversary_level, 6),
+                "minutesForAverage": adversary_of_adversary_minutes,
+                "averageMinute": round(trend_average(adversary_of_adversary_minutes), 4) if adversary_of_adversary_minutes else 0.0,
                 "matchHasAssists": opponent_attack.get("matchHasAssists", source.get("matchHasAssists")),
                 "assistDataStatus": opponent_attack.get("assistDataStatus", source.get("assistDataStatus")),
-                "reconstructionEntries": [] if defense_removed else (opponent_attack.get("reconstructionEntries") or source.get("reconstructionEntries") or []),
+                "reconstructionEntries": opponent_attack.get("reconstructionEntries") or [],
             },
-            "analysisFormula": "attaque équipe sans défense" if defense_removed else "attaque équipe + attaque adversaire du camp opposé",
-            "analysisFormulaLabel": combined_formula_label,
+            "analysisFormula": (
+                "moyenne des contextes offensifs de l'équipe + moyenne des contextes "
+                "offensifs de l'adversaire de l'adversaire; 0-0 inclus dans chaque moyenne"
+            ),
+            "analysisFormulaLabel": formula_label,
             "analysisLine": idx + 1,
             "side": side_key,
         }
@@ -3870,7 +3937,58 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             level_mode=level_mode,
             reconstruction_mode=reconstruction_mode,
             max_samples=needed_matches,
+            offensive_side="team" if level_mode == "attack" else None,
+            context_perspective="team",
         )
+
+        if level_mode == "attack":
+            # Deuxième flux indépendant : uniquement les buts offensifs des
+            # adversaires passés, lus depuis leur propre point de vue. Il sert
+            # ensuite au camp opposé comme attaque de l'adversaire de
+            # l'adversaire. Son 0-0 participe également à chaque moyenne.
+            opponent_reconstructed = build_reconstructed_trend_samples(
+                window_desc,
+                analyzed_team_id,
+                level_mode=level_mode,
+                reconstruction_mode=reconstruction_mode,
+                max_samples=needed_matches,
+                offensive_side="opponent",
+                context_perspective="opponent",
+            )
+
+            # Une ligne Camp Combiné n'est valide que si les deux composantes
+            # existent. Tronquer ici force le chargeur historique à chercher
+            # davantage de sources au lieu de remplacer silencieusement
+            # l'attaque de l'adversaire de l'adversaire par zéro.
+            usable_count = min(len(reconstructed), len(opponent_reconstructed))
+            reconstructed = reconstructed[:usable_count]
+            opponent_reconstructed = opponent_reconstructed[:usable_count]
+
+            for index, sample in enumerate(reconstructed):
+                opponent_sample = opponent_reconstructed[index] or {}
+                opponent_context_label = (
+                    f"Attaque contextuelle adverse "
+                    f"{format(float(opponent_sample.get('level') or 0.0), '.6g')}"
+                )
+                sample["opponentAttack"] = {
+                    "id": opponent_sample.get("id"),
+                    "label": opponent_sample.get("label"),
+                    "reconstructionLabel": opponent_sample.get("reconstructionLabel"),
+                    "reconstructionDisplayLabel": f"Reconstitution {index + 1} · {opponent_context_label}",
+                    "reconstructionScoreLabel": opponent_context_label,
+                    "competition": opponent_sample.get("competition"),
+                    "startTimestamp": opponent_sample.get("startTimestamp") or 0,
+                    "level": round(float(opponent_sample.get("level") or 0.0), 6),
+                    "attackGoalsFor": round(float(opponent_sample.get("attackGoalsFor") or 0.0), 6),
+                    "minutesForAverage": list(opponent_sample.get("minutesForAverage") or [0.0]),
+                    "averageMinute": round(float(opponent_sample.get("averageMinute") or 0.0), 4),
+                    "matchHasAssists": opponent_sample.get("matchHasAssists"),
+                    "assistDataStatus": opponent_sample.get("assistDataStatus"),
+                    "reconstructedMatch": True,
+                    "reconstructionEntries": list(opponent_sample.get("reconstructionEntries") or []),
+                    "contextPerspective": "opponent",
+                    "combinedContextPreserved": True,
+                }
         return reconstructed[:needed_matches]
 
     while True:
@@ -4346,7 +4464,10 @@ def summarize_trend_items(items):
 def reconstruction_goal_quantity(sample):
     """Quantité de buts utilisée comme critère de sélection.
 
-    Camp combiné : attaque uniquement, conformément à la règle sans défense.
+    Camp combiné : le classement Quantité But Haute reste basé sur les buts
+    offensifs de l'équipe. La valeur additionne la moyenne contextuelle de
+    cette attaque et celle de l'attaque de l'adversaire de l'adversaire,
+    avec un 0-0 inclus dans chaque moyenne.
     Camp séparé : score complet, donc buts de l'équipe + buts adverses.
     """
     if not isinstance(sample, dict):
@@ -5136,8 +5257,8 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: 🔎 scan complet côté worker activé.")
     print("Pages Web: 10 Pages d’abord, extension automatique à 15 puis 20 si nécessaire.")
-    print("Mode séparé: équipe analysée + adversaires passés pondérés par match utilisé.")
-    print("Mode simultané: équipe + adversaires passés opposés, match par match, minute par minute.")
+    print("Camp combiné: attaque contextuelle + attaque contextuelle de l'adversaire de l'adversaire, 0-0 inclus.")
+    print("Camp séparé: score complet attaque + défense de chaque reconstitution.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Liaison scan: lecture directe prioritaire + attente courte v244.")
     print("Système tendance: curseur 1-100, extra configurable, limitation temps réglementaire configurable.")
