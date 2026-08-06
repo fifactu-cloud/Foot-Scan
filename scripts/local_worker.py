@@ -733,10 +733,14 @@ FORFEIT_MATCH_KEYWORDS = (
 )
 
 EXTRA_TIME_PENALTY_KEYWORDS = (
-    "after extra time", "extra time", "aet", "a.e.t",
+    "after extra time", "after-extra-time", "afterextratime",
+    "finished after extra time", "finished-after-extra-time", "finishedafterextratime",
+    "extra time", "extra-time", "extratime", "aet", "a.e.t",
     "overtime", "prolongation", "prolongations",
     "apres prolongation", "apres prolongations",
-    "after penalties", "penalties", "penalty shootout",
+    "after penalties", "after-penalties", "afterpenalties",
+    "finished after penalties", "finished-after-penalties", "finishedafterpenalties",
+    "penalties", "penalty shootout", "penalty-shootout", "penaltyshootout",
     "penalty shoot-out", "penalty kicks", "shootout",
     "tirs au but", "tir au but", "apres tirs au but",
     "tab",
@@ -822,6 +826,54 @@ def extra_time_or_penalty_match_reason(match):
                 return "Prolongation/tirs au but détectés: score final différent du temps réglementaire"
 
     return None
+
+
+def event_match_from_payload(payload):
+    """Extrait la fiche match d'une réponse event/{id} SofaScore."""
+    if not isinstance(payload, dict):
+        return None
+    for key in ("event", "match"):
+        candidate = payload.get(key)
+        if isinstance(candidate, dict):
+            return candidate
+    if isinstance(payload.get("homeTeam"), dict) and isinstance(payload.get("awayTeam"), dict):
+        return payload
+    return None
+
+
+def resolve_extra_time_or_penalty_reason(match, incidents=None, fetch_event_detail=False):
+    """Détecte Extra/TAB avec trois niveaux de preuve.
+
+    1. fiche historique du match ;
+    2. incidents récupérés ;
+    3. fiche détaillée event/{id}, uniquement en repli lorsque les incidents
+       sont absents ou bloqués.
+
+    Ce troisième niveau évite qu'un match de prolongation/TAB soit reclassé à
+    tort en « hors 0-0 sans but récupérable » lorsque la page historique est
+    incomplète et que /incidents échoue.
+    """
+    reason = extra_time_or_penalty_match_reason(match)
+    if reason:
+        return reason
+
+    if incidents_indicate_extra_time_or_penalty(incidents or []):
+        return "Prolongation ou tirs au but détectés dans les événements"
+
+    match_id = (match or {}).get("id") if isinstance(match, dict) else None
+    if not fetch_event_detail or not match_id:
+        return None
+
+    try:
+        payload = get_json(f"event/{match_id}")
+    except Exception:
+        return None
+
+    detailed_match = event_match_from_payload(payload)
+    if not detailed_match:
+        return None
+
+    return extra_time_or_penalty_match_reason(detailed_match)
 
 
 def incidents_indicate_extra_time_or_penalty(incidents):
@@ -2241,14 +2293,19 @@ def scan_team(job_id, analyzed_team_id, skip, max_needed, team_name, base_progre
                     else:
                         issue = None
 
-                    if incidents_indicate_extra_time_or_penalty(incidents):
+                    extra_reason = None if include_extra else resolve_extra_time_or_penalty_reason(
+                        match,
+                        incidents=incidents,
+                        fetch_event_detail=False,
+                    )
+                    if extra_reason:
                         issue = {
                             "id": match.get("id"),
                             "label": make_match_label(match),
                             "competition": get_competition_name(match),
                             "startTimestamp": match.get("startTimestamp") or 0,
                             "type": "extra-time-penalties",
-                            "reason": "Prolongation ou tirs au but détectés dans les événements",
+                            "reason": extra_reason,
                             "message": "Match ignoré: prolongation ou tirs au but exclus de l'analyse.",
                         }
                         scanned.append({
@@ -4066,6 +4123,15 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             incidents = data.get("incidents") if isinstance(data, dict) else data
             if not isinstance(incidents, list):
                 incidents = []
+            # Si la liste historique est incomplète et que /incidents est
+            # indisponible, la fiche event/{id} sert de dernier contrôle avant
+            # de qualifier le match de « sans but récupérable ».
+            late_extra_reason = None if include_extra else resolve_extra_time_or_penalty_reason(
+                match,
+                incidents=incidents,
+                fetch_event_detail=bool(issue) or not incidents,
+            )
+
             source_record = collect_reconstruction_goal_entries(
                 match,
                 incidents,
@@ -4073,6 +4139,9 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 include_extra=include_extra,
                 regulation_time_limit=regulation_time_limit,
             )
+            if late_extra_reason:
+                source_record["extraTimePenaltyIssue"] = True
+
             if source_record.get("extraTimePenaltyIssue"):
                 # Une prolongation détectée tardivement est une exclusion Extra,
                 # pas une reconstitution non valide. Elle ne doit jamais être
@@ -4086,7 +4155,7 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                     "competition": get_competition_name(match),
                     "startTimestamp": match.get("startTimestamp") or 0,
                     "type": "extra-time-penalties",
-                    "reason": "Prolongation ou tirs au but détectés dans les événements",
+                    "reason": late_extra_reason or "Prolongation ou tirs au but détectés dans les événements",
                     "message": "Match ignoré pour la reconstitution: prolongation ou tirs au but exclus de l'analyse.",
                 })
             elif issue and source_record.get("trueZeroZero"):
