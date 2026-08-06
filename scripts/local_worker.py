@@ -722,15 +722,42 @@ ADMIN_MATCH_KEYWORDS = (
     "technical defeat", "technical loss", "technical win",
 )
 
-# Seuls ces statuts administratifs doivent alimenter l'avertissement visible
-# « reconstitution non valide ». Les autres exclusions administratives restent
-# ignorées proprement, mais sans déclencher ce message.
+# Ces familles servent uniquement à classer les exclusions. Le bandeau
+# « reconstitution non valide » est un indicateur de fiabilité : il ne doit
+# jamais apparaître pour une prolongation/TAB ni pour un match reporté avant
+# le coup d'envoi.
 FORFEIT_MATCH_KEYWORDS = (
     "forfeit", "forfait",
     "walkover", "walk over",
-    "defaulted", "default loss", "default win",
+    "awarded", "award",
+    "defaulted", "default loss", "default win", "default score",
     "technical defeat", "technical loss", "technical win",
 )
+
+UNSTARTED_MATCH_KEYWORDS = (
+    "not started", "notstarted", "scheduled", "fixture",
+    "postponed", "reporte", "delayed before kickoff",
+)
+
+CANCELLED_MATCH_KEYWORDS = (
+    "cancelled", "canceled", "annule",
+)
+
+ABANDONED_MATCH_KEYWORDS = (
+    "abandoned", "abandonne", "stopped", "arrete", "terminated",
+    "suspended", "suspendu", "interrupted", "interrompu", "retired",
+)
+
+STARTED_UNFINISHED_MATCH_KEYWORDS = (
+    "in progress", "inprogress", "live", "halftime", "half time",
+    "paused", "break", "first half", "second half",
+)
+
+RELIABILITY_WARNING_ADMIN_TYPES = {
+    "forfeit",
+    "abandoned",
+    "started-unfinished",
+}
 
 EXTRA_TIME_PENALTY_KEYWORDS = (
     "after extra time", "after-extra-time", "afterextratime",
@@ -892,60 +919,130 @@ def incidents_indicate_extra_time_or_penalty(incidents):
             if incident_phase_rank(incident) > 1:
                 return True
         except Exception:
-            minute = incident.get("time")
-            try:
-                if minute is not None and float(minute) > 90:
-                    return True
-            except Exception:
-                pass
+            # Une minute brute supérieure à 90 peut représenter 90+X. Sans
+            # phase explicite, elle ne suffit jamais à déclarer une prolongation.
+            pass
 
     return False
 
 
-def administrative_match_reason(match, include_extra=False):
-    """Retourne une raison si le match doit être exclu du calcul sportif.
-
-    Règle FOOTSCAN : tout match décidé administrativement ou non terminé
-    normalement est ignoré entièrement. Cela évite de compter des buts d'un
-    match abandonné/forfait/attribué dont le résultat officiel ne reflète plus
-    une performance sportive comparable.
-    """
+def match_status_values(match, reason=None):
+    values = [reason]
     if not isinstance(match, dict):
-        return "Format match invalide"
+        return values
 
     status = match.get("status") or {}
-    status_type = normalize_status_text(status.get("type"))
+    if isinstance(status, dict):
+        values.extend(status.get(key) for key in ("type", "description", "reason", "text", "name", "short", "detail"))
 
-    if status_type and status_type != "finished":
-        return f"Statut non terminé normalement: {status.get('type')}"
-
-    values = []
-
-    def add(value):
-        if value is None:
-            return
-        if isinstance(value, (str, int, float, bool)):
-            values.append(str(value))
-
-    # Champs SofaScore connus ou fréquents pour les statuts administratifs.
-    for key in ("type", "description", "reason", "text", "name", "short", "detail"):
-        add(status.get(key))
-
-    for key in (
+    values.extend(match.get(key) for key in (
         "statusDescription", "statusText", "statusReason", "reason",
         "note", "notes", "description", "resultType", "matchStatus",
         "defaultScore", "defaultWinner", "forfeit", "walkover",
         "awarded", "abandoned", "cancelled", "canceled", "postponed",
         "suspended", "interrupted", "retired",
-    ):
-        add(match.get(key))
+    ))
+    return values
 
-    haystack = " | ".join(normalize_status_text(v) for v in values if str(v).strip())
+
+def match_status_haystack(match, reason=None):
+    return " | ".join(
+        normalize_status_text(value)
+        for value in match_status_values(match, reason=reason)
+        if value is not None and str(value).strip()
+    )
+
+
+def match_has_started_evidence(match, reason=None):
+    """Vrai seulement si des éléments indiquent que le coup d'envoi a eu lieu.
+
+    Un simple startTimestamp passé ne suffit pas : un match reporté conserve
+    souvent son horaire prévu. On exige un statut de jeu, un statut d'arrêt,
+    un score positif ou des scores de période réellement présents.
+    """
+    if not isinstance(match, dict):
+        return False
+
+    haystack = match_status_haystack(match, reason=reason)
+    if any(keyword in haystack for keyword in ABANDONED_MATCH_KEYWORDS):
+        return True
+    if any(keyword in haystack for keyword in STARTED_UNFINISHED_MATCH_KEYWORDS):
+        return True
+
+    home_score = match.get("homeScore") or {}
+    away_score = match.get("awayScore") or {}
+    for score in (home_score, away_score):
+        if not isinstance(score, dict):
+            continue
+        for key in ("period1", "period2", "normaltime", "regularTime"):
+            if key in score and safe_score_value(score.get(key)) is not None:
+                return True
+
+    current_home, current_away = score_pair_for_key(match, "current")
+    if current_home is not None and current_away is not None and (current_home > 0 or current_away > 0):
+        return True
+
+    time_data = match.get("time") or {}
+    if isinstance(time_data, dict):
+        for key in ("currentPeriodStartTimestamp", "periodLength", "injuryTime1", "injuryTime2"):
+            if time_data.get(key) not in (None, "", 0, False):
+                return True
+
+    return False
+
+
+def match_indicates_postponed_unstarted(match, reason=None):
+    haystack = match_status_haystack(match, reason=reason)
+    unstarted_or_postponed = (
+        any(keyword in haystack for keyword in UNSTARTED_MATCH_KEYWORDS)
+        or any(keyword in haystack for keyword in CANCELLED_MATCH_KEYWORDS)
+    )
+    return bool(unstarted_or_postponed and not match_has_started_evidence(match, reason=reason))
+
+
+def match_indicates_abandoned(match, reason=None):
+    haystack = match_status_haystack(match, reason=reason)
+    return any(keyword in haystack for keyword in ABANDONED_MATCH_KEYWORDS)
+
+
+def match_indicates_started_unfinished(match, reason=None):
+    if match_indicates_postponed_unstarted(match, reason=reason):
+        return False
+    if match_indicates_abandoned(match, reason=reason):
+        return True
+
+    status = (match or {}).get("status") or {}
+    status_type = normalize_status_text(status.get("type")) if isinstance(status, dict) else ""
+    if status_type == "finished":
+        return False
+    return match_has_started_evidence(match, reason=reason)
+
+
+def administrative_match_reason(match, include_extra=False):
+    """Retourne une raison si le match doit être exclu du calcul sportif.
+
+    Les matchs Extra sont traités séparément. Avec Extra, un statut compact
+    tel que ``afterpenalties`` ne doit pas être confondu avec un match non
+    terminé. Les matchs reportés/non commencés sont exclus silencieusement du
+    calcul ; ils ne sont pas des alertes de fiabilité.
+    """
+    if not isinstance(match, dict):
+        return "Format match invalide"
+
+    status = match.get("status") or {}
+    status_type = normalize_status_text(status.get("type")) if isinstance(status, dict) else ""
 
     extra_reason = extra_time_or_penalty_match_reason(match)
     if extra_reason and not include_extra:
         return extra_reason
 
+    # Certains statuts SofaScore utilisent afterextratime/afterpenalties au
+    # lieu de finished. Ils sont admissibles lorsque Avec Extra est activé.
+    if status_type and status_type != "finished":
+        if not (include_extra and extra_reason):
+            return f"Statut non terminé normalement: {status.get('type')}"
+
+    haystack = match_status_haystack(match)
     if not haystack:
         return None
 
@@ -962,34 +1059,44 @@ def administrative_match_reason(match, include_extra=False):
 
 
 def match_indicates_forfeit(match, reason=None):
-    values = [reason]
-    status = (match or {}).get("status") or {}
-    if isinstance(status, dict):
-        values.extend(status.get(key) for key in ("type", "description", "reason", "text", "name", "short", "detail"))
-    if isinstance(match, dict):
-        values.extend(match.get(key) for key in (
-            "statusDescription", "statusText", "statusReason", "reason",
-            "note", "notes", "description", "resultType", "matchStatus",
-            "defaultScore", "defaultWinner", "forfeit", "walkover",
-        ))
-        if match.get("forfeit") is True or match.get("walkover") is True:
-            return True
-    haystack = " | ".join(normalize_status_text(value) for value in values if value is not None)
+    if isinstance(match, dict) and (
+        match.get("forfeit") is True
+        or match.get("walkover") is True
+        or match.get("awarded") is True
+    ):
+        return True
+    haystack = match_status_haystack(match, reason=reason)
     return any(keyword in haystack for keyword in FORFEIT_MATCH_KEYWORDS)
 
 
 def make_administrative_match_issue(match, reason):
-    reason_text = reason or "Match administratif / forfait"
+    reason_text = reason or "Match administratif"
     normalized_reason = normalize_status_text(reason_text)
-    if "prolongation" in normalized_reason or "penalt" in normalized_reason or "tir" in normalized_reason or "shootout" in normalized_reason:
+
+    if (
+        "prolongation" in normalized_reason
+        or "penalt" in normalized_reason
+        or "tir" in normalized_reason
+        or "shootout" in normalized_reason
+    ):
         issue_type = "extra-time-penalties"
         message = "Match ignoré: prolongation ou tirs au but exclus de l'analyse."
     elif match_indicates_forfeit(match, reason_text):
         issue_type = "forfeit"
-        message = "Match ignoré: forfait."
+        message = "Match ignoré: forfait ou résultat attribué administrativement."
+    elif match_indicates_postponed_unstarted(match, reason_text):
+        issue_type = "postponed-unstarted"
+        message = "Match ignoré: reporté/annulé avant le coup d'envoi."
+    elif match_indicates_abandoned(match, reason_text):
+        issue_type = "abandoned"
+        message = "Match ignoré: match arrêté ou abandonné après son démarrage."
+    elif match_indicates_started_unfinished(match, reason_text):
+        issue_type = "started-unfinished"
+        message = "Match ignoré: commencé mais non terminé."
     else:
         issue_type = "administrative"
-        message = "Match ignoré: statut administratif hors forfait."
+        message = "Match ignoré: statut administratif sans alerte de fiabilité."
+
     return {
         "id": match.get("id"),
         "label": make_match_label(match),
@@ -998,6 +1105,7 @@ def make_administrative_match_issue(match, reason):
         "type": issue_type,
         "reason": reason_text,
         "message": message,
+        "reliabilityWarning": issue_type in RELIABILITY_WARNING_ADMIN_TYPES,
     }
 
 
@@ -2937,8 +3045,10 @@ def incident_phase_rank(incident):
 
     if minute_value is None:
         return 3 if "penalt" in haystack else 1
-    if minute_value > 90 and added_value <= 0:
-        return 2
+
+    # Ne jamais déduire une prolongation de la seule minute numérique : selon
+    # les compétitions SofaScore peut encoder 90+4 sous time=94. Une vraie
+    # prolongation doit être prouvée par la phase, le statut ou la fiche match.
     return 1
 
 
@@ -4123,10 +4233,11 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
             incidents = data.get("incidents") if isinstance(data, dict) else data
             if not isinstance(incidents, list):
                 incidents = []
-            # Si la liste historique est incomplète et que /incidents est
-            # indisponible, la fiche event/{id} sert de dernier contrôle avant
-            # de qualifier le match de « sans but récupérable ».
-            late_extra_reason = None if include_extra else resolve_extra_time_or_penalty_reason(
+            # La détection Extra/TAB est toujours exécutée, même lorsque
+            # « Avec Extra » est activé. Elle sert alors à empêcher qu'un match
+            # Extra dont les incidents sont indisponibles déclenche à tort le
+            # bandeau de fiabilité « sans but récupérable ».
+            known_extra_reason = resolve_extra_time_or_penalty_reason(
                 match,
                 incidents=incidents,
                 fetch_event_detail=bool(issue) or not incidents,
@@ -4139,13 +4250,14 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 include_extra=include_extra,
                 regulation_time_limit=regulation_time_limit,
             )
-            if late_extra_reason:
+            source_record["knownExtraTimePenalty"] = bool(known_extra_reason)
+            if known_extra_reason and not include_extra:
                 source_record["extraTimePenaltyIssue"] = True
 
             if source_record.get("extraTimePenaltyIssue"):
-                # Une prolongation détectée tardivement est une exclusion Extra,
-                # pas une reconstitution non valide. Elle ne doit jamais être
-                # reclassée ensuite comme « buts absents/incomplets ».
+                # Sans Extra : exclusion silencieuse du point de vue du bandeau
+                # de fiabilité. Le match peut être remplacé, mais il ne doit
+                # jamais être présenté comme une reconstitution non fiable.
                 source_record["eventDataStatus"] = "extra-time-penalties"
                 source_record["eventDataIssue"] = True
                 source_record["error"] = "Prolongation ou tirs au but exclus de l'analyse"
@@ -4155,8 +4267,26 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                     "competition": get_competition_name(match),
                     "startTimestamp": match.get("startTimestamp") or 0,
                     "type": "extra-time-penalties",
-                    "reason": late_extra_reason or "Prolongation ou tirs au but détectés dans les événements",
+                    "reason": known_extra_reason or "Prolongation ou tirs au but détectés dans les événements",
                     "message": "Match ignoré pour la reconstitution: prolongation ou tirs au but exclus de l'analyse.",
+                    "reliabilityWarning": False,
+                })
+            elif known_extra_reason and (issue or source_record.get("reconstructionGoalsIncomplete")):
+                # Avec Extra : si les données de ce match Extra sont absentes ou
+                # partielles, la source est remplacée pour protéger le calcul,
+                # mais elle ne déclenche pas le bandeau demandé par l'utilisateur.
+                source_record["eventDataIssue"] = True
+                source_record["eventDataStatus"] = "extra-source-unavailable"
+                source_record["error"] = "Données Extra/TAB absentes ou partielles; source ignorée"
+                event_data_issues.append({
+                    "id": match.get("id"),
+                    "label": make_match_label(match),
+                    "competition": get_competition_name(match),
+                    "startTimestamp": match.get("startTimestamp") or 0,
+                    "type": "extra-source-unavailable",
+                    "reason": (issue.get("reason") if isinstance(issue, dict) else known_extra_reason),
+                    "message": "Source Extra/TAB ignorée: événements absents ou partiels.",
+                    "reliabilityWarning": False,
                 })
             elif issue and source_record.get("trueZeroZero"):
                 # Un vrai 0-0 n'a aucun but à récupérer par définition.
@@ -4175,6 +4305,7 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                         "type": "no-recoverable-goals",
                         "reason": issue.get("reason") if isinstance(issue, dict) else "Score hors 0-0 sans but récupérable",
                         "message": "Reconstitution non valide: match hors 0-0 sans but récupérable.",
+                        "reliabilityWarning": True,
                     })
                 else:
                     # Des buts existent mais la liste est partielle : la source
@@ -4190,6 +4321,7 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                         "type": "partial-goals",
                         "reason": issue.get("reason") if isinstance(issue, dict) else "Buts récupérés partiellement",
                         "message": "Source ignorée: informations de buts partielles.",
+                        "reliabilityWarning": False,
                     })
             source_records.append(source_record)
 
@@ -4245,8 +4377,32 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
         # Plus de sources brutes sont nécessaires à cause de matchs incomplets.
         required += max(8, min(20, window_max // 2))
 
+    # Ne remonter au résultat que les exclusions administratives réellement
+    # rencontrées dans la tranche chronologique parcourue. Un forfait très
+    # ancien chargé dans une page de réserve ne doit pas allumer le bandeau s'il
+    # n'a jamais pu influencer la fenêtre utilisée.
+    processed_timestamps = [
+        record.get("startTimestamp") or 0
+        for record in source_records
+        if isinstance(record, dict) and (record.get("startTimestamp") or 0)
+    ]
+    raw_timestamps = [
+        match.get("startTimestamp") or 0
+        for match in pages
+        if isinstance(match, dict) and (match.get("startTimestamp") or 0)
+    ]
+    if processed_timestamps:
+        oldest_processed = min(processed_timestamps)
+        newest_processed_range = max(raw_timestamps) if raw_timestamps else max(processed_timestamps)
+        administrative_source = [
+            item for item in administrative_matches_ignored.values()
+            if oldest_processed <= (item.get("startTimestamp") or 0) <= newest_processed_range
+        ]
+    else:
+        administrative_source = []
+
     administrative_ignored = sorted(
-        administrative_matches_ignored.values(),
+        administrative_source,
         key=lambda item: (item.get("startTimestamp") or 0, item.get("id") or 0),
         reverse=True,
     )
@@ -4944,15 +5100,26 @@ def process_trend_scan_job(job_id, params):
     home_admin_count = int(home_scan.get("administrativeMatchCount") or 0)
     away_admin_count = int(away_scan.get("administrativeMatchCount") or 0)
     total_admin_count = home_admin_count + away_admin_count
-    no_goal_reconstruction_issues = [
-        issue for issue in ((home_scan.get("ignoredSourceIssues") or []) + (away_scan.get("ignoredSourceIssues") or []))
-        if isinstance(issue, dict) and str(issue.get("type") or "") == "no-recoverable-goals"
+    ignored_source_issues = (home_scan.get("ignoredSourceIssues") or []) + (away_scan.get("ignoredSourceIssues") or [])
+    administrative_issues = (home_scan.get("administrativeMatchesIgnored") or []) + (away_scan.get("administrativeMatchesIgnored") or [])
+
+    # Le bandeau est volontairement limité aux cas qui rendent le résultat
+    # officiel potentiellement trompeur. Extra/TAB, matchs reportés avant le
+    # coup d'envoi et simples exclusions techniques n'y participent jamais.
+    invalid_reconstruction_issues = [
+        issue for issue in ignored_source_issues
+        if isinstance(issue, dict) and (
+            issue.get("reliabilityWarning") is True
+            or str(issue.get("type") or "") == "no-recoverable-goals"
+        )
     ]
-    forfeit_reconstruction_issues = [
-        issue for issue in ((home_scan.get("administrativeMatchesIgnored") or []) + (away_scan.get("administrativeMatchesIgnored") or []))
-        if isinstance(issue, dict) and str(issue.get("type") or "") == "forfeit"
-    ]
-    invalid_reconstruction_issues = no_goal_reconstruction_issues + forfeit_reconstruction_issues
+    invalid_reconstruction_issues.extend(
+        issue for issue in administrative_issues
+        if isinstance(issue, dict) and (
+            issue.get("reliabilityWarning") is True
+            or str(issue.get("type") or "") in RELIABILITY_WARNING_ADMIN_TYPES
+        )
+    )
     invalid_reconstruction_issue_count = len(invalid_reconstruction_issues)
 
     result = {
@@ -5030,7 +5197,7 @@ def process_trend_scan_job(job_id, params):
                 f"⚠️ Scan partiel : {total_issue_count} match(s) utilisé(s) sans événements récupérés."
                 if total_issue_count else
                 (
-                    f"⚠️ Reconstitution non valide ignorée/remplacée : {invalid_reconstruction_issue_count} match(s) hors 0-0 sans but récupérable ou forfait."
+                    f"⚠️ Reconstitution non valide ignorée/remplacée : {invalid_reconstruction_issue_count} match(s) hors 0-0 sans but récupérable, forfait, arrêté ou commencé sans être terminé."
                     if invalid_reconstruction_issue_count else
                     "Scan complet : reconstitutions valides. Les matchs incomplets éventuels ont été ignorés et remplacés."
                 )
