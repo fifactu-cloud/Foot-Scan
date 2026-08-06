@@ -8,6 +8,8 @@ import urllib.request
 import urllib.error
 import shutil
 import subprocess
+import random
+import threading
 
 # Optionnel : curl_cffi imite l'empreinte TLS de Chrome et contourne
 # le 403 "challenge" anti-bot de SofaScore. Installation dans Termux :
@@ -90,6 +92,12 @@ SOFA_FETCH_TIMEOUT_SECONDS = int(os.environ.get("SOFA_FETCH_TIMEOUT_SECONDS", "1
 SOFA_DEBUG_NETWORK = os.environ.get("SOFA_DEBUG_NETWORK", "0").strip().lower() in ("1", "true", "oui", "yes")
 SOFA_INCIDENT_TIMEOUT_SECONDS = int(os.environ.get("SOFA_INCIDENT_TIMEOUT_SECONDS", "8"))
 SOFA_INCIDENT_RETRIES = int(os.environ.get("SOFA_INCIDENT_RETRIES", "1"))
+SOFA_CHALLENGE_RETRY_SECONDS = float(os.environ.get("SOFA_CHALLENGE_RETRY_SECONDS", "2.5"))
+SOFA_CFFI_WARMUP_ENABLED = os.environ.get("SOFA_CFFI_WARMUP_ENABLED", "1").strip().lower() in ("1", "true", "oui", "yes")
+SOFA_CFFI_IMPERSONATIONS = tuple(
+    value.strip() for value in os.environ.get("SOFA_CFFI_IMPERSONATIONS", "chrome,safari_ios").split(",")
+    if value.strip()
+) or ("chrome",)
 PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
 DEFAULT_RANK_EVENT_STEP = 1.0
 CURRENT_RANK_EVENT_STEP = DEFAULT_RANK_EVENT_STEP
@@ -290,15 +298,131 @@ def pop_scan_job_fallback():
     return pop_latest_scan_job()
 
 
-def read_url(url, headers, impersonate=False, timeout=None):
-    # Si curl_cffi est dispo, on imite l'empreinte TLS de Chrome :
-    # c'est ce qui contourne le 403 "challenge" (anti-bot) de SofaScore.
-    if impersonate and HAS_CURL_CFFI:
+_CFFI_THREAD_LOCAL = threading.local()
+
+
+def _cffi_sessions():
+    sessions = getattr(_CFFI_THREAD_LOCAL, "sessions", None)
+    if sessions is None:
+        sessions = {}
+        _CFFI_THREAD_LOCAL.sessions = sessions
+    return sessions
+
+
+def _get_cffi_session(profile, reset=False):
+    sessions = _cffi_sessions()
+    if reset:
+        old = sessions.pop(profile, None)
         try:
-            resp = cffi_requests.get(url, headers=headers, timeout=timeout or SOFA_FETCH_TIMEOUT_SECONDS, impersonate="chrome")
-            return resp.status_code, resp.text
-        except Exception as e:
-            return 0, str(e)
+            if old is not None:
+                old.close()
+        except Exception:
+            pass
+
+    session = sessions.get(profile)
+    if session is None:
+        session = cffi_requests.Session()
+        sessions[profile] = session
+    return session
+
+
+def _coherent_cffi_headers(headers):
+    """Laisse curl_cffi produire des en-têtes cohérents avec son navigateur.
+
+    Un User-Agent Chrome figé combiné à une empreinte TLS d'une autre version
+    peut déclencher le challenge. On garde seulement les en-têtes fonctionnels.
+    """
+    blocked_exact = {
+        "user-agent", "accept-encoding", "connection", "host", "origin",
+        "x-requested-with",
+    }
+    clean = {}
+    for key, value in (headers or {}).items():
+        lower = str(key).lower()
+        if lower in blocked_exact or lower.startswith("sec-fetch-") or lower.startswith("sec-ch-"):
+            continue
+        clean[key] = value
+
+    clean.setdefault("Accept", "application/json, text/plain, */*")
+    clean.setdefault("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8")
+    return clean
+
+
+def _is_challenge_response(status, body):
+    text = str(body or "").lower()
+    return status == 403 and ("challenge" in text or '"code":403' in text or '"code": 403' in text)
+
+
+def _warmup_cffi_session(session, profile, timeout):
+    if not SOFA_CFFI_WARMUP_ENABLED:
+        return
+    try:
+        session.get(
+            "https://www.sofascore.com/",
+            headers={
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+                "Cache-Control": "no-cache",
+            },
+            timeout=max(5, min(int(timeout or SOFA_FETCH_TIMEOUT_SECONDS), 12)),
+            impersonate=profile,
+            allow_redirects=True,
+        )
+    except Exception:
+        # L'échauffement est un bonus : son échec ne doit pas masquer la requête API.
+        pass
+
+
+def read_url(url, headers, impersonate=False, timeout=None):
+    # curl_cffi est utilisé avec une session persistante : les cookies acquis
+    # sur sofascore.com restent disponibles pour les appels API suivants.
+    if impersonate and HAS_CURL_CFFI:
+        request_timeout = timeout or SOFA_FETCH_TIMEOUT_SECONDS
+        cffi_headers = _coherent_cffi_headers(headers)
+        last_status, last_body = 0, ""
+        last_challenge = None
+
+        for profile in SOFA_CFFI_IMPERSONATIONS:
+            try:
+                session = _get_cffi_session(profile)
+                resp = session.get(
+                    url,
+                    headers=cffi_headers,
+                    timeout=request_timeout,
+                    impersonate=profile,
+                    allow_redirects=True,
+                )
+                last_status, last_body = resp.status_code, resp.text
+
+                if not _is_challenge_response(last_status, last_body):
+                    return last_status, last_body
+                last_challenge = (last_status, last_body)
+
+                # Un challenge peut nécessiter une première navigation pour obtenir
+                # les cookies, puis une nouvelle tentative dans la même session.
+                _warmup_cffi_session(session, profile, request_timeout)
+                time.sleep(0.35 + random.random() * 0.25)
+                resp = session.get(
+                    url,
+                    headers=cffi_headers,
+                    timeout=request_timeout,
+                    impersonate=profile,
+                    allow_redirects=True,
+                )
+                last_status, last_body = resp.status_code, resp.text
+
+                if not _is_challenge_response(last_status, last_body):
+                    return last_status, last_body
+                last_challenge = (last_status, last_body)
+
+                # Ne réutilise pas indéfiniment une session déjà refusée.
+                _get_cffi_session(profile, reset=True)
+            except Exception as e:
+                last_status, last_body = 0, str(e)
+
+        if last_challenge is not None and last_status == 0:
+            return last_challenge
+        return last_status, last_body
 
     req = urllib.request.Request(url, headers=headers, method="GET")
 
@@ -406,6 +530,7 @@ def sofa_fetch(path, incident_mode=False):
         targets = [
             (www_url, browser_headers, "cffi"),
             (api_url, browser_headers, "cffi"),
+            (app_url, app_headers, "cffi"),
             (app_url, app_headers, "syscurl"),
             (www_url, browser_headers, "syscurl"),
             (api_url, browser_headers, "syscurl"),
@@ -415,14 +540,15 @@ def sofa_fetch(path, incident_mode=False):
         timeout = SOFA_INCIDENT_TIMEOUT_SECONDS
     else:
         targets = [
-            # curl_cffi d'abord quand il est disponible : moins de faux messages
-            # "réponse vide" au démarrage Termux, et meilleure empreinte navigateur.
+            # Les trois hôtes passent d'abord par une vraie session curl_cffi.
+            # L'hôte .app est utile quand la protection du domaine .com varie.
             (www_url, browser_headers, "cffi"),
             (api_url, browser_headers, "cffi"),
+            (app_url, app_headers, "cffi"),
+            (app_url, app_headers, "syscurl"),
             (app_url, app_headers, "urllib"),
             (www_url, browser_headers, "syscurl"),
             (api_url, browser_headers, "syscurl"),
-            (app_url, app_headers, "syscurl"),
             (www_url, browser_headers, "urllib"),
             (api_url, browser_headers, "urllib"),
         ]
@@ -464,7 +590,11 @@ def sofa_fetch(path, incident_mode=False):
                 print(f"Échec tentative {attempt}/{retries}: {error}", file=sys.stderr)
 
         if attempt < retries:
-            time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
+            if challenge_seen:
+                # Évite d'aggraver un blocage temporaire avec une rafale immédiate.
+                time.sleep(SOFA_CHALLENGE_RETRY_SECONDS * attempt + random.random() * 0.75)
+            else:
+                time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
 
     if challenge_seen and not HAS_CURL_CFFI:
         print(
