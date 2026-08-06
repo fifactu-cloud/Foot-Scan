@@ -8,8 +8,6 @@ import urllib.request
 import urllib.error
 import shutil
 import subprocess
-import random
-import threading
 
 # Optionnel : curl_cffi imite l'empreinte TLS de Chrome et contourne
 # le 403 "challenge" anti-bot de SofaScore. Installation dans Termux :
@@ -92,12 +90,6 @@ SOFA_FETCH_TIMEOUT_SECONDS = int(os.environ.get("SOFA_FETCH_TIMEOUT_SECONDS", "1
 SOFA_DEBUG_NETWORK = os.environ.get("SOFA_DEBUG_NETWORK", "0").strip().lower() in ("1", "true", "oui", "yes")
 SOFA_INCIDENT_TIMEOUT_SECONDS = int(os.environ.get("SOFA_INCIDENT_TIMEOUT_SECONDS", "8"))
 SOFA_INCIDENT_RETRIES = int(os.environ.get("SOFA_INCIDENT_RETRIES", "1"))
-SOFA_CHALLENGE_RETRY_SECONDS = float(os.environ.get("SOFA_CHALLENGE_RETRY_SECONDS", "2.5"))
-SOFA_CFFI_WARMUP_ENABLED = os.environ.get("SOFA_CFFI_WARMUP_ENABLED", "1").strip().lower() in ("1", "true", "oui", "yes")
-SOFA_CFFI_IMPERSONATIONS = tuple(
-    value.strip() for value in os.environ.get("SOFA_CFFI_IMPERSONATIONS", "chrome,safari_ios").split(",")
-    if value.strip()
-) or ("chrome",)
 PREFETCH_ENABLED = os.environ.get("FOOTSCAN_PREFETCH_ENABLED", "0") == "1"
 DEFAULT_RANK_EVENT_STEP = 1.0
 CURRENT_RANK_EVENT_STEP = DEFAULT_RANK_EVENT_STEP
@@ -298,131 +290,15 @@ def pop_scan_job_fallback():
     return pop_latest_scan_job()
 
 
-_CFFI_THREAD_LOCAL = threading.local()
-
-
-def _cffi_sessions():
-    sessions = getattr(_CFFI_THREAD_LOCAL, "sessions", None)
-    if sessions is None:
-        sessions = {}
-        _CFFI_THREAD_LOCAL.sessions = sessions
-    return sessions
-
-
-def _get_cffi_session(profile, reset=False):
-    sessions = _cffi_sessions()
-    if reset:
-        old = sessions.pop(profile, None)
-        try:
-            if old is not None:
-                old.close()
-        except Exception:
-            pass
-
-    session = sessions.get(profile)
-    if session is None:
-        session = cffi_requests.Session()
-        sessions[profile] = session
-    return session
-
-
-def _coherent_cffi_headers(headers):
-    """Laisse curl_cffi produire des en-têtes cohérents avec son navigateur.
-
-    Un User-Agent Chrome figé combiné à une empreinte TLS d'une autre version
-    peut déclencher le challenge. On garde seulement les en-têtes fonctionnels.
-    """
-    blocked_exact = {
-        "user-agent", "accept-encoding", "connection", "host", "origin",
-        "x-requested-with",
-    }
-    clean = {}
-    for key, value in (headers or {}).items():
-        lower = str(key).lower()
-        if lower in blocked_exact or lower.startswith("sec-fetch-") or lower.startswith("sec-ch-"):
-            continue
-        clean[key] = value
-
-    clean.setdefault("Accept", "application/json, text/plain, */*")
-    clean.setdefault("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8")
-    return clean
-
-
-def _is_challenge_response(status, body):
-    text = str(body or "").lower()
-    return status == 403 and ("challenge" in text or '"code":403' in text or '"code": 403' in text)
-
-
-def _warmup_cffi_session(session, profile, timeout):
-    if not SOFA_CFFI_WARMUP_ENABLED:
-        return
-    try:
-        session.get(
-            "https://www.sofascore.com/",
-            headers={
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-                "Cache-Control": "no-cache",
-            },
-            timeout=max(5, min(int(timeout or SOFA_FETCH_TIMEOUT_SECONDS), 12)),
-            impersonate=profile,
-            allow_redirects=True,
-        )
-    except Exception:
-        # L'échauffement est un bonus : son échec ne doit pas masquer la requête API.
-        pass
-
-
 def read_url(url, headers, impersonate=False, timeout=None):
-    # curl_cffi est utilisé avec une session persistante : les cookies acquis
-    # sur sofascore.com restent disponibles pour les appels API suivants.
+    # Si curl_cffi est dispo, on imite l'empreinte TLS de Chrome :
+    # c'est ce qui contourne le 403 "challenge" (anti-bot) de SofaScore.
     if impersonate and HAS_CURL_CFFI:
-        request_timeout = timeout or SOFA_FETCH_TIMEOUT_SECONDS
-        cffi_headers = _coherent_cffi_headers(headers)
-        last_status, last_body = 0, ""
-        last_challenge = None
-
-        for profile in SOFA_CFFI_IMPERSONATIONS:
-            try:
-                session = _get_cffi_session(profile)
-                resp = session.get(
-                    url,
-                    headers=cffi_headers,
-                    timeout=request_timeout,
-                    impersonate=profile,
-                    allow_redirects=True,
-                )
-                last_status, last_body = resp.status_code, resp.text
-
-                if not _is_challenge_response(last_status, last_body):
-                    return last_status, last_body
-                last_challenge = (last_status, last_body)
-
-                # Un challenge peut nécessiter une première navigation pour obtenir
-                # les cookies, puis une nouvelle tentative dans la même session.
-                _warmup_cffi_session(session, profile, request_timeout)
-                time.sleep(0.35 + random.random() * 0.25)
-                resp = session.get(
-                    url,
-                    headers=cffi_headers,
-                    timeout=request_timeout,
-                    impersonate=profile,
-                    allow_redirects=True,
-                )
-                last_status, last_body = resp.status_code, resp.text
-
-                if not _is_challenge_response(last_status, last_body):
-                    return last_status, last_body
-                last_challenge = (last_status, last_body)
-
-                # Ne réutilise pas indéfiniment une session déjà refusée.
-                _get_cffi_session(profile, reset=True)
-            except Exception as e:
-                last_status, last_body = 0, str(e)
-
-        if last_challenge is not None and last_status == 0:
-            return last_challenge
-        return last_status, last_body
+        try:
+            resp = cffi_requests.get(url, headers=headers, timeout=timeout or SOFA_FETCH_TIMEOUT_SECONDS, impersonate="chrome")
+            return resp.status_code, resp.text
+        except Exception as e:
+            return 0, str(e)
 
     req = urllib.request.Request(url, headers=headers, method="GET")
 
@@ -530,7 +406,6 @@ def sofa_fetch(path, incident_mode=False):
         targets = [
             (www_url, browser_headers, "cffi"),
             (api_url, browser_headers, "cffi"),
-            (app_url, app_headers, "cffi"),
             (app_url, app_headers, "syscurl"),
             (www_url, browser_headers, "syscurl"),
             (api_url, browser_headers, "syscurl"),
@@ -540,15 +415,14 @@ def sofa_fetch(path, incident_mode=False):
         timeout = SOFA_INCIDENT_TIMEOUT_SECONDS
     else:
         targets = [
-            # Les trois hôtes passent d'abord par une vraie session curl_cffi.
-            # L'hôte .app est utile quand la protection du domaine .com varie.
+            # curl_cffi d'abord quand il est disponible : moins de faux messages
+            # "réponse vide" au démarrage Termux, et meilleure empreinte navigateur.
             (www_url, browser_headers, "cffi"),
             (api_url, browser_headers, "cffi"),
-            (app_url, app_headers, "cffi"),
-            (app_url, app_headers, "syscurl"),
             (app_url, app_headers, "urllib"),
             (www_url, browser_headers, "syscurl"),
             (api_url, browser_headers, "syscurl"),
+            (app_url, app_headers, "syscurl"),
             (www_url, browser_headers, "urllib"),
             (api_url, browser_headers, "urllib"),
         ]
@@ -590,11 +464,7 @@ def sofa_fetch(path, incident_mode=False):
                 print(f"Échec tentative {attempt}/{retries}: {error}", file=sys.stderr)
 
         if attempt < retries:
-            if challenge_seen:
-                # Évite d'aggraver un blocage temporaire avec une rafale immédiate.
-                time.sleep(SOFA_CHALLENGE_RETRY_SECONDS * attempt + random.random() * 0.75)
-            else:
-                time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
+            time.sleep(SOFA_RETRY_SLEEP_SECONDS * attempt)
 
     if challenge_seen and not HAS_CURL_CFFI:
         print(
@@ -852,6 +722,16 @@ ADMIN_MATCH_KEYWORDS = (
     "technical defeat", "technical loss", "technical win",
 )
 
+# Seuls ces statuts administratifs doivent alimenter l'avertissement visible
+# « reconstitution non valide ». Les autres exclusions administratives restent
+# ignorées proprement, mais sans déclencher ce message.
+FORFEIT_MATCH_KEYWORDS = (
+    "forfeit", "forfait",
+    "walkover", "walk over",
+    "defaulted", "default loss", "default win",
+    "technical defeat", "technical loss", "technical win",
+)
+
 EXTRA_TIME_PENALTY_KEYWORDS = (
     "after extra time", "extra time", "aet", "a.e.t",
     "overtime", "prolongation", "prolongations",
@@ -1029,15 +909,35 @@ def administrative_match_reason(match, include_extra=False):
     return None
 
 
+def match_indicates_forfeit(match, reason=None):
+    values = [reason]
+    status = (match or {}).get("status") or {}
+    if isinstance(status, dict):
+        values.extend(status.get(key) for key in ("type", "description", "reason", "text", "name", "short", "detail"))
+    if isinstance(match, dict):
+        values.extend(match.get(key) for key in (
+            "statusDescription", "statusText", "statusReason", "reason",
+            "note", "notes", "description", "resultType", "matchStatus",
+            "defaultScore", "defaultWinner", "forfeit", "walkover",
+        ))
+        if match.get("forfeit") is True or match.get("walkover") is True:
+            return True
+    haystack = " | ".join(normalize_status_text(value) for value in values if value is not None)
+    return any(keyword in haystack for keyword in FORFEIT_MATCH_KEYWORDS)
+
+
 def make_administrative_match_issue(match, reason):
     reason_text = reason or "Match administratif / forfait"
     normalized_reason = normalize_status_text(reason_text)
     if "prolongation" in normalized_reason or "penalt" in normalized_reason or "tir" in normalized_reason or "shootout" in normalized_reason:
         issue_type = "extra-time-penalties"
         message = "Match ignoré: prolongation ou tirs au but exclus de l'analyse."
+    elif match_indicates_forfeit(match, reason_text):
+        issue_type = "forfeit"
+        message = "Match ignoré: forfait."
     else:
         issue_type = "administrative"
-        message = "Match ignoré: forfait, abandon, report, annulation ou décision administrative."
+        message = "Match ignoré: statut administratif hors forfait."
     return {
         "id": match.get("id"),
         "label": make_match_label(match),
@@ -3155,9 +3055,16 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id, incl
             "assistDataStatus": "assist-found" if match_has_assists else "no-assist-found",
         })
 
-    goal_data_complete = True
-    if final_score_total is not None and final_score_total > len(goals):
-        goal_data_complete = False
+    recoverable_goal_count = len(goals)
+    non_zero_final_score = bool(final_score_total is not None and final_score_total > 0)
+    no_recoverable_goals = bool(non_zero_final_score and recoverable_goal_count == 0)
+    partial_recoverable_goals = bool(
+        non_zero_final_score
+        and recoverable_goal_count > 0
+        and final_score_total is not None
+        and final_score_total > recoverable_goal_count
+    )
+    goal_data_complete = not (no_recoverable_goals or partial_recoverable_goals)
 
     zero_zero = {
         "isZeroZero": True,
@@ -3202,6 +3109,9 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id, incl
         "finalHomeScore": final_home_score,
         "finalAwayScore": final_away_score,
         "finalScoreTotal": final_score_total,
+        "recoverableGoalCount": recoverable_goal_count,
+        "noRecoverableGoals": no_recoverable_goals,
+        "partialRecoverableGoals": partial_recoverable_goals,
         "reconstructionGoalsIncomplete": not goal_data_complete,
         "extraTimePenaltyIssue": bool(extra_time_penalty_issue),
         "matchHasAssists": match_has_assists,
@@ -4164,6 +4074,9 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                 regulation_time_limit=regulation_time_limit,
             )
             if source_record.get("extraTimePenaltyIssue"):
+                # Une prolongation détectée tardivement est une exclusion Extra,
+                # pas une reconstitution non valide. Elle ne doit jamais être
+                # reclassée ensuite comme « buts absents/incomplets ».
                 source_record["eventDataStatus"] = "extra-time-penalties"
                 source_record["eventDataIssue"] = True
                 source_record["error"] = "Prolongation ou tirs au but exclus de l'analyse"
@@ -4176,35 +4089,39 @@ def fetch_trend_team_matches(job_id, analyzed_team_id, skip, trend_count, team_n
                     "reason": "Prolongation ou tirs au but détectés dans les événements",
                     "message": "Match ignoré pour la reconstitution: prolongation ou tirs au but exclus de l'analyse.",
                 })
-            if issue and not source_record.get("trueZeroZero"):
-                event_data_issues.append({
-                    "id": match.get("id"),
-                    "label": make_match_label(match),
-                    "competition": get_competition_name(match),
-                    "startTimestamp": match.get("startTimestamp") or 0,
-                    "type": issue.get("type") or "blocked",
-                    "reason": issue.get("reason") or issue.get("message") or "Événements non récupérés",
-                    "message": issue.get("message") or "Événements non récupérés pour ce match.",
-                })
-            if issue and not source_record.get("trueZeroZero"):
-                source_record["eventDataStatus"] = issue.get("type") or "blocked"
-                source_record["eventDataIssue"] = True
-                source_record["error"] = issue.get("reason") or issue.get("message") or "Événements non récupérés"
             elif issue and source_record.get("trueZeroZero"):
+                # Un vrai 0-0 n'a aucun but à récupérer par définition.
                 source_record["eventDataStatus"] = "ok-zero-zero"
-            elif source_record.get("reconstructionGoalsIncomplete"):
-                source_record["eventDataStatus"] = "incomplete-goals"
+            elif issue or source_record.get("reconstructionGoalsIncomplete"):
                 source_record["eventDataIssue"] = True
-                source_record["error"] = "Reconstitution non valide: score non nul sans buts récupérables complets"
-                event_data_issues.append({
-                    "id": match.get("id"),
-                    "label": make_match_label(match),
-                    "competition": get_competition_name(match),
-                    "startTimestamp": match.get("startTimestamp") or 0,
-                    "type": "incomplete-goals",
-                    "reason": "Reconstitution non valide: score non nul sans buts récupérables complets",
-                    "message": "Reconstitution non valide: le score du match est non nul mais les buts récupérables sont absents ou incomplets.",
-                })
+
+                if source_record.get("noRecoverableGoals"):
+                    source_record["eventDataStatus"] = "no-recoverable-goals"
+                    source_record["error"] = "Reconstitution non valide: score hors 0-0 sans but récupérable"
+                    event_data_issues.append({
+                        "id": match.get("id"),
+                        "label": make_match_label(match),
+                        "competition": get_competition_name(match),
+                        "startTimestamp": match.get("startTimestamp") or 0,
+                        "type": "no-recoverable-goals",
+                        "reason": issue.get("reason") if isinstance(issue, dict) else "Score hors 0-0 sans but récupérable",
+                        "message": "Reconstitution non valide: match hors 0-0 sans but récupérable.",
+                    })
+                else:
+                    # Des buts existent mais la liste est partielle : la source
+                    # reste exclue pour protéger le calcul, sans alimenter le
+                    # message visible demandé par l'utilisateur.
+                    source_record["eventDataStatus"] = "partial-goals"
+                    source_record["error"] = "Buts récupérés partiellement; source ignorée"
+                    event_data_issues.append({
+                        "id": match.get("id"),
+                        "label": make_match_label(match),
+                        "competition": get_competition_name(match),
+                        "startTimestamp": match.get("startTimestamp") or 0,
+                        "type": "partial-goals",
+                        "reason": issue.get("reason") if isinstance(issue, dict) else "Buts récupérés partiellement",
+                        "message": "Source ignorée: informations de buts partielles.",
+                    })
             source_records.append(source_record)
 
             effective = [record for record in source_records if reconstruction_source_is_complete(record)]
@@ -4958,10 +4875,15 @@ def process_trend_scan_job(job_id, params):
     home_admin_count = int(home_scan.get("administrativeMatchCount") or 0)
     away_admin_count = int(away_scan.get("administrativeMatchCount") or 0)
     total_admin_count = home_admin_count + away_admin_count
-    invalid_reconstruction_issues = [
+    no_goal_reconstruction_issues = [
         issue for issue in ((home_scan.get("ignoredSourceIssues") or []) + (away_scan.get("ignoredSourceIssues") or []))
-        if isinstance(issue, dict) and str(issue.get("type") or "") in {"incomplete-goals", "missing", "blocked", "error"}
+        if isinstance(issue, dict) and str(issue.get("type") or "") == "no-recoverable-goals"
     ]
+    forfeit_reconstruction_issues = [
+        issue for issue in ((home_scan.get("administrativeMatchesIgnored") or []) + (away_scan.get("administrativeMatchesIgnored") or []))
+        if isinstance(issue, dict) and str(issue.get("type") or "") == "forfeit"
+    ]
+    invalid_reconstruction_issues = no_goal_reconstruction_issues + forfeit_reconstruction_issues
     invalid_reconstruction_issue_count = len(invalid_reconstruction_issues)
 
     result = {
@@ -5039,7 +4961,7 @@ def process_trend_scan_job(job_id, params):
                 f"⚠️ Scan partiel : {total_issue_count} match(s) utilisé(s) sans événements récupérés."
                 if total_issue_count else
                 (
-                    f"⚠️ Reconstitution non valide ignorée/remplacée : {invalid_reconstruction_issue_count} match(s) à score non nul sans buts récupérables."
+                    f"⚠️ Reconstitution non valide ignorée/remplacée : {invalid_reconstruction_issue_count} match(s) hors 0-0 sans but récupérable ou forfait."
                     if invalid_reconstruction_issue_count else
                     "Scan complet : reconstitutions valides. Les matchs incomplets éventuels ont été ignorés et remplacés."
                 )
