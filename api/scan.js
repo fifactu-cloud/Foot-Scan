@@ -149,9 +149,12 @@ module.exports = async function (req, res) {
     const rankEventStep = numeric(b.rankEventStep, 1, 0.0001, 5);
     const rankEventMode = b.rankEventMode === 'performance' ? 'performance' : 'fixed';
     const winnerMode = b.winnerMode === 'evolution' ? 'evolution' : 'dominance';
-    const isTrendMode = bool(b.trendMode) || b.reconstructionCount !== undefined || b.trendCount !== undefined || b.rankEventMode === 'trend';
-    const reconstructionCount = numeric(b.reconstructionCount, numeric(b.trendCount, rank1 || 9, 1, 100), 1, 100);
-    const trendCount = reconstructionCount; // compatibilité avec les anciens workers/rapports
+    const stageMode = bool(b.stageMode);
+    const isTrendMode = !stageMode && (bool(b.trendMode) || b.reconstructionCount !== undefined || b.trendCount !== undefined || b.rankEventMode === 'trend');
+    const matchCount = numeric(b.matchCount, numeric(b.reconstructionCount, numeric(b.trendCount, rank1 || 9, 1, 100), 1, 100), 1, 100);
+    const reconstructionCount = matchCount; // compatibilité de transport avec les anciennes versions
+    const trendCount = reconstructionCount;
+    const assembleNullStages = bool(b.assembleNullStages);
     const trendSelectionMode = b.trendSelectionMode === 'top_half' ? 'top_half' : 'top_line';
     const highGoalQuantityEnabled = b.highGoalQuantityEnabled === undefined ? true : bool(b.highGoalQuantityEnabled);
     const trendToMeanEnabled = bool(b.trendToMeanEnabled);
@@ -165,12 +168,12 @@ module.exports = async function (req, res) {
       return res.end(JSON.stringify({ error: 'Match ID ou URL WEB invalide' }));
     }
 
-    if (!isTrendMode && !rank1) {
+    if (!stageMode && !isTrendMode && !rank1) {
       res.statusCode = 400;
       return res.end(JSON.stringify({ error: 'Rang 1 invalide' }));
     }
 
-    if (!isTrendMode && b.rank2 !== undefined && b.rank2 !== null && b.rank2 !== '' && !rank2) {
+    if (!stageMode && !isTrendMode && b.rank2 !== undefined && b.rank2 !== null && b.rank2 !== '' && !rank2) {
       res.statusCode = 400;
       return res.end(JSON.stringify({ error: 'Rang 2 invalide' }));
     }
@@ -196,6 +199,9 @@ module.exports = async function (req, res) {
         rankEventStep,
         rankEventMode,
         winnerMode,
+        stageMode,
+        matchCount,
+        assembleNullStages,
         trendMode: isTrendMode,
         trendCount,
         reconstructionCount,
