@@ -11605,6 +11605,211 @@
       padding-bottom: 12px !important;
     }
 
+
+    /* v254 — système Étages */
+    .stage-summary-note {
+      margin-top: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      opacity: .78;
+      text-align: center;
+    }
+
+    .stage-equality-box {
+      position: relative;
+      overflow: hidden;
+      margin-top: 14px;
+      padding: 18px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.045);
+      text-align: center;
+    }
+
+    .stage-equality-label {
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      opacity: .72;
+    }
+
+    .stage-equality-value {
+      margin-top: 5px;
+      font-size: clamp(26px, 7vw, 40px);
+      line-height: 1;
+      font-weight: 1000;
+      letter-spacing: .04em;
+    }
+
+    .stage-equality-meta {
+      margin-top: 7px;
+      font-size: 12px;
+      opacity: .72;
+    }
+
+    .stage-group {
+      margin-top: 15px;
+      border: 1px solid rgba(255,255,255,.09);
+      border-radius: 18px;
+      background: rgba(255,255,255,.025);
+      overflow: hidden;
+    }
+
+    .stage-group-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.035);
+    }
+
+    .stage-group-title {
+      min-width: 0;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .035em;
+      text-transform: uppercase;
+      overflow-wrap: anywhere;
+    }
+
+    .stage-group-count {
+      flex: 0 0 auto;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      font-size: 10px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .stage-list {
+      display: grid;
+      gap: 9px;
+      padding: 11px;
+    }
+
+    .stage-row {
+      display: grid;
+      grid-template-columns: minmax(70px, .65fr) minmax(0, 1.35fr);
+      gap: 10px;
+      align-items: stretch;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.12);
+    }
+
+    .stage-score-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 70px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.055);
+      text-align: center;
+    }
+
+    .stage-score-label {
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      opacity: .64;
+    }
+
+    .stage-score {
+      margin-top: 2px;
+      font-size: 24px;
+      line-height: 1;
+      font-weight: 1000;
+    }
+
+    .stage-main {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    .stage-statline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      align-items: baseline;
+      font-size: 11px;
+      opacity: .74;
+    }
+
+    .stage-statline strong {
+      font-size: 15px;
+      opacity: 1;
+    }
+
+    .stage-leader {
+      margin-top: 7px;
+      font-size: 13px;
+      line-height: 1.35;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .stage-leader-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      margin-left: 5px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.09);
+      font-size: 11px;
+      vertical-align: middle;
+    }
+
+    .stage-camp {
+      margin-top: 4px;
+      font-size: 10px;
+      font-weight: 800;
+      opacity: .66;
+    }
+
+    .stage-global-null {
+      margin: 18px 0;
+    }
+
+    .stage-empty {
+      padding: 16px;
+      font-size: 12px;
+      text-align: center;
+      opacity: .65;
+    }
+
+    .stage-match-meta {
+      font-size: 11px;
+      opacity: .68;
+    }
+
+    @media (max-width: 520px) {
+      .stage-row {
+        grid-template-columns: 72px minmax(0, 1fr);
+        padding: 8px;
+        gap: 8px;
+      }
+      .stage-score {
+        font-size: 21px;
+      }
+      .stage-leader {
+        font-size: 12px;
+      }
+      .stage-group-head {
+        align-items: flex-start;
+      }
+    }
+
   </style>
 </head>
 
@@ -11678,34 +11883,20 @@
             <div class="auto-grid trend-only-grid">
               <div class="auto-control trend-control">
                 <div class="auto-control-top">
-                  <div class="auto-control-title" id="trendControlTitle">Reconstitutions</div>
+                  <div class="auto-control-title" id="trendControlTitle">Matchs</div>
                   <input id="trendNumber" class="auto-number" type="number" min="1" max="100" step="1" value="9" />
                 </div>
                 <input id="trendRange" type="range" min="1" max="100" step="1" value="9" />
               </div>
             </div>
 
-            <div class="auto-formula" id="trendFormula">9 Reconstitutions</div>
+            <div class="auto-formula" id="trendFormula">9 Matchs</div>
 
             <input id="simultaneousMode" type="checkbox" hidden checked />
             <div class="calc-mode-slider sim" id="calcModeSlider" role="tablist" aria-label="Mode de camp">
               <span class="calc-mode-thumb" aria-hidden="true"></span>
               <button type="button" class="calc-mode-opt" data-mode="combined" role="tab">CAMP COMBINÉ</button>
               <button type="button" class="calc-mode-opt is-active" data-mode="separate" role="tab">CAMP SÉPARÉ</button>
-            </div>
-
-            <input id="trendSelectionMode" type="checkbox" hidden />
-            <div class="calc-mode-slider trend-selection-slider" id="trendSelectionSlider" role="tablist" aria-label="Sélection des reconstitutions pour la tendance">
-              <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt is-active" data-mode="line" role="tab">TOP LIGNE</button>
-              <button type="button" class="calc-mode-opt" data-mode="half" role="tab">TOP MOITIÉ</button>
-            </div>
-
-            <input id="reconstructionMode" type="checkbox" hidden />
-            <div class="calc-mode-slider reconstruction-mode-slider" id="reconstructionModeSlider" role="tablist" aria-label="Mode de reconstitution">
-              <span class="calc-mode-thumb" aria-hidden="true"></span>
-              <button type="button" class="calc-mode-opt is-active" data-mode="staircase" role="tab">ESCALIER</button>
-              <button type="button" class="calc-mode-opt" data-mode="sequence" role="tab">SÉQUENCE</button>
             </div>
 
             <input id="includeExtraEnabled" type="checkbox" hidden />
@@ -11721,22 +11912,10 @@
               <span class="metric-check-text">LIMITATION TEMPS RÉGLEMENTAIRE</span>
             </label>
 
-            <label class="metric-check-row" for="highGoalQuantityEnabled">
-              <input id="highGoalQuantityEnabled" type="checkbox" checked />
+            <label class="metric-check-row" for="assembleNullStages">
+              <input id="assembleNullStages" type="checkbox" />
               <span class="metric-check-box" aria-hidden="true"></span>
-              <span class="metric-check-text">QUANTITÉ BUT HAUTE</span>
-            </label>
-
-            <label class="metric-check-row" for="trendToMeanEnabled">
-              <input id="trendToMeanEnabled" type="checkbox" />
-              <span class="metric-check-box" aria-hidden="true"></span>
-              <span class="metric-check-text">TENDANCE VERS MOYENNE</span>
-            </label>
-
-            <label class="metric-check-row" for="meanToTrendEnabled">
-              <input id="meanToTrendEnabled" type="checkbox" checked />
-              <span class="metric-check-box" aria-hidden="true"></span>
-              <span class="metric-check-text">MOYENNE VERS TENDANCE</span>
+              <span class="metric-check-text">ASSEMBLAGE ÉTAGE NUL</span>
             </label>
 
           </div>
@@ -11796,41 +11975,33 @@
 
       <div class="bar-grid">
         <div class="bar-card">
-          <div class="bar-card-title">🏆 Gagnant</div>
-          <div class="bar-line"><span>Défaut</span><strong>Plus Grande Tendance</strong></div>
-          <div class="bar-line"><span>Direction</span><strong>Plus Grande Évolution Signée</strong></div>
-          <div class="bar-line"><span>Égalité</span><strong>Valeurs Exactement Identiques</strong></div>
-          <div class="bar-line"><span>⚠️</span><strong>Écart Inférieur À 0,1111111111</strong></div>
-          <div class="bar-line"><span>Switch Gagnant</span><strong>Deux Comptages Pris En X.5 Inversent Le Gagnant</strong></div>
+          <div class="bar-card-title">🏟️ Étages</div>
+          <div class="bar-line"><span>Étage</span><strong>Score créé après un but : 1-0, 1-1, 2-1…</strong></div>
+          <div class="bar-line"><span>Buts</span><strong>Nombre total d’occurrences dans cet étage</strong></div>
+          <div class="bar-line"><span>Joueur dominant</span><strong>Joueur qui revient le plus souvent dans l’étage</strong></div>
+          <div class="bar-line"><span>Égalité joueur</span><strong>Priorité à celui qui a marqué en premier</strong></div>
         </div>
 
         <div class="bar-card">
           <div class="bar-card-title">⚙️ Configuration</div>
-          <div class="bar-line"><span>Curseur</span><strong>Nb. Reconstitutions</strong></div>
-          <div class="bar-line"><span>Reconstitutions</span><strong>Nombre choisi dans le curseur</strong></div>
-          <div class="bar-line"><span>Camp Combiné</span><strong>Attaque Réciproque Avec Contexte</strong></div>
-          <div class="bar-line"><span>Camp Séparé</span><strong>Attaque + Défense Solo</strong></div>
-          <div class="bar-line"><span>Sans Extra</span><strong>Exclut Prolongations Et Tirs Au But</strong></div>
-          <div class="bar-line"><span>Avec Extra</span><strong>Autorise Prolongations Et Tirs Au But</strong></div>
-          <div class="bar-line"><span>Lim. Temps</span><strong>Ne Dépasse Pas Le Temps Réglementaire</strong></div>
-          <div class="bar-line"><span>Top Ligne</span><strong>Compare Les Reconstitutions De La Même Ligne</strong></div>
-          <div class="bar-line"><span>Top Moitié</span><strong>Garde La Moitié Haute De Chaque Équipe</strong></div>
-          <div class="bar-line"><span>Quantité But Haute</span><strong>Critère Offensif En Camp Combiné, Score Complet En Camp Séparé</strong></div>
+          <div class="bar-line"><span>Curseur</span><strong>Nombre de matchs historiques récupérés</strong></div>
+          <div class="bar-line"><span>Camp Combiné</span><strong>Attaque équipe + attaque des adversaires de l’autre équipe</strong></div>
+          <div class="bar-line"><span>Camp Séparé</span><strong>Équipe et adversaires conservés dans des groupes distincts</strong></div>
+          <div class="bar-line"><span>Assemblage Étage Nul</span><strong>Fusionne les étages 1-1, 2-2, 3-3… selon le mode de camp</strong></div>
         </div>
 
         <div class="bar-card">
-          <div class="bar-card-title">📈 Moyenne & Tendance</div>
-          <div class="bar-line"><span>Moyenne</span><strong>Moyenne De Toutes Les Reconstitutions</strong></div>
-          <div class="bar-line"><span>Tendance</span><strong>Moyenne Des Reconstitutions Retenues Par Top Ligne Ou Top Moitié</strong></div>
-          <div class="bar-line"><span>0-0</span><strong>Minute 0 Et Borne De Clôture</strong></div>
+          <div class="bar-card-title">⏱️ Extra</div>
+          <div class="bar-line"><span>Sans Extra</span><strong>Exclut prolongations et tirs au but</strong></div>
+          <div class="bar-line"><span>Avec Extra</span><strong>Autorise prolongations et tirs au but</strong></div>
+          <div class="bar-line"><span>Lim. Temps</span><strong>Conserve uniquement le temps réglementaire, 90+X inclus</strong></div>
         </div>
 
         <div class="bar-card">
-          <div class="bar-card-title">↔️ Direction</div>
-          <div class="bar-line"><span>Tendance Vers Moyenne</span><strong>Moyenne − Tendance</strong></div>
-          <div class="bar-line"><span>Moyenne Vers Tendance</span><strong>Tendance − Moyenne</strong></div>
-          <div class="bar-line"><span>Aucune Option</span><strong>Comparaison Directe Des Tendances</strong></div>
-          <div class="bar-line"><span>Extra</span><strong>Penalty → Prolongation → Temps Réglementaire → 0-0</strong></div>
+          <div class="bar-card-title">⚖️ Résultat</div>
+          <div class="bar-line"><span>Pour l’instant</span><strong>ÉGALITÉ affichée systématiquement</strong></div>
+          <div class="bar-line"><span>Gagnant</span><strong>Règle non définie — aucun gagnant provisoire</strong></div>
+          <div class="bar-line"><span>Alerte fiabilité</span><strong>Cas spéciaux susceptibles de fausser le résultat source</strong></div>
         </div>
       </div>
     </details>
@@ -12517,11 +12688,11 @@
       if ($("trendRange")) $("trendRange").value = String(trend);
       if ($("rank1")) $("rank1").value = String(trend);
       if ($("rank2")) $("rank2").value = "";
-      const trendWord = trend > 1 ? "Reconstitutions" : "Reconstitution";
-      if ($("trendBoxTitle")) $("trendBoxTitle").textContent = trendWord.toUpperCase();
-      if ($("trendControlTitle")) $("trendControlTitle").textContent = trendWord;
+      const matchWord = trend > 1 ? "Matchs" : "Match";
+      if ($("trendBoxTitle")) $("trendBoxTitle").textContent = matchWord.toUpperCase();
+      if ($("trendControlTitle")) $("trendControlTitle").textContent = matchWord;
       if ($("trendFormula")) {
-        $("trendFormula").textContent = `${trend} ${trendWord}`;
+        $("trendFormula").textContent = `${trend} ${matchWord}`;
       }
       updateRangeGradientFill();
     }
@@ -12529,9 +12700,10 @@
     function calculateAutoRanks() {
       const trend = getTrendCount();
       return {
-        mode: "trend",
-        presetLabel: "Reconstitution",
-        trendMode: true,
+        mode: "stages",
+        presetLabel: "Matchs",
+        stageMode: true,
+        matchCount: trend,
         trendCount: trend,
         matchesNeeded: trend,
         calculationTrendCount: trend,
@@ -12540,14 +12712,14 @@
         changes: trend,
         low: trend,
         high: null,
-        rankEventMode: "trend",
-        winnerMode: "trend",
+        rankEventMode: "stages",
+        winnerMode: "tie",
       };
     }
 
     function formulaTextForCalc(calc) {
-      const trend = Number(calc?.trendCount || getTrendCount());
-      return `${trend} Reconstitution${trend > 1 ? "s" : ""}`;
+      const trend = Number(calc?.matchCount || calc?.trendCount || getTrendCount());
+      return `${trend} Match${trend > 1 ? "s" : ""}`;
     }
 
     function updateAutoCalculator() {
@@ -12559,7 +12731,7 @@
     }
 
     function markPresetAsCustom() {
-      activePreset = "Reconstitution";
+      activePreset = "Matchs";
     }
 
     function applyAutoRanks() {
@@ -12731,8 +12903,8 @@
       box.classList.add("status-selection");
       box.innerHTML = `
         <div class="status-selection-wrap">
-          <div class="status-selection-label">RECONSTITUTIONS SÉLECTIONNÉES</div>
-          <div class="status-selection-value">${esc(trend)} Reconstitution${trend > 1 ? "s" : ""}</div>
+          <div class="status-selection-label">MATCHS SÉLECTIONNÉS</div>
+          <div class="status-selection-value">${esc(trend)} Match${trend > 1 ? "s" : ""}</div>
         </div>
       `;
     }
@@ -12938,6 +13110,11 @@
       return found ? found[1] : value;
     }
 
+    function isAssembleNullStagesEnabled(result = null) {
+      if (result && Object.prototype.hasOwnProperty.call(result, "assembleNullStages")) return Boolean(result.assembleNullStages);
+      return Boolean($("assembleNullStages")?.checked);
+    }
+
     async function startScanJob() {
       const matchId = extractMatchId($("matchInput").value);
       const trendCount = getTrendCount();
@@ -12971,19 +13148,17 @@
           skipAway: skipAwayValue,
           simultaneousMode: isSimultaneousMode(),
           campMode: isSimultaneousMode() ? "separate" : "combined",
+          stageMode: true,
+          matchCount: trendCount,
           reconstructionCount: trendCount,
-          trendSelectionMode: getTrendSelectionMode(),
-          highGoalQuantityEnabled: isHighGoalQuantityEnabled(),
-          trendToMeanEnabled: isTrendToMeanEnabled(),
-          meanToTrendEnabled: isMeanToTrendEnabled(),
+          assembleNullStages: isAssembleNullStagesEnabled(),
           includeExtra: isIncludeExtraEnabled(),
           includeExtraEnabled: isIncludeExtraEnabled(),
           regulationTimeLimitEnabled: isRegulationTimeLimitEnabled(),
-          reconstructionMode: getReconstructionMode(),
           rankEventStep: 1,
-          rankEventMode: "trend",
-          winnerMode: "trend",
-          trendMode: true,
+          rankEventMode: "stages",
+          winnerMode: "tie",
+          trendMode: false,
           trendCount,
         }),
       });
@@ -13164,10 +13339,156 @@
       `;
     }
 
+    function stageModeLabel(result) {
+      return `${campModeLabel(result)} · ${Number(result?.matchCount || 0)} Match${Number(result?.matchCount || 0) > 1 ? "s" : ""}${isAssembleNullStagesEnabled(result) ? " · Assemblage Étage Nul" : ""}`;
+    }
+
+    function renderStageRow(stage) {
+      const leader = stage?.leader || {};
+      const tieBreak = Boolean(leader?.tieBreakApplied);
+      const first = leader?.firstOccurrence || {};
+      return `
+        <div class="stage-row">
+          <div class="stage-score-box">
+            <div class="stage-score-label">ÉTAGE</div>
+            <div class="stage-score">${esc(stage?.score || "—")}</div>
+          </div>
+          <div class="stage-main">
+            <div class="stage-statline">
+              <span>Buts dans l’étage</span>
+              <strong>${esc(Number(stage?.goalCount || 0))}</strong>
+            </div>
+            <div class="stage-leader">
+              ${esc(leader?.name || "Joueur inconnu")}
+              <span class="stage-leader-count">${esc(Number(leader?.count || 0))} but${Number(leader?.count || 0) > 1 ? "s" : ""}</span>
+            </div>
+            <div class="stage-camp">Camp : ${esc(leader?.camp || "—")}${tieBreak ? " · départagé par première occurrence chronologique" : ""}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderStageGroup(group) {
+      const stages = Array.isArray(group?.stages) ? group.stages : [];
+      return `
+        <div class="stage-group">
+          <div class="stage-group-head">
+            <div class="stage-group-title">${esc(group?.label || "Étages")}</div>
+            <div class="stage-group-count">${esc(Number(group?.stageCount || stages.length))} étage${Number(group?.stageCount || stages.length) > 1 ? "s" : ""} · ${esc(Number(group?.goalCount || 0))} but${Number(group?.goalCount || 0) > 1 ? "s" : ""}</div>
+          </div>
+          <div class="stage-list">
+            ${stages.length ? stages.map(renderStageRow).join("") : '<div class="stage-empty">Aucun étage dans ce groupe.</div>'}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderStageMatches(matches) {
+      const rows = (matches || []).map((match, index) => `
+        <div class="match-row">
+          <div class="row-number match-number-badge"><span class="match-index">${index + 1}</span></div>
+          <div class="row-main">
+            <div class="row-title match-title-with-badges">${esc(match?.label || "Match")}</div>
+            <div class="row-sub stage-match-meta">${esc(match?.competition || "Toutes Compétitions")} · Score ${esc(match?.sourceScoreLabel || "—")} · ${esc(Number(match?.recoverableGoalCount || 0))} but${Number(match?.recoverableGoalCount || 0) > 1 ? "s" : ""} récupéré${Number(match?.recoverableGoalCount || 0) > 1 ? "s" : ""}${match?.knownExtraTimePenalty ? " · Extra" : ""}</div>
+          </div>
+        </div>
+      `).join("");
+      return `
+        <details class="clean events-details trend-matches-details">
+          <summary class="events-summary">
+            <span class="events-summary-label">MATCHS UTILISÉS</span>
+            <span class="count-pill events-count-pill">${esc((matches || []).length)}</span>
+          </summary>
+          <div class="trend-matches-panel">
+            <div class="match-list">${rows || "Aucun match trouvé."}</div>
+          </div>
+        </details>
+      `;
+    }
+
+    function renderStageTeam(team, side) {
+      const groups = Array.isArray(team?.stageGroups) ? team.stageGroups : [];
+      const sideClass = side === "Domicile" ? "side-home" : "side-away";
+      return `
+        <section class="team-card ${side === "Domicile" ? "team-card-home" : "team-card-away"} team-card-neutral">
+          <div class="team-hero">
+            <div class="side-pill ${sideClass}">${esc(String(side || "").toUpperCase())}</div>
+            <div class="team-header-line">
+              <div class="logo-m">
+                <img src="${logoUrl(team.id)}" alt="" referrerpolicy="no-referrer" data-team-id="${team.id}" onerror="__logoErr(this)" />
+              </div>
+              <div>
+                <div class="team-name">${esc(String(team.name || "—").toUpperCase())}</div>
+                <div class="team-meta">${esc(Number(team?.matchCount || (team?.matchesUsed || []).length))} Match${Number(team?.matchCount || (team?.matchesUsed || []).length) > 1 ? "s" : ""} · ${esc(Number(team?.stageGoalCount || 0))} But${Number(team?.stageGoalCount || 0) > 1 ? "s" : ""} classé${Number(team?.stageGoalCount || 0) > 1 ? "s" : ""}</div>
+              </div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">ÉTAGES</div>
+            ${groups.length ? groups.map(renderStageGroup).join("") : '<div class="stage-empty">Aucun étage trouvé.</div>'}
+          </div>
+          ${renderStageMatches(team?.matchesUsed || [])}
+        </section>
+      `;
+    }
+
+    function renderStageDataQuality(result) {
+      const count = Number(result?.dataQuality?.reliabilityIssueCount ?? result?.dataQuality?.invalidReconstructionIssueCount ?? 0);
+      if (!count) {
+        return `
+          <div class="data-quality-banner ok">
+            <div class="data-quality-main">✅ Historique fiable</div>
+          </div>
+        `;
+      }
+      return `
+        <div class="data-quality-banner">
+          <div class="data-quality-main">⚠️ Alerte fiabilité · ${esc(count)} ${pluralizeMatchCount(count)}</div>
+          <div class="data-quality-sub">Score hors 0-0 sans but récupérable, forfait, match arrêté ou commencé sans être terminé. Extra/TAB et matchs reportés avant le coup d’envoi ne déclenchent pas cette alerte.</div>
+        </div>
+      `;
+    }
+
+    function renderStageResult(result) {
+      const match = result?.match || {};
+      const globalNull = result?.globalNullStageGroup;
+      return `
+        <section class="summary">
+          <div class="summary-head">
+            <div class="summary-head-top">
+              <div class="summary-label summary-main-chip">RÉSUMÉ</div>
+              <div class="summary-label summary-mode">${esc(stageModeLabel(result))}</div>
+            </div>
+            <div class="summary-title summary-title-stacked">
+              <span class="summary-team-title summary-team-title-home">${esc(String(match?.homeTeam?.name || "").toUpperCase())}</span>
+              <span class="vs-echo v-neu s-neu" aria-label="VS">${Array.from({ length: 6 }, () => `<i class="ve-v">V</i>`).join("")}${Array.from({ length: 6 }, () => `<i class="ve-s">S</i>`).join("")}</span>
+              <span class="summary-team-title summary-team-title-away">${esc(String(match?.awayTeam?.name || "").toUpperCase())}</span>
+            </div>
+          </div>
+          <div class="stage-equality-box">
+            <div class="stage-equality-label">RÉSULTAT PROVISOIRE</div>
+            <div class="stage-equality-value">ÉGALITÉ</div>
+            <div class="stage-equality-meta">Aucune règle de gagnant n’est appliquée pour le moment.</div>
+          </div>
+          <div class="stage-summary-note">Chaque étage regroupe les buts ayant créé le même score. Le joueur affiché est celui qui revient le plus souvent ; en cas d’égalité, la première occurrence chronologique est prioritaire.</div>
+          ${renderStageDataQuality(result)}
+        </section>
+        ${renderStageTeam(result.home || {}, "Domicile")}
+        ${globalNull ? `<section class="team-card team-card-neutral stage-global-null"><div class="section"><div class="section-title">ASSEMBLAGE ÉTAGE NUL</div>${renderStageGroup(globalNull)}</div></section>` : ""}
+        <div class="vs-divider v-neu s-neu"><span class="vsb-v">V</span><span class="vsb-s">S</span></div>
+        ${renderStageTeam(result.away || {}, "Extérieur")}
+      `;
+    }
+
     function renderResult(result) {
       if (!result) return;
 
       updateHero(result.match, result);
+
+      if (result.stageMode) {
+        $("result").innerHTML = renderStageResult(result);
+        return;
+      }
 
       if (result.trendMode) {
         $("result").innerHTML = renderTrendResult(result);
@@ -14580,6 +14901,86 @@
       return lines.join("\n");
     };
 
+    /* v254 : rapport compatible système Étages */
+    const __fsEntryToSimpleTextBeforeStages = entryToSimpleText;
+    const __fsEntryToTextBeforeStages = entryToText;
+
+    function stageReportGroupLines(group, compact = false) {
+      const stages = Array.isArray(group?.stages) ? group.stages : [];
+      if (compact) {
+        return [`${group?.label || "Étages"} : ${stages.length} étage${stages.length > 1 ? "s" : ""} · ${Number(group?.goalCount || 0)} but${Number(group?.goalCount || 0) > 1 ? "s" : ""}`];
+      }
+      const lines = [`${group?.label || "Étages"} :`];
+      if (!stages.length) {
+        lines.push("- Aucun étage");
+        return lines;
+      }
+      stages.forEach((stage) => {
+        const leader = stage?.leader || {};
+        lines.push(`- Étage ${stage?.score || "—"} · ${Number(stage?.goalCount || 0)} but(s) · ${leader?.name || "Joueur inconnu"} : ${Number(leader?.count || 0)} · Camp ${leader?.camp || "—"}${leader?.tieBreakApplied ? " · départage première occurrence" : ""}`);
+      });
+      return lines;
+    }
+
+    function stageReportTeamLines(team, side, compact = false) {
+      const groups = Array.isArray(team?.stageGroups) ? team.stageGroups : [];
+      if (compact) {
+        return [`${side} : ${team?.name || "—"} · ${Number(team?.matchCount || 0)} match(s) · ${Number(team?.stageGoalCount || 0)} but(s) classé(s) · ${groups.reduce((sum, group) => sum + Number(group?.stageCount || 0), 0)} étage(s)`];
+      }
+      const lines = [`${String(side || "").toUpperCase()} — ${team?.name || "—"}`, `Matchs utilisés : ${Number(team?.matchCount || 0)}`];
+      groups.forEach((group) => lines.push(...stageReportGroupLines(group, false)));
+      return lines;
+    }
+
+    entryToSimpleText = function(entry, index) {
+      const result = entry?.result;
+      if (!result?.stageMode) return __fsEntryToSimpleTextBeforeStages(entry, index);
+      const date = new Date(entry.createdAt).toLocaleString("fr-FR");
+      const lines = [];
+      lines.push(`ANALYSE ${index + 1}`);
+      lines.push(date);
+      lines.push(`${result.match?.homeTeam?.name || "—"} vs ${result.match?.awayTeam?.name || "—"}`);
+      lines.push(`Mode : ${campModeLabel(result)} · ${Number(result.matchCount || 0)} match(s) · Assemblage Étage Nul ${result.assembleNullStages ? "activé" : "désactivé"}`);
+      lines.push("Résultat provisoire : ÉGALITÉ");
+      lines.push(...stageReportTeamLines(result.home, "Domicile", true));
+      if (result.globalNullStageGroup) lines.push(...stageReportGroupLines(result.globalNullStageGroup, true));
+      lines.push(...stageReportTeamLines(result.away, "Extérieur", true));
+      lines.push("────────────────────────");
+      lines.push("");
+      return lines.join("\n");
+    };
+
+    entryToText = function(entry, index) {
+      const result = entry?.result;
+      if (!result?.stageMode) return __fsEntryToTextBeforeStages(entry, index);
+      const date = new Date(entry.createdAt).toLocaleString("fr-FR");
+      const lines = [];
+      lines.push(`ANALYSE ${index + 1}`);
+      lines.push(`Date : ${date}`);
+      lines.push(`Match : ${result.match?.homeTeam?.name || "—"} vs ${result.match?.awayTeam?.name || "—"}`);
+      lines.push(`Matchs : ${Number(result.matchCount || 0)}`);
+      lines.push(`Mode : ${campModeLabel(result)}`);
+      lines.push(`Assemblage Étage Nul : ${result.assembleNullStages ? "Activé" : "Désactivé"}`);
+      lines.push(`Extra : ${extraModeLabel(result)}`);
+      lines.push(`Temps : ${regulationTimeLimitLabel(result)}`);
+      lines.push("");
+      lines.push("RÉSULTAT PROVISOIRE : ÉGALITÉ");
+      lines.push("Aucune règle de gagnant n’est appliquée pour le moment.");
+      lines.push("");
+      lines.push(...stageReportTeamLines(result.home, "Domicile", false));
+      if (result.globalNullStageGroup) {
+        lines.push("");
+        lines.push(...stageReportGroupLines(result.globalNullStageGroup, false));
+      }
+      lines.push("");
+      lines.push(...stageReportTeamLines(result.away, "Extérieur", false));
+      lines.push("");
+      lines.push("RÈGLE ÉTAGE : même score + même groupe de camp. Joueur dominant = plus grand nombre de buts ; égalité départagée par la première occurrence chronologique.");
+      lines.push("────────────────────────");
+      lines.push("");
+      return lines.join("\n");
+    };
+
     async function handleScan() {
       const button = $("scanBtn");
       if (button.disabled || button.classList.contains("scan-kick")) return;
@@ -14734,9 +15135,7 @@
       if ($("reconstructionMode")) $("reconstructionMode").checked = false;
       if ($("includeExtraEnabled")) $("includeExtraEnabled").checked = false;
       if ($("regulationTimeLimitEnabled")) $("regulationTimeLimitEnabled").checked = true;
-      if ($("highGoalQuantityEnabled")) $("highGoalQuantityEnabled").checked = true;
-      if ($("trendToMeanEnabled")) $("trendToMeanEnabled").checked = false;
-      if ($("meanToTrendEnabled")) $("meanToTrendEnabled").checked = true;
+      if ($("assembleNullStages")) $("assembleNullStages").checked = false;
     }
 
     applyDefaultScanSettings();
