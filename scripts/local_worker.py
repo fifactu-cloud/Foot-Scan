@@ -3190,6 +3190,14 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id, incl
         except Exception:
             clean_added = 0
 
+        player = inc.get("player") or {}
+        player_name = player.get("name") or player.get("shortName") or player.get("slug") or "Joueur inconnu"
+        player_id = player.get("id")
+        if own_goal:
+            scorer_is_analyzed_team = own_goal_committed_by_analyzed_team(inc, match, analyzed_team_id)
+        else:
+            scorer_is_analyzed_team = incident_belongs_to_analyzed_team(inc, match, analyzed_team_id)
+
         goals.append({
             "isZeroZero": False,
             "minute": clean_minute,
@@ -3203,6 +3211,9 @@ def collect_reconstruction_goal_entries(match, incidents, analyzed_team_id, incl
             "opponentAttackDelta": 0 if goal_for_team or own_goal else 1,
             "goalForTeam": bool(goal_for_team),
             "ownGoal": bool(own_goal),
+            "playerId": player_id,
+            "playerName": str(player_name),
+            "scorerCamp": "team" if scorer_is_analyzed_team else "opponent",
             "teamScore": float(team_score),
             "opponentScore": float(opponent_score),
             "attackScore": float(attack_score),
@@ -4900,6 +4911,566 @@ def summarize_reconstruction_samples(samples, selection=None):
     }
 
 
+def stage_score_label(a, b):
+    return f"{reconstruction_number_label(a)}-{reconstruction_number_label(b)}"
+
+
+def stage_occurrence_sort_key(occurrence):
+    if not isinstance(occurrence, dict):
+        return (0, 0, 0, 0, 0, "")
+    chrono = occurrence.get("chronoKey") or [0, 0, 0, 0]
+    if not isinstance(chrono, (list, tuple)):
+        chrono = [0, 0, 0, 0]
+    padded = list(chrono)[:4] + [0, 0, 0, 0]
+    return (
+        int(occurrence.get("sourceStartTimestamp") or 0),
+        int(padded[0] or 0),
+        int(padded[1] or 0),
+        int(padded[2] or 0),
+        int(padded[3] or 0),
+        str(occurrence.get("sourceMatchId") or ""),
+    )
+
+
+def build_stage_occurrences(source_records, source_role, camp_key, camp_label):
+    """Transforme les buts offensifs d'un flux historique en occurrences d'étage.
+
+    source_role="team"      -> buts offensifs de l'équipe analysée.
+    source_role="opponent"  -> buts offensifs de ses adversaires historiques,
+                                lus du point de vue de l'adversaire qui marque.
+    Les CSC ne sont pas des buts offensifs et ne créent donc pas d'occurrence.
+    """
+    role = "opponent" if str(source_role or "").lower() == "opponent" else "team"
+    occurrences = []
+    for record in source_records or []:
+        if not reconstruction_source_is_complete(record):
+            continue
+        for goal in record.get("goals") or []:
+            if not isinstance(goal, dict) or goal.get("ownGoal"):
+                continue
+            if role == "team":
+                if float(goal.get("attackDelta") or 0) <= 0:
+                    continue
+                score_for = float(goal.get("teamScore") or 0)
+                score_against = float(goal.get("opponentScore") or 0)
+            else:
+                if float(goal.get("opponentAttackDelta") or 0) <= 0:
+                    continue
+                score_for = float(goal.get("opponentScore") or 0)
+                score_against = float(goal.get("teamScore") or 0)
+
+            player_name = str(goal.get("playerName") or "Joueur inconnu").strip() or "Joueur inconnu"
+            player_id = goal.get("playerId")
+            player_key = f"id:{player_id}" if player_id not in (None, "") else f"name:{normalize_status_text(player_name)}:{goal.get('sourceMatchId')}:{goal.get('stateKey')}"
+            occurrences.append({
+                "scoreFor": score_for,
+                "scoreAgainst": score_against,
+                "scoreLabel": stage_score_label(score_for, score_against),
+                "isDraw": abs(score_for - score_against) <= 1e-9,
+                "playerId": player_id,
+                "playerKey": player_key,
+                "playerName": player_name,
+                "campKey": camp_key,
+                "campLabel": camp_label,
+                "sourceRole": role,
+                "sourceMatchId": goal.get("sourceMatchId"),
+                "sourceLabel": goal.get("sourceLabel"),
+                "sourceCompetition": goal.get("sourceCompetition"),
+                "sourceStartTimestamp": int(goal.get("sourceStartTimestamp") or 0),
+                "minute": int(goal.get("minute") or 0),
+                "added": int(goal.get("added") or 0),
+                "minuteLabel": goal.get("minuteLabel") or "—",
+                "chronoKey": list(goal.get("chronoKey") or [0, 0, 0, 0]),
+                "ownGoal": False,
+            })
+    return occurrences
+
+
+def aggregate_stage_occurrences(occurrences, group_key, group_label):
+    """Regroupe score + camp logique et calcule le joueur dominant de l'étage.
+
+    Priorité : plus grand nombre d'occurrences, puis première occurrence
+    chronologique la plus ancienne. C'est le départage demandé par l'utilisateur.
+    """
+    buckets = {}
+    for occurrence in occurrences or []:
+        if not isinstance(occurrence, dict):
+            continue
+        score = str(occurrence.get("scoreLabel") or "0-0")
+        bucket = buckets.setdefault(score, {
+            "score": score,
+            "scoreFor": float(occurrence.get("scoreFor") or 0),
+            "scoreAgainst": float(occurrence.get("scoreAgainst") or 0),
+            "isDraw": bool(occurrence.get("isDraw")),
+            "groupKey": group_key,
+            "groupLabel": group_label,
+            "occurrences": [],
+        })
+        bucket["occurrences"].append(occurrence)
+
+    stages = []
+    for bucket in buckets.values():
+        player_stats = {}
+        for occurrence in bucket["occurrences"]:
+            pkey = occurrence.get("playerKey") or f"unknown:{len(player_stats)}"
+            stat = player_stats.setdefault(pkey, {
+                "playerId": occurrence.get("playerId"),
+                "name": occurrence.get("playerName") or "Joueur inconnu",
+                "count": 0,
+                "firstOccurrence": occurrence,
+                "campCounts": {},
+                "campFirst": {},
+            })
+            stat["count"] += 1
+            camp_key = occurrence.get("campKey") or "unknown"
+            camp_label = occurrence.get("campLabel") or "Camp inconnu"
+            stat["campCounts"].setdefault(camp_key, {"label": camp_label, "count": 0})
+            stat["campCounts"][camp_key]["count"] += 1
+            if camp_key not in stat["campFirst"] or stage_occurrence_sort_key(occurrence) < stage_occurrence_sort_key(stat["campFirst"][camp_key]):
+                stat["campFirst"][camp_key] = occurrence
+            if stage_occurrence_sort_key(occurrence) < stage_occurrence_sort_key(stat["firstOccurrence"]):
+                stat["firstOccurrence"] = occurrence
+
+        ranked_players = []
+        for stat in player_stats.values():
+            camp_options = []
+            for ckey, cstat in stat["campCounts"].items():
+                first = stat["campFirst"].get(ckey) or stat["firstOccurrence"]
+                camp_options.append((
+                    -int(cstat.get("count") or 0),
+                    stage_occurrence_sort_key(first),
+                    str(cstat.get("label") or ""),
+                    ckey,
+                    cstat,
+                ))
+            camp_options.sort(key=lambda row: (row[0], row[1], row[2]))
+            chosen_camp = camp_options[0][4] if camp_options else {"label": "Camp inconnu", "count": 0}
+            first = stat["firstOccurrence"]
+            ranked_players.append({
+                "playerId": stat.get("playerId"),
+                "name": stat.get("name") or "Joueur inconnu",
+                "count": int(stat.get("count") or 0),
+                "camp": chosen_camp.get("label") or "Camp inconnu",
+                "firstOccurrence": {
+                    "matchId": first.get("sourceMatchId"),
+                    "match": first.get("sourceLabel"),
+                    "startTimestamp": first.get("sourceStartTimestamp") or 0,
+                    "minuteLabel": first.get("minuteLabel") or "—",
+                },
+                "_sort": stage_occurrence_sort_key(first),
+            })
+
+        ranked_players.sort(key=lambda row: (-int(row.get("count") or 0), row.get("_sort"), normalize_status_text(row.get("name"))))
+        for row in ranked_players:
+            row.pop("_sort", None)
+        leader = ranked_players[0] if ranked_players else None
+        leader_tie_break_applied = bool(
+            leader and len(ranked_players) > 1
+            and int(ranked_players[1].get("count") or 0) == int(leader.get("count") or 0)
+        )
+        if leader:
+            leader["tieBreakApplied"] = leader_tie_break_applied
+        stages.append({
+            "score": bucket["score"],
+            "scoreFor": bucket["scoreFor"],
+            "scoreAgainst": bucket["scoreAgainst"],
+            "isDraw": bucket["isDraw"],
+            "groupKey": group_key,
+            "groupLabel": group_label,
+            "goalCount": len(bucket["occurrences"]),
+            "leader": leader,
+            "players": ranked_players,
+        })
+
+    stages.sort(key=lambda stage: (
+        float(stage.get("scoreFor") or 0) + float(stage.get("scoreAgainst") or 0),
+        float(stage.get("scoreFor") or 0),
+        float(stage.get("scoreAgainst") or 0),
+        str(stage.get("score") or ""),
+    ))
+    return stages
+
+
+def stage_matches_used_from_records(records):
+    rows = []
+    for record in records or []:
+        rows.append({
+            "id": record.get("id"),
+            "label": record.get("label"),
+            "competition": record.get("competition"),
+            "startTimestamp": record.get("startTimestamp") or 0,
+            "sourceScoreLabel": stage_score_label(record.get("finalHomeScore") or 0, record.get("finalAwayScore") or 0) if record.get("finalHomeScore") is not None and record.get("finalAwayScore") is not None else "—",
+            "recoverableGoalCount": int(record.get("recoverableGoalCount") or 0),
+            "assistDataStatus": record.get("assistDataStatus"),
+            "matchHasAssists": record.get("matchHasAssists"),
+            "knownExtraTimePenalty": bool(record.get("knownExtraTimePenalty")),
+        })
+    return rows
+
+
+def fetch_stage_team_matches(job_id, analyzed_team_id, skip, match_count, team_name, base_progress, progress_span, include_extra=False, regulation_time_limit=True):
+    """Récupère exactement N matchs historiques valides pour le système d'étages."""
+    target_valid = max(1, int(match_count))
+    skip = max(0, int(skip or 0))
+    pages = []
+    processed_ids = set()
+    valid_records = []
+    ignored_source_issues = []
+    administrative_matches_ignored = []
+    pages_loaded = 0
+    stopped_history = False
+
+    for page in range(PAGES_TO_LOAD):
+        if stopped_history:
+            break
+        update_scan_job(
+            job_id,
+            status="running",
+            message=f"{team_name} · Matchs · Page {page + 1}/{PAGES_TO_LOAD}",
+            progress=base_progress + int(progress_span * 0.10 * ((page + 1) / max(1, PAGES_TO_LOAD))),
+        )
+        try:
+            data = get_json(f"team/{analyzed_team_id}/events/last/{page}")
+        except Exception as e:
+            text = str(e)
+            if "HTTP 404" in text or "Not Found" in text or pages:
+                stopped_history = True
+                break
+            raise
+        events = data.get("events") if isinstance(data, dict) else data
+        if not isinstance(events, list) or not events:
+            stopped_history = True
+            break
+        pages.extend(events)
+        pages_loaded = page + 1
+
+        unique = {}
+        for match in pages:
+            if not isinstance(match, dict) or not match.get("id"):
+                continue
+            home_id = (match.get("homeTeam") or {}).get("id")
+            away_id = (match.get("awayTeam") or {}).get("id")
+            if home_id != analyzed_team_id and away_id != analyzed_team_id:
+                continue
+            unique[match.get("id")] = match
+        ordered = sorted(unique.values(), key=lambda m: (m.get("startTimestamp") or 0, m.get("id") or 0), reverse=True)
+
+        pending = [match for match in ordered if match.get("id") not in processed_ids]
+        for idx, match in enumerate(pending):
+            match_id = match.get("id")
+            processed_ids.add(match_id)
+            admin_reason = administrative_match_reason(match, include_extra=include_extra)
+            if admin_reason:
+                administrative_matches_ignored.append(make_administrative_match_issue(match, admin_reason))
+                continue
+
+            update_scan_job(
+                job_id,
+                status="running",
+                message=f"{team_name} · Match {min(len(processed_ids), skip + target_valid)}/{skip + target_valid}",
+                progress=base_progress + int(progress_span * (0.14 + 0.82 * min(1.0, len(processed_ids) / max(1, skip + target_valid + 6)))),
+            )
+            try:
+                incident_data = get_incidents_json(f"event/{match_id}/incidents")
+            except Exception as e:
+                err_text = str(e)
+                incident_data = {
+                    "_footscanIssue": {
+                        "type": "missing" if ("HTTP 404" in err_text or "Not Found" in err_text) else ("blocked" if ("challenge" in err_text or "HTTP 403" in err_text) else "error"),
+                        "reason": err_text,
+                    },
+                    "incidents": [],
+                }
+
+            issue = incident_data.get("_footscanIssue") if isinstance(incident_data, dict) else None
+            incidents = incident_data.get("incidents") if isinstance(incident_data, dict) else incident_data
+            if not isinstance(incidents, list):
+                incidents = []
+            known_extra_reason = resolve_extra_time_or_penalty_reason(match, incidents=incidents, fetch_event_detail=bool(issue) or not incidents)
+            source = collect_reconstruction_goal_entries(
+                match,
+                incidents,
+                analyzed_team_id,
+                include_extra=include_extra,
+                regulation_time_limit=regulation_time_limit,
+            )
+            source["knownExtraTimePenalty"] = bool(known_extra_reason)
+
+            if known_extra_reason and not include_extra:
+                # Extra/TAB exclus : remplacement silencieux, jamais d'alerte fiabilité.
+                ignored_source_issues.append({
+                    "id": match_id,
+                    "label": make_match_label(match),
+                    "competition": get_competition_name(match),
+                    "startTimestamp": match.get("startTimestamp") or 0,
+                    "type": "extra-time-penalties",
+                    "reason": known_extra_reason,
+                    "reliabilityWarning": False,
+                })
+                continue
+
+            if known_extra_reason and (issue or source.get("reconstructionGoalsIncomplete")):
+                # Avec Extra mais données Extra absentes/partielles : remplacement silencieux.
+                ignored_source_issues.append({
+                    "id": match_id,
+                    "label": make_match_label(match),
+                    "competition": get_competition_name(match),
+                    "startTimestamp": match.get("startTimestamp") or 0,
+                    "type": "extra-source-unavailable",
+                    "reason": issue.get("reason") if isinstance(issue, dict) else known_extra_reason,
+                    "reliabilityWarning": False,
+                })
+                continue
+
+            if issue and source.get("trueZeroZero"):
+                valid_records.append(source)
+            elif issue or source.get("reconstructionGoalsIncomplete"):
+                if source.get("noRecoverableGoals"):
+                    ignored_source_issues.append({
+                        "id": match_id,
+                        "label": make_match_label(match),
+                        "competition": get_competition_name(match),
+                        "startTimestamp": match.get("startTimestamp") or 0,
+                        "type": "no-recoverable-goals",
+                        "reason": issue.get("reason") if isinstance(issue, dict) else "Score hors 0-0 sans but récupérable",
+                        "reliabilityWarning": True,
+                    })
+                else:
+                    ignored_source_issues.append({
+                        "id": match_id,
+                        "label": make_match_label(match),
+                        "competition": get_competition_name(match),
+                        "startTimestamp": match.get("startTimestamp") or 0,
+                        "type": "partial-goals",
+                        "reason": issue.get("reason") if isinstance(issue, dict) else "Buts récupérés partiellement",
+                        "reliabilityWarning": False,
+                    })
+                continue
+            else:
+                valid_records.append(source)
+
+            valid_records.sort(key=lambda r: (r.get("startTimestamp") or 0, r.get("id") or 0), reverse=True)
+            if len(valid_records) >= skip + target_valid:
+                break
+
+        valid_records.sort(key=lambda r: (r.get("startTimestamp") or 0, r.get("id") or 0), reverse=True)
+        if len(valid_records) >= skip + target_valid:
+            break
+
+    chosen = valid_records[skip:skip + target_valid]
+    if len(chosen) < target_valid:
+        raise RuntimeError(f"{team_name}: pas assez de matchs valides ({len(chosen)}/{target_valid}).")
+
+    reliability_issues = [
+        issue for issue in ignored_source_issues
+        if isinstance(issue, dict) and (issue.get("reliabilityWarning") is True or issue.get("type") == "no-recoverable-goals")
+    ]
+    reliability_issues.extend(
+        issue for issue in administrative_matches_ignored
+        if isinstance(issue, dict) and (issue.get("reliabilityWarning") is True or issue.get("type") in RELIABILITY_WARNING_ADMIN_TYPES)
+    )
+
+    return {
+        "sourceRecords": chosen,
+        "matchesUsed": stage_matches_used_from_records(chosen),
+        "matchCount": len(chosen),
+        "pagesLoaded": pages_loaded,
+        "ignoredSourceIssues": ignored_source_issues,
+        "administrativeMatchesIgnored": administrative_matches_ignored,
+        "reliabilityIssues": reliability_issues,
+        "reliabilityIssueCount": len(reliability_issues),
+        "eventDataIssueCount": 0,
+    }
+
+
+def split_draw_occurrences(occurrences):
+    draws = [row for row in occurrences or [] if row.get("isDraw")]
+    non_draws = [row for row in occurrences or [] if not row.get("isDraw")]
+    return draws, non_draws
+
+
+def stage_group_payload(occurrences, group_key, group_label):
+    stages = aggregate_stage_occurrences(occurrences, group_key, group_label)
+    return {
+        "key": group_key,
+        "label": group_label,
+        "goalCount": sum(int(stage.get("goalCount") or 0) for stage in stages),
+        "stageCount": len(stages),
+        "stages": stages,
+    }
+
+
+def process_stage_scan_job(job_id, params):
+    match_id = str(params.get("matchId") or "").strip()
+    match_count = int(float(params.get("matchCount") or params.get("reconstructionCount") or params.get("trendCount") or 9))
+    match_count = max(1, min(100, match_count))
+    skip_home = int(params.get("skipHome") or 0)
+    skip_away = int(params.get("skipAway") or 0)
+    camp_mode_raw = str(params.get("campMode") or "").strip().lower()
+    camp_mode = "combined" if camp_mode_raw in {"combined", "combine", "camp_combine", "camp-combiné"} else "separate"
+    include_extra_raw = params.get("includeExtra") if params.get("includeExtra") is not None else params.get("includeExtraEnabled")
+    include_extra = False if include_extra_raw is None else truthy_param(include_extra_raw)
+    regulation_time_limit = True if params.get("regulationTimeLimitEnabled") is None else truthy_param(params.get("regulationTimeLimitEnabled"))
+    assemble_null_stages = truthy_param(params.get("assembleNullStages"))
+
+    update_scan_job(job_id, status="running", message="Récupération Du Match Principal…", progress=5)
+    match_data = get_json(f"event/{match_id}")
+    match = match_data.get("event") if isinstance(match_data, dict) else match_data
+    if not isinstance(match, dict) or not match.get("homeTeam") or not match.get("awayTeam"):
+        raise RuntimeError("Format du match principal inattendu")
+
+    home_team = match["homeTeam"]
+    away_team = match["awayTeam"]
+    update_scan_job(job_id, status="running", message=f"Match trouvé : {home_team.get('name')} vs {away_team.get('name')} · {match_count} match(s)", progress=10)
+
+    home_scan = fetch_stage_team_matches(
+        job_id, home_team["id"], skip_home, match_count,
+        home_team.get("name") or "Domicile", 12, 40,
+        include_extra=include_extra, regulation_time_limit=regulation_time_limit,
+    )
+    away_scan = fetch_stage_team_matches(
+        job_id, away_team["id"], skip_away, match_count,
+        away_team.get("name") or "Extérieur", 54, 40,
+        include_extra=include_extra, regulation_time_limit=regulation_time_limit,
+    )
+
+    home_team_occ = build_stage_occurrences(home_scan["sourceRecords"], "team", "home-team", "Domicile")
+    home_opp_occ = build_stage_occurrences(home_scan["sourceRecords"], "opponent", "home-opponents", "Adversaire du Domicile")
+    away_team_occ = build_stage_occurrences(away_scan["sourceRecords"], "team", "away-team", "Extérieur")
+    away_opp_occ = build_stage_occurrences(away_scan["sourceRecords"], "opponent", "away-opponents", "Adversaire de l’Extérieur")
+
+    global_null_group = None
+    if camp_mode == "combined":
+        home_combined = home_team_occ + away_opp_occ
+        away_combined = away_team_occ + home_opp_occ
+        if assemble_null_stages:
+            home_draws, home_non_draws = split_draw_occurrences(home_combined)
+            away_draws, away_non_draws = split_draw_occurrences(away_combined)
+            home_groups = [stage_group_payload(home_non_draws, "home-combined", "Domicile + adversaires de l’Extérieur")]
+            away_groups = [stage_group_payload(away_non_draws, "away-combined", "Extérieur + adversaires du Domicile")]
+            global_null_group = stage_group_payload(
+                home_draws + away_draws,
+                "combined-null-global",
+                "Étages nuls assemblés · Domicile + Extérieur + tous leurs adversaires",
+            )
+        else:
+            home_groups = [stage_group_payload(home_combined, "home-combined", "Domicile + adversaires de l’Extérieur")]
+            away_groups = [stage_group_payload(away_combined, "away-combined", "Extérieur + adversaires du Domicile")]
+    else:
+        if assemble_null_stages:
+            home_team_draws, home_team_non = split_draw_occurrences(home_team_occ)
+            home_opp_draws, home_opp_non = split_draw_occurrences(home_opp_occ)
+            away_team_draws, away_team_non = split_draw_occurrences(away_team_occ)
+            away_opp_draws, away_opp_non = split_draw_occurrences(away_opp_occ)
+            home_groups = [
+                stage_group_payload(home_team_non, "home-team", "Domicile"),
+                stage_group_payload(home_opp_non, "home-opponents", "Adversaires du Domicile"),
+                stage_group_payload(home_team_draws + home_opp_draws, "home-null-mixed", "Étages nuls assemblés · Domicile + ses adversaires"),
+            ]
+            away_groups = [
+                stage_group_payload(away_team_non, "away-team", "Extérieur"),
+                stage_group_payload(away_opp_non, "away-opponents", "Adversaires de l’Extérieur"),
+                stage_group_payload(away_team_draws + away_opp_draws, "away-null-mixed", "Étages nuls assemblés · Extérieur + ses adversaires"),
+            ]
+        else:
+            home_groups = [
+                stage_group_payload(home_team_occ, "home-team", "Domicile"),
+                stage_group_payload(home_opp_occ, "home-opponents", "Adversaires du Domicile"),
+            ]
+            away_groups = [
+                stage_group_payload(away_team_occ, "away-team", "Extérieur"),
+                stage_group_payload(away_opp_occ, "away-opponents", "Adversaires de l’Extérieur"),
+            ]
+
+    # Supprime les groupes complètement vides pour garder un affichage compact.
+    home_groups = [group for group in home_groups if group.get("stageCount") or group.get("goalCount")]
+    away_groups = [group for group in away_groups if group.get("stageCount") or group.get("goalCount")]
+    if global_null_group and not global_null_group.get("stageCount"):
+        global_null_group = None
+
+    reliability_issues = list(home_scan.get("reliabilityIssues") or []) + list(away_scan.get("reliabilityIssues") or [])
+    data_quality = {
+        "isPartial": False,
+        "eventDataIssueCount": 0,
+        "homeIssueCount": 0,
+        "awayIssueCount": 0,
+        "invalidReconstructionIssueCount": len(reliability_issues),
+        "reliabilityIssueCount": len(reliability_issues),
+        "reliabilityIssues": reliability_issues,
+        "invalidReconstructionIssues": reliability_issues,
+        "message": (
+            f"⚠️ Alerte fiabilité : {len(reliability_issues)} match(s) spécial(aux) rencontré(s)."
+            if reliability_issues else
+            "Scan complet : aucun cas spécial de fiabilité rencontré."
+        ),
+    }
+
+    result = {
+        "stageMode": True,
+        "trendMode": False,
+        "matchCount": match_count,
+        "reconstructionCount": match_count,
+        "campMode": camp_mode,
+        "simultaneousMode": camp_mode == "separate",
+        "scanModeLabel": "Camp Séparé" if camp_mode == "separate" else "Camp Combiné",
+        "assembleNullStages": bool(assemble_null_stages),
+        "includeExtra": bool(include_extra),
+        "includeExtraEnabled": bool(include_extra),
+        "regulationTimeLimitEnabled": bool(regulation_time_limit),
+        "winner": {
+            "type": "tie",
+            "side": "tie",
+            "label": "Égalité",
+            "provisional": True,
+            "reason": "Gagnant non défini pour le moment",
+        },
+        "trendWinner": {
+            "type": "tie",
+            "side": "tie",
+            "label": "Égalité",
+            "score": 0,
+            "diff": 0,
+            "provisional": True,
+            "modeLabel": "Gagnant non défini",
+        },
+        "match": {
+            "id": match.get("id"),
+            "homeTeam": home_team,
+            "awayTeam": away_team,
+            "startTimestamp": match.get("startTimestamp"),
+            "label": make_match_label(match),
+        },
+        "home": {
+            **home_team,
+            "matchCount": home_scan.get("matchCount"),
+            "matchesUsed": home_scan.get("matchesUsed") or [],
+            "stageGroups": home_groups,
+            "stageGoalCount": sum(int(group.get("goalCount") or 0) for group in home_groups),
+            "reliabilityIssueCount": home_scan.get("reliabilityIssueCount") or 0,
+        },
+        "away": {
+            **away_team,
+            "matchCount": away_scan.get("matchCount"),
+            "matchesUsed": away_scan.get("matchesUsed") or [],
+            "stageGroups": away_groups,
+            "stageGoalCount": sum(int(group.get("goalCount") or 0) for group in away_groups),
+            "reliabilityIssueCount": away_scan.get("reliabilityIssueCount") or 0,
+        },
+        "globalNullStageGroup": global_null_group,
+        "dataQuality": data_quality,
+        "config": {
+            "system": "score-stages",
+            "matchCount": match_count,
+            "campMode": camp_mode,
+            "assembleNullStages": bool(assemble_null_stages),
+            "tieBreak": "highest_count_then_earliest_first_occurrence",
+            "winnerRule": "provisional_tie_only",
+        },
+    }
+
+    update_scan_job(job_id, status="done", message="🏟️ Scan étages terminé.", progress=100, result=result, finishedAt=now_ts())
+    print(f"✅ Scan étages terminé: {job_id} · {match_count} match(s) · résultat provisoire Égalité")
+
 def process_trend_scan_job(job_id, params):
     match_id = str(params.get("matchId") or "").strip()
     reconstruction_count = int(float(params.get("reconstructionCount") or params.get("trendCount") or params.get("rank1") or 9))
@@ -5257,6 +5828,14 @@ def process_scan_job(job_id):
     except Exception:
         pass
 
+    if params.get("stageMode"):
+        try:
+            process_stage_scan_job(job_id, params)
+        except Exception as e:
+            update_scan_job(job_id, status="error", message="Erreur pendant le scan étages.", progress=100, error=str(e))
+            print(f"ERREUR scan étages {job_id}: {e}", file=sys.stderr)
+        return
+
     if params.get("trendMode") or params.get("trendCount") is not None:
         try:
             process_trend_scan_job(job_id, params)
@@ -5545,11 +6124,11 @@ def main():
     print("Foot/Scan worker local démarré.")
     print("Version niveau 1: 🔎 scan complet côté worker activé.")
     print("Pages Web: 10 Pages d’abord, extension automatique à 15 puis 20 si nécessaire.")
-    print("Camp combiné: attaque contextuelle + attaque contextuelle de l'adversaire de l'adversaire, 0-0 inclus.")
-    print("Camp séparé: score complet attaque + défense de chaque reconstitution.")
+    print("Camp combiné: étages attaque équipe analysée + attaque des adversaires de l’autre équipe analysée.")
+    print("Camp séparé: étages de l’équipe analysée et de ses adversaires conservés séparément.")
     print("Option B: scan progressif 15 → 17 → 20 matchs activé.")
     print("Liaison scan: lecture directe prioritaire + attente courte v244.")
-    print("Système tendance: curseur 1-100, extra configurable, limitation temps réglementaire configurable.")
+    print("Système étages: curseur 1-100 match(s), extra configurable, assemblage des étages nuls configurable.")
     print("Événements: buts uniquement (But Avec Passeur, But Sans Passeur, CSC / Erreur). Cartons et passes seules ignorés.")
     print("Stabilité réseau: retry Web + matchs sans événements SofaScore signalés clairement.")
     print("Préchargement événements: désactivé par défaut pour économiser les requêtes.")
